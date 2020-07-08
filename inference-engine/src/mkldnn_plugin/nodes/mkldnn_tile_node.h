@@ -8,11 +8,15 @@
 #include <mkldnn_node.h>
 #include <string>
 
+#include "common/tile_broadcast_utils.h"
+#include <ngraph/op/tile.hpp>
+
 namespace MKLDNNPlugin {
 
-class MKLDNNTileNode : public MKLDNNNode {
+class MKLDNNTileNode : public MKLDNNNode, public TileBroadcastCommon {
 public:
     MKLDNNTileNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
+    ~MKLDNNTileNode() override = default;
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;

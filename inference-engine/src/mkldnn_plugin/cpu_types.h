@@ -98,7 +98,8 @@ enum Type {
     ExtractImagePatches,
     NonMaxSuppression,
     MatrixNms,
-    MulticlassNms
+    MulticlassNms,
+    ReduceSumSquare
 };
 
 enum Algorithm {

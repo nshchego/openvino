@@ -3,14 +3,10 @@
 //
 
 #include "mkldnn_tile_node.h"
-#include <string>
-#include <mkldnn_types.h>
-#include <mkldnn_extension_utils.h>
-#include "common/cpu_memcpy.h"
-#include <ngraph/opsets/opset1.hpp>
 
-using namespace mkldnn;
+using namespace InferenceEngine;
 using namespace MKLDNNPlugin;
+
 using namespace InferenceEngine;
 
 bool MKLDNNTileNode::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {

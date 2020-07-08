@@ -115,7 +115,6 @@ std::string CPUTestsBase::impls2str(const std::vector<std::string> &priority) {
 
 void CPUTestsBase::CheckPluginRelatedResults(InferenceEngine::ExecutableNetwork &execNet, std::string nodeType) const {
     if (nodeType.empty()) return;
-
     ASSERT_TRUE(!selectedType.empty()) << "Node type is not defined.";
     InferenceEngine::CNNNetwork execGraphInfo = execNet.GetExecGraphInfo();
     auto function = execGraphInfo.getFunction();

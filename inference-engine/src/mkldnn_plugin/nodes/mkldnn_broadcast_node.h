@@ -10,15 +10,19 @@
 #include <memory>
 #include <vector>
 
+#include "common/tile_broadcast_utils.h"
+#include <ngraph/op/broadcast.hpp>
+
 namespace MKLDNNPlugin {
 
-class MKLDNNBroadcastNode : public MKLDNNNode {
+class MKLDNNBroadcastNode : public MKLDNNNode, public TileBroadcastCommon {
 public:
     MKLDNNBroadcastNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
+    ~MKLDNNBroadcastNode() override = default;
 
-    void getSupportedDescriptors() override {};
+    void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
-    void createPrimitive() override {};
+    void createPrimitive() override;
     void execute(mkldnn::stream strm) override;
     bool created() const override;
 
