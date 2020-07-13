@@ -45,6 +45,7 @@
 #include "ngraph/runtime/reference/convolution.hpp"
 #include "ngraph/runtime/reference/cos.hpp"
 #include "ngraph/runtime/reference/cosh.hpp"
+#include "ngraph/runtime/reference/ctc_loss.hpp"
 #include "ngraph/runtime/reference/cum_sum.hpp"
 #include "ngraph/runtime/reference/dequantize.hpp"
 #include "ngraph/runtime/reference/dot.hpp"
@@ -427,6 +428,38 @@ protected:
             size_t element_count = shape_size(node.get_output_shape(0));
             reference::cosh<T>(
                 args[0]->get_data_ptr<const T>(), out[0]->get_data_ptr<T>(), element_count);
+            break;
+        }
+        case OP_TYPEID::CTCLoss_v4:
+        {
+            const op::CTCLoss* ctc_loss =
+                static_cast<const op::CTCLoss*>(&node);
+            auto t_int = node.get_input_element_type(1);
+            if (t_int == element::i32) {
+                reference::CTCLoss<T, int32_t>(
+                    args[0]->get_data_ptr<const T>(),
+                    ctc_loss->get_input_shape(0),
+                    args[1]->get_data_ptr<const int32_t>(),
+                    args[2]->get_data_ptr<const int32_t>(),
+                    args[3]->get_data_ptr<const int32_t>(),
+                    args.size() > 4 ? args[4]->get_data_ptr<const int32_t>() : nullptr,
+                    ctc_loss->get_preprocess_collapse_repeated(),
+                    ctc_loss->get_ctc_merge_repeated(),
+                    ctc_loss->get_unique(),
+                    out[0]->get_data_ptr<T>());
+            } else if (t_int == element::i64) {
+                reference::CTCLoss<T, int64_t>(
+                    args[0]->get_data_ptr<const T>(),
+                    ctc_loss->get_input_shape(0),
+                    args[1]->get_data_ptr<const int64_t>(),
+                    args[2]->get_data_ptr<const int64_t>(),
+                    args[3]->get_data_ptr<const int64_t>(),
+                    args.size() > 4 ? args[4]->get_data_ptr<const int64_t>() : nullptr,
+                    ctc_loss->get_preprocess_collapse_repeated(),
+                    ctc_loss->get_ctc_merge_repeated(),
+                    ctc_loss->get_unique(),
+                    out[0]->get_data_ptr<T>());
+            }
             break;
         }
         case OP_TYPEID::CumSum:
