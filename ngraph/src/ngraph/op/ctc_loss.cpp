@@ -173,31 +173,23 @@ void op::CTCLoss::validate_and_infer_types()
                 " and: ",
                 time_steps);
         }
-        else if (labels_pshape[1].is_static())
-        {
-            time_steps = labels_pshape.to_shape()[1];
-            is_time_steps_set = true;
-        }
     }
 
     if (label_length_pshape.is_static())
     {
-        if (is_batch_size_set)
-        {
-            NODE_VALIDATION_CHECK(
-                this,
-                label_length_pshape[0].compatible(batch_size),
-                "The first dimension of label length must be equal to the first dimension ",
-                "of the logits, the logit length and labels. Got: ",
-                label_length_pshape[0],
-                " and: ",
-                batch_size);
-        }
-        else if (label_length_pshape[0].is_static())
+        if (!is_batch_size_set && label_length_pshape[0].is_static())
         {
             batch_size = label_length_pshape.to_shape()[0];
             is_batch_size_set = true;
         }
+        NODE_VALIDATION_CHECK(
+            this,
+            label_length_pshape[0].compatible(batch_size),
+            "The first dimension of label length must be equal to the first dimension ",
+            "of the logits, the logit length and labels. Got: ",
+            label_length_pshape[0],
+            " and: ",
+            batch_size);
     }
 
     // set output shape
