@@ -74,6 +74,49 @@ public:
     }
 
 protected:
+    struct PathNode {
+        PathNode() {
+            _children.reserve(3);
+        }
+
+        PathNode* initialize(size_t depth, int64_t targetId, float logProbability, bool isBlank = false) {
+            _children.clear();
+            _depth = depth;
+            _targetId = targetId;
+            _logProbability = logProbability;
+            _isBlank = isBlank;
+
+            return this;
+        }
+
+        std::vector<PathNode*> _children;
+        size_t _depth;
+        int64_t _targetId;
+        float _logProbability;
+        bool _isBlank;
+    }
+
+    struct NodesPull {
+        NodesPull(size_t size) : pull(std::vector<PathNode>(size)){
+            for (size_t i = 0lu; i < size; i++)
+                pullPointers.push_front(&pull[i]);
+        }
+        PathNode* getNode() {
+            if (pullPointers.empty())
+                // Something went wrong. Throw exception?
+                return nullptr;
+            auto res = pullPointers.begin();
+            pullPointers.pop_front();
+            return res;
+        }
+        void returnNode(PathNode* nodePtr) {
+            pullPointers.push_front(nodePtr);
+        }
+    protected:
+        std::vector<PathNode> pull;
+        std::forward_list<PathNode*> pullPointers;
+    }
+
     template<typename I1>
     StatusCode processData(
                 std::vector<Blob::Ptr>& inputs,
@@ -177,6 +220,7 @@ protected:
                 for (size_t c = 0; c < classesNum; c++) {
                     kExp += std::exp(logits[btcT + c]);
                 }
+                // Not all are required. Add filter and check performance
                 for (size_t s = 0; s < decodedTargetLen; s++) {
                     logProb = logits[btcT + targetD[s]] - std::log(kExp);
                     logProbabilities[t].insert({targetD[s], logProb});
@@ -185,8 +229,77 @@ protected:
                 logProbabilities[t].insert({blankIndex, logProb});
             }
 
+
             const auto float_inf = std::numeric_limits<float>::infinity();
-            size_t work_amount = actualLogitLen - decodedTargetLen + 1lu;
+            float lnSum = -float_inf;
+            auto sumLogs = [](float log1, float log2) {
+                if (log1 == -float_inf) {
+                    return log2;
+                } else if (log2 != -float_inf) {
+                    if (log1 > log2)
+                        return log1 + std::log1pf(std::exp(log2 - log1));
+                    else
+                        return log2 + std::log1pf(std::exp(log1 - log2));
+                }
+            }
+
+            const size_t singleTargetDepth = actualLogitLen - decodedTargetLen + 1lu;
+            const size_t lastTargetID = decodedTargetLen - 1lu;
+
+            NodesPull nodesPull(actualLogitLen * 3);
+            PathNode* zeroNode = nodesPull.getNode()->initialize(0, -1, -float_inf);
+            std::vector<PathNode*> pathStack;
+            pathStack.reserve(actualLogitLen);
+
+            zeroNode->_children.push_back(nodesPull.getNode()->initialize(0, 0,
+                logProbabilities[0].find(blankIndex)->second));
+            PathNode* currentNode = nodesPull.getNode()->initialize(0, 0,
+                logProbabilities[0].find(targetD[0])->second);
+            pathStack.push_back(zeroNode);
+            pathStack.push_back(currentNode);
+
+            while(!pathStack.empty()) {
+                size_t nextDepth = currentNode->_depth + 1;
+                if (nextDepth == actualLogitLen) {
+                    if (currentNode->_targetId == lastTargetID) {
+                        sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId])->second);
+                        sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second);
+                    } else {
+                        sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId + 1])->second);
+                    }
+
+                    while (!pathStack.empty()) {
+                        nodesPull.returnNode(pathStack.back());
+                        pathStack.pop_back();
+                        if (pathStack.empty() || !pathStack.back()->_children.empty())
+                            break;
+                    }
+                    if (pathStack.empty())
+                        break;
+                    currentNode = pathStack.back();
+                } else {
+                    if (currentNode->_targetId + singleTargetDepth > currentNode->_depth)
+                        currentNode->_children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId,
+                            currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId])->second));
+
+                    if (currentNode->_isBlank) {
+                        currentNode->_children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId,
+                            currentNode->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second), true);
+                    } else {
+                        currentNode->_children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId + 1,
+                            currentNode->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second), true);
+                        currentNode->_children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId + 1,
+                            currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId + 1])->second));
+                    }
+
+                    pathStack.push_back(currentNode->_children.back());
+                    currentNode->_children.pop_back();
+                    currentNode = pathStack.back();
+                }
+            }
+
+
+/*            size_t work_amount = actualLogitLen - decodedTargetLen + 1lu;
             std::vector<float> sumPerThread(parallel_get_max_threads(), -float_inf);
 
             // Looking for aligned paths
@@ -311,8 +424,8 @@ protected:
                     }
                 }
             }; // thread_body
-
-            parallel_nt(0, thread_body);
+*/
+/*            parallel_nt(0, thread_body);
 
             float res = -float_inf;
 
@@ -325,7 +438,7 @@ protected:
                     else
                         res = sum + std::log1pf(std::exp(res - sum));
                 }
-            }
+            }*/
 
             dstData[b] = -res;
         } // for (size_t b = 0; b < batchNum; b++)
