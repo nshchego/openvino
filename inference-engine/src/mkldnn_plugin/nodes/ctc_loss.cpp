@@ -260,31 +260,30 @@ std::cout << "getNode() pullPointers.empty()" << std::endl;
             if (singleTargetDepth > 0)
                 zeroNode->_children.push_back(nodesPull.getNode()->initialize(0, -1,
                     logProbabilities[0].find(blankIndex)->second, true));
-            PathNode* currentNode = nodesPull.getNode()->initialize(0, 0,
-                logProbabilities[0].find(targetD[0])->second);
             pathStack.push_back(zeroNode);
-            pathStack.push_back(currentNode);
-//std::cout << "s: " << (currentNode->_isBlank ? blankIndex : targetD[currentNode->_targetId]) << std::endl;
+            pathStack.push_back(nodesPull.getNode()->initialize(0, 0,
+                logProbabilities[0].find(targetD[0])->second));
+//std::cout << "s: " << (pathStack.back()->_isBlank ? blankIndex : targetD[pathStack.back()->_targetId]) << std::endl;
 
             while (!pathStack.empty()) {
-                int64_t nextDepth = currentNode->_depth + 1;
+                int64_t nextDepth = pathStack.back()->_depth + 1;
                 if (nextDepth == lastLogitID) {
-                    if (currentNode->_targetId == lastTargetID) {
-                        if (!currentNode->_isBlank) {
-                            lnSum = sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId])->second);
-//std::cout << "s: " <<  targetD[currentNode->_targetId] << std::endl;
+                    if (pathStack.back()->_targetId == lastTargetID) {
+                        if (!pathStack.back()->_isBlank) {
+                            lnSum = sumLogs(lnSum, pathStack.back()->_logProbability + logProbabilities[nextDepth].find(targetD[pathStack.back()->_targetId])->second);
+//std::cout << "s: " <<  targetD[pathStack.back()->_targetId] << std::endl;
 //std::cout << "lnSum: " << lnSum << std::endl;
-                            lnSum = sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second);
+                            lnSum = sumLogs(lnSum, pathStack.back()->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second);
 //std::cout << "s: " <<  blankIndex << std::endl;
 //std::cout << "lnSum: " << lnSum << std::endl;
                         } else {
-                            lnSum = sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second);
+                            lnSum = sumLogs(lnSum, pathStack.back()->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second);
 //std::cout << "s: " << blankIndex << std::endl;
 //std::cout << "lnSum: " << lnSum << std::endl;
 }
                     } else {
-                        lnSum = sumLogs(lnSum, currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId + 1])->second);
-//std::cout << "s: " <<  targetD[currentNode->_targetId + 1] << std::endl;
+                        lnSum = sumLogs(lnSum, pathStack.back()->_logProbability + logProbabilities[nextDepth].find(targetD[pathStack.back()->_targetId + 1])->second);
+//std::cout << "s: " <<  targetD[pathStack.back()->_targetId + 1] << std::endl;
 //std::cout << "lnSum: " << lnSum << std::endl;
                     }
 
@@ -299,28 +298,26 @@ std::cout << "getNode() pullPointers.empty()" << std::endl;
                     auto next = pathStack.back()->_children.back();
                     pathStack.back()->_children.pop_back();
                     pathStack.push_back(next);
-                    currentNode = pathStack.back();
-//std::cout << "s: " <<  (currentNode->_isBlank ? blankIndex : targetD[currentNode->_targetId]) << std::endl;
+//std::cout << "s: " <<  (pathStack.back()->_isBlank ? blankIndex : targetD[pathStack.back()->_targetId]) << std::endl;
                 } else {
                     auto& children = pathStack.back()->_children;
-                    if (currentNode->_targetId + singleTargetDepth > currentNode->_depth) {
+                    if (pathStack.back()->_targetId + singleTargetDepth > pathStack.back()->_depth) {
                         if (!pathStack.back()->_isBlank)
-                            children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId,
-                                currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId])->second));
-                        children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId,
-                            currentNode->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second, true));
-                        if (currentNode->_targetId < lastTargetID)
-                            children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId + 1,
-                                currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId + 1])->second));
-                    } else if (currentNode->_targetId + singleTargetDepth == currentNode->_depth) {
-                        children.push_back(nodesPull.getNode()->initialize(nextDepth, currentNode->_targetId + 1,
-                            currentNode->_logProbability + logProbabilities[nextDepth].find(targetD[currentNode->_targetId + 1])->second));
+                            children.push_back(nodesPull.getNode()->initialize(nextDepth, pathStack.back()->_targetId,
+                                pathStack.back()->_logProbability + logProbabilities[nextDepth].find(targetD[pathStack.back()->_targetId])->second));
+                        children.push_back(nodesPull.getNode()->initialize(nextDepth, pathStack.back()->_targetId,
+                            pathStack.back()->_logProbability + logProbabilities[nextDepth].find(blankIndex)->second, true));
+                        if (pathStack.back()->_targetId < lastTargetID)
+                            children.push_back(nodesPull.getNode()->initialize(nextDepth, pathStack.back()->_targetId + 1,
+                                pathStack.back()->_logProbability + logProbabilities[nextDepth].find(targetD[pathStack.back()->_targetId + 1])->second));
+                    } else if (pathStack.back()->_targetId + singleTargetDepth == pathStack.back()->_depth) {
+                        children.push_back(nodesPull.getNode()->initialize(nextDepth, pathStack.back()->_targetId + 1,
+                            pathStack.back()->_logProbability + logProbabilities[nextDepth].find(targetD[pathStack.back()->_targetId + 1])->second));
                     }
 
                     pathStack.push_back(pathStack.back()->_children.back());
                     children.pop_back();
-                    currentNode = pathStack.back();
-//std::cout << "s: " << (currentNode->_isBlank ? blankIndex : targetD[currentNode->_targetId]) << std::endl;
+//std::cout << "s: " << (pathStack.back()->_isBlank ? blankIndex : targetD[pathStack.back()->_targetId]) << std::endl;
                 }
             }
 
