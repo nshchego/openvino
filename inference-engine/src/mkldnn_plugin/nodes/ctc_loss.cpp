@@ -139,32 +139,28 @@ public:
             const size_t BTC = b * TC;
 
             // logProbabilities = ln_softmax[b][t][c] = logits[b][t][c] - ln(sum_c(exp(logits[b][t])))
-            // their
+            // their:
             // logProbabilities = ln_softmax[b][t][c] = logits[b][t][c] - maxLogit - ln(sum_c(exp(logits[b][t] - maxLogit)))
-            std::vector<std::unordered_map<size_t, float>> logProbabilities(actualLogitLen);
-            float logProb = 0.f, expSum = 0.f;
+            std::vector<std::vector<float>> logProbabilities(actualLogitLen, std::vector<float>(decodedTargetLen));
             for (size_t t = 0; t < actualLogitLen; t++) {
-                expSum = 0.f;
                 const size_t btcT = BTC + classesNum * t;
                 float maxLogit = -std::numeric_limits<float>::max();
                 for (size_t c = 0; c < classesNum; c++) {
                     if (logits[btcT + c] > maxLogit)
                         maxLogit = logits[btcT + c];
                 }
-                for (size_t c = 0; c < classesNum; c++) {
-                    expSum += std::exp(logits[btcT + c] - maxLogit);
+                double expSum = 0.0;
+                for (size_t c = 0lu; c < classesNum; c++) {
+                    expSum += std::exp(static_cast<double>(logits[btcT + c]) - maxLogit);
                 }
+                float addendum = -(static_cast<double>(maxLogit) + std::log(expSum));
                 for (size_t s = 0; s < decodedTargetLen; s++) {
-                    logProb = logits[btcT + targetD[s]] - maxLogit - std::log(expSum);
-                    logProbabilities[t].insert({targetD[s], logProb});
+                    logProbabilities[t][s] = logits[btcT + targetD[s]] + addendum;
                 }
-                logProb = logits[btcT + blankIndex] - maxLogit - std::log(expSum);
-                logProbabilities[t].insert({blankIndex, logProb});
             }
 
             const auto float_inf = std::numeric_limits<float>::infinity();
-//            size_t work_amount = actualLogitLen - decodedTargetLen + 1lu;
-//            std::vector<float> sumPerThread(parallel_get_max_threads(), -float_inf);
+
             auto sumLogs = [&float_inf](float log1, float log2) {
                 if (log1 == -float_inf) {
                     return log2;
@@ -178,104 +174,48 @@ public:
                 }
             };
 
-            std::vector<std::vector<float>> logAlpha(decodedTargetLen, std::vector<float>(actualLogitLen, -float_inf));
-
-            auto CalculateForwardVariables = [&]() {
-                logAlpha[0][0] = logProbabilities[0][blankIndex];
-                // Below, targetD[1] == labels[0]
-                auto label_0 = (decodedTargetLen > 1) ? targetD[1] : blankIndex;
-                logAlpha[1][0] = logProbabilities[0][label_0];
-
-                /*for (int t = 1; t < actualLogitLen; ++t) {
-                    // If there is not enough time to output the remaining labels or
-                    // some labels have been skipped, then let logAlpha(u, t) continue to
-                    // be kLogZero.
-                    for (int u = std::max(0, decodedTargetLen - (2 * (actualLogitLen - t)));
-                            u < std::min(decodedTargetLen, 2 * (t + 1)); ++u) {
-                        // Add in the u, t - 1 term.
-                        float sum_log_alpha = -float_inf;
-                        if (_ctcMergeRepeated || targetD[u] == blankIndex) {
-                            sum_log_alpha = logAlpha[u][t - 1];
-                        }
-
-                        // Add in the u - 1, t - 1 term.
-                        if (u > 0) {
-                            sum_log_alpha =
-                                sumLogs(sum_log_alpha, logAlpha[u - 1][t - 1]);
-                        }
-
-                        // Add in the u - 2, t - 1 term if targetD(u) != blank or targetD(u-2).
-                        if (u > 1) {
-                            const bool matching_labels_merge =
-                                _ctcMergeRepeated && (targetD[u] == targetD[u - 2]);
-                            if (targetD[u] != blankIndex && !matching_labels_merge) {
-                                sum_log_alpha =
-                                    sumLogs(sum_log_alpha, logAlpha[u - 2][t - 1]);
-                            }
-                        }
-                        // Multiply the summed alphas with the activation log probability.
-                        logAlpha[u][t] =
-                            logProbabilities[t][targetD[u]] + sum_log_alpha;
-                    }
-                }*/
-            };
-
             std::vector<std::vector<float>> logBeta(decodedTargetLen, std::vector<float>(actualLogitLen, -float_inf));
 
-            auto CalculateBackwardVariables = [&]() {
-                // Number of cols is the number of time steps =  number of cols in target.
-                // Matrix logBeta =
-                //    Matrix::Constant(targetD.size(), y.cols() - output_delay_,
-                // kLogZero);
-                for (int u = decodedTargetLen - 2; u < decodedTargetLen; u++)
-                    logBeta[u][actualLogitLen - 1] = 0.f;
+            for (int u = decodedTargetLen - 2; u < decodedTargetLen; u++)
+                logBeta[u][actualLogitLen - 1] = 0.f;
 
-                for (int t = actualLogitLen - 1 - 1; t >= 0; --t) {
-                    // If there is not enough time to output the remaining labels or
-                    // some labels have been skipped, then let logBeta(u, t) continue to
-                    // be kLogZero.
-                    for (int u = std::max(0, decodedTargetLen - (2 * (actualLogitLen - t)));
-                            u < std::min(decodedTargetLen, 2 * (t + 1)); u++) {
-                        // Begin (GravesTh) Eq 7.15
-                        // Add in the u, t + 1 term.
-                        if (_ctcMergeRepeated || targetD[u] == blankIndex) {
+            for (int t = actualLogitLen - 2; t >= 0; t--) {
+                for (int u = std::max(0, decodedTargetLen - (2 * (actualLogitLen - t)));
+                        u < std::min(decodedTargetLen, 2 * (t + 1)); u++) {
+                    if (_ctcMergeRepeated || targetD[u] == blankIndex) {
+                        logBeta[u][t] = sumLogs(logBeta[u][t],
+                            logBeta[u][t + 1] + logProbabilities[t + 1][u]);
+                    }
+
+                    if (u + 1 < decodedTargetLen) {
+                        logBeta[u][t] = sumLogs(logBeta[u][t],
+                            logBeta[u + 1][t + 1] + logProbabilities[t + 1][u + 1]);
+                    }
+
+                    if (u + 2 < decodedTargetLen) {
+                        const bool matching_labels_merge =
+                            _ctcMergeRepeated && (targetD[u] == targetD[u + 2]);
+                        if (targetD[u] != blankIndex && !matching_labels_merge) {
                             logBeta[u][t] = sumLogs(logBeta[u][t],
-                                logBeta[u][t + 1] + logProbabilities[t + 1][targetD[u]]);
-                        }
-
-                        // Add in the u + 1, t + 1 term.
-                        if (u + 1 < decodedTargetLen) {
-                            logBeta[u][t] = sumLogs(logBeta[u][t],
-                                logBeta[u + 1][t + 1] + logProbabilities[t + 1][targetD[u + 1]]);
-                        }
-
-                        // Add in the u + 2, t + 1 term if targetD(u) != blank or targetD(u+2).
-                        if (u + 2 < decodedTargetLen) {
-                            const bool matching_labels_merge =
-                                _ctcMergeRepeated && (targetD[u] == targetD[u + 2]);
-                            if (targetD[u] != blankIndex && !matching_labels_merge) {
-                                // Add in u + 2 term.
-                                logBeta[u][t] = sumLogs(logBeta[u][t],
-                                    logBeta[u + 2][t + 1] + logProbabilities[t + 1][targetD[u + 2]]);
-                            }
+                                logBeta[u + 2][t + 1] + logProbabilities[t + 1][u + 2]);
                         }
                     }
                 }
-            };
+            }
 
-            // Compute forward, backward.
-            // Forward variables.
-            CalculateForwardVariables();
-            // Backward variables.
-            CalculateBackwardVariables();
+            std::vector<float> logAlpha(decodedTargetLen, -float_inf);
 
-            // The loss is computed as the log(p(z|x)) between the target and
-            // prediction. Do lazy evaluation of log_prob here.
+            logAlpha[0] = logProbabilities[0][0];
+            size_t label_0 = (decodedTargetLen > 1) ? 1 : 0;
+            logAlpha[1] = logProbabilities[0][label_0];
+
             float log_p_z_x = -float_inf;
             for (int u = 0; u < decodedTargetLen; ++u) {
-                log_p_z_x = sumLogs(log_p_z_x, logAlpha[u][0] + logBeta[u][0]);
+                log_p_z_x = sumLogs(log_p_z_x, logAlpha[u] + logBeta[u][0]);
             }
 /*
+            size_t work_amount = actualLogitLen - decodedTargetLen + 1lu;
+            std::vector<float> sumPerThread(parallel_get_max_threads(), -float_inf);
             std::vector<size_t> opPerThread(parallel_get_max_threads(), 0lu);
 
 size_t outcomes_counter = 0;
