@@ -75,45 +75,58 @@ public:
             outputs[0]->getTensorDesc().getBlockingDesc().getOffsetPadding();
 
         const auto& logitsShape = inputs[0]->getTensorDesc().getDims();
-        const auto batchNum = logitsShape[0];
+        const size_t batchNum = logitsShape[0];
         const auto maxTime = logitsShape[1];
-        const auto classesNum = logitsShape[2];
+        const size_t classesNum = logitsShape[2];
 
         int blankIndex = classesNum - 1;
         if (inputs.size() > 4) {
             blankIndex = inputs[4]->cbuffer().as<const int*>()[0];
         }
 
-        std::vector<int> targetD(2 * maxTime + 1);
-
         const size_t TC = maxTime * classesNum;
 
-        auto thread_body = [&](const int ithr, const int nthr) {
+static unsigned c1 = 0, c2 = 0;
+static double t1 = 0.;
+static double t2 = 0.;
+
+        std::vector<std::vector<std::vector<float>>> logProbabilities(batchNum);
+        for (size_t b = 0lu; b < batchNum; b++) {
+            logProbabilities[b].resize(logitsLength[b]);
+            for (size_t ll = 0; ll < logitsLength[b]; ll++) {
+                logProbabilities[b][ll].resize(labelsLength[b] * 2 + 1);
+            }
+        }
+        std::vector<int> decodedTargetLenB(batchNum, 0);
+        std::vector<std::vector<int>> targetDB(batchNum);
+
+        auto threadBody_1 = [&](const int ithr, const int nthr) {
             size_t start(0lu), end(0lu);
             splitter(batchNum, nthr, ithr, start, end);
             if (start >= end)
                 return;
 
-        for (size_t b = start; b < end; b++) {
-            const int actualLogitLen = logitsLength[b];
-            const int actualTargetLen = labelsLength[b];
-            if (actualLogitLen < 0 || actualTargetLen < 0 || actualLogitLen > maxTime || actualTargetLen > maxTime
-                    || actualTargetLen > actualLogitLen) {
-                std::string errorMsg = _logPrefix + ". Logit or label length cannot be greater than max sequence length. "
-                    + "Also a label length cannot be greater than a logit length"
-                    + " and both cannot be negative.\nMaxSeqLen: "
-                    + std::to_string(maxTime) + "; Logit len: " + std::to_string(actualLogitLen)
-                    + "; Label len: " + std::to_string(actualTargetLen);
-                errorMsg.copy(resp->msg, sizeof(resp->msg) - 1);
-                returnCode = GENERAL_ERROR;
-                return;
-            }
+            for (size_t b = start; b < end; b++) {
+                const int actualLogitLen = logitsLength[b];
+                const int actualTargetLen = labelsLength[b];
+                size_t decodedTargetLen = 0lu;
+                if (actualLogitLen < 0 || actualTargetLen < 0 || actualLogitLen > maxTime || actualTargetLen > actualLogitLen) {
+                    std::string errorMsg = _logPrefix + ". Logit length cannot be greater than max sequence length. "
+                        + "Label length cannot be greater than a logit length"
+                        + " and both cannot be negative.\nMaxSeqLen: "
+                        + std::to_string(maxTime) + "; Logit len: " + std::to_string(actualLogitLen)
+                        + "; Label len: " + std::to_string(actualTargetLen);
+                    errorMsg.copy(resp->msg, sizeof(resp->msg) - 1);
+                    returnCode = GENERAL_ERROR;
+                    return;
+                }
 
-            const int* target = &labels[b * maxTime];
-            // Decoding target: merge repeated characters if preprocess_collapse_repeated == True,
-            // find unique elemnts if unique == True
-            // Target indices with blanks before each index and a blank at the end.
-            int decodedTargetLen = 0lu;
+                // Decoding target: merge repeated characters if preprocess_collapse_repeated == True,
+                // find unique elemnts if unique == True
+                // Target indices with blanks before each index and a blank at the end.
+                const int* target = &labels[b * maxTime];
+                targetDB[b].resize(actualTargetLen * 2 + 1);
+                auto& targetD = targetDB[b];
             if (_unique) {
                 std::unordered_set<int> uniqVals;
                 for (size_t t = 0lu; t < actualTargetLen; t++) {
@@ -145,40 +158,110 @@ public:
                 }
                 targetD[decodedTargetLen++] = blankIndex;
             }
+                decodedTargetLenB[b] = decodedTargetLen;
+            } // for batch
+        }; // threadBody_1
 
-            const size_t BTC = b * TC;
-
-            // logProbabilities = ln_softmax[b][t][c] = logits[b][t][c] - ln(sum_c(exp(logits[b][t])))
-            // their:
-            // logProbabilities = ln_softmax[b][t][c] = logits[b][t][c] - maxLogit - ln(sum_c(exp(logits[b][t] - maxLogit)))
-static unsigned c1 = 0;
-static double t1 = 0.;
-static double t2 = 0.;
-c1++;
+        parallel_nt(0, threadBody_1);
+//printf("threadBody_1 end\n");
+/*
+for (int b = 0; b < batchNum; b++) {
+    printf("B %d; decodedTargetLen: %d\ntargetD: ", b, decodedTargetLenB[b]);
+    for (int s = 0; s < decodedTargetLenB[b]; s++)
+        printf("%d; ", targetDB[b][s]);
+    printf("\n");
+}
+*/
+        auto threadBody_2 = [&](const int ithr, const int nthr) {
 auto start1 = std::chrono::steady_clock::now();
 
-            std::vector<std::vector<float>> logProbabilities(actualLogitLen, std::vector<float>(decodedTargetLen));
-            float maxLogit, expSum, addendum;
-            size_t btcT = BTC;
-            for (size_t t = 0lu; t < actualLogitLen; t++) {
-                maxLogit = -std::numeric_limits<float>::max();
-                for (size_t c = 0lu; c < classesNum; c++) {
-                    if (logits[btcT + c] > maxLogit)
-                        maxLogit = logits[btcT + c];
+            size_t start(0lu), end(0lu);
+            size_t sB(0lu), sT(0lu);
+//            if (batchNum >= nthr) {
+/*                splitter(batchNum, nthr, ithr, start, end);
+                if (start >= end)
+                    return;
+                sB = start;*/
+//            } else {
+                size_t workAmount = 0;
+                for (size_t b = 0; b < batchNum; b++)
+                    workAmount += logitsLength[b];
+                splitter(workAmount, nthr, ithr, start, end);
+                if (start >= end)
+                    return;
+                int64_t cw = 0, st = start;
+                for (; sB < batchNum; sB++) {
+                    cw += logitsLength[sB];
+                    if (cw >= st) {
+                        sT = logitsLength[sB] + st - cw;
+                        break;
+                    }
                 }
-                expSum = 0.f;
-                for (size_t c = 0lu; c < classesNum; c++) {
-                    expSum += std::exp(logits[btcT + c] - maxLogit);
-                }
-                addendum = -(maxLogit + std::log(expSum));
-                for (size_t s = 0; s < decodedTargetLen; s++) {
-                    logProbabilities[t][s] = logits[btcT + targetD[s]] + addendum;
-                }
-                btcT += classesNum;
-            }
+//            }
+//printf("ithr: %d; start: %lu; end: %lu; sB: %lu; sT: %lu\n", ithr, start, end, sB, sT);
+            size_t workCounter = start;
 
+            for (size_t b = sB; b < batchNum; b++) {
+                const size_t actualLogitLen = logitsLength[b];
+                const size_t BTC = b * TC;
+                auto& targetD = targetDB[b];
+
+//c1++;
+//auto start1 = std::chrono::steady_clock::now();
+
+                double expSum = 0.0;
+                size_t btcT = BTC + sT * classesNum;
+                size_t decodedTargetLen = decodedTargetLenB[b];
+                // logProbabilities = ln_softmax[b][t][c] = logits[b][t][c] - ln(sum_c(exp(logits[b][t])))
+                for (size_t t = sT; t < actualLogitLen; t++) {
+                    expSum = 0.0;
+                    for (size_t c = 0lu; c < classesNum; c++) {
+                        expSum += std::exp(logits[btcT + c]);
+                    }
+                    for (size_t s = 0; s < decodedTargetLen; s++) {
+                        logProbabilities[b][t][s] = logits[btcT + targetD[s]] - std::log(expSum);
+                    }
+                    btcT += classesNum;
+                    workCounter++;
+                    if (workCounter >= end) {
+//printf("end ithr %d: b: %lu; t: %lu\n", ithr, b, t);
+//c1++;
 auto end1 = std::chrono::steady_clock::now();
+/*t1 += std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count();
+if (c1 % 100 == 0) {
+    printf("T1: %f\n", t1 / c1);
+}*/
+//printf("T1: %f; ", static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count()));
+                        return;
+                    }
+                }
+                sT = 0lu;
+            }  // batch
+            }; // thread
+printf("\n");
+//c1++;
+//auto start1 = std::chrono::steady_clock::now();
+
+        parallel_nt(0, threadBody_2);
+
+/*auto end1 = std::chrono::steady_clock::now();
 t1 += std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count();
+if (c1 % 100 == 0) {
+    printf("T1: %f\n", t1 / c1);
+}*/
+
+/*for (int b = 0; b < batchNum; b++) {
+    std::cout << "B_" << b << std::endl;
+    for (int t = 0; t < logitsLength[b]; t++) {
+        for (int s = 0; s < decodedTargetLenB[b]; s++) {
+            std::cout << logProbabilities[b][t][s] << ";";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}*/
+
+//printf("threadBody_2 end\n");
 
             const auto float_inf = std::numeric_limits<float>::infinity();
 
@@ -195,8 +278,19 @@ t1 += std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count
                 }
             };
 
-auto start2 = std::chrono::steady_clock::now();
+        auto threadBody_3 = [&](const int ithr, const int nthr) {
+            size_t start(0lu), end(0lu);
+            splitter(batchNum, nthr, ithr, start, end);
+            if (start >= end)
+                return;
 
+        for (size_t b = start; b < end; b++) {
+//c2++;
+//auto start2 = std::chrono::steady_clock::now();
+
+            auto& targetD = targetDB[b];
+            int actualLogitLen = logitsLength[b];
+            int decodedTargetLen = decodedTargetLenB[b];
             std::vector<std::vector<float>> logBeta(decodedTargetLen, std::vector<float>(actualLogitLen, -float_inf));
 
             for (int u = decodedTargetLen - 2; u < decodedTargetLen; u++)
@@ -207,12 +301,12 @@ auto start2 = std::chrono::steady_clock::now();
                         u < std::min(decodedTargetLen, 2 * (t + 1)); u++) {
                     if (_ctcMergeRepeated || targetD[u] == blankIndex) {
                         logBeta[u][t] = sumLogs(logBeta[u][t],
-                            logBeta[u][t + 1] + logProbabilities[t + 1][u]);
+                            logBeta[u][t + 1] + logProbabilities[b][t + 1][u]);
                     }
 
                     if (u + 1 < decodedTargetLen) {
                         logBeta[u][t] = sumLogs(logBeta[u][t],
-                            logBeta[u + 1][t + 1] + logProbabilities[t + 1][u + 1]);
+                            logBeta[u + 1][t + 1] + logProbabilities[b][t + 1][u + 1]);
                     }
 
                     if (u + 2 < decodedTargetLen) {
@@ -220,32 +314,43 @@ auto start2 = std::chrono::steady_clock::now();
                             _ctcMergeRepeated && (targetD[u] == targetD[u + 2]);
                         if (targetD[u] != blankIndex && !matching_labels_merge) {
                             logBeta[u][t] = sumLogs(logBeta[u][t],
-                                logBeta[u + 2][t + 1] + logProbabilities[t + 1][u + 2]);
+                                logBeta[u + 2][t + 1] + logProbabilities[b][t + 1][u + 2]);
                         }
                     }
                 }
             }
+//printf("Final loop end\n");
 
             std::vector<float> logAlpha(decodedTargetLen, -float_inf);
 
-            logAlpha[0] = logProbabilities[0][0];
+            logAlpha[0] = logProbabilities[b][0][0];
             size_t label_0 = (decodedTargetLen > 1) ? 1 : 0;
-            logAlpha[1] = logProbabilities[0][label_0];
+            logAlpha[1] = logProbabilities[b][0][label_0];
 
-auto end2 = std::chrono::steady_clock::now();
+/*auto end2 = std::chrono::steady_clock::now();
 t2 += std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2).count();
 
-if (c1 % 100 == 0)
-    std::cout << "T1: " << t1 / c1 << "; T2: " << t2 / c1 << std::endl;
+if (c2 % 100 == 0)
+    std::cout << "T2: " << t2 / c1 << std::endl;*/
 
             float log_p_z_x = -float_inf;
             for (int u = 0; u < decodedTargetLen; ++u) {
                 log_p_z_x = sumLogs(log_p_z_x, logAlpha[u] + logBeta[u][0]);
             }
             dstData[b] = -log_p_z_x;
-            }
-        };
-        parallel_nt(0, thread_body);
+            } // batch
+        }; // threadBody_3
+
+c2++;
+auto start2 = std::chrono::steady_clock::now();
+
+        parallel_nt(0, threadBody_3);
+
+auto end2 = std::chrono::steady_clock::now();
+t2 += std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2).count();
+
+if (c2 % 100 == 0)
+    std::cout << "T2: " << t2 / c2 << std::endl;
 
         return returnCode;
     } // execute
