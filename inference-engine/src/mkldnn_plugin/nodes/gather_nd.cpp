@@ -65,6 +65,17 @@ public:
         for (int i = dataDims.size() - 2; i >= 0; i--)
             _srcMultipliers[i] = _srcMultipliers[i + 1] * dataDims[i + 1];
 
+        jitGatherNdConfT jpp;
+        jpp.batchNum = _batchNum;
+        jpp.sliceRank = _sliceRank;
+        jpp.batchStep = _batchStep;
+        jpp.cycles = layer->outData[0]->size() / (_batchNum * _blockSize);
+        jpp.dataSize = dataPrecision.size();
+        if ((dataPrecision == Precision::FP32 || dataPrecision == Precision::I32)
+                && (mayiuse(cpu::avx2) || mayiuse(cpu::avx512_common))) {
+            i32Kernel.reset(new jit_uni_permute_kernel_f32<cpu::avx2>(jpp));
+        }
+
         LayerConfig config;
         DataConfig dataConfig, indicesConfig, outConfig;
         dataConfig.desc = TensorDesc(dataPrecision, dataDims,
@@ -151,6 +162,7 @@ protected:
                             return;
                         }
                     }
+                    cStart = 0;
                     shiftedData += _batchStep;
                 }
             };
@@ -175,20 +187,32 @@ protected:
                 const dataType* shiftedData = data + bStart * _batchStep;
                 const int* shiftedIndices = indices + bStart * CS + cStart * _sliceRank;
                 dataType* shiftedDstData = dstData + bStart * CB + cStart * _blockSize;
-
-                for (size_t b = bStart; b < _batchNum; b++) {
-                    for (size_t j = cStart; j < cycles; j++) {
-                        size_t dataIdx = 0lu;
-                        for (size_t i = 0lu; i < _sliceRank; i++)
-                            dataIdx += srcMultipliers[i] * shiftedIndices[i];
-                        shiftedDstData[0] = shiftedData[dataIdx];
-                        shiftedDstData++;
-                        shiftedIndices += _sliceRank;
-                        if (++workCounter == end) {
-                            return;
+                if (i32Kernel != nullptr) {
+                    auto arg = jitArgsGatherND();
+                    arg.src = shiftedData;
+                    arg.dst = shiftedDstData;
+                    arg.indices = shiftedIndices;
+                    arg.multipliers = srcMultipliers.data();
+                    arg.bStart = bStart;
+                    arg.cStart = cStart;
+                    arg.workAmount = end - start;
+                    (*i32Kernel)(&arg);
+                } else {
+                    for (size_t b = bStart; b < _batchNum; b++) {
+                        for (size_t j = cStart; j < cycles; j++) {
+                            size_t dataIdx = 0lu;
+                            for (size_t i = 0lu; i < _sliceRank; i++)
+                                dataIdx += srcMultipliers[i] * shiftedIndices[i];
+                            shiftedDstData[0] = shiftedData[dataIdx];
+                            shiftedDstData++;
+                            shiftedIndices += _sliceRank;
+                            if (++workCounter == end) {
+                                return;
+                            }
                         }
+                        cStart = 0;
+                        shiftedData += _batchStep;
                     }
-                    shiftedData += _batchStep;
                 }
             };
 
@@ -206,8 +230,133 @@ protected:
     const size_t _indicesIndex = 1;
     std::vector<size_t> _srcMultipliers;
     std::string _errorPrefix;
+
+    std::shared_ptr<jitUniGatherNdKernel> i32Kernel;
 };
 
+#define GET_OFF(field) offsetof(jitArgsGatherND, field)
+
+struct jitGatherNdConfT {
+    uint32_t batchNum;
+    uint32_t batchStep;
+    uint32_t sliceRank;
+    uint32_t cycles;
+    uint32_t dataSize;
+};
+
+struct jitArgsGatherND {
+    const void* src;
+    void* dst;
+    const void* indices;
+    const void* multipliers;
+    uint32_t bStart;
+    uint32_t cStart;
+    uint32_t workAmount;
+};
+
+struct jitUniGatherNdKernel {
+    void (*ker_)(const jitArgsGatherND *);
+
+    void operator()(const jitArgsGatherND *args) { assert(ker_); ker_(args); }
+
+    jitGatherNdConfT jpp;
+
+    explicit jitUniGatherNdKernel(jitGatherNdConfT jpp) : ker_(nullptr), jpp(jpp) {}
+    virtual ~jitUniGatherNdKernel() {}
+};
+
+template <cpu::cpu_isa_t isa>
+struct jitUniGatherNdKernel_i32 : public jitUniGatherNdKernel, public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jitUniGatherNdKernel_i32)
+
+    explicit jitUniGatherNdKernel_i32(jitGatherNdConfT jpp) : jitUniGatherNdKernel(jpp), jit_generator() {
+        this->preamble();
+
+        mov(regSrc, ptr[regParams + GET_OFF(src)]);
+        mov(regDst, ptr[regParams + GET_OFF(dst)]);
+        mov(regIndices, ptr[regParams + GET_OFF(indices)]);
+        mov(regBatchIdx, ptr[regParams + GET_OFF(bStart)]);
+        mov(regCycleIdx, ptr[regParams + GET_OFF(cStart)]);
+        mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+
+        Xbyak::Label tailLabel;
+
+        const uint32_t dataStep = vlen / jpp.dataSize;
+        const uint32_t cycles = jpp.cycles / dataStep;
+
+        { // per batch
+            Xbyak::Label cLabel;
+            Xbyak::Label ceLabel;
+            const uint32_t iShift = vlen * jpp.sliceRank;
+            L(cLabel);
+            {
+                cmp(regCycleIdx, cycles);
+                jge(ceLabel, T_NEAR);
+
+                vpbrodcastd(vmmSrcIdx, 0);
+                // vmovd ?
+                vmovdqa(vmmIndicies, ptr[regIndices]);
+                mov(regMultipliers, ptr[regParams + GET_OFF(_multipliers)]);
+                // vmmSrcIdx += vmmMult * vmmIndicies;
+                for (int i = 0; i < jpp._sliceRank; i++) {
+                    vpbrodcastd(vmmMult, regMultipliers);
+                    vpmulld(vmmAcc, vmmMult, vmmIndicies);
+                    paddd(vmmSrcIdx, vmmAcc);
+                    add(regMultipliers, sizeof(int));
+                }
+                // uni_vmovups ?
+                //vmovdqa(vmmDst, ptr[regDst]);
+                vpgatherdd(vmmDst, regSrc, vmmSrcIdx); // Shift vmmSrc on vmmSrcIdx -> vmmDst;
+                vmovdqa(ptr[regDst], vmmDst);
+                
+                add(regDst, vlen); // Shift vmmDst on vlen;
+                add(regIndices, iShift); // Shift vmmIndicies on vlen * jpp._sliceRank;
+                
+                sub(regWorkAmount, dataStep);
+
+                add(regCycleIdx, dataStep);
+                jmp(cLabel, T_NEAR);
+            }
+            L(ceLabel);
+            cmp(regWorkAmount, dataStep);
+            jl(tailLabel, T_NEAR);
+
+            mov(regCycleIdx, 0);
+            add(regSrc, jpp._batchStep * jpp.dataSize);
+            jmp(cLabel, T_NEAR);
+        }
+
+        L(tailLabel);
+        const uint32_t restC = jpp.cycles % dataStep;
+        {
+
+        }
+
+        this->postamble();
+
+        ker_ = (decltype(ker_))this->getCode();
+    }
+
+private:
+    using Vmm = typename conditional3<isa == cpu::sse42, Xbyak::Xmm, isa == cpu::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
+    uint32_t vlen = cpu_isa_traits<isa>::vlen;
+
+    Xbyak::Reg64 regSrc = r8;
+    Xbyak::Reg64 regDst = r9;
+    Xbyak::Reg64 regIndices = r10;
+    Xbyak::Reg64 regMultipliers = r11;
+    Xbyak::Reg64 regBatchIdx = r12;
+    Xbyak::Reg64 regCycleIdx = r13;
+    Xbyak::Reg64 regWorkAmount = r14;
+
+    Xbyak::Reg64 regParams = abi_param1;
+
+    Vmm vmmDst = Vmm(0);
+    Vmm vmmIndicies = Vmm(1);
+    Vmm vmmSrcIdx = Vmm(2);
+    Vmm vmmMult = Vmm(3);
+    Vmm vmmAcc = Vmm(4);
+};
 
 REG_FACTORY_FOR(GatherNDImpl, GatherND);
 }  // namespace Cpu
