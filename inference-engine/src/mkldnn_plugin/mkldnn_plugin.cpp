@@ -39,6 +39,7 @@
 #include <transformations/op_conversions/convert_gelu.hpp>
 #include <transformations/op_conversions/hswish_decomposition.hpp>
 #include <transformations/op_conversions/hsigmoid_decomposition.hpp>
+#include <transformations/op_conversions/mvn6_decomposition.hpp>
 #include <transformations/op_conversions/reduce_l1_decomposition.hpp>
 #include <transformations/op_conversions/reduce_l2_decomposition.hpp>
 #include <transformations/op_conversions/convert_pad_to_group_conv.hpp>
@@ -113,8 +114,9 @@ static void Transformation(ICNNNetwork::Ptr& clonedNetwork, const Config& conf) 
     manager.register_pass<ngraph::pass::ConvertTensorIteratorToGRUSequence>();
     manager.register_pass<ngraph::pass::ConvertTensorIteratorToLSTMSequence>();
     manager.register_pass<ngraph::pass::ConvertTensorIteratorToRNNSequence>();
-    manager.register_pass<ngraph::pass::LSTMCellDecomposition>();
     manager.register_pass<ngraph::pass::GRUCellDecomposition>();
+    manager.register_pass<ngraph::pass::LSTMCellDecomposition>();
+    manager.register_pass<ngraph::pass::MVN6Decomposition>();
     manager.register_pass<ngraph::pass::RNNCellDecomposition>();
 
     std::vector<std::pair<ngraph::element::Type, ngraph::element::Type>> convert_precision_list{

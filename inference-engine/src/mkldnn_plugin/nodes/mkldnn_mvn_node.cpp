@@ -465,28 +465,37 @@ private:
 //////////////////////////////////////////////////////////////////////////////////
 
 MKLDNNMVNNode::MKLDNNMVNNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache)
-        : MKLDNNNode(layer, eng, cache) {}
+        : MKLDNNNode(layer, eng, cache), howEpsApplied_(inSqrt) {}
 
 void MKLDNNMVNNode::getSupportedDescriptors() {
     if (!descs.empty())
         return;
 
-    const auto& numOfDims = getParentEdgeAt(0)->getDims().ndims();
-    if (numOfDims < 1 || numOfDims > 5)
-        THROW_IE_EXCEPTION << "MVN layer with name '" << getCnnLayer()->name << "' doesn't support input with size of dimensions: " << numOfDims;
+    std::string errPrefix = "MVN node with name '" + getName() + "' ";
 
-    auto * mvnLayer = dynamic_cast<MVNLayer*>(getCnnLayer().get());
-    if (mvnLayer == nullptr)
-        THROW_IE_EXCEPTION << "Cannot convert MVN layer.";
+    auto cnnLayer = getCnnLayer();
+    if (cnnLayer == nullptr)
+        THROW_IE_EXCEPTION << errPrefix << "does not have CNN layer.";
 
     if (getParentEdges().size() != 1)
-        THROW_IE_EXCEPTION << "Incorrect number of input edges for layer " << getName();
-    if (getChildEdges().empty())
-        THROW_IE_EXCEPTION << "Incorrect number of output edges for layer " << getName();
+        THROW_IE_EXCEPTION << errPrefix << "has incorrect number of input edges.";
 
-    across_channels = mvnLayer->across_channels;
-    normalize_variance = mvnLayer->normalize;
-    eps = mvnLayer->GetParamAsFloat("eps");
+    if (getChildEdges().empty())
+        THROW_IE_EXCEPTION << errPrefix << "has incorrect number of output edges.";
+
+    const auto& numOfDims = getParentEdgeAt(0)->getDims().ndims();
+    if (numOfDims < 1 || numOfDims > 5)
+        THROW_IE_EXCEPTION << errPrefix << "doesn't support input with size of dimensions: " << numOfDims;
+
+    across_channels = cnnLayer->GetParamAsBool("across_channels", false);
+    normalize_variance = cnnLayer->GetParamAsBool("normalize_variance", true);
+    eps = cnnLayer->GetParamAsFloat("eps", 1e-9f);
+    auto howEpsApplied = cnnLayer->GetParamAsString("how_eps_applied", "");
+    if (details::CaselessEq<std::string>()(howEpsApplied, "in_sqrt")) {
+        howEpsApplied_ = inSqrt;
+    } else if (details::CaselessEq<std::string>()(howEpsApplied, "outside_sqrt")) {
+        howEpsApplied_ = outsideSqrt;
+    }
 }
 
 void MKLDNNMVNNode::initSupportedPrimitiveDescriptors() {
@@ -864,7 +873,11 @@ void MKLDNNMVNNode::mvn_pln(const in_data_t* src_data, out_data_t* dst_data, con
                         return variance_internal;
                     });
                 }
-                float variance = 1.f / sqrtf(variance_temp * C3inv + eps);
+                float variance = 1.f;
+                if (howEpsApplied_ == inSqrt)
+                    variance /= sqrtf(variance_temp * C3inv + eps);
+                else if (howEpsApplied_ == outsideSqrt)
+                    variance /= sqrtf(variance_temp * C3inv) + eps;
                 // mvn for one instance in batch
                 if (mvn_kernel) {
                     parallel_for(C, [&](int c) {
@@ -951,7 +964,10 @@ void MKLDNNMVNNode::mvn_pln(const in_data_t* src_data, out_data_t* dst_data, con
                         for (size_t tail = tail_per_channel; tail < C2; tail++) {
                             variance += (src_data[cc + tail] - mean) * (src_data[cc + tail] - mean);
                         }
-                        variance = 1.f / sqrtf(variance * C2inv + eps);
+                        if (howEpsApplied_ == inSqrt)
+                            variance = 1.f / sqrtf(variance * C2inv + eps);
+                        else if (howEpsApplied_ == outsideSqrt)
+                            variance = 1.f / (sqrtf(variance * C2inv) + eps);
 
                         // mvn for this channel
                         (*mvn_kernel)(&arg);
@@ -984,7 +1000,10 @@ void MKLDNNMVNNode::mvn_pln(const in_data_t* src_data, out_data_t* dst_data, con
                         for (size_t tail = 0lu; tail < C2; tail++) {
                             variance += (src_data[cc + tail] - mean) * (src_data[cc + tail] - mean);
                         }
-                        variance = 1.f / sqrtf(variance * C2inv + eps);
+                        if (howEpsApplied_ == inSqrt)
+                            variance = 1.f / sqrtf(variance * C2inv + eps);
+                        else if (howEpsApplied_ == outsideSqrt)
+                            variance = 1.f / (sqrtf(variance * C2inv) + eps);
 
                         // mvn for this channel
                         for (size_t tail = 0lu; tail < C2; tail++) {
@@ -1115,7 +1134,11 @@ void MKLDNNMVNNode::mvn_blk(const in_data_t* src_data, out_data_t* dst_data, con
                     return variance_internal;
                 });
 
-                float variance = 1.f / sqrtf(variance_temp * C5inv + eps);
+                float variance = 1.f;
+                if (howEpsApplied_ == inSqrt)
+                    variance /= sqrtf(variance_temp * C5inv + eps);
+                else if (howEpsApplied_ == outsideSqrt)
+                    variance /= sqrtf(variance_temp * C5inv) + eps;
                 // mvn for one instance in batch
                 parallel_for3d(CB, D, H, [&](size_t cb, size_t d, size_t h) {
                     size_t ccbd = ccb + cb * C2 + d * C1 + h * C0;
@@ -1251,8 +1274,12 @@ void MKLDNNMVNNode::mvn_blk(const in_data_t* src_data, out_data_t* dst_data, con
                         for (size_t c = 0; c < C; c++)
                             variance_buffer[c] += variance_buffer[c + aux_buffer_size * i];
                     }
-                    for (size_t c = 0; c < C; c++)
-                        variance_buffer[c] = 1.f / sqrtf(variance_buffer[c] * size_inv + eps);
+                    for (size_t c = 0; c < C; c++) {
+                        if (howEpsApplied_ == inSqrt)
+                            variance_buffer[c] = 1.f / sqrtf(variance_buffer[c] * size_inv + eps);
+                        else if (howEpsApplied_ == outsideSqrt)
+                            variance_buffer[c] = 1.f / (sqrtf(variance_buffer[c] * size_inv) + eps);
+                    }
                 }
 
                 for (size_t cb = tail_cb_start; cb < tail_cb_end; cb++) {
@@ -1276,7 +1303,10 @@ void MKLDNNMVNNode::mvn_blk(const in_data_t* src_data, out_data_t* dst_data, con
                                 }
                             }
                         }
-                        variance_buffer_ptr[c] = 1.f / sqrtf(variance_buffer_ptr[c] * size_inv + eps);
+                        if (howEpsApplied_ == inSqrt)
+                            variance_buffer_ptr[c] = 1.f / sqrtf(variance_buffer_ptr[c] * size_inv + eps);
+                        else if (howEpsApplied_ == outsideSqrt)
+                            variance_buffer_ptr[c] = 1.f / (sqrtf(variance_buffer_ptr[c] * size_inv) + eps);
                     }
                 }
 

@@ -48,4 +48,3 @@ const auto MvnCases = ::testing::Combine(
 );
 
 INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
-

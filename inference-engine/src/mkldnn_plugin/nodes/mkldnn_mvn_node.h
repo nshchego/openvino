@@ -94,6 +94,11 @@ private:
     bool across_channels = false;
     bool normalize_variance = true;
     float eps = 1e-9f;
+    enum epsType {
+        inSqrt,
+        outsideSqrt
+    };
+    epsType howEpsApplied_;
 
     InferenceEngine::Precision input_prec, output_prec;
     size_t src_data_size, dst_data_size;
