@@ -15,6 +15,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
     InferenceEngine::Precision::FP16
 };
+std::vector<bool> mergeRepeated{true, false};
 
 const auto basicCases = ::testing::Combine(
     ::testing::ValuesIn(netPrecisions),
@@ -23,11 +24,13 @@ const auto basicCases = ::testing::Combine(
     ::testing::Values(InferenceEngine::Layout::ANY),
     ::testing::Values(InferenceEngine::Layout::ANY),
     ::testing::Values(std::vector<size_t>({ 10, 1, 16 }),
-                      std::vector<size_t>({ 20, 2, 8 })),
-    ::testing::Values(true/*, false - current implementation of CPU greedy decoder always merge_repeated */),
+                      std::vector<size_t>({ 20, 2, 8 }),
+                      std::vector<size_t>({ 20, 2, 256 }),
+                      std::vector<size_t>({ 20, 2, 50 })),
+    ::testing::ValuesIn(mergeRepeated),
     ::testing::Values(CommonTestUtils::DEVICE_CPU));
 
-INSTANTIATE_TEST_CASE_P(smoke_CTC_Greedy_decoder_Basic, CTCGreedyDecoderLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke_CtcGreedyDecoderBasic, CTCGreedyDecoderLayerTest,
                         basicCases,
                         CTCGreedyDecoderLayerTest::getTestCaseName);
 }  // namespace
