@@ -4,6 +4,12 @@
 
 #include "base.hpp"
 #include "ie_parallel.hpp"
+#include "jit_generator.hpp"
+#include "common/cpu_memcpy.h"
+#include <mkldnn_types.h>
+#include <mkldnn_extension_utils.h>
+#include <ie_common.h>
+#include <mkldnn_node.h>
 
 #include <cmath>
 #include <vector>
@@ -14,17 +20,204 @@ namespace InferenceEngine {
 namespace Extensions {
 namespace Cpu {
 
+using namespace mkldnn;
+using namespace MKLDNNPlugin;
+using namespace mkldnn::impl;
+using namespace mkldnn::impl::cpu;
+using namespace mkldnn::impl::utils;
+
+struct jitGreedyDecoderConfT {
+    int classesNum;
+};
+
+struct jitArgsGreedyDecoder {
+    const float* probs;
+    float* tmpDst;
+    int* maxClassIdx;
+    float* tmpVal;
+};
+
+struct jitUniGreedyDecoderBase {
+    void (*ker_)(const jitArgsGreedyDecoder *);
+    void operator()(const jitArgsGreedyDecoder *args) { assert(ker_); ker_(args); }
+    jitGreedyDecoderConfT jpp;
+    explicit jitUniGreedyDecoderBase(jitGreedyDecoderConfT jpp) : ker_(nullptr), jpp(jpp) {}
+    virtual ~jitUniGreedyDecoderBase() {}
+};
+
+#define GET_OFF(field) offsetof(jitArgsGreedyDecoder, field)
+
+template <cpu::cpu_isa_t isa>
+struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jitUniGreedyDecoderKernel)
+
+    explicit jitUniGreedyDecoderKernel(jitGreedyDecoderConfT jpp) : jitUniGreedyDecoderBase(jpp), jit_generator() {
+        this->preamble();
+
+        mov(regProbs, ptr[regParams + GET_OFF(probs)]);
+//        mov(regTmpDst, ptr[regParams + GET_OFF(tmpDst)]);
+        mov(regMaxClassIdx, ptr[regParams + GET_OFF(maxClassIdx)]);
+
+        const uint32_t dataTypeSize = sizeof(float);
+        const uint32_t elPerVector = vlen / dataTypeSize;
+        const int tailLen = jpp.classesNum % elPerVector;
+        mov(regMaxIdx, 0);
+
+        if (jpp.classesNum >= elPerVector) {
+            uni_vmovups(vmmFirstV, ptr[regProbs]);
+            broadcastMax(vmmFirstV);
+            vpcmpeqd(vmmOnes, vmmOnes, vmmOnes);
+            const int iterations = jpp.classesNum / elPerVector;
+            for (int i = 1; i < iterations; i++) {
+                Xbyak::Label loopLabel1;
+                add(regProbs, vlen);
+                uni_vmovups(vmmFirstV, ptr[regProbs]);
+                vcmpps(vmmGrtMask, vmmFirstV, vmmMaxVec, jit_generator::_cmp_nle_us);
+                vptest(vmmGrtMask, vmmOnes);
+                jz(loopLabel1, T_NEAR);
+                vmaxps(vmmFirstV, vmmFirstV, vmmMaxVec);
+                broadcastMax(vmmFirstV);
+                mov(regMaxIdx, i);
+                L(loopLabel1);
+            }
+        }
+
+        Xbyak::Label foundLabel, lookWithStep;
+        // Tail
+        if (tailLen > 0) {
+            if (jpp.classesNum > elPerVector) {
+                add(regProbs, vlen);
+            }
+            uni_vmovups(vmmFirstV, ptr[regProbs]);
+            mov(regTmp, 0);
+            mov(regTmpVal, -1);
+            int c = 0;
+            for (int x = 0; x < 2; x++) {
+                vextractf128(xmm8, vmmFirstV, x);
+                if (jpp.classesNum < elPerVector && x == 0) {
+                    extractps(regMaxProb, xmm8, 0);
+                }
+                for (int i = 0; i < 4 && c < tailLen; i++, c++) {
+                    Xbyak::Label setLabel;
+                    Xbyak::Label nextLabel;
+                    extractps(regCurProb, xmm8, i);
+                    cmp(regCurProb, regMaxProb);
+                    jg(setLabel, T_NEAR);
+                    jmp(nextLabel, T_NEAR);
+                    L(setLabel);
+                    mov(regMaxProb, regCurProb);
+                    mov(regTmpVal, regTmp);
+                    L(nextLabel);
+                    inc(regTmp);
+                }
+            }
+            Xbyak::Label foundInTail;
+            cmp(regTmpVal, -1);
+            jg(foundInTail, T_NEAR);
+            jmp(lookWithStep);
+            L(foundInTail);
+            add(regTmpVal, (jpp.classesNum - tailLen));
+            mov(regMaxIdx, regTmpVal);
+            jmp(foundLabel, T_NEAR);
+        }
+
+        L(lookWithStep);
+        mov(regProbs, ptr[regParams + GET_OFF(probs)]);
+        mov(rax, elPerVector);
+        mul(regMaxIdx);
+        mov(regMaxIdx, eax);
+
+        mov(rax, dataTypeSize);
+        mul(regMaxIdx);
+        add(regProbs, eax);
+        uni_vmovups(vmmFirstV, ptr[regProbs]);
+//        uni_vmovups(ptr[regTmpDst], vmmFirstV);
+        mov(regTmp, 0);
+        for (int x = 0; x < 2; x++) {
+            vextractf128(xmm8, vmmFirstV, x);
+            for (int i = 0; i < 4; i++) {
+                Xbyak::Label setLabel1;
+                Xbyak::Label nextLabel1;
+                extractps(regCurProb, xmm8, i);
+                cmp(regCurProb, regMaxProb);
+                je(setLabel1, T_NEAR);
+                jmp(nextLabel1, T_NEAR);
+                L(setLabel1);
+                add(regMaxIdx, regTmp);
+                jmp(foundLabel, T_NEAR);
+                L(nextLabel1);
+                add(regTmp, 1);
+            }
+        }
+
+        L(foundLabel);
+
+        mov(ptr[regMaxClassIdx], regMaxIdx);
+
+        this->postamble();
+
+        ker_ = (decltype(ker_))this->getCode();
+    }
+
+    void broadcastMax(const Xbyak::Ymm& src) {
+        vextractf128(xmm8, src, 0);
+        vextractf128(xmm9, src, 1);
+        vmaxps(xmm8, xmm9);
+        extractps(regMaxProb, xmm8, 0);
+        vinsertps(xmm9, xmm8, xmm8, 0x0);
+        for (int i = 1; i < 4; i++) {
+            Xbyak::Label setLabel;
+            Xbyak::Label nextLabel;
+            extractps(regCurProb, xmm8, i);
+            cmp(regCurProb, regMaxProb);
+            jg(setLabel, T_NEAR);
+            jmp(nextLabel, T_NEAR);
+            L(setLabel);
+            mov(regMaxProb, regCurProb);
+            vinsertps(xmm9, xmm8, xmm8, i << 6);
+            L(nextLabel);
+        }
+        vbroadcastss(vmmMaxVec, xmm9);
+    }
+
+private:
+    using Vmm = typename conditional3<isa == cpu::sse42, Xbyak::Xmm, isa == cpu::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
+    uint32_t vlen = cpu_isa_traits<isa>::vlen;
+
+    Xbyak::Reg64 regProbs = r8;
+    Xbyak::Reg64 regTmpDst = r9;
+    Xbyak::Reg64 regMaxProb = r10;
+    Xbyak::Reg64 regCurProb = r11;
+    Xbyak::Reg64 regMaxIdx = r12;
+    Xbyak::Reg64 regMaxClassIdx = r13;
+    Xbyak::Reg64 regTmpVal = r14;
+    Xbyak::Reg64 regTmp = r15;
+
+    Xbyak::Fpu regSt0 = st0;
+    Xbyak::Fpu regSt1 = st1;
+
+    Xbyak::Reg64 regParams = abi_param1;
+
+    Xbyak::Xmm xmm8 = Xbyak::Xmm(8);
+    Xbyak::Xmm xmm9 = Xbyak::Xmm(9);
+    Vmm vmmFirstV = Vmm(0);
+    Vmm vmmSecondV = Vmm(1);
+    Vmm vmmGrtMask = Vmm(2);
+    Vmm vmmOnes = Vmm(3);
+    Vmm vmmMaxVec = Vmm(4);
+//    Vmm vmmOnes = Vmm(5);
+//    Vmm vmmIndicesSteps = Vmm(7);
+};
+
 class CTCGreedyDecoderImpl: public ExtLayerBase {
 public:
-    explicit CTCGreedyDecoderImpl(const CNNLayer* layer) : mergeRepeated_(true), isVersion1_(false) {
+    explicit CTCGreedyDecoderImpl(const CNNLayer* layer) : mergeRepeated_(true) {
         try {
             std::string errPrefix = "CTCGreedyDecoder layer with name '" + layer->name + "' ";
-            if (layer->insData.size() < 2 || layer->insData.size() > 3)
+            if (layer->insData.size() != 2)
                 THROW_IE_EXCEPTION << errPrefix << "has invalid number of input edges: " << layer->insData.size();
-            if (layer->outData.empty() || layer->outData.size() > 2)
+            if (layer->outData.size() != 1)
                 THROW_IE_EXCEPTION << errPrefix << "has invalid number of outputs edges: " << layer->outData.size();
-            if (layer->outData.size() == 1)
-                isVersion1_ = true;
 
             auto inData = layer->insData[DATA_INDEX].lock();
             auto sequenceLenData = layer->insData[SEQUENCE_LENGTH_INDEX].lock();
@@ -32,170 +225,372 @@ public:
                 THROW_IE_EXCEPTION << errPrefix << "has nullable inputs.";
             if (inData->getTensorDesc().getPrecision() != Precision::FP32)
                 THROW_IE_EXCEPTION << errPrefix << "has unsupported 'data' input precision: " << inData->getTensorDesc().getPrecision();
+            if (sequenceLenData->getTensorDesc().getPrecision() != Precision::FP32)
+                THROW_IE_EXCEPTION << errPrefix << "has unsupported 'sequence_length' input precision: " << sequenceLenData->getTensorDesc().getPrecision();
 
-            std::vector<DataConfigurator> inputConfigs;
-            inputConfigs.push_back({ConfLayout::PLN, Precision::FP32});
-            std::vector<DataConfigurator> outputConfigs;
-
-            if (isVersion1_) {
-                if (sequenceLenData->getTensorDesc().getPrecision() != Precision::FP32)
-                    THROW_IE_EXCEPTION << errPrefix << "has unsupported 'sequence_length' input precision: " << sequenceLenData->getTensorDesc().getPrecision();
-                inputConfigs.push_back({ConfLayout::PLN, Precision::FP32});
-                outputConfigs.push_back({ConfLayout::PLN, Precision::FP32});
-            } else {
-                if (sequenceLenData->getTensorDesc().getPrecision() != Precision::I32)
-                    THROW_IE_EXCEPTION << errPrefix << "has unsupported 'sequence_length' input precision: " << sequenceLenData->getTensorDesc().getPrecision();
-                inputConfigs.push_back({ConfLayout::PLN, Precision::I32});
-                if (layer->insData.size() > BLANK_INDEX) {
-                    auto blankIndexData = layer->insData[BLANK_INDEX].lock();
-                    if (!blankIndexData)
-                        THROW_IE_EXCEPTION << errPrefix << "has nullable inputs.";
-                    if (blankIndexData->getTensorDesc().getPrecision() != Precision::I32)
-                        THROW_IE_EXCEPTION << errPrefix << "has unsupported 'blank_index' input precision: " << blankIndexData->getTensorDesc().getPrecision();
-                    inputConfigs.push_back({ConfLayout::PLN, Precision::I32});
-                }
-                outputConfigs.push_back({ConfLayout::PLN, Precision::I32});
-                outputConfigs.push_back({ConfLayout::PLN, Precision::I32});
-            }
-            mergeRepeated_ = layer->GetParamAsBool("merge_repeated", true);
-
+            std::vector<DataConfigurator> inputConfigs{{ConfLayout::PLN, Precision::FP32}, {ConfLayout::PLN, Precision::FP32}};
+            std::vector<DataConfigurator> outputConfigs{{ConfLayout::PLN, Precision::FP32}};
             addConfig(layer, inputConfigs, outputConfigs);
+
+            mergeRepeated_ = layer->GetParamAsBool("ctc_merge_repeated", true);
+
+            jitGreedyDecoderConfT jpp;
+            jpp.classesNum = inData->getTensorDesc().getDims()[2];
+            if (mayiuse(cpu::avx2)) {
+                kernel_.reset(new jitUniGreedyDecoderKernel<cpu::avx2>(jpp));
+            }
         } catch (InferenceEngine::details::InferenceEngineException &ex) {
             errorMsg = ex.what();
         }
     }
 
+//    StatusCode execute(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs,
+//                       ResponseDesc *resp) noexcept override {
+//        const float* probabilities = inputs[DATA_INDEX]->cbuffer().as<const float*>() +
+//            inputs[DATA_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+//        const float* sequenceLengths = inputs[SEQUENCE_LENGTH_INDEX]->cbuffer().as<const float*>() +
+//            inputs[SEQUENCE_LENGTH_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+//        float* outputSequences = outputs[0]->buffer().as<float*>();
+//
+//        const size_t T = inputs[DATA_INDEX]->getTensorDesc().getDims()[0];
+//        const size_t B = inputs[DATA_INDEX]->getTensorDesc().getDims()[1];
+//        const int C = inputs[DATA_INDEX]->getTensorDesc().getDims()[2];
+//        const size_t BC = C * B;
+//        const size_t TB = T * B;
+//        const size_t CB1 = C * (B - 1);
+//
+//        const int blankIndex = C - 1;
+//
+////printf("T: %lu; B: %lu; C: %d\n", T, B, C);
+//
+//static double du1 = 0.0;
+//static int c1 = 0;
+//auto start = std::chrono::steady_clock::now();
+//
+////        size_t workAmount = 0;
+////        std::vector<size_t> sequenceLengthB(B, 0);
+////        for (size_t b = 0; b < B; b++) {
+////            for (size_t t = 0; t < T; t++) {
+////                if (sequenceLengths[B * t + b] == 0.f)
+////                    break;
+////                sequenceLengthB[b]++;
+////            }
+////            workAmount += sequenceLengthB[b];
+////        }
+//
+//        // Parallelization could not be made by T due to output index depends on merged classes and
+//        // blank index thus could not be shared between threads. Better to parallelize by classes.
+////        auto threadBody = [&](const int ithr, const int nthr) {
+////            size_t start(0lu), end(0lu);
+////            splitter(workAmount, nthr, ithr, start, end);
+////            if (start >= end)
+////                return;
+////            size_t tStart = 0lu, bStart = 0lu;
+////            int64_t cw = 0, st = start;
+////            for (; bStart < B; bStart++) {
+////                cw += sequenceLengthB[bStart];
+////                if (cw >= st) {
+////                    tStart = sequenceLengthB[bStart] + st - cw;
+////                    break;
+////                }
+////            }
+//
+////            size_t workCounter = start;
+////printf("[] tStart: %lu; bStart: %lu\n", tStart, bStart);
+//
+//            for (size_t b = 0; b < B; ++b) {
+//                int prev_class_idx = -1;
+//                size_t outputIndex = b * T;
+//                const float* probs = probabilities + b * C;
+////                size_t sequenceLength = sequenceLengthB[b];
+////printf("[] sequenceLengths: %lu; b: %lu\n", sequenceLength, b);
+//
+//                for (size_t t = 0; t < T; ++t) {
+//                    if (sequenceLengths[B * t + b] == 0.f) {
+////printf("[] BREAK: t: %lu; b: %lu\n", t, b);
+//                        break;
+//                    }
+////                    int maxClassIdx = 0;
+//
+////    std::string probsStr = "probs: ";
+////for (int i = 0; i < C; i++) {
+////    probsStr += std::to_string(probs[i]) + "; ";
+////}
+////printf(probsStr);
+////                    if (kernel_ != nullptr) {
+////                        float tmpDst[8];
+////                        auto arg = jitArgsGreedyDecoder();
+////                        arg.probs = probs;
+////                        arg.tmpDst = tmpDst;
+////                        arg.maxClassIdx = &maxClassIdx;
+////                        (*kernel_)(&arg);
+////                        probs += C;
+////probsStr += "\ntmpDst: ";
+////for (int i = 0; i < 8; i++) {
+////    probsStr += std::to_string(tmpDst[i]) + "; ";
+////}
+////probsStr += "\tt: " + std::to_string(t) + "; b: " + std::to_string(b) + "; maxClassIdx: " + std::to_string(maxClassIdx);
+////                    } else {
+////                        const int threadsNum = parallel_get_max_threads();
+////                        std::vector<int> maxClassPerThread(threadsNum, -1);
+////                        std::vector<float> probsPerThread(threadsNum, std::numeric_limits<float>::lowest());
+//
+////static double du2 = 0.0;
+////static int c2 = 0;
+////auto start2 = std::chrono::steady_clock::now();
+//
+//                        const int threadsNum = parallel_get_max_threads();
+//                        std::vector<int> maxClassPerThread(threadsNum, -1);
+//                        std::vector<float> probsPerThread(threadsNum, std::numeric_limits<float>::lowest());
+//
+//                        auto threadBody = [&](const int ithr, const int nthr) {
+//                            int start(0), end(0);
+//                            splitter(C, nthr, ithr, start, end);
+//                            if (start >= end)
+//                                return;
+//
+//                            maxClassPerThread[ithr] = start;
+//                            const float* probsThr = probs + start;
+//                            probsPerThread[ithr] = probsThr[0];
+//                            probsThr++;
+//                            for (int c = start + 1; c < end; c++, probsThr++) {
+//                                if (probsThr[0] > probsPerThread[ithr]) {
+//                                    maxClassPerThread[ithr] = c;
+//                                    probsPerThread[ithr] = probsThr[0];
+//                                }
+//                            }
+//                        };
+//                        parallel_nt(0, threadBody);
+////                        probs += C;
+//                        int maxClassIdx = maxClassPerThread[0];
+//                        float maxProb = probsPerThread[0];
+//                        for (int i = 1; i < threadsNum; i++) {
+//                            if (probsPerThread[i] > maxProb) {
+//                                maxClassIdx = maxClassPerThread[i];
+//                                maxProb = probsPerThread[i];
+//                            }
+//                        }
+//
+////auto end2 = std::chrono::steady_clock::now();
+////c2++;
+////du2 += std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2).count();
+////if (c2 % 1000 == 0) {
+////    printf("DU2: %f\n", du2 / c2);
+////}
+////                    }
+////probsStr += "    t: " + std::to_string(t) + "; b: " + std::to_string(b) + "; maxClassIdx: " + std::to_string(maxClassIdx) +
+////        "; outputIndex: " + std::to_string(outputIndex);
+////printf("%s\n", probsStr.c_str());
+////printf("t: %lu; b: %lu; maxClassIdx: %d\n", t, b, maxClassIdx);
+//                    if (maxClassIdx < blankIndex &&
+//                            !(mergeRepeated_ && maxClassIdx == prev_class_idx)) {
+//                        outputSequences[outputIndex++] = static_cast<float>(maxClassIdx);
+//                    }
+//
+//                    prev_class_idx = maxClassIdx;
+//                    probs += BC;
+//
+////                    if (++workCounter >= end) {
+////                        return;
+////                    }
+//                }
+//                std::fill(outputSequences + outputIndex, outputSequences + (b + 1) * T, -1.f);
+////                tStart = 0lu;
+//            }
+////        }; // thread body
+//
+////        parallel_nt(0, threadBody);
+//
+//auto end = std::chrono::steady_clock::now();
+//c1++;
+//du1 += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+//if (c1 % 100 == 0) {
+//    printf("DU1: %f\n", du1 / c1);
+//}
+//
+//        return OK;
+//    }
+//
+//    const size_t DATA_INDEX = 0lu;
+//    const size_t SEQUENCE_LENGTH_INDEX = 1lu;
+//    bool mergeRepeated_;
+//
+//    std::shared_ptr<jitUniGreedyDecoderBase> kernel_;
+//};
+
+
     StatusCode execute(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs,
                        ResponseDesc *resp) noexcept override {
+static double du1 = 0.0;
+static int c1 = 0;
+//auto start = std::chrono::steady_clock::now();
+
         const float* probabilities = inputs[DATA_INDEX]->cbuffer().as<const float*>() +
             inputs[DATA_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+        const float* sequenceLengths = inputs[SEQUENCE_LENGTH_INDEX]->cbuffer().as<const float*>() +
+            inputs[SEQUENCE_LENGTH_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+        float* outputSequences = outputs[0]->buffer().as<float*>();
 
         const size_t T = inputs[DATA_INDEX]->getTensorDesc().getDims()[0];
         const size_t B = inputs[DATA_INDEX]->getTensorDesc().getDims()[1];
         const int C = inputs[DATA_INDEX]->getTensorDesc().getDims()[2];
-        const size_t CN = C * B;
-        const size_t TN = T * B;
-        const size_t CN1 = C * (B - 1);
+        const size_t BC = B * C;
+        const size_t TB = T * B;
+        const size_t CB1 = C * (B - 1);
 
-        int blankIndex = C - 1;
+        const int blankIndex = C - 1;
 
-static double du1 = 0.0;
-static int c1 = 0;
+//printf("T: %lu; B: %lu; C: %d\n", T, B, C);
 auto start = std::chrono::steady_clock::now();
 
-        if (isVersion1_) {
-            const float* sequenceLengths = inputs[SEQUENCE_LENGTH_INDEX]->cbuffer().as<const float*>() +
-                inputs[SEQUENCE_LENGTH_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
-            float* outputSequences = outputs[0]->buffer().as<float*>();
+        std::vector<size_t> sequenceLengthB(B, 0);
+        parallel_for(B, [&](size_t b) {
+            for (size_t t = 0; t < T; t++) {
+                if (sequenceLengths[B * t + b] == 0.f)
+                    break;
+                sequenceLengthB[b]++;
+            }
+        });
 
-            auto threadBody = [&](const int ithr, const int nthr) {
-                size_t start(0lu), end(0lu);
-                splitter(TN, nthr, ithr, start, end);
-                if (start >= end)
-                    return;
-                size_t bStart = start / T;
-                size_t tStart = start % B;
-
-                size_t workCounter = start;
-
-                for (size_t b = bStart; b < B; ++b) {
-                    int prev_class_idx = -1;
-                    size_t outputIndex = b * T;
-                    const float* probs = probabilities + b * C;
-
-                    for (size_t t = tStart; t < T; ++t) {
-                        if (sequenceLengths[B * t + b] == 0.f) {
-                            break;
-                        }
-                        int maxClassIdx = 0;
-                        float maxProb = probs[0];
-                        ++probs;
-
-                        for (int c = 1; c < C; ++c, ++probs) {
-                            if (*probs > maxProb) {
-                                maxClassIdx = c;
-                                maxProb = *probs;
-                            }
-                        }
-                        if (maxClassIdx < blankIndex &&
-                                !(mergeRepeated_ && maxClassIdx == prev_class_idx)) {
-                            outputSequences[outputIndex++] = static_cast<float>(maxClassIdx);
-                        }
-
-                        prev_class_idx = maxClassIdx;
-                        probs += CN1;
-
-                        if (++workCounter >= end) {
-                            return;
-                        }
-                    }
-                    std::fill(outputSequences + outputIndex, outputSequences + (b + 1) * T, -1.f);
-                    tStart = 0lu;
-                }
-            }; // thread body
-
-            parallel_nt(0, threadBody);
-        } else {
-            const int* sequenceLengths = inputs[SEQUENCE_LENGTH_INDEX]->cbuffer().as<const int*>() +
-                inputs[SEQUENCE_LENGTH_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
-            if (inputs.size() > BLANK_INDEX)
-                blankIndex = (inputs[BLANK_INDEX]->cbuffer().as<const int*>() +
-                    inputs[BLANK_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding())[0];
-            int* outputSequences = outputs[0]->buffer().as<int*>();
-
-            auto threadBody = [&](const int ithr, const int nthr) {
-                size_t start(0lu), end(0lu);
-                splitter(TN, nthr, ithr, start, end);
-                if (start >= end)
-                    return;
-                size_t bStart = start / T;
-                size_t tStart = start % B;
-
-                size_t workCounter = start;
-
-                for (size_t b = bStart; b < B; ++b) {
-                    int prev_class_idx = -1;
-                    size_t outputIndex = b * T;
-                    const float* probs = probabilities + b * C;
-                    const size_t actualSeqLen = sequenceLengths[b];
-                    if (actualSeqLen > T)
-                        return; // err
-
-                    for (size_t t = tStart; t < actualSeqLen; ++t) {
-                        int maxClassIdx = 0;
-                        float maxProb = probs[0];
-                        ++probs;
-
-                        for (int c = 1; c < C; ++c, ++probs) {
-                            if (*probs > maxProb) {
-                                maxClassIdx = c;
-                                maxProb = *probs;
-                            }
-                        }
-                        if (maxClassIdx != blankIndex && maxClassIdx < C &&
-                                !(mergeRepeated_ && maxClassIdx == prev_class_idx)) {
-                            outputSequences[outputIndex++] = static_cast<float>(maxClassIdx);
-                        }
-
-                        prev_class_idx = maxClassIdx;
-                        probs += CN1;
-
-                        if (++workCounter >= end) {
-                            return;
-                        }
-                    }
-                    tStart = 0lu;
-                }
-            }; // thread body
-
-            parallel_nt(0, threadBody);
+        size_t workAmount = 0;
+        for (size_t b = 0; b < B; b++) {
+            workAmount += sequenceLengthB[b];
         }
 
+//auto start = std::chrono::steady_clock::now();
+
+        auto threadBody = [&](const int ithr, const int nthr) {
+            size_t start(0lu), end(0lu);
+            splitter(workAmount, nthr, ithr, start, end);
+            if (start >= end)
+                return;
+            size_t tStart = 0lu, bStart = 0lu;
+            int64_t cw = 0, st = start;
+            for (; bStart < B; bStart++) {
+                cw += sequenceLengthB[bStart];
+                if (cw >= st) {
+                    tStart = sequenceLengthB[bStart] + st - cw;
+                    break;
+                }
+            }
+
+            size_t workCounter = start;
+//printf("[] tStart: %lu; bStart: %lu\n", tStart, bStart);
+
+            for (size_t b = bStart; b < B; ++b) {
+                int prev_class_idx = -1;
+                size_t outputIndex = b * T + tStart;
+                const float* probs = probabilities + b * C + BC * tStart;
+                size_t sequenceLength = sequenceLengthB[b];
+//printf("[] sequenceLengths: %lu; b: %lu\n", sequenceLength, b);
+
+                for (size_t t = tStart; t < sequenceLength; ++t) {
+//                    if (sequenceLengths[B * t + b] == 0.f) {
+////printf("[] BREAK: t: %lu; b: %lu\n", t, b);
+//                        break;
+//                    }
+                    int maxClassIdx = 0;
+
+//    std::string probsStr = "probs: ";
+//for (int i = 0; i < C; i++) {
+//    probsStr += std::to_string(probs[i]) + "; ";
+//}
+//printf("%s\n", probsStr.c_str());
+                    if (kernel_ != nullptr) {
+//                        float tmpDst[8];
+//                        float tmpVal = -1.f;
+                        auto arg = jitArgsGreedyDecoder();
+                        arg.probs = probs;
+//                        arg.tmpDst = tmpDst;
+                        arg.maxClassIdx = &maxClassIdx;
+//                        arg.tmpVal = static_cast<float*>(&tmpVal);
+                        (*kernel_)(&arg);
+                        probs += C;
+//probsStr += "\ntmpDst: ";
+//for (int i = 0; i < 8; i++) {
+//    probsStr += std::to_string(tmpDst[i]) + "; ";
+//}
+//probsStr += "  t: " + std::to_string(t) + "; b: " + std::to_string(b) + "; maxClassIdx: " + std::to_string(maxClassIdx);
+//probsStr += "  tmpVal: " + std::to_string(tmpVal);
+                    } else {
+//static double du2 = 0.0;
+//static int c2 = 0;
+//auto start2 = std::chrono::steady_clock::now();
+
+                        float maxProb = probs[0];
+                        ++probs;
+
+                        for (int c = 1; c < C; ++c, ++probs) {
+                            if (*probs > maxProb) {
+                                maxClassIdx = c;
+                                maxProb = *probs;
+                            }
+                        }
+                    }
+//auto end2 = std::chrono::steady_clock::now();
+//c2++;
+//du2 += std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2).count();
+//if (c2 % 1000 == 0) {
+//    printf("DU2: %f\n", du2 / c2);
+//}
+//                    }
+//probsStr += "  t: " + std::to_string(t) + "; b: " + std::to_string(b) + "; maxClassIdx: " + std::to_string(maxClassIdx) +
+//        "; outputIndex: " + std::to_string(outputIndex);
+//printf("%s\n", probsStr.c_str());
+//                    if (maxClassIdx < blankIndex &&
+//                            !(mergeRepeated_ && maxClassIdx == prev_class_idx)) {
+                        outputSequences[outputIndex++] = static_cast<float>(maxClassIdx);
+//                    }
+
+//                    prev_class_idx = maxClassIdx;
+                    probs += CB1;
+
+                    if (++workCounter >= end) {
+                        return;
+                    }
+                }
+//                std::fill(outputSequences + outputIndex, outputSequences + (b + 1) * T, -1.f);
+                tStart = 0lu;
+            }
+        }; // thread body
+
+        parallel_nt(0, threadBody);
+
 auto end = std::chrono::steady_clock::now();
+
+
+        parallel_for(B, [&](size_t b) {
+            int prev_class_idx = -1;
+            size_t outputIndex = b * T;
+            const size_t sequenceLength = sequenceLengthB[b];
+//printf("[] sequenceLengths: %lu; b: %lu\n", sequenceLength, b);
+
+            float* shiftedOut = outputSequences + b * T;
+
+//    std::string probsStr = "INDX: ";
+//for (int i = 0; i < sequenceLength; i++) {
+//    probsStr += std::to_string(outputSequences[i]) + "; ";
+//}
+//probsStr += "\nRES:\n";
+            for (size_t t = 0; t < sequenceLength; ++t) {
+                if (*shiftedOut < blankIndex &&
+                        !(mergeRepeated_ && *shiftedOut == prev_class_idx)) {
+                    outputSequences[outputIndex++] = *shiftedOut;
+//                        probsStr += std::to_string(prev_class_idx) + "; ";
+//                        probsStr += std::to_string(outputIndex) + ": " + std::to_string(outputSequences[outputIndex]) + "\n";
+                }
+                prev_class_idx = *shiftedOut;
+                shiftedOut++;
+            }
+            std::fill(outputSequences + outputIndex, outputSequences + (b + 1) * T, -1.f);
+        });
+//printf("%s\n", probsStr.c_str());
+
+//auto end = std::chrono::steady_clock::now();
 c1++;
 du1 += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 if (c1 % 100 == 0) {
-    printf("DU1: %f\b", du1 / c1);
+    printf("DU1: %f\n", du1 / c1);
 }
 
         return OK;
@@ -203,9 +598,9 @@ if (c1 % 100 == 0) {
 
     const size_t DATA_INDEX = 0lu;
     const size_t SEQUENCE_LENGTH_INDEX = 1lu;
-    const size_t BLANK_INDEX = 2lu;
     bool mergeRepeated_;
-    bool isVersion1_;
+
+    std::shared_ptr<jitUniGreedyDecoderBase> kernel_;
 };
 
 REG_FACTORY_FOR(CTCGreedyDecoderImpl, CTCGreedyDecoder);

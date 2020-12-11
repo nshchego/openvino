@@ -23,10 +23,14 @@ const auto basicCases = ::testing::Combine(
     ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
     ::testing::Values(InferenceEngine::Layout::ANY),
     ::testing::Values(InferenceEngine::Layout::ANY),
-    ::testing::Values(std::vector<size_t>({ 10, 1, 16 }),
-                      std::vector<size_t>({ 20, 2, 8 }),
-                      std::vector<size_t>({ 20, 2, 256 }),
-                      std::vector<size_t>({ 20, 2, 50 })),
+    ::testing::Values(std::vector<size_t>({ 50, 3, 3 }),
+                      std::vector<size_t>({ 50, 3, 7 }),
+                      std::vector<size_t>({ 50, 3, 8 }),
+                      std::vector<size_t>({ 50, 3, 16 }),
+                      std::vector<size_t>({ 50, 3, 128 }),
+                      std::vector<size_t>({ 50, 3, 49 }),
+                      std::vector<size_t>({ 50, 3, 55 }),
+                      std::vector<size_t>({ 1, 1, 16 })),
     ::testing::ValuesIn(mergeRepeated),
     ::testing::Values(CommonTestUtils::DEVICE_CPU));
 
