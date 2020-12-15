@@ -263,7 +263,7 @@ else()
     # TODO: enable for C sources as well
     # ie_add_compiler_flags(-Werror)
     if(TREAT_WARNING_AS_ERROR)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     endif()
 
     ie_add_compiler_flags(-ffunction-sections -fdata-sections)

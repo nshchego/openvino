@@ -242,8 +242,10 @@ public:
                 const int actualLogitLen = logitsLength[b];
                 const int decodedTargetLen = decodedTargetLenB[b];
                 std::vector<std::vector<float>> logBwd(decodedTargetLen, std::vector<float>(actualLogitLen, -float_inf));
-                for (int s = decodedTargetLen - 2; s < decodedTargetLen; s++)
-                    logBwd[s][actualLogitLen - 1] = 0.f;
+                if (decodedTargetLen > 1) {
+                    for (int s = decodedTargetLen - 2; s < decodedTargetLen; s++)
+                        logBwd[s][actualLogitLen - 1] = 0.f;
+                }
 
                 for (int t = actualLogitLen - 2; t >= 0; t--) {
                     const int t_1 = t + 1;
@@ -269,9 +271,12 @@ public:
                 }
 
                 logBwd[0][0] += logProbabilities[0][0];
-                logBwd[1][0] += logProbabilities[0][(decodedTargetLen > 1) ? 1 : 0];
-
-                dstData[b] = -sumLogs(logBwd[0][0], logBwd[1][0]);
+                if (decodedTargetLen > 1) {
+                    logBwd[1][0] += logProbabilities[0][(decodedTargetLen > 1) ? 1 : 0];
+                    dstData[b] = -sumLogs(logBwd[0][0], logBwd[1][0]);
+                } else {
+                    dstData[b] = -logBwd[0][0];
+                }
             } // for batch
         }; // threadBody_3
 

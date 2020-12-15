@@ -62,6 +62,7 @@ namespace ngraph
                         // first 0 marks the end of a sequence
                         if (sequence_masks[mask_index] == T{0})
                         {
+printf("\nREF Break: t: %u; b: %u\n", seq_ind, batch_ind);
                             break;
                         }
 
@@ -69,6 +70,14 @@ namespace ngraph
                         auto class_max_element =
                             std::max_element(class_index, class_index + class_count);
                         unsigned int max_class_ind = std::distance(class_index, class_max_element);
+
+    std::string probsStr = "REF : ";
+for (int i = 0; i < class_count; i++) {
+    probsStr += std::to_string(class_index[i]) + "; ";
+}
+probsStr += "  t: " + std::to_string(seq_ind) + "; b: " + std::to_string(batch_ind) +
+    "; max_class_ind: " + std::to_string(max_class_ind) + "; out_index: " + std::to_string(out_index);
+//printf("\n%s", probsStr.c_str());
                         if (!(previous_class_index == max_class_ind && ctc_merge_repeated) &&
                             max_class_ind < blank_index)
                         {

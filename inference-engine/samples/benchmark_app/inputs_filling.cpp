@@ -304,6 +304,26 @@ void fillBlobs(const std::vector<std::string>& inputFiles,
             slog::info << "Fill input '" << item.first << "' with random values ("
                        << std::string((isImage(inputBlob) ? "image" : "some binary data"))
                        << " is expected)" << slog::endl;
+            if (item.first == "seq_len") {
+                MemoryBlob::Ptr minput = as<MemoryBlob>(inputBlob);
+                auto minputHolder = minput->wmap();
+                auto inputBlobData = minputHolder.as<int *>();
+                for (size_t i = 0; i < inputBlob->size(); i++) {
+                    inputBlobData[i] = 1;
+                }
+            } else if (item.first == "input_images") {
+                MemoryBlob::Ptr minput = as<MemoryBlob>(inputBlob);
+                auto minputHolder = minput->wmap();
+                auto inputBlobData = minputHolder.as<float *>();
+                //float rand_max = static_cast<float>(RAND_MAX);
+                //unsigned int seedp = 1;
+                for (size_t i = 0; i < inputBlob->size(); i++) {
+                    //inputBlobData[i] = static_cast<float>(rand_r(&seedp)) / rand_max;
+                    if (i % 3 == 0) inputBlobData[i] = 0.1f;
+                    if (i % 3 == 1) inputBlobData[i] = 0.8f;
+                    if (i % 3 == 2) inputBlobData[i] = 0.3f;
+                }
+            } else {
             if (item.second->getPrecision() == InferenceEngine::Precision::FP32) {
                 fillBlobRandom<float>(inputBlob);
             } else if (item.second->getPrecision() == InferenceEngine::Precision::FP16) {
@@ -320,6 +340,7 @@ void fillBlobs(const std::vector<std::string>& inputFiles,
                 fillBlobRandom<int16_t>(inputBlob);
             } else {
                 THROW_IE_EXCEPTION << "Input precision is not supported for " << item.first;
+            }
             }
         }
     }
