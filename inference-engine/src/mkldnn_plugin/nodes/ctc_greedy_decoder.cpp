@@ -65,21 +65,13 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
 
         if (jpp.classesNum >= elPerVector) {
             uni_vmovups(vmmFirstV, ptr[regProbs]);
-            broadcastMax(vmmFirstV);
-            vpcmpeqd(vmmOnes, vmmOnes, vmmOnes);
             const int iterations = jpp.classesNum / elPerVector;
             for (int i = 1; i < iterations; i++) {
-                Xbyak::Label loopLabel1;
                 add(regProbs, vlen);
-                uni_vmovups(vmmFirstV, ptr[regProbs]);
-                vcmpps(vmmGrtMask, vmmFirstV, vmmMaxVec, jit_generator::_cmp_nle_us);
-                vptest(vmmGrtMask, vmmOnes);
-                jz(loopLabel1, T_NEAR);
-                vmaxps(vmmFirstV, vmmFirstV, vmmMaxVec);
-                broadcastMax(vmmFirstV);
-                mov(regMaxIdx, i);
-                L(loopLabel1);
+                uni_vmovups(vmmSecondV, ptr[regProbs]);
+                vmaxps(vmmFirstV, vmmFirstV, vmmSecondV);
             }
+            broadcastMax(vmmFirstV);
         }
 
         Xbyak::Label foundLabel, lookWithStep;
@@ -122,16 +114,24 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
         }
 
         L(lookWithStep);
+        Xbyak::Label findInVecLabel;
+        const int iterations = jpp.classesNum / elPerVector;
+        vpcmpeqd(vmmOnes, vmmOnes, vmmOnes);
         mov(regProbs, ptr[regParams + GET_OFF(probs)]);
+        int idx = 0;
+        for (; idx < iterations; idx++) {
+            uni_vmovups(vmmFirstV, ptr[regProbs]);
+            vcmpps(vmmGrtMask, vmmFirstV, vmmMaxVec, jit_generator::_cmp_eq_oq);
+            vptest(vmmGrtMask, vmmOnes);
+            jnz(findInVecLabel, T_NEAR);
+            add(regProbs, vlen);
+            add(regMaxIdx, 1);
+        }
+        L(findInVecLabel);
         mov(rax, elPerVector);
         mul(regMaxIdx);
         mov(regMaxIdx, eax);
 
-        mov(rax, dataTypeSize);
-        mul(regMaxIdx);
-        add(regProbs, eax);
-        uni_vmovups(vmmFirstV, ptr[regProbs]);
-//        uni_vmovups(ptr[regTmpDst], vmmFirstV);
         mov(regTmp, 0);
         for (int x = 0; x < 2; x++) {
             vextractf128(xmm8, vmmFirstV, x);
@@ -159,16 +159,34 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
         ker_ = (decltype(ker_))this->getCode();
     }
 
+//    void broadcastMax(const Xbyak::Xmm& src) {
+//        extractps(regMaxProb, src, 0);
+//        insertps(xmm9, src, 0x0);
+//        for (int i = 1; i < 4; i++) {
+//            Xbyak::Label setLabel;
+//            Xbyak::Label nextLabel;
+//            extractps(regCurProb, src, i);
+//            cmp(regCurProb, regMaxProb);
+//            jg(setLabel, T_NEAR);
+//            jmp(nextLabel, T_NEAR);
+//            L(setLabel);
+//            mov(regMaxProb, regCurProb);
+//            insertps(xmm9, src, i << 6);
+//            L(nextLabel);
+//        }
+//        vbroadcastss(vmmMaxVec, xmm9);
+//    }
+
     void broadcastMax(const Xbyak::Ymm& src) {
         vextractf128(xmm8, src, 0);
         vextractf128(xmm9, src, 1);
         vmaxps(xmm8, xmm9);
-        extractps(regMaxProb, xmm8, 0);
+        vextractps(regMaxProb, xmm8, 0);
         vinsertps(xmm9, xmm8, xmm8, 0x0);
         for (int i = 1; i < 4; i++) {
             Xbyak::Label setLabel;
             Xbyak::Label nextLabel;
-            extractps(regCurProb, xmm8, i);
+            vextractps(regCurProb, xmm8, i);
             cmp(regCurProb, regMaxProb);
             jg(setLabel, T_NEAR);
             jmp(nextLabel, T_NEAR);
@@ -179,6 +197,27 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
         }
         vbroadcastss(vmmMaxVec, xmm9);
     }
+
+//    void broadcastMax(const Xbyak::Zmm& src) {
+//        vextractf128(xmm8, src, 0);
+//        vextractf128(xmm9, src, 1);
+//        vmaxps(xmm8, xmm9);
+//        extractps(regMaxProb, xmm8, 0);
+//        vinsertps(xmm9, xmm8, xmm8, 0x0);
+//        for (int i = 1; i < 4; i++) {
+//            Xbyak::Label setLabel;
+//            Xbyak::Label nextLabel;
+//            extractps(regCurProb, xmm8, i);
+//            cmp(regCurProb, regMaxProb);
+//            jg(setLabel, T_NEAR);
+//            jmp(nextLabel, T_NEAR);
+//            L(setLabel);
+//            mov(regMaxProb, regCurProb);
+//            vinsertps(xmm9, xmm8, xmm8, i << 6);
+//            L(nextLabel);
+//        }
+//        vbroadcastss(vmmMaxVec, xmm9);
+//    }
 
 private:
     using Vmm = typename conditional3<isa == cpu::sse42, Xbyak::Xmm, isa == cpu::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
@@ -205,8 +244,6 @@ private:
     Vmm vmmGrtMask = Vmm(2);
     Vmm vmmOnes = Vmm(3);
     Vmm vmmMaxVec = Vmm(4);
-//    Vmm vmmOnes = Vmm(5);
-//    Vmm vmmIndicesSteps = Vmm(7);
 };
 
 class CTCGreedyDecoderImpl: public ExtLayerBase {
@@ -423,7 +460,7 @@ public:
                        ResponseDesc *resp) noexcept override {
 static double du1 = 0.0;
 static int c1 = 0;
-//auto start = std::chrono::steady_clock::now();
+auto start = std::chrono::steady_clock::now();
 
         const float* probabilities = inputs[DATA_INDEX]->cbuffer().as<const float*>() +
             inputs[DATA_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
@@ -441,7 +478,7 @@ static int c1 = 0;
         const int blankIndex = C - 1;
 
 //printf("T: %lu; B: %lu; C: %d\n", T, B, C);
-auto start = std::chrono::steady_clock::now();
+//auto start = std::chrono::steady_clock::now();
 
         std::vector<size_t> sequenceLengthB(B, 0);
         parallel_for(B, [&](size_t b) {
@@ -556,7 +593,7 @@ auto start = std::chrono::steady_clock::now();
 
         parallel_nt(0, threadBody);
 
-auto end = std::chrono::steady_clock::now();
+//auto end = std::chrono::steady_clock::now();
 
 
         parallel_for(B, [&](size_t b) {
@@ -586,7 +623,7 @@ auto end = std::chrono::steady_clock::now();
         });
 //printf("%s\n", probsStr.c_str());
 
-//auto end = std::chrono::steady_clock::now();
+auto end = std::chrono::steady_clock::now();
 c1++;
 du1 += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 if (c1 % 100 == 0) {
