@@ -61,6 +61,13 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
         const uint32_t dataTypeSize = sizeof(float);
         const uint32_t elPerVector = vlen / dataTypeSize;
         const int tailLen = jpp.classesNum % elPerVector;
+        uint8_t xmmNum = 1;
+        if (isa == cpu::avx512_common) {
+            xmmNum = 4;
+        } else if (isa == cpu::avx2) {
+            xmmNum = 2;
+        }
+
         mov(regMaxIdx, 0);
 
         if (jpp.classesNum >= elPerVector) {
@@ -84,20 +91,21 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
             mov(regTmp, 0);
             mov(regTmpVal, -1);
             int c = 0;
-            for (int x = 0; x < 2; x++) {
-                vextractf128(xmm8, vmmFirstV, x);
-                if (jpp.classesNum < elPerVector && x == 0) {
-                    extractps(regMaxProb, xmm8, 0);
+            for (uint8_t x = 0; x < xmmNum; x++) {
+                if (isa == cpu::avx512_common) {
+                    vextractf32x4(xmm8, vmmFirstV, x);
+                } else if (isa == cpu::avx2) {
+                    vextractf128(xmm8, vmmFirstV, x);
                 }
-                for (int i = 0; i < 4 && c < tailLen; i++, c++) {
-                    Xbyak::Label setLabel;
+                if (jpp.classesNum < elPerVector && x == 0) {
+                    uni_extractps(regMaxProb32, xmm8, x);
+                }
+                for (uint8_t i = 0; i < 4 && c < tailLen; i++, c++) {
                     Xbyak::Label nextLabel;
-                    extractps(regCurProb, xmm8, i);
-                    cmp(regCurProb, regMaxProb);
-                    jg(setLabel, T_NEAR);
-                    jmp(nextLabel, T_NEAR);
-                    L(setLabel);
-                    mov(regMaxProb, regCurProb);
+                    uni_extractps(regCurProb32, xmm8, i);
+                    cmp(regCurProb32, regMaxProb32);
+                    jle(nextLabel, T_NEAR);
+                    mov(regMaxProb32, regCurProb32);
                     mov(regTmpVal, regTmp);
                     L(nextLabel);
                     inc(regTmp);
@@ -125,7 +133,7 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
             vptest(vmmGrtMask, vmmOnes);
             jnz(findInVecLabel, T_NEAR);
             add(regProbs, vlen);
-            add(regMaxIdx, 1);
+            inc(regMaxIdx);
         }
         L(findInVecLabel);
         mov(rax, elPerVector);
@@ -133,20 +141,21 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
         mov(regMaxIdx, eax);
 
         mov(regTmp, 0);
-        for (int x = 0; x < 2; x++) {
-            vextractf128(xmm8, vmmFirstV, x);
+        for (int x = 0; x < xmmNum; x++) {
+            if (isa == cpu::avx512_common) {
+                vextractf32x4(xmm8, vmmFirstV, x);
+            } else if (isa == cpu::avx2) {
+                vextractf128(xmm8, vmmFirstV, x);
+            }
             for (int i = 0; i < 4; i++) {
-                Xbyak::Label setLabel1;
-                Xbyak::Label nextLabel1;
-                extractps(regCurProb, xmm8, i);
-                cmp(regCurProb, regMaxProb);
-                je(setLabel1, T_NEAR);
-                jmp(nextLabel1, T_NEAR);
-                L(setLabel1);
+                Xbyak::Label nextLabel;
+                uni_extractps(regCurProb32, xmm8, i);
+                cmp(regCurProb32, regMaxProb);
+                jne(nextLabel, T_NEAR);
                 add(regMaxIdx, regTmp);
                 jmp(foundLabel, T_NEAR);
-                L(nextLabel1);
-                add(regTmp, 1);
+                L(nextLabel);
+                inc(regTmp);
             }
         }
 
@@ -159,65 +168,95 @@ struct jitUniGreedyDecoderKernel : public jitUniGreedyDecoderBase, public jit_ge
         ker_ = (decltype(ker_))this->getCode();
     }
 
-//    void broadcastMax(const Xbyak::Xmm& src) {
-//        extractps(regMaxProb, src, 0);
-//        insertps(xmm9, src, 0x0);
-//        for (int i = 1; i < 4; i++) {
-//            Xbyak::Label setLabel;
-//            Xbyak::Label nextLabel;
-//            extractps(regCurProb, src, i);
-//            cmp(regCurProb, regMaxProb);
-//            jg(setLabel, T_NEAR);
-//            jmp(nextLabel, T_NEAR);
-//            L(setLabel);
-//            mov(regMaxProb, regCurProb);
-//            insertps(xmm9, src, i << 6);
-//            L(nextLabel);
-//        }
-//        vbroadcastss(vmmMaxVec, xmm9);
-//    }
-
-    void broadcastMax(const Xbyak::Ymm& src) {
-        vextractf128(xmm8, src, 0);
-        vextractf128(xmm9, src, 1);
-        vmaxps(xmm8, xmm9);
-        vextractps(regMaxProb, xmm8, 0);
-        vinsertps(xmm9, xmm8, xmm8, 0x0);
-        for (int i = 1; i < 4; i++) {
-            Xbyak::Label setLabel;
-            Xbyak::Label nextLabel;
-            vextractps(regCurProb, xmm8, i);
-            cmp(regCurProb, regMaxProb);
-            jg(setLabel, T_NEAR);
-            jmp(nextLabel, T_NEAR);
-            L(setLabel);
-            mov(regMaxProb, regCurProb);
-            vinsertps(xmm9, xmm8, xmm8, i << 6);
-            L(nextLabel);
+    inline void uni_extractps(const Xbyak::Operand& op, const Xbyak::Xmm& xmm, uint8_t imm) {
+        if (isa == cpu::avx512_common || isa == cpu::avx2) {
+            vextractps(op, xmm, imm);
+        } else {
+            extractps(op, xmm, imm);
         }
-        vbroadcastss(vmmMaxVec, xmm9);
     }
 
-//    void broadcastMax(const Xbyak::Zmm& src) {
-//        vextractf128(xmm8, src, 0);
-//        vextractf128(xmm9, src, 1);
-//        vmaxps(xmm8, xmm9);
-//        extractps(regMaxProb, xmm8, 0);
-//        vinsertps(xmm9, xmm8, xmm8, 0x0);
+    inline void uni_insertps(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2, const Xbyak::Operand& op, uint8_t imm) {
+        if (isa == cpu::avx512_common || isa == cpu::avx2) {
+            vinsertps(x1, x2, op, imm);
+        } else {
+            insertps(x1, op, imm);
+        }
+    }
+
+    inline void findMaxInXmm(const Xbyak::Xmm& src, const Xbyak::Xmm& dst, const Xbyak::Reg32& maxVal) {
+        uni_extractps(maxVal, src, 0);
+        uni_insertps(dst, src, src, 0x0);
+        for (int i = 1; i < 4; i++) {
+            Xbyak::Label nextLabel;
+            uni_extractps(regCurProb32, src, i);
+            cmp(regCurProb, maxVal);
+            jle(nextLabel, T_NEAR);
+            mov(maxVal, regCurProb);
+            uni_insertps(dst, src, src, i << 6);
+            L(nextLabel);
+        }
+    }
+
+    void broadcastMax(const Xbyak::Xmm& src) {
+//        uni_extractps(regMaxProb, src, 0);
+//        uni_insertps(xmmAux9, src, src, 0x0);
 //        for (int i = 1; i < 4; i++) {
-//            Xbyak::Label setLabel;
 //            Xbyak::Label nextLabel;
-//            extractps(regCurProb, xmm8, i);
+//            uni_extractps(regCurProb, src, i);
 //            cmp(regCurProb, regMaxProb);
-//            jg(setLabel, T_NEAR);
-//            jmp(nextLabel, T_NEAR);
-//            L(setLabel);
+//            jle(nextLabel, T_NEAR);
 //            mov(regMaxProb, regCurProb);
-//            vinsertps(xmm9, xmm8, xmm8, i << 6);
+//            uni_insertps(xmmAux9, src, src, i << 6);
 //            L(nextLabel);
 //        }
-//        vbroadcastss(vmmMaxVec, xmm9);
-//    }
+        findMaxInXmm(src, xmmAux9, regMaxProb32);
+        uni_vbroadcastss(vmmMaxVec, xmmAux9);
+    }
+
+    inline void broadcastMax(const Xbyak::Ymm& src) {
+        vextractf128(xmm8, src, 0);
+        vextractf128(xmmAux9, src, 1);
+        vmaxps(xmm8, xmmAux9);
+        findMaxInXmm(xmm8, xmmAux9, regMaxProb32);
+//        uni_extractps(regMaxProb32, xmm8, 0);
+//        uni_insertps(xmmAux9, xmm8, xmm8, 0x0);
+//        for (int i = 1; i < 4; i++) {
+//            Xbyak::Label nextLabel;
+//            uni_extractps(regCurProb32, xmm8, i);
+//            cmp(regCurProb32, regMaxProb32);
+//            jle(nextLabel, T_NEAR);
+//            mov(regMaxProb, regCurProb32);
+//            uni_insertps(xmmAux9, xmm8, xmm8, i << 6);
+//            L(nextLabel);
+//        }
+        vbroadcastss(vmmMaxVec, xmmAux9);
+    }
+
+    void broadcastMax(const Xbyak::Zmm& src) {
+        vextractf32x8(vmmAux5, src, 0);
+        vextractf32x8(vmmAux6, src, 1);
+        vmaxps(vmmAux5, vmmAux6);
+        broadcastMax(vmmAux5);
+//        vextractf32x4(xmm8, src, 0);
+//        for (int i = 1; i < 4; i++) {
+//            vextractf32x4(xmmAux9, src, i);
+//            vmaxps(xmm8, xmmAux9);
+//        }
+//        findMaxInXmm(xmm8, xmmAux9, regMaxProb32);
+//        uni_extractps(regMaxProb32, xmm8, 0);
+//        uni_insertps(xmmAux9, xmm8, xmm8, 0x0);
+//        for (int i = 1; i < 4; i++) {
+//            Xbyak::Label nextLabel;
+//            uni_extractps(regCurProb32, xmm8, i);
+//            cmp(regCurProb32, regMaxProb32);
+//            jle(nextLabel, T_NEAR);
+//            mov(regMaxProb, regCurProb32);
+//            uni_insertps(xmmAux9, xmm8, xmm8, i << 6);
+//            L(nextLabel);
+//        }
+//        vbroadcastss(vmmMaxVec, xmmAux9);
+    }
 
 private:
     using Vmm = typename conditional3<isa == cpu::sse42, Xbyak::Xmm, isa == cpu::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
@@ -231,6 +270,8 @@ private:
     Xbyak::Reg64 regMaxClassIdx = r13;
     Xbyak::Reg64 regTmpVal = r14;
     Xbyak::Reg64 regTmp = r15;
+    Xbyak::Reg32 regMaxProb32 = r10d;
+    Xbyak::Reg32 regCurProb32 = r11d;
 
     Xbyak::Fpu regSt0 = st0;
     Xbyak::Fpu regSt1 = st1;
@@ -238,12 +279,14 @@ private:
     Xbyak::Reg64 regParams = abi_param1;
 
     Xbyak::Xmm xmm8 = Xbyak::Xmm(8);
-    Xbyak::Xmm xmm9 = Xbyak::Xmm(9);
+    Xbyak::Xmm xmmAux9 = Xbyak::Xmm(9);
     Vmm vmmFirstV = Vmm(0);
     Vmm vmmSecondV = Vmm(1);
     Vmm vmmGrtMask = Vmm(2);
     Vmm vmmOnes = Vmm(3);
     Vmm vmmMaxVec = Vmm(4);
+    Vmm vmmAux5 = Vmm(5);
+    Vmm vmmAux6 = Vmm(6);
 };
 
 class CTCGreedyDecoderImpl: public ExtLayerBase {
