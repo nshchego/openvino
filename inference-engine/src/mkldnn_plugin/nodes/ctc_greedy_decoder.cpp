@@ -287,181 +287,6 @@ public:
         }
     }
 
-//    StatusCode execute(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs,
-//                       ResponseDesc *resp) noexcept override {
-//        const float* probabilities = inputs[DATA_INDEX]->cbuffer().as<const float*>() +
-//            inputs[DATA_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
-//        const float* sequenceLengths = inputs[SEQUENCE_LENGTH_INDEX]->cbuffer().as<const float*>() +
-//            inputs[SEQUENCE_LENGTH_INDEX]->getTensorDesc().getBlockingDesc().getOffsetPadding();
-//        float* outputSequences = outputs[0]->buffer().as<float*>();
-//
-//        const size_t T = inputs[DATA_INDEX]->getTensorDesc().getDims()[0];
-//        const size_t B = inputs[DATA_INDEX]->getTensorDesc().getDims()[1];
-//        const int C = inputs[DATA_INDEX]->getTensorDesc().getDims()[2];
-//        const size_t BC = C * B;
-//        const size_t TB = T * B;
-//        const size_t CB1 = C * (B - 1);
-//
-//        const int blankIndex = C - 1;
-//
-////printf("T: %lu; B: %lu; C: %d\n", T, B, C);
-//
-//static double du1 = 0.0;
-//static int c1 = 0;
-//auto start = std::chrono::steady_clock::now();
-//
-////        size_t workAmount = 0;
-////        std::vector<size_t> sequenceLengthB(B, 0);
-////        for (size_t b = 0; b < B; b++) {
-////            for (size_t t = 0; t < T; t++) {
-////                if (sequenceLengths[B * t + b] == 0.f)
-////                    break;
-////                sequenceLengthB[b]++;
-////            }
-////            workAmount += sequenceLengthB[b];
-////        }
-//
-//        // Parallelization could not be made by T due to output index depends on merged classes and
-//        // blank index thus could not be shared between threads. Better to parallelize by classes.
-////        auto threadBody = [&](const int ithr, const int nthr) {
-////            size_t start(0lu), end(0lu);
-////            splitter(workAmount, nthr, ithr, start, end);
-////            if (start >= end)
-////                return;
-////            size_t tStart = 0lu, bStart = 0lu;
-////            int64_t cw = 0, st = start;
-////            for (; bStart < B; bStart++) {
-////                cw += sequenceLengthB[bStart];
-////                if (cw >= st) {
-////                    tStart = sequenceLengthB[bStart] + st - cw;
-////                    break;
-////                }
-////            }
-//
-////            size_t workCounter = start;
-////printf("[] tStart: %lu; bStart: %lu\n", tStart, bStart);
-//
-//            for (size_t b = 0; b < B; ++b) {
-//                int prev_class_idx = -1;
-//                size_t outputIndex = b * T;
-//                const float* probs = probabilities + b * C;
-////                size_t sequenceLength = sequenceLengthB[b];
-////printf("[] sequenceLengths: %lu; b: %lu\n", sequenceLength, b);
-//
-//                for (size_t t = 0; t < T; ++t) {
-//                    if (sequenceLengths[B * t + b] == 0.f) {
-////printf("[] BREAK: t: %lu; b: %lu\n", t, b);
-//                        break;
-//                    }
-////                    int maxClassIdx = 0;
-//
-////    std::string probsStr = "probs: ";
-////for (int i = 0; i < C; i++) {
-////    probsStr += std::to_string(probs[i]) + "; ";
-////}
-////printf(probsStr);
-////                    if (kernel_ != nullptr) {
-////                        float tmpDst[8];
-////                        auto arg = jitArgsGreedyDecoder();
-////                        arg.probs = probs;
-////                        arg.tmpDst = tmpDst;
-////                        arg.maxClassIdx = &maxClassIdx;
-////                        (*kernel_)(&arg);
-////                        probs += C;
-////probsStr += "\ntmpDst: ";
-////for (int i = 0; i < 8; i++) {
-////    probsStr += std::to_string(tmpDst[i]) + "; ";
-////}
-////probsStr += "\tt: " + std::to_string(t) + "; b: " + std::to_string(b) + "; maxClassIdx: " + std::to_string(maxClassIdx);
-////                    } else {
-////                        const int threadsNum = parallel_get_max_threads();
-////                        std::vector<int> maxClassPerThread(threadsNum, -1);
-////                        std::vector<float> probsPerThread(threadsNum, std::numeric_limits<float>::lowest());
-//
-////static double du2 = 0.0;
-////static int c2 = 0;
-////auto start2 = std::chrono::steady_clock::now();
-//
-//                        const int threadsNum = parallel_get_max_threads();
-//                        std::vector<int> maxClassPerThread(threadsNum, -1);
-//                        std::vector<float> probsPerThread(threadsNum, std::numeric_limits<float>::lowest());
-//
-//                        auto threadBody = [&](const int ithr, const int nthr) {
-//                            int start(0), end(0);
-//                            splitter(C, nthr, ithr, start, end);
-//                            if (start >= end)
-//                                return;
-//
-//                            maxClassPerThread[ithr] = start;
-//                            const float* probsThr = probs + start;
-//                            probsPerThread[ithr] = probsThr[0];
-//                            probsThr++;
-//                            for (int c = start + 1; c < end; c++, probsThr++) {
-//                                if (probsThr[0] > probsPerThread[ithr]) {
-//                                    maxClassPerThread[ithr] = c;
-//                                    probsPerThread[ithr] = probsThr[0];
-//                                }
-//                            }
-//                        };
-//                        parallel_nt(0, threadBody);
-////                        probs += C;
-//                        int maxClassIdx = maxClassPerThread[0];
-//                        float maxProb = probsPerThread[0];
-//                        for (int i = 1; i < threadsNum; i++) {
-//                            if (probsPerThread[i] > maxProb) {
-//                                maxClassIdx = maxClassPerThread[i];
-//                                maxProb = probsPerThread[i];
-//                            }
-//                        }
-//
-////auto end2 = std::chrono::steady_clock::now();
-////c2++;
-////du2 += std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2).count();
-////if (c2 % 1000 == 0) {
-////    printf("DU2: %f\n", du2 / c2);
-////}
-////                    }
-////probsStr += "    t: " + std::to_string(t) + "; b: " + std::to_string(b) + "; maxClassIdx: " + std::to_string(maxClassIdx) +
-////        "; outputIndex: " + std::to_string(outputIndex);
-////printf("%s\n", probsStr.c_str());
-////printf("t: %lu; b: %lu; maxClassIdx: %d\n", t, b, maxClassIdx);
-//                    if (maxClassIdx < blankIndex &&
-//                            !(mergeRepeated_ && maxClassIdx == prev_class_idx)) {
-//                        outputSequences[outputIndex++] = static_cast<float>(maxClassIdx);
-//                    }
-//
-//                    prev_class_idx = maxClassIdx;
-//                    probs += BC;
-//
-////                    if (++workCounter >= end) {
-////                        return;
-////                    }
-//                }
-//                std::fill(outputSequences + outputIndex, outputSequences + (b + 1) * T, -1.f);
-////                tStart = 0lu;
-//            }
-////        }; // thread body
-//
-////        parallel_nt(0, threadBody);
-//
-//auto end = std::chrono::steady_clock::now();
-//c1++;
-//du1 += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-//if (c1 % 100 == 0) {
-//    printf("DU1: %f\n", du1 / c1);
-//}
-//
-//        return OK;
-//    }
-//
-//    const size_t DATA_INDEX = 0lu;
-//    const size_t SEQUENCE_LENGTH_INDEX = 1lu;
-//    bool mergeRepeated_;
-//
-//    std::shared_ptr<jitUniGreedyDecoderBase> kernel_;
-//};
-
-
     StatusCode execute(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs,
                        ResponseDesc *resp) noexcept override {
 static double du1 = 0.0;
@@ -478,7 +303,7 @@ auto start = std::chrono::steady_clock::now();
         const size_t B = inputs[DATA_INDEX]->getTensorDesc().getDims()[1];
         const int C = inputs[DATA_INDEX]->getTensorDesc().getDims()[2];
         const size_t BC = B * C;
-        const size_t TB = T * B;
+        const size_t BT = B * T;
         const size_t CB1 = C * (B - 1);
 
         const int blankIndex = C - 1;
@@ -502,6 +327,10 @@ auto start = std::chrono::steady_clock::now();
 
 //auto start = std::chrono::steady_clock::now();
 
+        // Parallelization could not be made directly by T due to output index depends on merged classes and
+        // blank index, thus could not be shared between threads. Better to divide operation on two steps.
+        // At the first stage find the maximum index. At second stage merge if needed.
+        // Such approach makes parallelization more efficient.
         auto threadBody = [&](const int ithr, const int nthr) {
             size_t start(0lu), end(0lu);
             splitter(workAmount, nthr, ithr, start, end);
@@ -595,7 +424,6 @@ auto start = std::chrono::steady_clock::now();
         parallel_nt(0, threadBody);
 
 //auto end = std::chrono::steady_clock::now();
-
 
         parallel_for(B, [&](size_t b) {
             int prev_class_idx = -1;
