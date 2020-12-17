@@ -72,6 +72,7 @@ MKLDNN_EXTENSION_NODE(SparseFillEmptyRowsImpl, SparseFillEmptyRows);
 MKLDNN_EXTENSION_NODE(BucketizeImpl, Bucketize);
 MKLDNN_EXTENSION_NODE(CTCGreedyDecoderImpl, CTCGreedyDecoder);
 MKLDNN_EXTENSION_NODE(GatherImpl, Gather);
+MKLDNN_EXTENSION_NODE(GatherElementsImpl, GatherElements);
 MKLDNN_EXTENSION_NODE(GatherNDImpl, GatherND);
 MKLDNN_EXTENSION_NODE(ProposalImpl, Proposal);
 MKLDNN_EXTENSION_NODE(RangeImpl, Range);
