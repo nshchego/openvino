@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 #include "ie_parallel.hpp"
-//#include "common/cpu_memcpy.h"
 #include "jit_generator.hpp"
 #include "common/cpu_memcpy.h"
 #include <mkldnn_types.h>
@@ -38,10 +37,10 @@ struct jitArgsGatherEl {
     const int* strideAx1Diff;
     const int* dstShift0;
     const int* incVec;
+    const int* one;
     int axStrideIt;
-    int one;
     size_t workAmount;
-    int* retVal;
+//    int* retVal;
 };
 
 struct jitUniGatherElKernel {
@@ -65,32 +64,30 @@ struct jitUniGatherElKernel_32 : public jitUniGatherElKernel, public jit_generat
         mov(regSrc, ptr[regParams + GET_OFF(src)]);
         mov(regDst, ptr[regParams + GET_OFF(dst)]);
         mov(regIndices, ptr[regParams + GET_OFF(indices)]);
-        mov(regTmp, ptr[regParams + GET_OFF(dstAxIdx)]);
-//        uni_vpbroadcastd(vmmAxIdx, ptr[regTmp]);
-        uni_vpbroadcastd(xmmDstAxIdxAux, ptr[regTmp]);
-        mov(regDstAxIdx, ptr[regTmp]);
         mov(regAxStrideIt, ptr[regParams + GET_OFF(axStrideIt)]);
         mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+
+        mov(regTmp, ptr[regParams + GET_OFF(dstAxIdx)]);
+        mov(regDstAxIdx, ptr[regTmp]);
+        uni_vpbroadcastd(xmmDstAxIdxAux, ptr[regTmp]);
         mov(regTmp, ptr[regParams + GET_OFF(strideAx1Diff)]);
         uni_vpbroadcastd(xmmStrideAx1Diff, ptr[regTmp]);
         mov(regTmp, ptr[regParams + GET_OFF(dstShift0)]);
         uni_vpbroadcastd(xmmDstShift0Aux, ptr[regTmp]);
         mov(regTmp, ptr[regParams + GET_OFF(strideAxSrc)]);
         uni_vpbroadcastd(vmmStrideAxSrc, ptr[regTmp]);
-        mov(regRetVal, ptr[regParams + GET_OFF(retVal)]);
-//        mov(ptr[regRetVal], regWorkAmount);
-        uni_vpbroadcastd(xmmOnes, ptr[regRetVal]);
+        mov(regTmp, ptr[regParams + GET_OFF(one)]);
+        uni_vpbroadcastd(xmmOnes, ptr[regTmp]);
         mov(regTmp, ptr[regParams + GET_OFF(incVec)]);
         uni_vmovups(vmmIncVec, ptr[regTmp]);
-//        mov(regTmp, ptr[regParams + GET_OFF(dataSize)]);
-//        uni_vpbroadcastd(vmmDataSize, ptr[regTmp]);
 
-        Xbyak::Label oLabel;
+        Xbyak::Label oLabel, endLabel;
 
         const size_t elPerVec = vlen / jpp.dataSize;
 
         uni_vxorps(xmmZero, xmmZero, xmmZero);
-//        uni_vpcmpeqd(xmmOnes, xmmOnes, xmmOnes);
+//        uni_vpbroadcastd(vmmDstAxIdx, xmmZero);
+//        uni_vpbroadcastd(vmmDstShift0, xmmZero);
 
         L(oLabel);
         {
@@ -104,13 +101,10 @@ struct jitUniGatherElKernel_32 : public jitUniGatherElKernel, public jit_generat
             uni_vpmulld(vmmSrcIdx, vmmSrcIdx, vmmStrideAxSrc);
             uni_vpaddd(vmmSrcIdx, vmmSrcIdx, vmmDstShift0);
             uni_vpaddd(vmmSrcIdx, vmmSrcIdx, vmmIncVec);
-//            uni_vpmulld(vmmSrcIdx, vmmSrcIdx, vmmDataSize);
 
             uni_vpcmpeqd(vmmOnesBit, vmmOnesBit, vmmOnesBit);
             vpgatherdd(vmmDst, ptr[regSrc + vmmSrcIdx], vmmOnesBit);
             uni_vmovups(ptr[regDst], vmmDst);
-//            uni_vmovups(ptr[regDst], vmmIncVec);
-//            vmovdqa(ptr[regDst], vmmOnesBit);
 
             add(regSrc, vlen);
             add(regDst, vlen);
@@ -121,26 +115,54 @@ struct jitUniGatherElKernel_32 : public jitUniGatherElKernel, public jit_generat
 
             L(tailLabel);
             {
-//                    cmp(regWorkAmount, 0);
-//                    je(endLabel, T_NEAR);
-//                    cmp(regElInBatch, 0);
-//                    je(ceLabel, T_NEAR);
-//                    sub(regWorkAmount, 1);
-//                    sub(regElInBatch, 1);
+                cmp(regWorkAmount, 0);
+                je(endLabel, T_NEAR);
 
-//                    mov(regMultipliers, ptr[regParams + GET_OFF(multipliers)]);
-//                    for (int i = 0; i < jpp.sliceRank; i++) {
-//                        vpbroadcastd(vmmMult, ptr[regMultipliers]);
-//                        vpgatherdd(vmmIndicies, ptr[regIndices + vmmAxIdx], vmmOnesBit);
-//                        vpmulld(vmmAcc, vmmMult, vmmIndicies);
-//                        vpaddd(vmmSrcIdx, vmmSrcIdx, vmmAcc);
-//                        add(regMultipliers, indicesDataTypeSize);
-//                        add(regIndices, indicesDataTypeSize);
-//                        vpcmpeqd(vmmOnesBit, vmmOnesBit, vmmOnesBit);
-//                    }
-//                    jmp(tailLabel, T_NEAR);
+                Xbyak::Label insertLabel, incLabel;
+
+                cmp(regAxStrideIt, jpp.strideAxDst);
+                jl(insertLabel, T_NEAR);
+                mov(regAxStrideIt, 0);
+                inc(regDstAxIdx);
+//
+                cmp(regDstAxIdx, jpp.dstAxDim);
+                jl(incLabel, T_NEAR);
+                mov(regDstAxIdx, 0);
+//                uni_movaps(xmmDstAxIdxAux, xmmZero);
+//                uni_vpaddd(xmmDstShift0Aux, xmmDstShift0Aux, xmmStrideAx1Diff);
+                jmp(insertLabel, T_NEAR);
+//
+                L(incLabel);
+//                uni_vpaddd(xmmDstAxIdxAux, xmmDstAxIdxAux, xmmOnes);
+//
+                L(insertLabel);
+//                uni_insertps(idx, xmmDstAxIdxAux, xmmDstAxIdxAux, i << 6);
+//                uni_insertps(shift0, xmmDstShift0Aux, xmmDstShift0Aux, i << 6);
+                inc(regAxStrideIt);
+
+//                // mov form idx +reg
+//                // extract dstAxIdx from xmmDstAxIdxAux +reg
+//                // extract strideAxSrc from vmmStrideAxSrc or regAxStrideIt
+//                // extract dstShift0 from vmmDstShift0 +reg
+//
+//                mov(vmmIndicies, ptr[regIndices]);
+//                sub(vmmSrcIdx, vmmIndicies, vmmDstAxIdx);
+//                mul(vmmSrcIdx, vmmSrcIdx, vmmStrideAxSrc);
+//                add(vmmSrcIdx, vmmSrcIdx, vmmDstShift0);
+//
+//                uni_vpcmpeqd(vmmOnesBit, vmmOnesBit, vmmOnesBit);
+//                vpgatherdd(vmmDst, ptr[regSrc + vmmSrcIdx], vmmOnesBit);
+//                uni_vmovups(ptr[regDst], vmmDst);
+
+                add(regSrc, jpp.dataSize);
+                add(regDst, jpp.dataSize);
+                add(regIndices, jpp.dataSize);
+                sub(regWorkAmount, 1);
+
+                jmp(tailLabel, T_NEAR);
             }
         }
+        L(endLabel);
 
         this->postamble();
 
@@ -240,7 +262,6 @@ private:
     Xbyak::Xmm xmmStrideAx1Diff = Xbyak::Xmm(4);
     Xbyak::Xmm xmmZero = Xbyak::Xmm(5);
     Xbyak::Xmm xmmOnes = Xbyak::Xmm(6);
-//    Xbyak::Xmm xmmAux1 = Xbyak::Xmm(7);
 
     Vmm vmmIncVec = Vmm(7);
     Vmm vmmIndicies = Vmm(10);
@@ -253,27 +274,27 @@ private:
 
 class GatherElementsImpl: public ExtLayerBase {
 public:
-    explicit GatherElementsImpl(const CNNLayer* layer) {
+    explicit GatherElementsImpl(const CNNLayer* layer) : strideAx1Diff_(0) {
         errorPrefix_ = std::string("Layer GatherElements with name '") + layer->name + "'";
 
         if (layer->insData.size() != 2 || layer->outData.size() != 1)
             THROW_IE_EXCEPTION << errorPrefix_ << " has invalid number of input/output edges.";
 
-        auto data = layer->insData[dataIndex_].lock();
+        auto inputData = layer->insData[dataIndex_].lock();
         auto indices = layer->insData[indicesIndex_].lock();
-        if (!data || !indices)
+        if (!inputData || !indices)
             THROW_IE_EXCEPTION << errorPrefix_ << " has nullable inputs.";
 
-        const auto& dataDims = data->getTensorDesc().getDims();
+        const auto& dataDims = inputData->getTensorDesc().getDims();
         const auto& indicesDims = indices->getTensorDesc().getDims();
         if (dataDims.size() != indicesDims.size())
             THROW_IE_EXCEPTION << errorPrefix_ << " has invalid input shapes. Inputs 'Data' and 'Indices' must have equal ranks.";
 
-        Precision dataPrecision = data->getTensorDesc().getPrecision();
+        Precision dataPrecision = inputData->getTensorDesc().getPrecision();
         if (dataPrecision.size() != sizeof(PrecisionTrait<Precision::I32>::value_type) &&
                 dataPrecision.size() != sizeof(PrecisionTrait<Precision::I16>::value_type) &&
                 dataPrecision.size() != sizeof(PrecisionTrait<Precision::I8>::value_type)) {
-            THROW_IE_EXCEPTION << errorPrefix_ << " has unsupported 'data' input precision: " << dataPrecision;
+            THROW_IE_EXCEPTION << errorPrefix_ << " has unsupported 'inputData' input precision: " << dataPrecision;
         }
 
         Precision indicesPrecision = indices->getTensorDesc().getPrecision();
@@ -281,38 +302,56 @@ public:
             THROW_IE_EXCEPTION << errorPrefix_ << " has unsupported 'indices' input precision: " << indicesPrecision;
         }
 
+        auto& outputData = layer->outData[0];
+        auto outputPrecision = outputData->getPrecision();
+        if (!mayiuse(avx512_core)) {
+            if (outputPrecision == Precision::BF16)
+                outputPrecision = Precision::FP32;
+        }
+
         dataTypeSize_ = dataPrecision.size();
 
         axis_ = layer->GetParamAsInt("axis", 0);
         if (axis_ >= dataDims.size())
             THROW_IE_EXCEPTION << errorPrefix_ << " has invalid axis attribute: " << axis_;
+        if (axis_ < 0)
+            axis_ += dataDims.size();
 
-        strideAxDst_ = layer->outData[0]->getTensorDesc().getBlockingDesc().getStrides()[axis_];
-        dstAxDim_ = layer->outData[0]->getTensorDesc().getDims()[axis_];
+        strideAxDst_ = outputData->getTensorDesc().getBlockingDesc().getStrides()[axis_];
+        dstAxDim_ = outputData->getTensorDesc().getDims()[axis_];
+        if (axis_ > 0) {
+            strideAx1Diff_ = inputData->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1] -
+                    outputData->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1];
+        }
 
-        jitGatherElConfT jpp;
-        jpp.strideAxDst = strideAxDst_;
-        jpp.dstAxDim = dstAxDim_;
-        jpp.dataSize = dataTypeSize_;
-//        if (mayiuse(cpu::avx512_common)) {
-//            kernel32_.reset(new jitUniGatherElKernel_32<cpu::avx512_common>(jpp));
-//        } else if (mayiuse(cpu::avx2)) {
-//            kernel32_.reset(new jitUniGatherElKernel_32<cpu::avx2>(jpp));
-//        } else if (mayiuse(cpu::sse42)) {
-//            kernel32_.reset(new jitUniGatherElKernel_32<cpu::sse42>(jpp));
-//        }
+        // Gather instruction is applicable just for 32 and 64 bit inputData and is not supported by SSE.
+        if (dataPrecision.size() == sizeof(PrecisionTrait<Precision::I32>::value_type)) {
+            jitGatherElConfT jpp;
+            jpp.strideAxDst = strideAxDst_;
+            jpp.dstAxDim = dstAxDim_;
+            jpp.dataSize = dataTypeSize_;
+            if (mayiuse(cpu::avx512_common)) {
+                kernel32_.reset(new jitUniGatherElKernel_32<cpu::avx512_common>(jpp));
+                incVec_.resize(16, 0);
+            } else if (mayiuse(cpu::avx2)) {
+                kernel32_.reset(new jitUniGatherElKernel_32<cpu::avx2>(jpp));
+                incVec_.resize(8, 0);
+            }
+            for (int j = 1; j < incVec_.size(); j++)
+                incVec_[j] = incVec_[j - 1] + dataTypeSize_;
+        }
 
         LayerConfig config;
         DataConfig dataConfig, indicesConfig, outConfig;
         dataConfig.desc = TensorDesc(dataPrecision, dataDims,
-            data->getTensorDesc().getLayoutByDims(dataDims));
+            inputData->getTensorDesc().getLayoutByDims(dataDims));
         config.inConfs.push_back(dataConfig);
         indicesConfig.desc = TensorDesc(Precision::I32, indicesDims,
             indices->getTensorDesc().getLayoutByDims(indicesDims));
         config.inConfs.push_back(indicesConfig);
 
         const auto& outDims = layer->outData[0]->getTensorDesc().getDims();
-        outConfig.desc = TensorDesc(dataPrecision, outDims,
+        outConfig.desc = TensorDesc(outputPrecision, outDims,
                 layer->outData[0]->getTensorDesc().getLayoutByDims(outDims));
         config.outConfs.push_back(outConfig);
         config.dynBatchSupport = false;
@@ -321,32 +360,37 @@ public:
     }
 
     StatusCode execute(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs, ResponseDesc *resp) noexcept override {
-        switch (dataTypeSize_) {
-            case sizeof(PrecisionTrait<Precision::I32>::value_type):
-                gatherElementwise<PrecisionTrait<Precision::I32>::value_type>(inputs, outputs, resp);
-                break;
-            case sizeof(PrecisionTrait<Precision::I16>::value_type):
-                gatherElementwise<PrecisionTrait<Precision::I16>::value_type>(inputs, outputs, resp);
-                break;
-            case sizeof(PrecisionTrait<Precision::I8>::value_type):
-                gatherElementwise<PrecisionTrait<Precision::I8>::value_type>(inputs, outputs, resp);
-                break;
-            default:
-                std::string errMsg = errorPrefix_ + " has data input with unsupported precision: " +
-                    inputs[dataIndex_]->getTensorDesc().getPrecision().name();
-                errMsg.copy(resp->msg, sizeof(resp->msg) - 1);
-                return GENERAL_ERROR;
+static double du1 = 0.0;
+static int c1 = 0;
+auto start = std::chrono::steady_clock::now();
+        if (kernel32_) {
+            return vectorizedExecution(inputs, outputs, resp);
+        } else {
+            switch (dataTypeSize_) {
+                case sizeof(PrecisionTrait<Precision::I32>::value_type):
+                    return directExecution<PrecisionTrait<Precision::I32>::value_type>(inputs, outputs, resp);
+                case sizeof(PrecisionTrait<Precision::I16>::value_type):
+                    return directExecution<PrecisionTrait<Precision::I16>::value_type>(inputs, outputs, resp);
+                case sizeof(PrecisionTrait<Precision::I8>::value_type):
+                    return directExecution<PrecisionTrait<Precision::I8>::value_type>(inputs, outputs, resp);
+                default:
+                    std::string errMsg = errorPrefix_ + " has inputData input with unsupported precision: " +
+                        inputs[dataIndex_]->getTensorDesc().getPrecision().name();
+                    errMsg.copy(resp->msg, sizeof(resp->msg) - 1);
+                    return GENERAL_ERROR;
+            }
         }
-
-        return OK;
+auto end = std::chrono::steady_clock::now();
+c1++;
+du1 += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+if (c1 % 100 == 0) {
+    printf("DU1: %f\n", du1 / c1);
+}
     }
 
 protected:
     template <typename dataType>
-    void gatherElementwise(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs, ResponseDesc *resp) noexcept {
-static double du1 = 0.0;
-static int c1 = 0;
-auto start = std::chrono::steady_clock::now();
+    StatusCode directExecution(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs, ResponseDesc *resp) noexcept {
         const dataType* srcData = inputs[dataIndex_]->cbuffer().as<const dataType*>() +
             inputs[dataIndex_]->getTensorDesc().getBlockingDesc().getOffsetPadding();
         const int* indices = inputs[indicesIndex_]->cbuffer().as<const int*>() +
@@ -369,15 +413,6 @@ auto start = std::chrono::steady_clock::now();
 //printf("%s\n", probsStr.c_str());
 
         const size_t outSize = outputs[0]->size();
-//        const int strideAxSrc = inputs[dataIndex_]->getTensorDesc().getBlockingDesc().getStrides()[axis_];
-        int strideAx1Src = 0;//std::numeric_limits<size_t>::max();
-        int strideAx1Dst = 0;//std::numeric_limits<size_t>::max();
-        if (axis_ > 0) {
-            strideAx1Src = inputs[dataIndex_]->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1];
-            strideAx1Dst = outputs[0]->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1];
-        }
-        int strideAx1Diff = strideAx1Src - strideAx1Dst;
-
 //        {
 ////probsStr += "\nSeq Out:\n";
 //            size_t axStrideIt = 0lu;
@@ -389,7 +424,7 @@ auto start = std::chrono::steady_clock::now();
 //                    dstAxIdx++;
 //                    if (dstAxIdx == dstAxDim_) {
 //                        dstAxIdx = 0lu;
-//                        dstShift0 += strideAx1Diff;
+//                        dstShift0 += strideAx1Diff_;
 //                    }
 //                }
 ////if (o % 10 == 0)
@@ -407,44 +442,19 @@ auto start = std::chrono::steady_clock::now();
 
             int axStrideIt = start % strideAxDst_;
             int dstAxIdx = (start / strideAxDst_) % dstAxDim_;
-            int dstShift0 = (start / strideAxDst_ / dstAxDim_) * strideAx1Diff;
+            int dstShift0 = (start / strideAxDst_ / dstAxDim_) * strideAx1Diff_;
 ////printf("ithr: %d; start: %lu; end: %lu; axStrideIt: %d\n", ithr, start, end, axStrideIt);
-int retVal = 1;
-
-            if (kernel32_) {
-                int incVec[16] = {0};
-                for (int j = 1; j < 16; j++)
-                    incVec[j] = incVec[j - 1] + dataTypeSize_;
-                int strideAxDst = strideAxDst_ * dataTypeSize_;
-                int dstShift0B = dstShift0 * dataTypeSize_;
-                int strideAx1DiffB = strideAx1Diff * dataTypeSize_;
-                auto arg = jitArgsGatherEl();
-                arg.src = srcData + start;
-                arg.dst = dstData + start;
-                arg.indices = indices + start;
-                arg.axStrideIt = axStrideIt;
-                arg.strideAxSrc = &strideAxDst;
-                arg.dstAxIdx = &dstAxIdx;
-                arg.strideAx1Diff = &strideAx1DiffB;
-                arg.dstShift0 = &dstShift0B;
-                arg.incVec = incVec;
-//                arg.one = 1;
-                arg.workAmount = (uint32_t)(end - start);
-                arg.retVal = &retVal;
-                (*kernel32_)(&arg);
-//printf("retVal: %d\n", retVal);
-            } else {
-                for (size_t o = start; o < end; o++, axStrideIt++) {
-                    if (axStrideIt == strideAxDst_) {
-                        axStrideIt = 0lu;
-                        dstAxIdx++;
-                        if (dstAxIdx == dstAxDim_) {
-                            dstAxIdx = 0lu;
-                            dstShift0 += strideAx1Diff;
-                        }
+//int retVal = 1;
+            for (size_t o = start; o < end; o++, axStrideIt++) {
+                if (axStrideIt == strideAxDst_) {
+                    axStrideIt = 0lu;
+                    dstAxIdx++;
+                    if (dstAxIdx == dstAxDim_) {
+                        dstAxIdx = 0lu;
+                        dstShift0 += strideAx1Diff_;
                     }
-                    dstData[o] = srcData[o + dstShift0 + (indices[o] - dstAxIdx) * strideAxDst_];
                 }
+                dstData[o] = srcData[o + dstShift0 + (indices[o] - dstAxIdx) * strideAxDst_];
             }
         };
         parallel_nt(0, threadBody);
@@ -456,21 +466,107 @@ int retVal = 1;
 //    probsStr += std::to_string(dstData[i]) + "; ";
 //}
 //printf("%s\n", probsStr.c_str());
-
-auto end = std::chrono::steady_clock::now();
-c1++;
-du1 += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-if (c1 % 100 == 0) {
-    printf("DU1: %f\n", du1 / c1);
-}
+        return OK;
     }
+
+    StatusCode vectorizedExecution(std::vector<Blob::Ptr>& inputs, std::vector<Blob::Ptr>& outputs, ResponseDesc *resp) noexcept {
+        const int* srcData = inputs[dataIndex_]->cbuffer().as<const int*>() +
+            inputs[dataIndex_]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+        const int* indices = inputs[indicesIndex_]->cbuffer().as<const int*>() +
+            inputs[indicesIndex_]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+        int* dstData = outputs[0]->buffer().as<int*>() +
+            outputs[0]->getTensorDesc().getBlockingDesc().getOffsetPadding();
+
+    std::string probsStr = "srcData:\n";
+for (int i = 0; i < inputs[dataIndex_]->size(); i++) {
+    if (i % 10 == 0)
+        probsStr += "(" + std::to_string(i) + "); ";
+    probsStr += std::to_string(srcData[i]) + "; ";
+}
+probsStr += "\nIndices:\n";
+for (int i = 0; i < inputs[indicesIndex_]->size(); i++) {
+    if (i % 10 == 0)
+        probsStr += "(" + std::to_string(i) + "); ";
+    probsStr += std::to_string(indices[i]) + "; ";
+}
+printf("%s\n", probsStr.c_str());
+
+        const size_t outSize = outputs[0]->size();
+
+        {
+probsStr += "\nSeq Out:\n";
+            size_t axStrideIt = 0lu;
+            size_t dstAxIdx = 0lu;
+            int dstShift0 = 0;
+            for (size_t o = 0; o < outSize; o++, axStrideIt++) {
+                if (axStrideIt == strideAxDst_) {
+                    axStrideIt = 0lu;
+                    dstAxIdx++;
+                    if (dstAxIdx == dstAxDim_) {
+                        dstAxIdx = 0lu;
+                        dstShift0 += strideAx1Diff_;
+                    }
+                }
+if (o % 10 == 0)
+    probsStr += "(" + std::to_string(o) + "); ";
+probsStr += std::to_string(srcData[o + dstShift0 + (indices[o] - dstAxIdx) * strideAxDst_]) + "; ";
+//                dstData[o] = srcData[o + dstShift0 + (indices[o] - dstAxIdx) * strideAxDst_];
+            }
+        }
+
+        auto threadBody = [&](const int ithr, const int nthr) {
+            size_t start(0lu), end(0lu);
+            splitter(outSize, nthr, ithr, start, end);
+            if (start >= end)
+                return;
+
+            int axStrideIt = start % strideAxDst_;
+            int dstAxIdx = (start / strideAxDst_) % dstAxDim_;
+            int dstShift0 = (start / strideAxDst_ / dstAxDim_) * strideAx1Diff_;
+printf("ithr: %d; start: %lu; end: %lu; axStrideIt: %d\n", ithr, start, end, axStrideIt);
+//int retVal = 1;
+
+            const int strideAxDst = strideAxDst_ * dataTypeSize_;
+            const int dstShift0B = dstShift0 * dataTypeSize_;
+            const int strideAx1DiffB = strideAx1Diff_ * dataTypeSize_;
+            const int one = 1;
+            auto arg = jitArgsGatherEl();
+            arg.src = srcData + start;
+            arg.dst = dstData + start;
+            arg.indices = indices + start;
+            arg.axStrideIt = axStrideIt;
+            arg.strideAxSrc = &strideAxDst;
+            arg.dstAxIdx = &dstAxIdx;
+            arg.strideAx1Diff = &strideAx1DiffB;
+            arg.dstShift0 = &dstShift0B;
+            arg.incVec = incVec_.data();
+            arg.one = &one;
+            arg.workAmount = (uint32_t)(end - start);
+//                arg.retVal = &retVal;
+            (*kernel32_)(&arg);
+//printf("retVal: %d\n", retVal);
+        };
+        parallel_nt(0, threadBody);
+
+probsStr += "\nOutput:\n";
+for (int i = 0; i < outputs[0]->size(); i++) {
+    if (i % 10 ==0)
+        probsStr += "(" + std::to_string(i) + "); ";
+    probsStr += std::to_string(dstData[i]) + "; ";
+}
+printf("%s\n", probsStr.c_str());
+        return OK;
+    }
+
+    const size_t dataIndex_ = 0;
+    const size_t indicesIndex_ = 1;
 
     size_t axis_;
     size_t dataTypeSize_;
-    const size_t dataIndex_ = 0;
-    const size_t indicesIndex_ = 1;
     int strideAxDst_;
     int dstAxDim_;
+    int strideAx1Diff_;
+    std::vector<int> incVec_;
     std::shared_ptr<jitUniGatherElKernel> kernel32_;
     std::string errorPrefix_;
 };
