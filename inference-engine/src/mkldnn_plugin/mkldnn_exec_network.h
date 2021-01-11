@@ -14,7 +14,6 @@
 #include <memory>
 #include <map>
 #include <string>
-#include <legacy/cnn_network_impl.hpp>
 #include <unordered_map>
 
 namespace MKLDNNPlugin {
@@ -51,7 +50,7 @@ protected:
     friend class MKLDNNInferRequest;
     MKLDNNExtensionManager::Ptr extensionManager;
     std::vector<InferenceEngine::IVariableStateInternal::Ptr> memoryStates;
-    InferenceEngine::CNNNetwork                 _clonedNetwork;
+//    InferenceEngine::CNNNetwork                 _clonedNetwork;
     std::mutex                                  _cfgMutex;
     Config                                      _cfg;
     std::atomic_int                             _numRequests = {0};

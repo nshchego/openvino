@@ -39,6 +39,7 @@
 #include <nodes/mkldnn_tensoriterator_node.h>
 #include <nodes/mkldnn_scatter_update_node.h>
 #include <nodes/mkldnn_interpolate_node.h>
+#include <nodes/mkldnn_reference_node.h>
 #include <mkldnn_types.h>
 #include <dnnl_types.h>
 #include "mkldnn_extension_utils.h"
@@ -47,6 +48,8 @@
 #include "mkldnn_debug.h"
 #include "utils/rt_info/memory_formats_attribute.hpp"
 
+#include <ie_ngraph_utils.hpp>
+
 using namespace mkldnn;
 using namespace MKLDNNPlugin;
 using namespace openvino;
@@ -54,89 +57,134 @@ using namespace openvino;
 using namespace InferenceEngine::details;
 namespace MKLDNNPlugin {
 static const InferenceEngine::details::caseless_unordered_map<std::string, Type> type_to_name_tbl = {
-        { "Unknown", Unknown },
-        { "Input", Input },
-        { "Const", Input },
-        { "Output", Output },
-        { "Reorder", Reorder },
+        { "Constant", Input },
+        { "Parameter", Input },
+        { "Result", Output },
         { "Convolution", Convolution },
-        { "ReLU", Eltwise },
-        { "GELU", Eltwise },
-        { "ELU", Eltwise },
+        { "GroupConvolution", Convolution },
+        { "MatMul", Gemm },
+        { "MaxPool", Pooling },
+        { "AvgPool", Pooling },
+        { "Add", Eltwise },
+        { "Subtract", Eltwise },
+        { "Multiply", Eltwise },
+        { "Divide", Eltwise },
+        { "SquaredDifference", Eltwise },
+        { "Maximum", Eltwise },
+        { "Minimum", Eltwise },
+        { "Mod", Eltwise },
+        { "FloorMod", Eltwise },
+        { "Power", Eltwise },
+        { "Equal", Eltwise },
+        { "NotEqual", Eltwise },
+        { "Greater", Eltwise },
+        { "GreaterEqual", Eltwise },
+        { "Less", Eltwise },
+        { "LessEqual", Eltwise },
+        { "LogicalAnd", Eltwise },
+        { "LogicalOr", Eltwise },
+        { "LogicalXor", Eltwise },
+        { "LogicalNot", Eltwise },
+        { "Relu", Eltwise },
+        { "Gelu", Eltwise },
+        { "Elu", Eltwise },
+        { "Tanh", Eltwise },
         { "Sigmoid", Eltwise },
-        { "Logistic", Eltwise },
-        { "TanH", Eltwise },
-        { "ReLU6", Eltwise },
-        { "Exp", Eltwise },
-        { "Not", Eltwise },
-        { "Activation", Eltwise },
+        { "Abs", Eltwise },
+        { "Sqrt", Eltwise },
         { "Clamp", Eltwise },
+        { "Exp", Eltwise },
         { "Swish", Eltwise },
         { "HSwish", Eltwise },
         { "Mish", Eltwise },
         { "HSigmoid", Eltwise },
         { "Round", Eltwise },
-        { "ScaleShift", Eltwise },
-        { "PReLU", Eltwise },
-        { "Norm", Lrn },
-        { "LRN", Lrn },
-        { "Pooling", Pooling },
-        { "FullyConnected", FullyConnected },
-        { "InnerProduct", FullyConnected },
-        { "Gemm", Gemm },
-        { "Softmax", SoftMax },
-        { "SoftMax", SoftMax },
-        { "Split", Split },
-        { "Slice", Split },
-        { "Concat", Concatenation },
-        { "Deconvolution", Deconvolution },
-        { "Eltwise", Eltwise },
-        { "Mod", Eltwise },
-        { "Power", Eltwise },
-        { "Crop", Crop },
+        { "PRelu", Eltwise },
         { "Reshape", Reshape },
-        { "Tile", Tile },
-        { "SimplerNMS", SimplerNMS },
-        { "ROIAlign", ROIAlign },
-        { "ROIPooling", ROIPooling },
-        { "BatchNormalization", BatchNormalization },
-        { "Flatten", Flatten },
-        { "Pad", Pad },
-        { "Permute", Permute },
-        { "Copy", Copy },
-        { "LSTMCell", RNNCell },
-        { "GRUCell", RNNCell },
-        { "RNNCell", RNNCell },
-        { "LSTMSequence", RNNSeq },
-        { "GRUSequence", RNNSeq },
-        { "RNNSequence", RNNSeq },
-        { "Quantize", Quantize },
-        { "FakeQuantize", Quantize },
-        { "BinaryConvolution", BinaryConvolution },
-        { "DeformableConvolution", DeformableConvolution },
-        { "TensorIterator", TensorIterator },
-        { "Loop", TensorIterator },
-        { "MemoryInput", MemoryInput},  // for construction from name ctor, arbitrary name is used
-        { "Memory", MemoryOutput },  // for construction from layer ctor
-        { "Convert", Convert },
-        { "MVN", MVN},
-        { "Normalize", Normalize},
-        { "ScatterUpdate", ScatterUpdate},
-        { "ScatterElementsUpdate", ScatterElementsUpdate},
-        { "ScatterNDUpdate", ScatterNDUpdate},
-        { "Interpolate", Interpolate},
-        { "ReduceAnd", ReduceAnd},
-        { "ReduceL1", ReduceL1},
-        { "ReduceL2", ReduceL2},
-        { "ReduceLogSum", ReduceLogSum},
-        { "ReduceLogSumExp", ReduceLogSumExp},
-        { "ReduceMax", ReduceMax},
-        { "ReduceMean", ReduceMean},
-        { "ReduceMin", ReduceMin},
-        { "ReduceOr", ReduceOr},
-        { "ReduceProd", ReduceProd},
-        { "ReduceSum", ReduceSum},
-        { "ReduceSumSquare", ReduceSumSquare},
+        { "Softmax", Softmax },
+        { "Reorder", Reorder },
+
+//        { "Unknown", Unknown },
+//        { "Input", Input },
+//        { "Reorder", Reorder },
+//        { "Convolution", Convolution },
+//        { "ReLU", Eltwise },
+//        { "GELU", Eltwise },
+//        { "ELU", Eltwise },
+//        { "Sigmoid", Eltwise },
+//        { "Logistic", Eltwise },
+//        { "TanH", Eltwise },
+//        { "ReLU6", Eltwise },
+//        { "Exp", Eltwise },
+//        { "Not", Eltwise },
+//        { "Activation", Eltwise },
+//        { "Clamp", Eltwise },
+//        { "Swish", Eltwise },
+//        { "HSwish", Eltwise },
+//        { "Mish", Eltwise },
+//        { "HSigmoid", Eltwise },
+//        { "Round", Eltwise },
+//        { "ScaleShift", Eltwise },
+//        { "PReLU", Eltwise },
+//        { "Norm", Lrn },
+//        { "LRN", Lrn },
+//        { "Pooling", Pooling },
+//        { "FullyConnected", FullyConnected },
+//        { "InnerProduct", FullyConnected },
+//        { "Gemm", Gemm },
+//        { "Softmax", SoftMax },
+//        { "SoftMax", SoftMax },
+//        { "Split", Split },
+//        { "Slice", Split },
+//        { "Concat", Concatenation },
+//        { "Deconvolution", Deconvolution },
+//        { "Eltwise", Eltwise },
+//        { "Mod", Eltwise },
+//        { "Power", Eltwise },
+//        { "Crop", Crop },
+//        { "Reshape", Reshape },
+//        { "Tile", Tile },
+//        { "SimplerNMS", SimplerNMS },
+//        { "ROIAlign", ROIAlign },
+//        { "ROIPooling", ROIPooling },
+//        { "BatchNormalization", BatchNormalization },
+//        { "Flatten", Flatten },
+//        { "Pad", Pad },
+//        { "Permute", Permute },
+//        { "Copy", Copy },
+//        { "LSTMCell", RNNCell },
+//        { "GRUCell", RNNCell },
+//        { "RNNCell", RNNCell },
+//        { "LSTMSequence", RNNSeq },
+//        { "GRUSequence", RNNSeq },
+//        { "RNNSequence", RNNSeq },
+//        { "Quantize", Quantize },
+//        { "FakeQuantize", Quantize },
+//        { "BinaryConvolution", BinaryConvolution },
+//        { "DeformableConvolution", DeformableConvolution },
+//        { "TensorIterator", TensorIterator },
+//        { "Loop", TensorIterator },
+//        { "MemoryInput", MemoryInput},  // for construction from name ctor, arbitrary name is used
+//        { "Memory", MemoryOutput },  // for construction from layer ctor
+//        { "Convert", Convert },
+//        { "MVN", MVN},
+//        { "Normalize", Normalize},
+//        { "ScatterUpdate", ScatterUpdate},
+//        { "ScatterElementsUpdate", ScatterElementsUpdate},
+//        { "ScatterNDUpdate", ScatterNDUpdate},
+//        { "Interpolate", Interpolate},
+//        { "ReduceAnd", ReduceAnd},
+//        { "ReduceL1", ReduceL1},
+//        { "ReduceL2", ReduceL2},
+//        { "ReduceLogSum", ReduceLogSum},
+//        { "ReduceLogSumExp", ReduceLogSumExp},
+//        { "ReduceMax", ReduceMax},
+//        { "ReduceMean", ReduceMean},
+//        { "ReduceMin", ReduceMin},
+//        { "ReduceOr", ReduceOr},
+//        { "ReduceProd", ReduceProd},
+//        { "ReduceSum", ReduceSum},
+//        { "ReduceSumSquare", ReduceSumSquare},
 };
 
 Type TypeFromName(const std::string type) {
@@ -155,44 +203,56 @@ MKLDNNNode::NodesFactory & MKLDNNNode::factory() {
     return factoryInstance;
 }
 
-MKLDNNNode::MKLDNNNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::engine& eng,
-        MKLDNNWeightsSharing::Ptr &w_cache)
+MKLDNNNode::MKLDNNNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &w_cache)
         : selectedPrimitiveDescriptorIndex(-1), permanent(false), temporary(false), constant(ConstantType::Unknown),
-          weightCache(w_cache), cnnLayer(layer), engine(eng), name(layer->name), typeStr(layer->type),
-          type(TypeFromName(layer->type)), profiling(layer->name) {
-    if (!layer->outData.empty()) {
-        for (const auto& outData : layer->outData) {
-            outDims.emplace_back(outData->getDims());
+          weightCache(w_cache), engine(eng), name(op->get_friendly_name()), typeStr(op->get_type_name()),
+          type(TypeFromName(op->get_type_name())), profiling(op->get_friendly_name()) {
+    algorithm = Algorithm::Undefined;
+    fusingPort = -1;
+
+    originalName = name;
+    originalInputsNumber = op->get_input_size();
+    for (size_t i = 0; i < op->get_input_size(); i++) {
+        inDims.emplace_back(op->get_input_shape(i));
+        originalInputPrecisions.emplace_back(details::convertPrecision(op->get_input_element_type(i)));
+    }
+
+    if (op->get_output_size() != 0 && typeStr != "Result") {
+        for (size_t i = 0; i < op->get_output_size(); i++) {
+            outDims.emplace_back(op->get_output_shape(i));
+            originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     } else {
-        if (!(CaselessEq<std::string>()(layer->type, "memory") ||
-            CaselessEq<std::string>()(layer->type, "memoryinput") ||
-            CaselessEq<std::string>()(layer->type, "output") ||
-            CaselessEq<std::string>()(layer->type, "reorder") ||
-            CaselessEq<std::string>()(layer->type, "convert"))) {
-            THROW_IE_EXCEPTION << "Inappropriate layer type: " << layer->type << " name: " << layer->name;
+        // TODO [NM]: get rid of this condition
+        if (!(CaselessEq<std::string>()(typeStr, "Result"))) {
+            THROW_IE_EXCEPTION << "Inappropriate layer type: " << typeStr << " name: " << name;
         }
+//        if (!(CaselessEq<std::string>()(typeStr, "memory") ||
+//            CaselessEq<std::string>()(typeStr, "memoryinput") ||
+//            CaselessEq<std::string>()(typeStr, "output") ||
+//            CaselessEq<std::string>()(typeStr, "reorder"))) {
+//            THROW_IE_EXCEPTION << "Inappropriate layer type: " << typeStr << " name: " << name;
+//        }
     }
 
-    for (const auto& inData : layer->insData) {
-        inDims.emplace_back(inData.lock()->getDims());
-    }
-    if (layer->params.find("PrimitivesPriority") != layer->params.end()) {
-        std::istringstream stream(layer->params["PrimitivesPriority"]);
-        std::string str;
-        while (getline(stream, str, ',')) {
-            if (str.substr(0, 4) != "cpu:")
-                continue;
-            implPriorities.push_back(parse_impl_name(str));
-            if (implPriorities[implPriorities.size() - 1] == impl_desc_type::unknown &&
-                    str != "cpu:unknown")
-                THROW_IE_EXCEPTION << "Unsupported CPU implementation " << str << " for node " << getName();
-        }
-    }
 
-    auto ngraphNode = layer->getNode();
-    if (ngraphNode != nullptr) {
-        std::string inputMemoryFormats = ngraph::getMLKDNNInputMemoryFormats(ngraphNode);
+
+
+//    if (op->params.find("PrimitivesPriority") != layer->params.end()) {
+//        std::istringstream stream(layer->params["PrimitivesPriority"]);
+//        std::string str;
+//        while (getline(stream, str, ',')) {
+//            if (str.substr(0, 4) != "cpu:")
+//                continue;
+//            implPriorities.push_back(parse_impl_name(str));
+//            if (implPriorities[implPriorities.size() - 1] == impl_desc_type::unknown &&
+//                    str != "cpu:unknown")
+//                THROW_IE_EXCEPTION << "Unsupported CPU implementation " << str << " for node " << getName();
+//        }
+//    }
+
+    if (op != nullptr) {
+        std::string inputMemoryFormats = ngraph::getMLKDNNInputMemoryFormats(op);
         if (!inputMemoryFormats.empty()) {
             std::istringstream stream(inputMemoryFormats);
             std::string str;
@@ -203,7 +263,7 @@ MKLDNNNode::MKLDNNNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::
             }
         }
 
-        std::string outputMemoryFormats = ngraph::getMLKDNNOutputMemoryFormats(ngraphNode);
+        std::string outputMemoryFormats = ngraph::getMLKDNNOutputMemoryFormats(op);
         if (!outputMemoryFormats.empty()) {
             std::istringstream stream(outputMemoryFormats);
             std::string str;
@@ -214,6 +274,13 @@ MKLDNNNode::MKLDNNNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::
             }
         }
     }
+}
+
+MKLDNNNode::MKLDNNNode(const std::string& type, const std::string& name, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &w_cache)
+        : selectedPrimitiveDescriptorIndex(-1), permanent(false), temporary(false), constant(ConstantType::Unknown),
+          weightCache(w_cache), engine(eng), name(name), typeStr(type),
+          type(TypeFromName(type)), profiling(name) {
+    // TODO [NM]: What about filling inDims and outDims?
 }
 
 void MKLDNNNode::addEdge(const MKLDNNEdgeWeakPtr& edge) {
@@ -662,66 +729,66 @@ void MKLDNNNode::initDescriptor(const InferenceEngine::LayerConfig &config) {
     selectedPD->getConfig() = rightConfig;
 }
 
-InferenceEngine::Blob::Ptr MKLDNNNode::createInternalBlob(InferenceEngine::SizeVector dims, bool weights, bool isGrouped) {
-    auto checkSize = [](size_t dst_size, size_t src_size) {
-        if (dst_size < src_size) {
-            THROW_IE_EXCEPTION << "Cannot create internal buffer. Buffer can be overrun.";
-        }
-    };
-    auto * wLayer = dynamic_cast<InferenceEngine::WeightableLayer*>(getCnnLayer().get());
-    if (wLayer == nullptr)
-        THROW_IE_EXCEPTION << "Cannot get weightable layer for node " << getName() << ".";
-
-    InferenceEngine::Blob::Ptr blb = weights ? wLayer->_weights : wLayer->_biases;
-
-    if (blb == nullptr)
-        THROW_IE_EXCEPTION << "Cannot get internal blob layer for node " << getName() << ".";
-
-    auto intLayout = getWeightsLayoutByDims(dims, isGrouped);
-
-    InferenceEngine::TensorDesc desc(blb->getTensorDesc().getPrecision(), dims, intLayout);
-
-    auto fillInternalBlob = [&](char *data, size_t intBuffSize) {
-        size_t offset = blb->byteSize();
-        checkSize(intBuffSize, offset);
-        cpu_memcpy_s(data, intBuffSize, blb->buffer(), blb->byteSize());
-        data += blb->byteSize();
-        for (const auto &merged : getMergeWith()) {
-            wLayer = dynamic_cast<InferenceEngine::WeightableLayer*>(merged->getCnnLayer().get());
-            if (wLayer == nullptr)
-                THROW_IE_EXCEPTION << "Cannot convert merged weightable layer for node "
-                                   << getName() << ".";
-            blb = weights ? wLayer->_weights : wLayer->_biases;
-
-            if (blb == nullptr)
-                THROW_IE_EXCEPTION << "Cannot get internal blob layer for node " << getName() << ".";
-            offset += blb->byteSize();
-            checkSize(intBuffSize, offset);
-            cpu_memcpy_s(data, intBuffSize, blb->buffer(), blb->byteSize());
-            data += blb->byteSize();
-        }
-    };
-
-    Blob::Ptr internalBlob;
-    if (blb->getTensorDesc().getPrecision() == Precision::BIN) {
-        internalBlob = InferenceEngine::make_shared_blob<int8_t>(desc);
-    } else if (blb->getTensorDesc().getPrecision() == Precision::I8) {
-        internalBlob = InferenceEngine::make_shared_blob<int8_t>(desc);
-    } else if (blb->getTensorDesc().getPrecision() == Precision::I32) {
-        internalBlob = InferenceEngine::make_shared_blob<int32_t>(desc);
-    } else if (blb->getTensorDesc().getPrecision() == Precision::BF16) {
-        internalBlob = InferenceEngine::make_shared_blob<int16_t>(desc);
-    } else {
-        internalBlob = InferenceEngine::make_shared_blob<float>(desc);
-    }
-    internalBlob->allocate();
-    char *data = internalBlob->buffer();
-    size_t intBuffSize = internalBlob->byteSize();
-
-    fillInternalBlob(data, intBuffSize);
-
-    return internalBlob;
-}
+//InferenceEngine::Blob::Ptr MKLDNNNode::createInternalBlob(InferenceEngine::SizeVector dims, bool weights, bool isGrouped) {
+//    auto checkSize = [](size_t dst_size, size_t src_size) {
+//        if (dst_size < src_size) {
+//            THROW_IE_EXCEPTION << "Cannot create internal buffer. Buffer can be overrun.";
+//        }
+//    };
+//    auto * wLayer = dynamic_cast<InferenceEngine::WeightableLayer*>(getCnnLayer().get());
+//    if (wLayer == nullptr)
+//        THROW_IE_EXCEPTION << "Cannot get weightable layer for node " << getName() << ".";
+//
+//    InferenceEngine::Blob::Ptr blb = weights ? wLayer->_weights : wLayer->_biases;
+//
+//    if (blb == nullptr)
+//        THROW_IE_EXCEPTION << "Cannot get internal blob layer for node " << getName() << ".";
+//
+//    auto intLayout = getWeightsLayoutByDims(dims, isGrouped);
+//
+//    InferenceEngine::TensorDesc desc(blb->getTensorDesc().getPrecision(), dims, intLayout);
+//
+//    auto fillInternalBlob = [&](char *data, size_t intBuffSize) {
+//        size_t offset = blb->byteSize();
+//        checkSize(intBuffSize, offset);
+//        cpu_memcpy_s(data, intBuffSize, blb->buffer(), blb->byteSize());
+//        data += blb->byteSize();
+//        for (const auto &merged : getMergeWith()) {
+//            wLayer = dynamic_cast<InferenceEngine::WeightableLayer*>(merged->getCnnLayer().get());
+//            if (wLayer == nullptr)
+//                THROW_IE_EXCEPTION << "Cannot convert merged weightable layer for node "
+//                                   << getName() << ".";
+//            blb = weights ? wLayer->_weights : wLayer->_biases;
+//
+//            if (blb == nullptr)
+//                THROW_IE_EXCEPTION << "Cannot get internal blob layer for node " << getName() << ".";
+//            offset += blb->byteSize();
+//            checkSize(intBuffSize, offset);
+//            cpu_memcpy_s(data, intBuffSize, blb->buffer(), blb->byteSize());
+//            data += blb->byteSize();
+//        }
+//    };
+//
+//    Blob::Ptr internalBlob;
+//    if (blb->getTensorDesc().getPrecision() == Precision::BIN) {
+//        internalBlob = InferenceEngine::make_shared_blob<int8_t>(desc);
+//    } else if (blb->getTensorDesc().getPrecision() == Precision::I8) {
+//        internalBlob = InferenceEngine::make_shared_blob<int8_t>(desc);
+//    } else if (blb->getTensorDesc().getPrecision() == Precision::I32) {
+//        internalBlob = InferenceEngine::make_shared_blob<int32_t>(desc);
+//    } else if (blb->getTensorDesc().getPrecision() == Precision::BF16) {
+//        internalBlob = InferenceEngine::make_shared_blob<int16_t>(desc);
+//    } else {
+//        internalBlob = InferenceEngine::make_shared_blob<float>(desc);
+//    }
+//    internalBlob->allocate();
+//    char *data = internalBlob->buffer();
+//    size_t intBuffSize = internalBlob->byteSize();
+//
+//    fillInternalBlob(data, intBuffSize);
+//
+//    return internalBlob;
+//}
 
 void MKLDNNNode::prepareMemory(const PrimitiveDescInfo *selected_pd, mkldnn::primitive_desc_iterator& itpd) {
     for (size_t i = 0; i < getChildEdges().size(); i++) {
@@ -830,18 +897,18 @@ MKLDNNNode::ConstantType MKLDNNNode::checkConstant(LOOK look, std::vector<MKLDNN
     return constant;
 }
 
-void MKLDNNNode::addOriginalLayer(const InferenceEngine::CNNLayerPtr &layer) {
-    if (!layer) return;
+void MKLDNNNode::addOriginalLayer(const std::string& layerName) {
+    if (layerName.empty()) return;
     if (originalLayers.empty()) {
-        originalLayers = layer->name;
+        originalLayers = layerName;
     } else {
-        originalLayers += "," + layer->name;
+        originalLayers += "," + layerName;
     }
 }
 
 void MKLDNNNode::cleanup() {
     internalBlobs.clear();
-    cnnLayer.reset();
+//    cnnLayer.reset();
 
     for (auto it : fusedWith) {
         it->cleanup();
@@ -1178,29 +1245,51 @@ InferenceEngine::Precision MKLDNNNode::getRuntimePrecision() const {
     return runtimePrecision;
 }
 
-MKLDNNNode* MKLDNNNode::NodesFactory::create(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::engine& eng,
+MKLDNNNode* MKLDNNNode::NodesFactory::create(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng,
                                              const MKLDNNExtensionManager::Ptr& extMgr, MKLDNNWeightsSharing::Ptr &w_cache) {
     MKLDNNNode *newNode = nullptr;
 
-    std::unique_ptr<MKLDNNNode> ol(createNodeIfRegistered(MKLDNNPlugin, Generic, layer, eng, w_cache));
-    if (ol != nullptr && ol->created(extMgr))
-        newNode = ol.release();
-
-    if (newNode == nullptr) {
-        std::unique_ptr<MKLDNNNode> ol(createNodeIfRegistered(MKLDNNPlugin, TypeFromName(layer->type), layer, eng, w_cache));
+    try {
+        std::unique_ptr<MKLDNNNode> ol(createNodeIfRegistered(MKLDNNPlugin, Generic, op, eng, w_cache));
         if (ol != nullptr && ol->created(extMgr))
             newNode = ol.release();
+    } catch (const details::InferenceEngineException& ex) {
+        if (ex.getStatus() != NOT_IMPLEMENTED)
+            throw;
     }
 
-    //  WA-start : TI node requires all attributes to construct internal subgpath
-    //             including extManager, socket and mkldnn::eng.
-    MKLDNNTensorIteratorNode *ti = dynamic_cast<MKLDNNTensorIteratorNode*>(newNode);
-    if (ti != nullptr)
-        ti->setExtManager(extMgr);
-    //  WA-end
+    if (newNode == nullptr) {
+        try {
+            std::unique_ptr<MKLDNNNode> ol(createNodeIfRegistered(MKLDNNPlugin, TypeFromName(op->get_type_name()), op, eng, w_cache));
+            if (ol != nullptr && ol->created(extMgr))
+                newNode = ol.release();
+        } catch (const details::InferenceEngineException& ex) {
+            if (ex.getStatus() != NOT_IMPLEMENTED)
+                throw;
+        }
+    }
+
+    if (newNode == nullptr) {
+        try {
+            std::unique_ptr<MKLDNNNode> ol(new MKLDNNReferenceNode(op, eng, w_cache));
+            if (ol != nullptr && ol->created(extMgr))
+                newNode = ol.release();
+        } catch (const details::InferenceEngineException& ex) {
+            if (ex.getStatus() != NOT_IMPLEMENTED)
+                throw;
+        }
+    }
+
+// TODO [NM]: Not implemented
+//    //  WA-start : TI node requires all attributes to construct internal subgpath
+//    //             including extManager, socket and mkldnn::eng.
+//    MKLDNNTensorIteratorNode *ti = dynamic_cast<MKLDNNTensorIteratorNode*>(newNode);
+//    if (ti != nullptr)
+//        ti->setExtManager(extMgr);
+//    //  WA-end
 
     if (!newNode)
-        THROW_IE_EXCEPTION << "Unsupported primitive of type: " << layer->type << " name: " << layer->name;
+        THROW_IE_EXCEPTION << "Unsupported primitive of type: " << op->get_type_name() << " name: " << op->get_friendly_name();
 
     return newNode;
 }

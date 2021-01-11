@@ -4,8 +4,6 @@
 
 #include "jit_eltwise_emitters.hpp"
 #include <cpu/x64/jit_uni_eltwise.hpp>
-#include "legacy/ie_layers.h"
-
 #include <ngraph/opsets/opset1.hpp>
 
 using namespace InferenceEngine;
@@ -1307,13 +1305,11 @@ jit_power_static_emitter::jit_power_static_emitter(jit_generator *host, cpu_isa_
 }
 jit_power_static_emitter::jit_power_static_emitter(jit_generator *host, cpu_isa_t host_isa, const MKLDNNNode* node, Precision exec_prc)
 : jit_emitter(host, host_isa, node, exec_prc) {
-    auto *powerLayer = dynamic_cast<InferenceEngine::PowerLayer *>(node->getCnnLayer().get());
-    if (powerLayer == nullptr)
-        THROW_IE_EXCEPTION << "Cannot convert power layer.";
+    THROW_IE_EXCEPTION << "[NM] Not implemented";
 
-    power = powerLayer->power;
-    scale = powerLayer->scale;
-    shift = powerLayer->offset;
+//    power = powerLayer->power;
+//    scale = powerLayer->scale;
+//    shift = powerLayer->offset;
 
     prepare_table();
 }

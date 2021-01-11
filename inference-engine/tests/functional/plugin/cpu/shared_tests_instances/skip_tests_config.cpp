@@ -21,8 +21,6 @@ std::vector<std::string> disabledTestPatterns() {
         // TODO: Issue 33886
         R"(.*(QuantGroupConv2D).*)",
         R"(.*(QuantGroupConv3D).*)",
-        // TODO: failed to downgrade to opset v0 in interpreter backend
-        R"(.*Gather.*axis=-1.*)",
         // TODO: Issue 33151
         R"(.*Reduce.*axes=\(1\.-1\).*)",
         // TODO: Issue: 34518

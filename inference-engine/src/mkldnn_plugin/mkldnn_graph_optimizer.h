@@ -34,9 +34,7 @@ private:
     void FuseMVNAndSimpleOperation(MKLDNNGraph &graph);
     void FuseInterpolateAndSimpleOperation(MKLDNNGraph &graph);
     void FuseNormalizeAndSimpleOperation(MKLDNNGraph &graph);
-    void RemoveIdentityOperator(MKLDNNGraph& graph);
 
-    void RemoveIOScaleShifts(MKLDNNGraph& graph);
     void DropDoubleReorders(MKLDNNGraph& graph);
     void DropConvertReorder(MKLDNNGraph& graph);
     void ChangeConvertToReorder(MKLDNNGraph &graph);
@@ -49,7 +47,6 @@ private:
     void MergePermuteAndReorder(MKLDNNGraph &graph);
 
     bool IsOneOf(Type type, std::vector<Type> types);
-    bool IsOneOf(EltwiseOpType alg, std::vector<EltwiseOpType> algs);
 
     void removeEdge(MKLDNNGraph &graph, MKLDNNEdgePtr& edge);
 };
