@@ -45,7 +45,7 @@ struct jit_uni_permute_kernel {
 
 class MKLDNNPermuteNode : public MKLDNNNode {
 public:
-    MKLDNNPermuteNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
+    MKLDNNPermuteNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
     ~MKLDNNPermuteNode() override = default;
 
     void getSupportedDescriptors() override;

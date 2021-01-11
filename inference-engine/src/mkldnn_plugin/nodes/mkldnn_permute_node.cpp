@@ -3,7 +3,6 @@
 //
 
 #include "mkldnn_permute_node.h"
-#include <legacy/ie_layers.h>
 #include <string>
 #include <mkldnn_types.h>
 #include <mkldnn_extension_utils.h>
@@ -136,97 +135,99 @@ private:
     Xbyak::Xmm xmm = Xbyak::Xmm(0);
 };
 
-MKLDNNPermuteNode::MKLDNNPermuteNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache)
-        : MKLDNNNode(layer, eng, cache) {}
+MKLDNNPermuteNode::MKLDNNPermuteNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache)
+        : MKLDNNNode(op, eng, cache) {}
 
 void MKLDNNPermuteNode::getSupportedDescriptors() {
-    if (getParentEdges().size() != 1)
-        THROW_IE_EXCEPTION << "Incorrect number of input edges for layer " << getName();
-    if (!getChildEdges().size())
-        THROW_IE_EXCEPTION << "Incorrect number of output edges for layer " << getName();
-
-    auto& layer = getCnnLayer();
-    if (!layer) {
-        THROW_IE_EXCEPTION << "Cannot get CNNLayer.";
-    }
-
-    order.clear();
-    std::vector<int> layerOrder = layer->GetParamAsInts("order");
-    for (auto ord : layerOrder)
-        order.push_back(static_cast<size_t>(ord));
-
-    if (order.empty()) {
-        size_t rank = getParentEdgeAt(0)->getDims().ndims();
-        for (size_t i = 1; i <= rank; ++i) {
-            order.emplace_back(rank - i);
-        }
-    }
+    THROW_IE_EXCEPTION << "[NM] Not implemented";
+//    if (getParentEdges().size() != 1)
+//        THROW_IE_EXCEPTION << "Incorrect number of input edges for layer " << getName();
+//    if (!getChildEdges().size())
+//        THROW_IE_EXCEPTION << "Incorrect number of output edges for layer " << getName();
+//
+//    auto& layer = getCnnLayer();
+//    if (!layer) {
+//        THROW_IE_EXCEPTION << "Cannot get CNNLayer.";
+//    }
+//
+//    order.clear();
+//    std::vector<int> layerOrder = layer->GetParamAsInts("order");
+//    for (auto ord : layerOrder)
+//        order.push_back(static_cast<size_t>(ord));
+//
+//    if (order.empty()) {
+//        size_t rank = getParentEdgeAt(0)->getDims().ndims();
+//        for (size_t i = 1; i <= rank; ++i) {
+//            order.emplace_back(rank - i);
+//        }
+//    }
 }
 
 void MKLDNNPermuteNode::initSupportedPrimitiveDescriptors() {
-    if (!supportedPrimitiveDescriptors.empty())
-        return;
-
-    prec = getCnnLayer()->insData[0].lock()->getPrecision();
-    auto inputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(prec);
-    auto outputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(prec);
-
-    InferenceEngine::LayerConfig config;
-    config.dynBatchSupport = true;
-    config.inConfs.resize(1);
-    config.outConfs.resize(1);
-    config.inConfs[0].inPlace = -1;
-    config.inConfs[0].constant = false;
-    config.outConfs[0].inPlace = -1;
-    config.outConfs[0].constant = false;
-    if (getParentEdgeAt(0)->getDims().ndims() == 4) {
-        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nchw);
-        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::nchw);
-        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nchw});
-
-        auto srcDims = getParentEdgeAt(0)->getDims();
-        if (srcDims[1] % 8 == 0) {
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nChw8c);
-            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nChw8c});
-        }
-
-        if (srcDims[1] % 16 == 0) {
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nChw16c);
-            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nChw16c});
-        }
-
-        if (prec == Precision::I8 || prec == Precision::U8) {
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nhwc);
-            config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::nhwc);
-            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nhwc});
-        }
-    } else if (getParentEdgeAt(0)->getDims().ndims() == 5) {
-        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::ncdhw);
-        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::ncdhw);
-        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::ncdhw});
-
-        auto srcDims = getParentEdgeAt(0)->getDims();
-        if (srcDims[1] % 8 == 0) {
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nCdhw8c);
-            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nCdhw8c});
-        }
-
-        if (srcDims[1] % 16 == 0) {
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nCdhw16c);
-            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nCdhw16c});
-        }
-
-        if (prec == Precision::I8 || prec == Precision::U8) {
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::ndhwc);
-            config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::ndhwc);
-            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::ndhwc});
-        }
-    } else {
-        // general plain case
-        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType);
-        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType);
-        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
-    }
+    THROW_IE_EXCEPTION << "[NM] Not implemented";
+//    if (!supportedPrimitiveDescriptors.empty())
+//        return;
+//
+//    prec = getCnnLayer()->insData[0].lock()->getPrecision();
+//    auto inputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(prec);
+//    auto outputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(prec);
+//
+//    InferenceEngine::LayerConfig config;
+//    config.dynBatchSupport = true;
+//    config.inConfs.resize(1);
+//    config.outConfs.resize(1);
+//    config.inConfs[0].inPlace = -1;
+//    config.inConfs[0].constant = false;
+//    config.outConfs[0].inPlace = -1;
+//    config.outConfs[0].constant = false;
+//    if (getParentEdgeAt(0)->getDims().ndims() == 4) {
+//        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nchw);
+//        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::nchw);
+//        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nchw});
+//
+//        auto srcDims = getParentEdgeAt(0)->getDims();
+//        if (srcDims[1] % 8 == 0) {
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nChw8c);
+//            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nChw8c});
+//        }
+//
+//        if (srcDims[1] % 16 == 0) {
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nChw16c);
+//            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nChw16c});
+//        }
+//
+//        if (prec == Precision::I8 || prec == Precision::U8) {
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nhwc);
+//            config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::nhwc);
+//            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nhwc});
+//        }
+//    } else if (getParentEdgeAt(0)->getDims().ndims() == 5) {
+//        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::ncdhw);
+//        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::ncdhw);
+//        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::ncdhw});
+//
+//        auto srcDims = getParentEdgeAt(0)->getDims();
+//        if (srcDims[1] % 8 == 0) {
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nCdhw8c);
+//            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nCdhw8c});
+//        }
+//
+//        if (srcDims[1] % 16 == 0) {
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::nCdhw16c);
+//            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::nCdhw16c});
+//        }
+//
+//        if (prec == Precision::I8 || prec == Precision::U8) {
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, memory::format_tag::ndhwc);
+//            config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, memory::format_tag::ndhwc);
+//            supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown, memory::format_tag::ndhwc});
+//        }
+//    } else {
+//        // general plain case
+//        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType);
+//        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType);
+//        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
+//    }
 }
 
 void MKLDNNPermuteNode::createPrimitive() {

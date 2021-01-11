@@ -16,95 +16,99 @@ using namespace mkldnn;
 using namespace MKLDNNPlugin;
 using namespace InferenceEngine;
 
-MKLDNNCropNode::MKLDNNCropNode(const InferenceEngine::CNNLayerPtr& layer, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache) :
-        MKLDNNNode(layer, eng, cache) {}
+MKLDNNCropNode::MKLDNNCropNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache) :
+        MKLDNNNode(op, eng, cache) {}
 
 void MKLDNNCropNode::getSupportedDescriptors() {
-    CropLayer* cropLayer = dynamic_cast<CropLayer*>(getCnnLayer().get());
-
-    if (cropLayer == nullptr)
-        THROW_IE_EXCEPTION << "Cannot convert crop layer.";
-
-    channelAxis = 1;
-    if (getParentEdges().size() != 1 && getParentEdges().size() != 2) {
-        THROW_IE_EXCEPTION << "Incorrect number of input edges for layer " << getName();
-    }
-
-    MKLDNNDims childDims = getChildEdgeAt(0)->getDims();
-
-    offsets.resize(static_cast<size_t>(childDims.ndims()));  // plus one dim for batch
-    dims.resize(static_cast<size_t>(childDims.ndims()));     // plus one dim for batch
-    for (int i = 0; i < childDims.ndims(); i++)
-        dims[i] = childDims[i];
-
-    for (int i = 0; i < cropLayer->axis.size(); i++) {
-        offsets[cropLayer->axis[i]] = cropLayer->offset[i];
-    }
-
-    if (cropLayer->axis.size() == dims.size()) {
-        for (size_t i = 0; i < cropLayer->axis.size(); i++) {
-            if (cropLayer->axis[i] == 1) {
-                channelAxis = static_cast<int>(i);
-                break;
-            }
-        }
-    }
-
-    if (!getChildEdges().size())
-        THROW_IE_EXCEPTION << "Incorrect number of output edges for layer " << getName();
+    THROW_IE_EXCEPTION << "Not implemented";
+    // TODO [NM]: reimplement w/o using CNNLayer
+//    CropLayer* cropLayer = dynamic_cast<CropLayer*>(getCnnLayer().get());
+//
+//    if (cropLayer == nullptr)
+//        THROW_IE_EXCEPTION << "Cannot convert crop layer.";
+//
+//    channelAxis = 1;
+//    if (getParentEdges().size() != 1 && getParentEdges().size() != 2) {
+//        THROW_IE_EXCEPTION << "Incorrect number of input edges for layer " << getName();
+//    }
+//
+//    MKLDNNDims childDims = getChildEdgeAt(0)->getDims();
+//
+//    offsets.resize(static_cast<size_t>(childDims.ndims()));  // plus one dim for batch
+//    dims.resize(static_cast<size_t>(childDims.ndims()));     // plus one dim for batch
+//    for (int i = 0; i < childDims.ndims(); i++)
+//        dims[i] = childDims[i];
+//
+//    for (int i = 0; i < cropLayer->axis.size(); i++) {
+//        offsets[cropLayer->axis[i]] = cropLayer->offset[i];
+//    }
+//
+//    if (cropLayer->axis.size() == dims.size()) {
+//        for (size_t i = 0; i < cropLayer->axis.size(); i++) {
+//            if (cropLayer->axis[i] == 1) {
+//                channelAxis = static_cast<int>(i);
+//                break;
+//            }
+//        }
+//    }
+//
+//    if (!getChildEdges().size())
+//        THROW_IE_EXCEPTION << "Incorrect number of output edges for layer " << getName();
 }
 
 void MKLDNNCropNode::initSupportedPrimitiveDescriptors() {
-    if (!supportedPrimitiveDescriptors.empty())
-        return;
-
-    InferenceEngine::Precision precision = getCnnLayer()->insData[0].lock()->getPrecision();
-    auto inputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(precision);
-    precision = getCnnLayer()->outData[0]->getPrecision();
-    auto outputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(precision);
-    if (inputDataType != outputDataType) {
-        outputDataType = inputDataType; // Crop doesn't convert precisions, only moves data
-    }
-
-    auto& inDims = getParentEdgeAt(0)->getDims();
-    if (inDims.ndims() != 2 && inDims.ndims() != 4 && inDims.ndims() != 5) {
-        THROW_IE_EXCEPTION << "Crop supports only 2d, 4d and 5d blobs.";
-    }
-
-    memory::format_tag fmt = memory::format_tag::undef;
-    switch (inDims.ndims()) {
-        case 2: fmt = memory::format_tag::nc; break;
-        case 4: fmt = memory::format_tag::nchw; break;
-        case 5: fmt = memory::format_tag::ncdhw; break;
-    }
-
-    InferenceEngine::LayerConfig config;
-    config.dynBatchSupport = true;
-    config.inConfs.resize(getParentEdges().size());
-    config.outConfs.resize(1);
-    for (size_t i = 0; i < getParentEdges().size(); i++) {
-        config.inConfs[i].inPlace = -1;
-        config.inConfs[i].constant = i != 0;
-        config.inConfs[i].desc = MKLDNNMemoryDesc(getParentEdgeAt(i)->getDims(), inputDataType, fmt);
-    }
-    config.outConfs[0].inPlace = -1;
-    config.outConfs[0].constant = false;
-    config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, fmt);
-
-    supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, fmt);
-
-    if ((inDims.ndims() == 4 || inDims.ndims() == 5) && channelAxis >= 0 && dims[channelAxis] % 8 == 0) {
-        fmt = inDims.ndims() == 5 ? memory::format_tag::nCdhw8c : memory::format_tag::nChw8c;
-        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, fmt);
-        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, fmt);
-        supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, fmt);
-        if (dims[channelAxis] % 16 == 0) {
-            fmt = inDims.ndims() == 5 ? memory::format_tag::nCdhw16c : memory::format_tag::nChw16c;
-            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, fmt);
-            config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, fmt);
-            supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, fmt);
-        }
-    }
+    THROW_IE_EXCEPTION << "Not implemented";
+    // TODO [NM]: reimplement w/o using CNNLayer
+//    if (!supportedPrimitiveDescriptors.empty())
+//        return;
+//
+//    InferenceEngine::Precision precision = getCnnLayer()->insData[0].lock()->getPrecision();
+//    auto inputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(precision);
+//    precision = getCnnLayer()->outData[0]->getPrecision();
+//    auto outputDataType = MKLDNNExtensionUtils::IEPrecisionToDataType(precision);
+//    if (inputDataType != outputDataType) {
+//        outputDataType = inputDataType; // Crop doesn't convert precisions, only moves data
+//    }
+//
+//    auto& inDims = getParentEdgeAt(0)->getDims();
+//    if (inDims.ndims() != 2 && inDims.ndims() != 4 && inDims.ndims() != 5) {
+//        THROW_IE_EXCEPTION << "Crop supports only 2d, 4d and 5d blobs.";
+//    }
+//
+//    memory::format_tag fmt = memory::format_tag::undef;
+//    switch (inDims.ndims()) {
+//        case 2: fmt = memory::format_tag::nc; break;
+//        case 4: fmt = memory::format_tag::nchw; break;
+//        case 5: fmt = memory::format_tag::ncdhw; break;
+//    }
+//
+//    InferenceEngine::LayerConfig config;
+//    config.dynBatchSupport = true;
+//    config.inConfs.resize(getParentEdges().size());
+//    config.outConfs.resize(1);
+//    for (size_t i = 0; i < getParentEdges().size(); i++) {
+//        config.inConfs[i].inPlace = -1;
+//        config.inConfs[i].constant = i != 0;
+//        config.inConfs[i].desc = MKLDNNMemoryDesc(getParentEdgeAt(i)->getDims(), inputDataType, fmt);
+//    }
+//    config.outConfs[0].inPlace = -1;
+//    config.outConfs[0].constant = false;
+//    config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, fmt);
+//
+//    supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, fmt);
+//
+//    if ((inDims.ndims() == 4 || inDims.ndims() == 5) && channelAxis >= 0 && dims[channelAxis] % 8 == 0) {
+//        fmt = inDims.ndims() == 5 ? memory::format_tag::nCdhw8c : memory::format_tag::nChw8c;
+//        config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, fmt);
+//        config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, fmt);
+//        supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, fmt);
+//        if (dims[channelAxis] % 16 == 0) {
+//            fmt = inDims.ndims() == 5 ? memory::format_tag::nCdhw16c : memory::format_tag::nChw16c;
+//            config.inConfs[0].desc = MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, fmt);
+//            config.outConfs[0].desc = MKLDNNMemoryDesc(getChildEdgeAt(0)->getDims(), outputDataType, fmt);
+//            supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, fmt);
+//        }
+//    }
 }
 
 void MKLDNNCropNode::createPrimitive() {
