@@ -8,6 +8,8 @@
 #include <vector>
 #include "ie_parallel.hpp"
 
+#include <chrono>
+
 namespace InferenceEngine {
 namespace Extensions {
 namespace Cpu {
@@ -58,6 +60,10 @@ public:
             strideAx1Diff_ = inputData->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1] -
                     outputData->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1];
         }
+        dimsBeforeAxis_ = 1;
+        for (int i = 0; i < axis_; i++) {
+            dimsBeforeAxis_ *= outputData->getTensorDesc().getDims()[i];
+        }
 
         LayerConfig config;
         DataConfig dataConfig, indicesConfig, outConfig;
@@ -104,31 +110,82 @@ protected:
         dataType* dstData = outputs[0]->buffer().as<dataType*>() +
             outputs[0]->getTensorDesc().getBlockingDesc().getOffsetPadding();
 
-        const int outSize = outputs[0]->size();
-        auto threadBody = [&](const int ithr, const int nthr) {
-            int start(0lu), end(0lu);
+static unsigned c1 = 0;
+static double t1 = 0.0;
+c1++;
+auto start1 = std::chrono::steady_clock::now();
+
+//        const int outSize = outputs[0]->size();
+//        auto threadBody = [&](const int ithr, const int nthr) {
+//            int start(0lu), end(0lu);
+//            splitter(outSize, nthr, ithr, start, end);
+//            if (start >= end)
+//                return;
+//
+//            int axStrideIt = start % strideAxDst_;
+//            int dstAxIdx = (start / strideAxDst_) % dstAxDim_;
+//            int dstShift0 = (start / strideAxDst_ / dstAxDim_) * strideAx1Diff_;
+//
+//            for (size_t o = start; o < end; o++, axStrideIt++) {
+//                if (axStrideIt == strideAxDst_) {
+//                    axStrideIt = 0;
+//                    dstAxIdx++;
+//                    if (dstAxIdx == dstAxDim_) {
+//                        dstAxIdx = 0;
+//                        dstShift0 += strideAx1Diff_;
+//                    }
+//                }
+//
+//                dstData[o] = srcData[o + dstShift0 + (indices[o] - dstAxIdx) * strideAxDst_];
+//            }
+//        };
+//        parallel_nt(0, threadBody);
+
+
+        const size_t outSize = outputs[0]->size();
+        size_t srcAxStride_1 = 1;
+        if (axis_ > 0)
+            srcAxStride_1 = inputs[dataIndex_]->getTensorDesc().getBlockingDesc().getStrides()[axis_ - 1];
+//        size_t o = 0lu;
+//        size_t ks = 0lu;
+//        for (size_t k = 0; k < dimsBeforeAxis_; k++) {
+//            for (size_t j = 0; j < dstAxDim_; j++) {
+//                for (size_t i = 0; i < strideAxDst_; i++) {
+//                    dstData[o++] = srcData[ks + indices[o] * strideAxDst_ + i];
+//                }
+//            }
+//            ks += srcAxStride_1;
+//        }
+
+        auto threadBody = [&](const size_t ithr, const size_t nthr) {
+            size_t start(0lu), end(0lu);
             splitter(outSize, nthr, ithr, start, end);
             if (start >= end)
                 return;
+            size_t beforeAxIdx = 0lu, axIdx = 0lu, afterAxIdx = 0lu;
+            parallel_it_init(start, beforeAxIdx, dimsBeforeAxis_, axIdx, dstAxDim_, afterAxIdx, strideAxDst_);
 
-            int axStrideIt = start % strideAxDst_;
-            int dstAxIdx = (start / strideAxDst_) % dstAxDim_;
-            int dstShift0 = (start / strideAxDst_ / dstAxDim_) * strideAx1Diff_;
-
-            for (size_t o = start; o < end; o++, axStrideIt++) {
-                if (axStrideIt == strideAxDst_) {
-                    axStrideIt = 0;
-                    dstAxIdx++;
-                    if (dstAxIdx == dstAxDim_) {
-                        dstAxIdx = 0;
-                        dstShift0 += strideAx1Diff_;
+            size_t ks = beforeAxIdx * srcAxStride_1;
+            for (; beforeAxIdx < dimsBeforeAxis_; beforeAxIdx++) {
+                for (; axIdx < dstAxDim_; axIdx++) {
+                    for (; afterAxIdx < strideAxDst_; afterAxIdx++) {
+                        dstData[start++] = srcData[ks + indices[start] * strideAxDst_ + afterAxIdx];
+                        if (start == end)
+                            return;
                     }
+                    afterAxIdx = 0lu;
                 }
-                dstData[o] = srcData[o + dstShift0 + (indices[o] - dstAxIdx) * strideAxDst_];
+                axIdx = 0lu;
+                ks += srcAxStride_1;
             }
         };
         parallel_nt(0, threadBody);
 
+auto end1 = std::chrono::steady_clock::now();
+t1 += std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1).count();
+if (c1 % 1000 == 0) {
+    std::cout << "GE PARALLEL SECTION: " << t1 / c1 << std::endl;
+}
         return OK;
     }
 
@@ -141,6 +198,8 @@ protected:
     int dstAxDim_;
     int strideAx1Diff_;
     std::string errorPrefix_;
+
+    int dimsBeforeAxis_;
 };
 
 REG_FACTORY_FOR(GatherElementsImpl, GatherElements);
