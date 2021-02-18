@@ -473,22 +473,60 @@ struct jitUniGatherKernelThr : public jitGatherKernelBase, public x64::jit_gener
 //        mov(regAux1, ptr[regParams + GET_OFF(tmp)]);
 //        mov(regAux2, ptr[regParams + GET_OFF(retVal)]);
 
-        int64_t elPerVec = vlen / jcp_.dictTypeSize;
+        const int64_t elPerVec = vlen / jcp_.dictTypeSize;
         if (isa == x64::avx512_common) {
             vpcmpub(kMaskOnes, vmmGatherMask, vmmGatherMask, 0);
         }
-        idxIterator_ = jcp_.idxIterator;
+//        idxIterator_ = jcp_.idxIterator;
+        int64_t idxIterator = jcp_.idxIterator;
+//        const int64_t indicesSize = jcp_.indicesSize;
 
-        if (jcp_.dictTypeSize == 4) {
+//        if (jcp_.dictTypeSize == 4) {
             int64_t workRest = jcp_.workAmount;
             for (; workRest >= elPerVec; workRest -= elPerVec) {
-                vpGatherDD(vmmDst);
+//                if (idxIterator <= indicesSize - vlenYmm) {
+                    mov(regIdxIter, idxIterator);
+//        mov(regWorkAmount, jcp_.workAmount);
+//                Xbyak::Label lDstIdxLoop, lTail;
+//                L(lDstIdxLoop);
+//                {
+//                    cmp(regWorkAmount, elPerVec);
+//                    jl(lTail, T_NEAR);
+
+                    uni_vmovups(vmmSrcShifts, ptr[regIndices + regIdxIter]);
+                    uni_vpmulld(vmmSrcShifts, vmmSrcShifts, vmmDictTypeSize);
+                    // Check boundaries
+                    vpcmpgtd(vmmGatherMask, vmmSrcShifts, vmmMinusOne);
+                    vpcmpgtd(vmmAux1, vmmAxDim, vmmSrcShifts);
+                    vpand(vmmGatherMask, vmmGatherMask, vmmAux1);
+//
+                    uni_vpaddd(vmmSrcShifts, vmmSrcShifts, vmmAxDimSum);
+                    idxIterator += vlenYmm;
+//                    add(regIdxIter, vlenYmm);
+//                    if (idxIterator == jcp_.indicesSize) {
+//                        idxIterator = 0;
+//                        uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
+//                    }
+//                } else {
+//                    for (int i = 0; i < 2; i++) {
+//                        fillIndicies(xmmAux0, xmmAux2);
+//                        vinsertf128(vmmSrcShifts, vmmSrcShifts, xmmAux0, i);
+//                        vinsertf128(vmmGatherMask, vmmGatherMask, xmmAux2, i);
+//                    }
+//                }
+
+                vpgatherdd(vmmDst, ptr[regSrc + vmmSrcShifts], vmmGatherMask);
                 uni_vmovups(ptr[regDst], vmmDst);
 
                 add(regDst, vlen);
+//                sub(regWorkAmount, elPerVec);
+
+//                jmp(lDstIdxLoop, T_NEAR);
             }
-            tail(workRest);
-        } else if (jcp_.dictTypeSize == 2) {
+//            L(lTail);
+//            }
+//            tail(workRest);
+//        } else if (jcp_.dictTypeSize == 2) {
 //            auto& vmmShufMask = vmmAux8;
 //            mov(regAux1, ptr[regParams + GET_OFF(shufMask16bitUni)]);
 //            uni_vmovups(vmmShufMask, ptr[regAux1]);
@@ -522,7 +560,7 @@ struct jitUniGatherKernelThr : public jitGatherKernelBase, public x64::jit_gener
 //            }
 //            L(lTail);
 //            tail();
-        } else if (jcp_.dictTypeSize == 1) {
+//        } else if (jcp_.dictTypeSize == 1) {
 //            auto& vmmShufMask = vmmAux8;
 //            mov(regAux1, ptr[regParams + GET_OFF(shufMask8bitUni)]);
 //            uni_vmovups(vmmShufMask, ptr[regAux1]);
@@ -561,7 +599,7 @@ struct jitUniGatherKernelThr : public jitGatherKernelBase, public x64::jit_gener
 //            }
 //            L(lTail);
 //            tail();
-        }
+//        }
 
         this->postamble();
     }
@@ -572,215 +610,185 @@ protected:
     const int64_t vlenXmm = x64::cpu_isa_traits<x64::sse41>::vlen;
     const int64_t vlenYmm = x64::cpu_isa_traits<x64::avx2>::vlen;
 
-    void tail(int64_t workRest) {
-        if (workRest == 0)
-            return;
-//        Xbyak::Label lTailLoop, lCalc, lCmpTop, lPositiveIdx, lFinish;
-        Xbyak::Reg32 regDictTypeSize32(regAux1.getIdx());
-        Xbyak::Reg32 regAxDimSum32(regAux2.getIdx());
-        Xbyak::Reg32 regAux3_32(regAux3.getIdx());
-        Xbyak::Reg16 regAux3_16(regAux3.getIdx());
-        Xbyak::Reg8  regAux3_8(regAux3.getIdx());
-        uni_vpextrd(regDictTypeSize32, xmmDictTypeSize, 0);
-        uni_vpextrd(regAxDimSum32, xmmAxDimSum, 0);
-//        L(lTailLoop);
-//        {
-//            cmp(regWorkAmount, 0);
-//            je(lFinish, T_NEAR);
-
-        for (; workRest > 0; workRest--) {
-            Xbyak::Label lCmpTop, lPositiveIdx;
-
-            if (idxIterator_ == jcp_.indicesSize) {
-//            cmp(regIdxIter, jcp_.indicesSize);
-//            jl(lCalc, T_NEAR);
-//            mov(regIdxIter, 0);
-                idxIterator_ = 0;
-                uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
-                uni_vpextrd(regAxDimSum32, xmmAxDimSum, 0);
-            }
-
-//            L(lCalc);
-            mov(regIdxIter, idxIterator_);
-            mov(eax, ptr[regIndices + regIdxIter]);
-            cmp(rax, 0);
-            jge(lCmpTop, T_NEAR);
-            mov(rax, 0);
-            jmp(lPositiveIdx);
-            L(lCmpTop);
-            cmp(rax, jcp_.axisDim);
-            jl(lPositiveIdx, T_NEAR);
-            mov(rax, 0);
-            L(lPositiveIdx);
-            mul(regDictTypeSize32);
-            add(eax, regAxDimSum32);
-            if (jcp_.dictTypeSize == 4) {
-                mov(regAux3_32, ptr[regSrc + rax]);
-                mov(ptr[regDst], regAux3_32);
-            } else if (jcp_.dictTypeSize == 2) {
-                mov(regAux3_16, ptr[regSrc + rax]);
-                mov(ptr[regDst], regAux3_16);
-            } else if (jcp_.dictTypeSize == 1) {
-                mov(regAux3_8, ptr[regSrc + rax]);
-                mov(ptr[regDst], regAux3_8);
-            }
-
-            idxIterator_ += sizeof(int);
-//            add(regIdxIter, sizeof(int));
-            add(regDst, jcp_.dictTypeSize);
-//            sub(regWorkAmount, 1);
-//            jmp(lTailLoop, T_NEAR);
-        }
-//        L(lFinish);
-    }
-
-    void fillIndicies(Xbyak::Xmm& dst, Xbyak::Xmm& mask) {
-//        Xbyak::Label lPerElements, lExit;
-
-//        cmp(regIdxIter, jcp_.indicesSize - vlenXmm);
-//        jg(lPerElements, T_NEAR);
-        if (idxIterator_ <= jcp_.indicesSize - vlenXmm) {
-            mov(regIdxIter, idxIterator_);
-            uni_vmovups(dst, ptr[regIndices + regIdxIter]);
-            uni_vpmulld(dst, dst, xmmDictTypeSize);
-            // Check boundaries
-            vpcmpgtd(mask, dst, xmmMinusOne);
-            vpcmpgtd(xmmAux1, xmmAxDim, dst);
-            vpand(mask, mask, xmmAux1);
-
-            uni_vpaddd(dst, dst, xmmAxDimSum);
-            idxIterator_ += vlenXmm;
-//            add(regIdxIter, vlenXmm);
-//        cmp(regIdxIter, jcp_.indicesSize);
-//        jl(lExit, T_NEAR);
-            if (idxIterator_ == jcp_.indicesSize) {
-                uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
-                idxIterator_ = 0;
-//                mov(regIdxIter, 0);
-            }
-//        jmp(lExit, T_NEAR);
-        } else {
-//        L(lPerElements);
-            for (uint8_t i = 0; i < 4; i++) {
-//                Xbyak::Label insertLabel;
-
-//                cmp(regIdxIter, jcp_.indicesSize);
-//                jl(insertLabel, T_NEAR);
-                if (idxIterator_ == jcp_.indicesSize) {
-                    idxIterator_ = 0;
-//                    mov(regIdxIter, 0);
-                    uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
-                }
-
-//                L(insertLabel);
-                mov(regIdxIter, idxIterator_);
-                uni_vpbroadcastd(xmmAux1, ptr[regIndices + regIdxIter]);
-                uni_vpmulld(xmmAux1, xmmAux1, xmmDictTypeSize);
-                // Check boundaries
-                vpcmpgtd(xmmAux3, xmmAux1, xmmMinusOne);
-                vpcmpgtd(xmmAux7, xmmAxDim, xmmAux1);
-                vpand(xmmAux3, xmmAux3, xmmAux7);
-
-                uni_vpaddd(xmmAux1, xmmAux1, xmmAxDimSum);
-                vinsertps(dst, dst, xmmAux1, i << 4);
-                vinsertps(mask, mask, xmmAux3, i << 4);
-//                add(regIdxIter, sizeof(int));
-                idxIterator_ += sizeof(int);
-            }
-        }
-//        L(lExit);
-    }
-
-    void fillIndicies(Xbyak::Ymm& dst, Xbyak::Ymm& mask) {
-//        Xbyak::Label lPerXmm, lExit;
-
-//        cmp(regIdxIter, jcp_.indicesSize - vlenYmm);
-//        jg(lPerXmm, T_NEAR);
-        if (idxIterator_ <= jcp_.indicesSize - vlenYmm) {
-            mov(regIdxIter, idxIterator_);
-            uni_vmovups(dst, ptr[regIndices + regIdxIter]);
-//mov(regAux1, ptr[regParams + GET_OFF(tmp)]);
-//uni_vmovups(ptr[regAux1], dst);
-            uni_vpmulld(dst, dst, vmmDictTypeSize);
-            // Check boundaries
-            vpcmpgtd(mask, dst, vmmMinusOne);
-            vpcmpgtd(vmmAux1, vmmAxDim, dst);
-            vpand(mask, mask, vmmAux1);
-
-            uni_vpaddd(dst, dst, vmmAxDimSum);
-//            add(regIdxIter, vlenYmm);
-            idxIterator_ += vlenYmm;
-            if (idxIterator_ == jcp_.indicesSize) {
-                idxIterator_ = 0;
-                uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
-            }
-        } else {
-//        cmp(regIdxIter, jcp_.indicesSize);
-//        jl(lExit, T_NEAR);
-//            uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
-//            mov(regIdxIter, 0);
-//        jmp(lExit, T_NEAR);
-//        L(lPerXmm);
-            for (int i = 0; i < 2; i++) {
-                fillIndicies(xmmAux0, xmmAux2);
-                vinsertf128(dst, dst, xmmAux0, i);
-                vinsertf128(mask, mask, xmmAux2, i);
-            }
-//        L(lExit);
-        }
-    }
-
-    void fillIndicies(Xbyak::Zmm& dst, Xbyak::Opmask& mask) {
-//        Xbyak::Label lPerYmm, lExit;
+//    void tail(int64_t workRest) {
+//        if (workRest == 0)
+//            return;
+////        Xbyak::Label lTailLoop, lCalc, lCmpTop, lPositiveIdx, lFinish;
+//        Xbyak::Reg32 regDictTypeSize32(regAux1.getIdx());
+//        Xbyak::Reg32 regAxDimSum32(regAux2.getIdx());
+//        Xbyak::Reg32 regAux3_32(regAux3.getIdx());
+//        Xbyak::Reg16 regAux3_16(regAux3.getIdx());
+//        Xbyak::Reg8  regAux3_8(regAux3.getIdx());
+//        uni_vpextrd(regDictTypeSize32, xmmDictTypeSize, 0);
+//        uni_vpextrd(regAxDimSum32, xmmAxDimSum, 0);
+////        L(lTailLoop);
+////        {
+////            cmp(regWorkAmount, 0);
+////            je(lFinish, T_NEAR);
 //
-//        cmp(regIdxIter, jcp_.indicesSize - vlen);
-//        jg(lPerYmm, T_NEAR);
-//            uni_vmovups(dst, ptr[regIndices + regIdxIter]);
-//            uni_vpmulld(dst, dst, vmmDictTypeSize);
-//        vpcmpgtd(mask, dst, vmmMinusOne);
-//        vpcmpgtd(kMaskAux2, vmmAxDim, dst);
-//        kandd(mask, mask, kMaskAux2);
-//            uni_vpaddd(dst, dst, vmmAxDimSum);
-//            add(regIdxIter, vlen);
-//        cmp(regIdxIter, jcp_.indicesSize);
-//        jl(lExit, T_NEAR);
-//            uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
-//            mov(regIdxIter, 0);
-//        jmp(lExit, T_NEAR);
-//        L(lPerYmm);
-//            for (int i = 0; i < 2; i++) {
-//                fillIndicies(ymmAux2, ymmAux10);
-//                vinsertf32x8(dst, dst, ymmAux2, i);
-//                vinsertf32x8(vmmAux11, vmmAux11, ymmAux10, i);
+//        for (; workRest > 0; workRest--) {
+//            Xbyak::Label lCmpTop, lPositiveIdx;
+//
+//            if (idxIterator_ == jcp_.indicesSize) {
+////            cmp(regIdxIter, jcp_.indicesSize);
+////            jl(lCalc, T_NEAR);
+////            mov(regIdxIter, 0);
+//                idxIterator_ = 0;
+//                uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
+//                uni_vpextrd(regAxDimSum32, xmmAxDimSum, 0);
 //            }
-//            vpmovd2m(mask, ymmAux10);
-//        L(lExit);
-    }
+//
+////            L(lCalc);
+//            mov(regIdxIter, idxIterator_);
+//            mov(eax, ptr[regIndices + regIdxIter]);
+//            cmp(rax, 0);
+//            jge(lCmpTop, T_NEAR);
+//            mov(rax, 0);
+//            jmp(lPositiveIdx);
+//            L(lCmpTop);
+//            cmp(rax, jcp_.axisDim);
+//            jl(lPositiveIdx, T_NEAR);
+//            mov(rax, 0);
+//            L(lPositiveIdx);
+//            mul(regDictTypeSize32);
+//            add(eax, regAxDimSum32);
+//            if (jcp_.dictTypeSize == 4) {
+//                mov(regAux3_32, ptr[regSrc + rax]);
+//                mov(ptr[regDst], regAux3_32);
+//            } else if (jcp_.dictTypeSize == 2) {
+//                mov(regAux3_16, ptr[regSrc + rax]);
+//                mov(ptr[regDst], regAux3_16);
+//            } else if (jcp_.dictTypeSize == 1) {
+//                mov(regAux3_8, ptr[regSrc + rax]);
+//                mov(ptr[regDst], regAux3_8);
+//            }
+//
+//            idxIterator_ += sizeof(int);
+////            add(regIdxIter, sizeof(int));
+//            add(regDst, jcp_.dictTypeSize);
+////            sub(regWorkAmount, 1);
+////            jmp(lTailLoop, T_NEAR);
+//        }
+////        L(lFinish);
+//    }
+//
+//    void fillIndicies(Xbyak::Xmm& dst, Xbyak::Xmm& mask) {
+//        if (idxIterator_ <= jcp_.indicesSize - vlenXmm) {
+//            mov(regIdxIter, idxIterator_);
+//            uni_vmovups(dst, ptr[regIndices + regIdxIter]);
+//            uni_vpmulld(dst, dst, xmmDictTypeSize);
+//            // Check boundaries
+//            vpcmpgtd(mask, dst, xmmMinusOne);
+//            vpcmpgtd(xmmAux1, xmmAxDim, dst);
+//            vpand(mask, mask, xmmAux1);
+//
+//            uni_vpaddd(dst, dst, xmmAxDimSum);
+//            idxIterator_ += vlenXmm;
+//            if (idxIterator_ == jcp_.indicesSize) {
+//                uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
+//                idxIterator_ = 0;
+//            }
+//        } else {
+//            for (uint8_t i = 0; i < 4; i++) {
+//                if (idxIterator_ == jcp_.indicesSize) {
+//                    idxIterator_ = 0;
+//                    uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
+//                }
+//
+//                mov(regIdxIter, idxIterator_);
+//                uni_vpbroadcastd(xmmAux1, ptr[regIndices + regIdxIter]);
+//                uni_vpmulld(xmmAux1, xmmAux1, xmmDictTypeSize);
+//                // Check boundaries
+//                vpcmpgtd(xmmAux3, xmmAux1, xmmMinusOne);
+//                vpcmpgtd(xmmAux7, xmmAxDim, xmmAux1);
+//                vpand(xmmAux3, xmmAux3, xmmAux7);
+//
+//                uni_vpaddd(xmmAux1, xmmAux1, xmmAxDimSum);
+//                vinsertps(dst, dst, xmmAux1, i << 4);
+//                vinsertps(mask, mask, xmmAux3, i << 4);
+//                idxIterator_ += sizeof(int);
+//            }
+//        }
+//    }
+//
+//    void fillIndicies(Xbyak::Ymm& dst, Xbyak::Ymm& mask) {
+//        if (idxIterator_ <= jcp_.indicesSize - vlenYmm) {
+//            mov(regIdxIter, idxIterator_);
+//            uni_vmovups(dst, ptr[regIndices + regIdxIter]);
+////mov(regAux1, ptr[regParams + GET_OFF(tmp)]);
+////uni_vmovups(ptr[regAux1], dst);
+//            uni_vpmulld(dst, dst, vmmDictTypeSize);
+//            // Check boundaries
+//            vpcmpgtd(mask, dst, vmmMinusOne);
+//            vpcmpgtd(vmmAux1, vmmAxDim, dst);
+//            vpand(mask, mask, vmmAux1);
+//
+//            uni_vpaddd(dst, dst, vmmAxDimSum);
+//            idxIterator_ += vlenYmm;
+//            if (idxIterator_ == jcp_.indicesSize) {
+//                idxIterator_ = 0;
+//                uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
+//            }
+//        } else {
+//            for (int i = 0; i < 2; i++) {
+//                fillIndicies(xmmAux0, xmmAux2);
+//                vinsertf128(dst, dst, xmmAux0, i);
+//                vinsertf128(mask, mask, xmmAux2, i);
+//            }
+//        }
+//    }
+//
+//    void fillIndicies(Xbyak::Zmm& dst, Xbyak::Opmask& mask) {
+////        Xbyak::Label lPerYmm, lExit;
+////
+////        cmp(regIdxIter, jcp_.indicesSize - vlen);
+////        jg(lPerYmm, T_NEAR);
+////            uni_vmovups(dst, ptr[regIndices + regIdxIter]);
+////            uni_vpmulld(dst, dst, vmmDictTypeSize);
+////        vpcmpgtd(mask, dst, vmmMinusOne);
+////        vpcmpgtd(kMaskAux2, vmmAxDim, dst);
+////        kandd(mask, mask, kMaskAux2);
+////            uni_vpaddd(dst, dst, vmmAxDimSum);
+////            add(regIdxIter, vlen);
+////        cmp(regIdxIter, jcp_.indicesSize);
+////        jl(lExit, T_NEAR);
+////            uni_vpaddd(vmmAxDimSum, vmmAxDimSum, vmmAxDim);
+////            mov(regIdxIter, 0);
+////        jmp(lExit, T_NEAR);
+////        L(lPerYmm);
+////            for (int i = 0; i < 2; i++) {
+////                fillIndicies(ymmAux2, ymmAux10);
+////                vinsertf32x8(dst, dst, ymmAux2, i);
+////                vinsertf32x8(vmmAux11, vmmAux11, ymmAux10, i);
+////            }
+////            vpmovd2m(mask, ymmAux10);
+////        L(lExit);
+//    }
+//
+//    void vpGatherDD(const Xbyak::Ymm& dst) {
+//        fillIndicies(vmmSrcShifts, vmmGatherMask);
+////mov(regAux1, ptr[regParams + GET_OFF(tmp)]);
+////uni_vmovups(ptr[regAux1], vmmSrcShifts);
+//        vpgatherdd(dst, ptr[regSrc + vmmSrcShifts], vmmGatherMask);
+//    }
+//
+//    void vpGatherDD(const Xbyak::Zmm& dst) {
+//        fillIndicies(vmmSrcShifts, kMaskAux1);
+////        vpcmpub(kMaskAux1, vmmGatherMask, vmmGatherMask, 0);
+//        vpgatherdd(dst | kMaskAux1, ptr[regSrc + vmmSrcShifts]);
+//    }
+//
+//    void gatherAndGroup(const Xbyak::Ymm& dst, const Xbyak::Ymm& shufMask) {
+//        vpGatherDD(dst);
+//        vpshufb(dst, dst, shufMask);
+//    }
+//
+//    void gatherAndGroup(const Xbyak::Zmm& dst, const Xbyak::Zmm& shufMask) {
+//        vpGatherDD(dst);
+//        vpshufb(dst | kMaskOnes, dst, shufMask);
+//    }
 
-    void vpGatherDD(const Xbyak::Ymm& dst) {
-        fillIndicies(vmmSrcShifts, vmmGatherMask);
-//mov(regAux1, ptr[regParams + GET_OFF(tmp)]);
-//uni_vmovups(ptr[regAux1], vmmSrcShifts);
-        vpgatherdd(dst, ptr[regSrc + vmmSrcShifts], vmmGatherMask);
-    }
-
-    void vpGatherDD(const Xbyak::Zmm& dst) {
-        fillIndicies(vmmSrcShifts, kMaskAux1);
-//        vpcmpub(kMaskAux1, vmmGatherMask, vmmGatherMask, 0);
-        vpgatherdd(dst | kMaskAux1, ptr[regSrc + vmmSrcShifts]);
-    }
-
-    void gatherAndGroup(const Xbyak::Ymm& dst, const Xbyak::Ymm& shufMask) {
-        vpGatherDD(dst);
-        vpshufb(dst, dst, shufMask);
-    }
-
-    void gatherAndGroup(const Xbyak::Zmm& dst, const Xbyak::Zmm& shufMask) {
-        vpGatherDD(dst);
-        vpshufb(dst | kMaskOnes, dst, shufMask);
-    }
-
-    int64_t idxIterator_;
+//    int64_t idxIterator_;
 
     Xbyak::Reg64 regSrc = r8;
     Xbyak::Reg64 regDst = r9;
@@ -1001,7 +1009,7 @@ auto start1 = std::chrono::steady_clock::now();
                     const int axisDimB = axisDim_ * dictTypeSize_;
                     const int axDimSumB = axisDimB * basStart;
                     const int minusOne = -1;
-//printf("[%d] basStart: %lu; idxStart: %lu; axisDimB: %d; axDimSumB: %d\n", ithr, basStart, idxStart, axisDimB, axDimSumB);
+//printf("[%d] start: %ld; basStart: %lu; idxStart: %lu; axisDimB: %d; axDimSumB: %d\n", ithr, ker->jcp_.start, basStart, idxStart, axisDimB, axDimSumB);
 //int tmp[16] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 //int retVal = 0;
 
