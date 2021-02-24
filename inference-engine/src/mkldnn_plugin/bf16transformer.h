@@ -22,7 +22,7 @@
 //          "sigmoid", "ReLU6", "not", "activation", "HSwish", "mish", "logistic", "mod", "resample",
 //          "exp", "gelu", "clamp", "swish", "prelu", "pooling", "norm", "gather", "gather_elements", "memory", "mvn", "crop", "activation",
 //          "broadcast", "convert", "BatchToSpace", "DepthToSpace", "ExtractImagePatches", "concat", "power", "lrn",
-//          "permute", "ScatterUpdate", "ScatterElementsUpdate", "ScatterNDUpdate", "depthwise",
+//          "Transpose", "ScatterUpdate", "ScatterElementsUpdate", "ScatterNDUpdate", "depthwise",
 //          "select", "ShuffleChannels", "SpaceToBatch", "SpaceToDepth", "squeeze", "StridedSlice", "unsqueeze", "eltwise",
 //          "ReduceAnd", "ReduceOr", "ReduceMax", "ReduceMin", "ScaleShift"};
 //

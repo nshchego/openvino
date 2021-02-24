@@ -14,7 +14,7 @@
 
 namespace MKLDNNPlugin {
 
-struct jit_permute_conf_t {
+struct jit_transpose_conf_t {
     uint32_t ndims;
     InferenceEngine::SizeVector dst_block_dims;
     InferenceEngine::SizeVector src_strides;
@@ -25,29 +25,30 @@ struct jit_permute_conf_t {
     bool supported_dynamic_batch = false;
 };
 
-struct jit_args_permute {
+struct jit_args_transpose {
     const void* src;
     const void* dst;
 };
 
-struct jit_uni_permute_kernel {
-    void (*ker_)(const jit_args_permute *);
+struct jit_uni_transpose_kernel {
+    void (*ker_)(const jit_args_transpose *);
 
-    void operator()(const jit_args_permute *args) { assert(ker_); ker_(args); }
+    void operator()(const jit_args_transpose *args) { assert(ker_); ker_(args); }
 
-    jit_permute_conf_t jpp;
+    jit_transpose_conf_t jpp;
 
     virtual void create_ker() = 0;
 
-    explicit jit_uni_permute_kernel(jit_permute_conf_t jpp) : ker_(nullptr), jpp(jpp) {}
-    virtual ~jit_uni_permute_kernel() {}
+    explicit jit_uni_transpose_kernel(jit_transpose_conf_t jpp) : ker_(nullptr), jpp(jpp) {}
+    virtual ~jit_uni_transpose_kernel() {}
 };
 
-class MKLDNNPermuteNode : public MKLDNNNode {
+class MKLDNNTransposeNode : public MKLDNNNode {
 public:
-    MKLDNNPermuteNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
-    ~MKLDNNPermuteNode() override = default;
+    MKLDNNTransposeNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
+    ~MKLDNNTransposeNode() override = default;
 
+    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
@@ -65,17 +66,17 @@ private:
     InferenceEngine::SizeVector order;
     InferenceEngine::Precision prec;
 
-    typedef std::function<void(int MB, MKLDNNMemoryPtr& srcMemPtr, MKLDNNMemoryPtr& dstMemPtr)> permuteImpl;
+    typedef std::function<void(int MB, MKLDNNMemoryPtr& srcMemPtr, MKLDNNMemoryPtr& dstMemPtr)> transposeImpl;
     typedef std::function<bool(int MB, MKLDNNMemoryPtr& srcMemPtr, MKLDNNMemoryPtr& dstMemPtr)> isApplicable;
-    struct PermuteImpl {
-        PermuteImpl(permuteImpl f0, isApplicable f1): execute(std::move(f0)), isValidParams(std::move(f1)) {}
+    struct TransposeImpl {
+        TransposeImpl(transposeImpl f0, isApplicable f1): execute(std::move(f0)), isValidParams(std::move(f1)) {}
 
-        permuteImpl execute;
+        transposeImpl execute;
         isApplicable isValidParams;
     };
 
-    static const std::multimap<InferenceEngine::SizeVector, PermuteImpl> OptimizedCases;
-    std::shared_ptr<jit_uni_permute_kernel> permute_kernel;
+    static const std::multimap<InferenceEngine::SizeVector, TransposeImpl> OptimizedCases;
+    std::shared_ptr<jit_uni_transpose_kernel> transpose_kernel;
 };
 
 }  // namespace MKLDNNPlugin
