@@ -167,7 +167,7 @@ static const InferenceEngine::details::caseless_unordered_map<std::string, Type>
 //        { "MemoryInput", MemoryInput},  // for construction from name ctor, arbitrary name is used
 //        { "Memory", MemoryOutput },  // for construction from layer ctor
 //        { "Convert", Convert },
-//        { "MVN", MVN},
+        { "MVN", MVN},
 //        { "Normalize", Normalize},
 //        { "ScatterUpdate", ScatterUpdate},
 //        { "ScatterElementsUpdate", ScatterElementsUpdate},
