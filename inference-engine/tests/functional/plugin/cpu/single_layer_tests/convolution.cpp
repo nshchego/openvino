@@ -106,7 +106,7 @@ const std::vector<fusingSpecificParams> fusingParamsSet{
         fusingElu,
         fusingSigmoid,
         fusingClamp,
-        fusingPRelu,
+        fusingPReluPerChannel,
         fusingSwish,
         // other patterns
         fusingReluScaleShift,
@@ -123,7 +123,7 @@ const std::vector<fusingSpecificParams> fusingParamsSetBF16{
         fusingElu,
         fusingSigmoid,
         fusingClamp,
-        fusingPRelu,
+        fusingPReluPerChannel,
         fusingSwish,
         // other patterns
         fusingReluScaleShift,
