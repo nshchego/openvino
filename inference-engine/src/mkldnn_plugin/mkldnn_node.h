@@ -61,7 +61,7 @@ enum Type {
     BatchNormalization,
     Flatten,
     Pad,
-    Permute,
+    Transpose,
     Copy,
     MemoryOutput,
     MemoryInput,
@@ -206,8 +206,8 @@ static std::string NameFromType(Type type) {
             return "Flatten";
         case Pad:
             return "Pad";
-        case Permute:
-            return "Permute";
+        case Transpose:
+            return "Transpose";
         case Copy:
             return "Copy";
         case MemoryOutput:

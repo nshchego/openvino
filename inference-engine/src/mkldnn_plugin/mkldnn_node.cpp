@@ -31,7 +31,7 @@
 #include <nodes/mkldnn_tile_node.h>
 #include <nodes/mkldnn_split_node.h>
 #include <nodes/mkldnn_pad_node.h>
-#include <nodes/mkldnn_permute_node.h>
+#include <nodes/mkldnn_transpose_node.h>
 #include <nodes/mkldnn_memory_node.hpp>
 #include <nodes/mkldnn_mvn_node.h>
 #include <nodes/mkldnn_normalize_node.h>
@@ -137,7 +137,7 @@ static const InferenceEngine::details::caseless_unordered_map<std::string, Type>
 //        { "SoftMax", SoftMax },
 //        { "Split", Split },
 //        { "Slice", Split },
-//        { "Concat", Concatenation },
+        { "Concat", Concatenation },
 //        { "Deconvolution", Deconvolution },
 //        { "Eltwise", Eltwise },
 //        { "Mod", Eltwise },
@@ -151,7 +151,7 @@ static const InferenceEngine::details::caseless_unordered_map<std::string, Type>
 //        { "BatchNormalization", BatchNormalization },
 //        { "Flatten", Flatten },
 //        { "Pad", Pad },
-//        { "Permute", Permute },
+        { "Transpose", Transpose },
 //        { "Copy", Copy },
 //        { "LSTMCell", RNNCell },
 //        { "GRUCell", RNNCell },
