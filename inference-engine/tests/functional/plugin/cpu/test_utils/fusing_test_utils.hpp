@@ -163,7 +163,7 @@ const auto fusingReluScaleShift = fusingSpecificParams{std::make_shared<postNode
                      THROW_IE_EXCEPTION << "If shape.size() == 1 then Granularity can be PerTensor only";
                  ngraph::Shape newShape(shape.size(), 1);
                  newShape[1] = shape[1];
-                 auto constNode = ngraph::builder::makeConstant<float>(ngraph::element::f32, newShape, {}, true);
+                 auto constNode = ngraph::builder::makeConstant(ngPrc, newShape, std::vector<float>{}, true);
                  return std::make_shared<ngraph::opset1::Multiply>(inpNode, constNode);
             }, "Multiply(PerChannel)"},
             {[](std::shared_ptr<ngraph::Node> inpNode, const ngraph::element::Type& ngPrc, ngraph::ParameterVector& params){
@@ -172,7 +172,7 @@ const auto fusingReluScaleShift = fusingSpecificParams{std::make_shared<postNode
                  THROW_IE_EXCEPTION << "If shape.size() == 1 then Granularity can be PerTensor only";
                 ngraph::Shape newShape(shape.size(), 1);
                 newShape[1] = shape[1];
-                auto constNode = ngraph::builder::makeConstant<float>(ngraph::element::f32, newShape, {}, true);
+                auto constNode = ngraph::builder::makeConstant(ngPrc, newShape, std::vector<float>{}, true);
                 return std::make_shared<ngraph::opset1::Add>(inpNode, constNode);
             }, "Add(PerChannel)"}}), {"Relu", "Add"}};
 
@@ -183,7 +183,7 @@ const auto fusingScaleShift = fusingSpecificParams{ std::make_shared<postNodesMg
                      THROW_IE_EXCEPTION << "If shape.size() == 1 then Granularity can be PerTensor only";
                  ngraph::Shape newShape(shape.size(), 1);
                  newShape[1] = shape[1];
-                 auto constNode = ngraph::builder::makeConstant<float>(ngraph::element::f32, newShape, {}, true);
+                 auto constNode = ngraph::builder::makeConstant(ngPrc, newShape, std::vector<float>{}, true);
                  return std::make_shared<ngraph::opset1::Multiply>(inpNode, constNode);
             }, "Multiply(PerChannel)"},
             {[](std::shared_ptr<ngraph::Node> inpNode, const ngraph::element::Type& ngPrc, ngraph::ParameterVector& params) {
@@ -192,7 +192,7 @@ const auto fusingScaleShift = fusingSpecificParams{ std::make_shared<postNodesMg
                  THROW_IE_EXCEPTION << "If shape.size() == 1 then Granularity can be PerTensor only";
                 ngraph::Shape newShape(shape.size(), 1);
                 newShape[1] = shape[1];
-                auto constNode = ngraph::builder::makeConstant<float>(ngraph::element::f32, newShape, {}, true);
+                auto constNode = ngraph::builder::makeConstant(ngPrc, newShape, std::vector<float>{}, true);
                 return std::make_shared<ngraph::opset1::Add>(inpNode, constNode);
             }, "Add(PerChannel)"}}), {"Add"} };
 
