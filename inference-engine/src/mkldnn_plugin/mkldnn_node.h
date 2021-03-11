@@ -59,7 +59,6 @@ enum Type {
     SimplerNMS,
     ROIAlign,
     ROIPooling,
-    BatchNormalization,
     Flatten,
     Pad,
     Transpose,
@@ -201,8 +200,6 @@ static std::string NameFromType(Type type) {
             return "ROIAlign";
         case ROIPooling:
             return "ROIPooling";
-        case BatchNormalization:
-            return "BatchNormalization";
         case Flatten:
             return "Flatten";
         case Pad:
