@@ -578,7 +578,7 @@ namespace ngraph
     }
 
     template <>
-    EnumNames<op::v4::Interpolate::CoordinateTransformMode>&
+    NGRAPH_API EnumNames<op::v4::Interpolate::CoordinateTransformMode>&
         EnumNames<op::v4::Interpolate::CoordinateTransformMode>::get()
     {
         static auto enum_names = EnumNames<op::v4::Interpolate::CoordinateTransformMode>(
@@ -603,7 +603,8 @@ namespace ngraph
     }
 
     template <>
-    EnumNames<op::v4::Interpolate::NearestMode>& EnumNames<op::v4::Interpolate::NearestMode>::get()
+    NGRAPH_API EnumNames<op::v4::Interpolate::NearestMode>&
+        EnumNames<op::v4::Interpolate::NearestMode>::get()
     {
         static auto enum_names = EnumNames<op::v4::Interpolate::NearestMode>(
             "op::v4::Interpolate::NearestMode",
