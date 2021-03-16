@@ -67,7 +67,7 @@ enum Type {
     MemoryInput,
     RNNCell,
     RNNSeq,
-    Quantize,
+    FakeQuantize,
     BinaryConvolution,
     DeformableConvolution,
     TensorIterator,
@@ -151,7 +151,12 @@ enum Algorithm {
     EltwiseHswish,
     EltwiseHsigmoid,
     EltwiseRoundHalfToEven,
-    EltwiseRoundHalfAwayFromZero
+    EltwiseRoundHalfAwayFromZero,
+
+    // FakeQuantize algorithms
+    FQCommon,
+    FQQuantization,
+    FQBinarization
 };
 
 Type TypeFromName(const std::string type);
@@ -218,8 +223,8 @@ static std::string NameFromType(Type type) {
             return "RNNCell";
         case Eltwise:
             return "Eltwise";
-        case Quantize:
-            return "Quantize";
+        case FakeQuantize:
+            return "FakeQuantize";
         case BinaryConvolution:
             return "BinaryConvolution";
         case DeformableConvolution:
@@ -657,7 +662,7 @@ public:
     }
 
 protected:
-    bool canBePerformedAsScaleShift() const;
+    bool canBePerformedAsScaleShift(const MKLDNNNode *parentNode = nullptr) const;
     bool canFuseSimpleOperation(const MKLDNNNodePtr& node) const;
 
     void setType(Type type) {
