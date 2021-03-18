@@ -52,7 +52,7 @@ enum Type {
     Split,
     Concatenation,
     Eltwise,
-    Gemm,
+    MatMul,
     Crop,
     Reshape,
     Tile,
@@ -183,8 +183,8 @@ static std::string NameFromType(Type type) {
             return "Pooling";
         case FullyConnected:
             return "FullyConnected";
-        case Gemm:
-            return "Gemm";
+        case MatMul:
+            return "MatMul";
         case Softmax:
             return "Softmax";
         case Split:
