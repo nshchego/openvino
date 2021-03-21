@@ -584,6 +584,10 @@ public:
         return originalInputPrecisions.size();
     }
 
+    size_t getOriginalOutputsNumber() const {
+        return originalOutputPrecisions.size();
+    }
+
     Algorithm getAlgorithm() const {
         return algorithm;
     }
