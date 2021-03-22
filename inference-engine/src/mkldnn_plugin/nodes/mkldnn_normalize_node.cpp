@@ -810,9 +810,9 @@ void MKLDNNNormalizeL2Node::createPrimitive() {
     auto& dstMemPtr = getChildEdgeAt(DATA)->getMemoryPtr();
     auto& srcMemPtr = getParentEdgeAt(DATA)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->GetPrimitivePtr())
-        THROW_IE_EXCEPTION << errorPrefix << "has didn't allocated destination memory";
+        THROW_IE_EXCEPTION << errorPrefix << "can't get destination memory";
     if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
-        THROW_IE_EXCEPTION << errorPrefix << "has didn't allocated input memory";
+        THROW_IE_EXCEPTION << errorPrefix << "can't get input memory";
     if (getSelectedPrimitiveDescriptor() == nullptr)
         THROW_IE_EXCEPTION << errorPrefix << "has nullable preferable primitive descriptor";
 

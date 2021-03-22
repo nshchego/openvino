@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2020 Intel Corporation
+// Copyright (C) 2018-2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -10,42 +10,56 @@
 #include <cassert>
 #include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
+#include <ngraph/opsets/opset1.hpp>
 
 namespace InferenceEngine {
 namespace Extensions {
 namespace Cpu {
 
+using MKLDNNPlugin::TensorDescCreatorTypes;
+
 class BroadcastImpl: public ExtLayerBase {
 public:
-    explicit BroadcastImpl(const CNNLayer* layer) {
+    static bool isSupportedOperation(const std::shared_ptr<ngraph::Node>& op, std::string& errorMessage) noexcept {
         try {
-            if (layer->insData.empty() || layer->outData.empty())
-                THROW_IE_EXCEPTION << layer->name << " Incorrect number of input/output edges!";
+            const auto broadcast = std::dynamic_pointer_cast<const ngraph::opset1::Broadcast>(op);
+            if (!broadcast) {
+                errorMessage = "Only opset1 Broadcast operation is supported";
+                return false;
+            }
+            if (broadcast->get_broadcast_spec() != ngraph::op::AutoBroadcastSpec::NUMPY) {
+                errorMessage = "Only NUMPY broadcast type is supported";
+                return false;
+            }
+            if (std::dynamic_pointer_cast<const ngraph::opset1::Constant>(broadcast->get_input_node_shared_ptr(BROADCAST_SHAPE)) == nullptr) {
+                errorMessage = "Only const 'shape' input is supported";
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+        return true;
+    }
 
-            if (layer->insData.size() != 2)
-                THROW_IE_EXCEPTION << layer->name << " Incorrect number of input edges!";
+    explicit BroadcastImpl(const std::shared_ptr<ngraph::Node>& op) {
+        try {
+            std::string errorMessage;
+            if (!isSupportedOperation(op, errorMessage)) {
+                THROW_IE_EXCEPTION_WITH_STATUS(NOT_IMPLEMENTED) << errorMessage;
+            }
 
-            SizeVector shape_dims = layer->insData[BROADCAST_SHAPE].lock()->getTensorDesc().getDims();
+            errorPrefix = "Broadcast node with name '" + op->get_friendly_name() + "'";
+            if (op->get_input_size() != 2 || op->get_output_size() != 1)
+                THROW_IE_EXCEPTION << errorPrefix << " has incorrect number of input/output edges!";
+
+            SizeVector shape_dims = op->get_input_shape(BROADCAST_SHAPE);
             if (shape_dims.size() > 1)
-                THROW_IE_EXCEPTION << layer->name << " Shape vector should be 1 dimension";
+                THROW_IE_EXCEPTION << errorPrefix << " has incorrect 'shape' input rank: " << shape_dims.size();
 
-            LayerConfig config;
-            DataConfig dataConfig, shapeConfig;
-            Precision dataPrecision = layer->insData[BROADCAST_INPUT].lock()->getTensorDesc().getPrecision();
-            const SizeVector& data_dims = layer->insData[BROADCAST_INPUT].lock()->getTensorDesc().getDims();
-            dataConfig.desc = TensorDesc(dataPrecision, data_dims,
-                                         layer->insData[BROADCAST_INPUT].lock()->getTensorDesc().getLayout());
-            config.inConfs.push_back(dataConfig);
-            shapeConfig.desc = TensorDesc(layer->insData[BROADCAST_SHAPE].lock()->getTensorDesc().getPrecision(),
-                                          shape_dims, TensorDesc::getLayoutByDims(shape_dims));
-            config.inConfs.push_back(shapeConfig);
-
-            DataConfig outConfig;
-            const SizeVector& out_dims = layer->outData[0]->getTensorDesc().getDims();
-            outConfig.desc = TensorDesc(dataPrecision, out_dims, layer->outData[0]->getTensorDesc().getLayout());
-            config.outConfs.push_back(outConfig);
-            config.dynBatchSupport = false;
-            confs.push_back(config);
+            Precision prec = details::convertPrecision(op->get_input_element_type(BROADCAST_INPUT));
+            addConfig(op, {{TensorDescCreatorTypes::ncsp, prec},
+                           {TensorDescCreatorTypes::ncsp, Precision::I32}},
+                          {{TensorDescCreatorTypes::ncsp, prec}});
         } catch (InferenceEngine::details::InferenceEngineException &ex) {
             errorMsg = ex.what();
         }
@@ -124,8 +138,10 @@ public:
     }
 
 private:
-    const size_t BROADCAST_INPUT = 0;
-    const size_t BROADCAST_SHAPE = 1;
+    static const size_t BROADCAST_INPUT = 0;
+    static const size_t BROADCAST_SHAPE = 1;
+
+    std::string errorPrefix;
 };
 
 REG_FACTORY_FOR(BroadcastImpl, Broadcast);
