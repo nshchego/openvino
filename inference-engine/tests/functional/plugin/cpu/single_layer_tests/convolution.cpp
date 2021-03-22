@@ -109,6 +109,7 @@ const std::vector<fusingSpecificParams> fusingParamsSet{
         fusingPReluPerChannel,
         fusingSwish,
         // other patterns
+        fusingReluAdd,
         fusingReluScaleShift,
         fusingFakeQuantizePerTensorRelu,
         fusingFakeQuantizePerChannelRelu,
@@ -126,6 +127,7 @@ const std::vector<fusingSpecificParams> fusingParamsSetBF16{
         fusingPReluPerChannel,
         fusingSwish,
         // other patterns
+        fusingReluAdd,
         fusingReluScaleShift,
         fusingSum
 };
