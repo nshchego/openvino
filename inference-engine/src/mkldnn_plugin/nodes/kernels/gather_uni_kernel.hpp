@@ -94,6 +94,7 @@ protected:
     const uint32_t vlenXmm = mkldnn::impl::cpu::x64::cpu_isa_traits<mkldnn::impl::cpu::x64::sse41>::vlen;
     const uint32_t vlenYmm = mkldnn::impl::cpu::x64::cpu_isa_traits<mkldnn::impl::cpu::x64::avx2>::vlen;
     uint32_t dataTypeShift = 0;
+    const uint32_t indicesTypeSize = sizeof(int);
 
     Xbyak::Reg64 regSrc = r8;
     Xbyak::Reg64 regDst = r9;
@@ -170,8 +171,8 @@ protected:
 
     Vmm vmmAux11 = Vmm(17);
 
-    void calcSrcShiftLong(Xbyak::Ymm& dstIndices, Xbyak::Ymm& dstMask, Xbyak::Ymm& idxMask); // remove idxMask ?
-    void calcSrcShiftLong(Xbyak::Zmm& dstIndices, Xbyak::Opmask& dstMask, Xbyak::Opmask& idxMask);
+    void calcSrcShiftLong(Xbyak::Ymm& dstIndices, Xbyak::Ymm& dstMask);
+    void calcSrcShiftLong(Xbyak::Zmm& dstIndices, Xbyak::Opmask& dstMask);
     void calcSrcShiftShort(Xbyak::Ymm& dst, Xbyak::Ymm& dstMask);
     void calcSrcShiftShort(Xbyak::Zmm& dst, Xbyak::Opmask& dstMask);
     void normalizeRawIndices(Xbyak::Ymm& rawIndices, Xbyak::Ymm& dstMask, Xbyak::Ymm& aux);
