@@ -280,15 +280,15 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 //        std::cout << "_";
 //    std::cout << std::to_string(tmpDst[i]) << ";";
 //}
-/*
-short* tmpDst = reinterpret_cast<short*>(dstData);
+
+/*short* tmpDst = reinterpret_cast<short*>(dstData);
 std::cout << "\nOUT DATA:\n";
-for (int i = 0; i < getChildEdgeAt(0)->getDims().size(); i++) {
+for (int i = 10496; i < getChildEdgeAt(0)->getDims().size(); i++) {
     if (i % 16 == 0)
         std::cout << " ";
     std::cout << tmpDst[i] << ";";
-}
-*/
+}*/
+
 //int* tmpDst = reinterpret_cast<int*>(dstData);
 //std::cout << "\nOUT DATA:\n";
 //for (int i = 0; i < getChildEdgeAt(0)->getDims().size(); i++) {
@@ -296,7 +296,7 @@ for (int i = 0; i < getChildEdgeAt(0)->getDims().size(); i++) {
 //        std::cout << "_";
 //    std::cout << tmpDst[i] << ";";
 //}
-//std::cout << "\n";
+std::cout << "\n";
     } else {
         parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
             int ii = srcIndices[b * specIndicesSize + j];
