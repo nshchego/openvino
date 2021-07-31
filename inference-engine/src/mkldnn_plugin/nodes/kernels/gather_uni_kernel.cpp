@@ -145,44 +145,41 @@ void jitUniGatherKernel<isa>::tail32() {
     uni_vpmulld(vmmAux0, vmmAux0, vmmSpecIdxSize);
     uni_vpaddd(vmmAux0, vmmAux0, vmmSpecIndices);
     uni_vmovups(vmmDst, vmmOnes);
+
     if (isa == x64::avx2) {
         vpgatherdd(vmmAux1, ptr[regIndices + vmmAux0], vmmDst);
         normalizeRawIndices(vmmAux1, vmmGatherMask, vmmAux0);
+        uni_vpaddd(vmmSrcShifts, vmmBeforeAxisSum, vmmAux1);
+        vpand(vmmGatherMask, vmmGatherMask, vmmOnes);
+        vpgatherdd(vmmDst, ptr[regSrc + vmmSrcShifts], vmmGatherMask);
+
+        Xbyak::Reg32 reg32Aux3(regAux3.getIdx());
+        for (int j = 0; j < vlen / vlenXmm; j++) {
+            vextracti128(xmmAux0, vmmDst, j);
+
+            for (int k = 0; k < 4; k++) {
+                cmp(regWorkAmount, 0);
+                je(lFinish, T_NEAR);
+
+                vpextrd(reg32Aux3, xmmAux0, k);
+                mov(ptr[regDst], reg32Aux3);
+
+                add(regDst, jcp_.dataTypeSize);
+                sub(regWorkAmount, 1);
+            }
+        }
     } else if (isa == x64::avx512_common) {
         vpmovd2m(kMaskOnes, vmmDst);
         vpgatherdd(vmmAux1 | kMaskOnes, ptr[regIndices + vmmAux0]);
         normalizeRawIndices(zmmAux1, kGatherMask, kMaskAux1);
-    }
-
-    uni_vpaddd(vmmSrcShifts, vmmBeforeAxisSum, vmmAux1);
-    if (isa == x64::avx2) {
-        vpand(vmmGatherMask, vmmGatherMask, vmmOnes);
-        vpgatherdd(vmmDst, ptr[regSrc + vmmSrcShifts], vmmGatherMask);
-    } else if (isa == x64::avx512_common) {
+        uni_vpaddd(vmmSrcShifts, vmmBeforeAxisSum, vmmAux1);
         vpmovd2m(kMaskAux1, vmmOnes);
         kandd(kGatherMask, kGatherMask, kMaskAux1);
+        kmovd(kMaskAux1, kGatherMask);
         vpgatherdd(vmmDst | kGatherMask, ptr[regSrc + vmmSrcShifts]);
+        vmovups(ptr[regDst] | kMaskAux1, vmmDst);
     }
 
-    Xbyak::Reg32 reg32Aux3(regAux3.getIdx());
-    // TODO: try movups with mask for AVX5
-    for (int j = 0; j < vlen / vlenXmm; j++) {
-        if (isa == x64::avx2)
-            vextracti128(xmmAux0, vmmDst, j);
-        else if (isa == x64::avx512_common)
-            vextracti64x2(xmmAux0, vmmDst, j);
-
-        for (int k = 0; k < 4; k++) {
-            cmp(regWorkAmount, 0);
-            je(lFinish, T_NEAR);
-
-            vpextrd(reg32Aux3, xmmAux0, k);
-            mov(ptr[regDst], reg32Aux3);
-
-            add(regDst, jcp_.dataTypeSize);
-            sub(regWorkAmount, 1);
-        }
-    }
     L(lFinish);
 }
 
@@ -222,6 +219,7 @@ void jitUniGatherKernel<isa>::tail16() {
 
     Xbyak::Reg32 reg32Aux3(regAux3.getIdx());
     Xbyak::Reg16 reg16Aux3(regAux3.getIdx());
+    // TODO: Try to use vmovups with mask for AVX5
     for (int j = 0; j < vlen / vlenXmm; j++) {
         if (isa == x64::avx2)
             vextracti128(xmmAux0, vmmDst, j);
