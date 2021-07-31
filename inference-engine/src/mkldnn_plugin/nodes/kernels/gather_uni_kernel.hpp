@@ -77,6 +77,7 @@ protected:
     jGatherConfParams jcp_;
     uint32_t vlen;
     uint32_t elPerVec;
+    uint32_t idxElPerVec;
 };
 
 template <mkldnn::impl::cpu::x64::cpu_isa_t isa>
@@ -122,7 +123,8 @@ protected:
     Xbyak::Xmm xmmAxDim = Xbyak::Xmm(3);
     Xbyak::Xmm xmmDictTypeSize = Xbyak::Xmm(4);
     Xbyak::Xmm xmmSrcShifts = Xbyak::Xmm(5);
-    Xbyak::Xmm xmmMinusOne = Xbyak::Xmm(6);
+//    Xbyak::Xmm xmmMinusOne = Xbyak::Xmm(6);
+    Xbyak::Xmm xmmZeros = Xbyak::Xmm(6);
     Xbyak::Xmm xmmAux2 = Xbyak::Xmm(7);
     Xbyak::Xmm xmmAux3 = Xbyak::Xmm(8);
     Xbyak::Xmm xmmAux9 = Xbyak::Xmm(9);
@@ -186,6 +188,7 @@ protected:
     void tail32();
     void tail16();
     void tail8();
+    void fillRestWorkMask(Vmm& vmmOnesMask, Vmm& vmmAux, Xbyak::Reg64& rWorkRest, Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
 };
 
 }  // namespace MKLDNNPlugin
