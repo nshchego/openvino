@@ -85,11 +85,11 @@ void jitUniGatherKernel<isa>::generate() {
     jg(lBlock_N, T_NEAR);
     {
         Xbyak::Label lLessThanVector, lTail, lEnd;
-        cmp(regWorkAmount, elPerVec);
-        jl(lTail, T_NEAR);
 
         cmp(regSpecIdxSizeInBytes, vlen);
         jl(lLessThanVector, T_NEAR);
+            cmp(regWorkAmount, elPerVec);
+            jl(lTail, T_NEAR);
             if (jcp_.dataTypeSize == 4)
                 gatherLongIdx32();
             if (jcp_.dataTypeSize == 2)
@@ -104,6 +104,8 @@ void jitUniGatherKernel<isa>::generate() {
             uni_vmovups(vmmBeforeAxisDiff, ptr[regAux1]);
             if (jcp_.dataTypeSize != 1)
                 vpslld(vmmBeforeAxisDiff, vmmBeforeAxisDiff, dataTypeShift); // multiply by type size
+            cmp(regWorkAmount, elPerVec);
+            jl(lTail, T_NEAR);
             mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeInBytes)]);
             uni_vpbroadcastd(vmmSrcAfterBatchSize, ptr[regAux1]);
 
@@ -394,7 +396,6 @@ void jitUniGatherKernel<isa>::calcSrcShiftLong(Xbyak::Ymm& dstIndices, Xbyak::Ym
     jge(lIdxStride, T_NEAR);
         uni_vpaddd(vmmAux0, vmmIdxBatchSum, vmmSpecIndices);
         vpgatherdd(dstIndices, ptr[regIndices + vmmAux0], vmmOnes); // TODO: could be movups here
-//vmovups(dstIndices, vmmAux0);
         normalizeRawIndices(dstIndices, dstMask, vmmAux0);
         uni_vpaddd(dstIndices, dstIndices, vmmBeforeAxisSum);
     jmp(lExit, T_NEAR);
@@ -417,7 +418,6 @@ void jitUniGatherKernel<isa>::calcSrcShiftLong(Xbyak::Ymm& dstIndices, Xbyak::Ym
         L(l1);
 
         vpgatherdd(dstIndices, ptr[regIndices + vmmAux1], vmmOnes);
-//vmovups(dstIndices, vmmAux1);
         normalizeRawIndices(dstIndices, dstMask, vmmAux1);
 
         vpandn(vmmAux0, vmmAux0, vmmAxisAndAfterAxisSize);
