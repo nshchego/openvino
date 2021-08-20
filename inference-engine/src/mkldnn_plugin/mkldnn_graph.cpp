@@ -48,6 +48,8 @@
 #include <transformations/utils/utils.hpp>
 #include <low_precision/low_precision.hpp>
 
+#include <chrono>
+
 using namespace mkldnn;
 using namespace MKLDNNPlugin;
 using namespace InferenceEngine;
@@ -68,7 +70,15 @@ void MKLDNNGraph::CreateGraph(NET &net, const MKLDNNExtensionManager::Ptr& extMg
     // disable caching if graph was created only once
     weightsCache = config.streamExecutorConfig._streams != 1 ? w_cache : nullptr;
 
+//int sum = 0;
+auto start = std::chrono::steady_clock::now();
+for (int i = 0; i < 100; i++) {
     Replicate(net, extMgr);
+}
+auto end = std::chrono::steady_clock::now();
+
+std::cout << "Replicate time: " << (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count() / 100 << "us\n";
+
     InitGraph();
 
     status = Ready;
@@ -515,7 +525,7 @@ static inline bool isConstOutput(MKLDNNEdgePtr edge) {
     return edge->getParent()->isConstant() && !edge->getChild()->isConstant();
 }
 
-static edge_clusters_t findEdgeClusters(const std::vector<MKLDNNEdgePtr> & graphEdges) {
+static edge_clusters_t findEdgeClusters(const std::deque<MKLDNNEdgePtr> & graphEdges) {
     typedef std::unordered_map<MKLDNNEdgePtr, size_t> edge_cluster_idx_map_t;
 
     edge_clusters_t edge_clusters;
