@@ -972,7 +972,7 @@ static bool is_data_dependency(const std::shared_ptr<MKLDNNNode> &parent,
  */
 
 void MKLDNNGraphOptimizer::FuseConvolutionSumAndConvolutionSumActivation(MKLDNNGraph &graph) {
-    std::vector<MKLDNNNodePtr> &graphNodes = graph.GetNodes();
+    auto& graphNodes = graph.GetNodes();
 
     auto isFusingSupported = [&](MKLDNNNodePtr conv, MKLDNNNodePtr child) {
         return child->getType() == Eltwise &&
@@ -1443,7 +1443,7 @@ void MKLDNNGraphOptimizer::DropDoubleReorders(MKLDNNGraph &graph) {
 }
 
 void MKLDNNGraphOptimizer::FuseBroadcastAndEltwise(MKLDNNGraph &graph) {
-    std::vector<MKLDNNNodePtr>& graphNodes = graph.GetNodes();
+    auto& graphNodes = graph.GetNodes();
 
     for (auto &graphNode : graphNodes) {
         if (graphNode->getType() != Generic
