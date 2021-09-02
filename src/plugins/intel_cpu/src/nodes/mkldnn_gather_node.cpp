@@ -169,7 +169,7 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
     const uint64_t axisAndAfterAxisSizeInBytes = srcDims[axis] * afterAxisSizeInBytes;
     const uint64_t srcAfterBatchSizeInBytes = betweenBatchAndAxis * axisAndAfterAxisSizeInBytes;
 
-    if (jitKernel && afterAxisSize == 1) {
+    if (jitKernel) {
         const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
         const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
@@ -186,15 +186,16 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             arg.indices = srcIndices;
             arg.start = &start;
             arg.axisDim = &axisDim;
-            arg.afterAxisBlockSize = afterAxisSize;
+            arg.afterAxSize = afterAxisSize;
             arg.axisAndAfterAxisSizeInBytes = &axisAndAfterAxisSizeInBytes;
             arg.srcAfterBatchSizeInBytes = &srcAfterBatchSizeInBytes;
             arg.betweenBatchAndAxisSize = &betweenBatchAndAxis;
             arg.specIndicesSize = &specIndicesSize;
             arg.workAmount = workAmount;
 
-            const size_t idxElPerVec = jitKernel->getIdxElPerVec();
-            if (specIndicesSize < idxElPerVec) {
+            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
+            const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
                 int permIdx[16];
                 int beforeAxisDiff[16];
                 permIdx[0] = idxElPerVec - specIndicesSize;
@@ -217,12 +218,43 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
                 }
                 arg.permIdx = permIdx;
                 arg.beforeAxisDiff = beforeAxisDiff;
+            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) {
+                int beforeBlockDiff[16];
+                int div = idxElPerVec / afterAxisSize;
+                int remainder = idxElPerVec % afterAxisSize;
+                int blockIndices[16] = {0};
+                for (int i = 0; i < idxElPerVec; i++) {
+                    blockIndices[i] = (start + i) % afterAxisSize;
+                }
+                for (int i = 0; i < idxElPerVec; i++) {
+                    if (blockIndices[i] < afterAxisSize - remainder)
+                        beforeBlockDiff[i] = div;//axisDim * div;
+                    else
+                        beforeBlockDiff[i] = div + 1;//axisDim * (div + 1);
+                }
+                arg.beforeAxisDiff = beforeBlockDiff;
             }
 
             (*jitKernel)(&arg);
         };
 
         parallel_nt(0, threadBody);
+//char* tmpDst = reinterpret_cast<char*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 216 * 4; i < getChildEdgeAt(0)->getShape().getElementsCount() * 4; i++) {
+//    if (i % 4 == 0)
+//        std::cout << "_";
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
+//int* tmpDst = reinterpret_cast<int*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 0; i < getChildEdgeAt(0)->getShape().getElementsCount(); i++) {
+//    if (i % 8 == 0)
+//        std::cout << "_";
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
     } else {
         const size_t dstIdxAndAfterAxisSize = afterAxisSizeInBytes * specIndicesSize;
         const size_t dstAfterBatchSize = betweenBatchAndAxis * dstIdxAndAfterAxisSize;

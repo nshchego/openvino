@@ -27,7 +27,7 @@ struct gatherJitExecArgs {
     const int* permIdx;
     const int* beforeAxisDiff;
     uint64_t workAmount = 0;
-    uint64_t afterAxisBlockSize = 0;
+    uint64_t afterAxSize = 0;
 };
 
 struct jitGatherKernelBase {
@@ -81,7 +81,7 @@ protected:
     Xbyak::Reg64 regWorkAmount = r12;
     Xbyak::Reg64 regSpecIdxSizeInBytes = r13;
     Xbyak::Reg64 regAux1 = r14;
-    Xbyak::Reg64 regAux2 = r15;
+    Xbyak::Reg64 regAux2 = rsi;
     Xbyak::Reg64 regBetweenBatchAndAxisIter = r15;
     Xbyak::Reg64 regBetweenBatchAndAxisSize = rbx;
 
@@ -93,6 +93,7 @@ protected:
     Xbyak::Reg32 reg32BetweenBatchAndAxisSize = Xbyak::Reg32(regBetweenBatchAndAxisSize.getIdx());
     Xbyak::Reg32 reg32BetweenBatchAndAxisIter = Xbyak::Reg32(regBetweenBatchAndAxisIter.getIdx());
     Xbyak::Reg32 reg32Aux1 = Xbyak::Reg32(regAux1.getIdx());
+    Xbyak::Reg32 reg32Aux2 = Xbyak::Reg32(regAux2.getIdx());
 
     // Opmasks.
     Xbyak::Opmask kMaskOnes = Xbyak::Opmask(1);
@@ -105,52 +106,66 @@ protected:
     Vmask vAuxMask0;
     Vmask vAuxMask1;
 
-    Vmm vmmAxisAndAfterAxisSize = Vmm(2);
-    Vmm vmmSrcAfterBatchSize = Vmm(2);
-    Vmm vmmBeforeAxisSum = Vmm(3);
-    Vmm vmmSrcShifts = Vmm(5);
-    Vmm vmmZeros = Vmm(6);
-    Vmm vmmPermIdx = Vmm(8);
     // Common.
+    Vmm vmmSrcBeforeAxisSum = Vmm(13);
+    Vmm vmmSrcShifts = Vmm(5); // TODO: reuse as aux
+    Vmm vmmZeros = Vmm(6);
     Vmm vmmSpecIndicesInBytes = Vmm(9);
-    Vmm vmmGatherMask = Vmm(11);
     Vmm vmmSpecIdxSizeInBytes = Vmm(12);
+    Vmm vmmGatherMask = Vmm(11);
     Vmm vmmAxisDim = Vmm(14);
     Vmm vmmDst = Vmm(15);
     // Auxiliary.
     Vmm vmmAux0 = Vmm(0);
     Vmm vmmAux1 = Vmm(1);
-    Vmm vmmAux3 = Vmm(8);
+    Vmm vmmAux2 = Vmm(2);
+    Vmm vmmAux3 = Vmm(3);
     Vmm vmmAux4 = Vmm(4);
-    Vmm vmmAux6 = Vmm(13);
+    Vmm vmmAuxContainer[6] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(16)};
     // AVX512
     Vmm vmmAux5 = Vmm(16);
 
     // Only long.
+    Vmm vmmAxisAndAfterAxisSize = Vmm(8);
     Vmm vmmVecLen = Vmm(7);
     Vmm vmmIdxBatchSum = Vmm(10);
     // Only short.
+    Vmm vmmSrcAfterBatchSize = Vmm(8);
     Vmm vmmAux8 = Vmm(7);
+    Vmm vmmPermIdxMask = Vmm(2);
     Vmm vmmBeforeAxisDiff = Vmm(10);
+    Vmm vmmSpecIdxDiff;
+    Vmm vmmAfterAxisSize;
 
     // XMM
     Xbyak::Xmm xmmAux0 = Xbyak::Xmm(vmmAux0.getIdx());
     Xbyak::Xmm xmmAux1 = Xbyak::Xmm(vmmAux1.getIdx());
     Xbyak::Xmm xmmZeros = Xbyak::Xmm(vmmZeros.getIdx());
-    Xbyak::Xmm xmmBeforeAxisSum = Xbyak::Xmm(vmmBeforeAxisSum.getIdx());
+    Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSum.getIdx());
     Xbyak::Xmm xmmSpecIdxSizeInBytes = Xbyak::Xmm(vmmSpecIdxSizeInBytes.getIdx());
     Xbyak::Xmm xmmSpecIndicesInBytes = Xbyak::Xmm(vmmSpecIndicesInBytes.getIdx());
 
+    // Blocked
+    Vmm vmmBlockIdxInBytes = vmmSpecIndicesInBytes;
+    Vmm vmmSrcBeforeBlockSum = vmmSrcBeforeAxisSum;
+    Vmm vmmBeforeBlockDiff = vmmBeforeAxisDiff;
+
+
     void calcSrcShiftLong(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
+    void calcSrcShiftLong(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
+    void calcSrcShiftShort(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
+    void calcSrcShiftShortBlock(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst);
     void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
     void process32b(bool isShortIdx);
     void process16b(bool isShortIdx);
     void process8b(bool isShortIdx);
+    void processBlock32b(bool isShortIdx, bool shiftFirst = true);
     void tail(bool isShortIdx, bool shiftFirst = true);
     void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, Xbyak::Reg64& rWorkRest, Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
     void storeScalar(Xbyak::Reg64& rDst, Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
     void shiftIdxAndGather(Vmm& vDst, Vmm& vAux, Vmask& mAux, bool isShortIdx, bool shiftFirst = true);
+    void shiftIdxAndGather(Vmm* vAuxPool, Vmask& mAux, bool isShortIdx, bool shiftFirst = true);
     void uni_vpgatherdd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void uni_vpcmpeqd(Vmask& vMask, Vmm& vOp0, Vmm& vOp2);
 
@@ -161,7 +176,7 @@ protected:
     const unsigned* permMask8bitUni;
 
     const unsigned shufMask16bitUni[16] = {0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080,
-                                      0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080};
+                                           0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080};
     const unsigned permMask16bitA2[8]   = {0, 1, 4, 5, 2, 3, 6, 7};
     const unsigned permMask16bitA5[16]  = {0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15};
     const unsigned* permMask16bitUni;
