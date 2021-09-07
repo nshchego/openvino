@@ -74,18 +74,18 @@ protected:
     const uint32_t indicesTypeSize = sizeof(int);
 
     // 64b registers.
-    Xbyak::Reg64 regSrc = r8;
-    Xbyak::Reg64 regDst = r9;
-    Xbyak::Reg64 regIndices = r10;
-    Xbyak::Reg64 regIdxIter = r11;
-    Xbyak::Reg64 regWorkAmount = r12;
-    Xbyak::Reg64 regSpecIdxSizeInBytes = r13;
-    Xbyak::Reg64 regAux1 = r14;
-    Xbyak::Reg64 regAux2 = rsi;
-    Xbyak::Reg64 regBetweenBatchAndAxisIter = r15;
-    Xbyak::Reg64 regBetweenBatchAndAxisSize = rbx;
+    const Xbyak::Reg64& regSrc = r8;
+    const Xbyak::Reg64& regDst = r9;
+    const Xbyak::Reg64& regIndices = r10;
+    const Xbyak::Reg64& regIdxIter = r11;
+    const Xbyak::Reg64& regWorkAmount = r12;
+    const Xbyak::Reg64& regSpecIdxSizeInBytes = r13;
+    const Xbyak::Reg64& regAux1 = r14;
+    const Xbyak::Reg64& regAux2 = rsi;
+    const Xbyak::Reg64& regBetweenBatchAndAxisIter = r15;
+    const Xbyak::Reg64& regBetweenBatchAndAxisSize = rbx;
 
-    Xbyak::Reg64 regParams = mkldnn::impl::cpu::x64::abi_param1;
+    const Xbyak::Reg64& regParams = mkldnn::impl::cpu::x64::abi_param1;
 
     // 32b registers.
     Xbyak::Reg32 reg32IdxIter = Xbyak::Reg32(regIdxIter.getIdx());
@@ -96,50 +96,40 @@ protected:
     Xbyak::Reg32 reg32Aux2 = Xbyak::Reg32(regAux2.getIdx());
 
     // Opmasks.
-    Xbyak::Opmask kMaskOnes = Xbyak::Opmask(1);
-    Xbyak::Opmask kMaskAux0 = Xbyak::Opmask(2);
-    Xbyak::Opmask kMaskAux1 = Xbyak::Opmask(3);
-    Xbyak::Opmask kMaskAux2 = Xbyak::Opmask(4);
-    Xbyak::Opmask kGatherMask = Xbyak::Opmask(5);
+    Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
+    const Xbyak::Opmask& kMaskAux0   = k0;
+    const Xbyak::Opmask& kMaskAux1   = k1;
+    const Xbyak::Opmask& kGatherMask = k7;
 
     Vmask vGatherMask;
     Vmask vAuxMask0;
     Vmask vAuxMask1;
 
-    // Common.
-    Vmm vmmSrcBeforeAxisSum = Vmm(13);
-    Vmm vmmSrcShifts = Vmm(5); // TODO: reuse as aux
-    Vmm vmmZeros = Vmm(6);
-    Vmm vmmSpecIndicesInBytes = Vmm(9);
-    Vmm vmmSpecIdxSizeInBytes = Vmm(12);
-    Vmm vmmGatherMask = Vmm(11);
-    Vmm vmmAxisDim = Vmm(14);
-    Vmm vmmDst = Vmm(15);
     // Auxiliary.
-    Vmm vmmAux0 = Vmm(0);
-    Vmm vmmAux1 = Vmm(1);
-    Vmm vmmAux2 = Vmm(2);
-    Vmm vmmAux3 = Vmm(3);
-    Vmm vmmAux4 = Vmm(4);
-    Vmm vmmAuxContainer[6] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(16)};
-    // AVX512
+    Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
+    // Common.
+    Vmm vmmZeros = Vmm(7);
+    Vmm vmmSrcBeforeAxisSum = Vmm(8);
+    Vmm vmmSpecIndicesInBytes = Vmm(9);
+    Vmm vmmSpecIdxSizeInBytes = Vmm(10);
+    Vmm vmmGatherMask = Vmm(11);
+    Vmm vmmAxisDim = Vmm(12);
+    // AVX5
     Vmm vmmAux5 = Vmm(16);
 
     // Only long.
-    Vmm vmmAxisAndAfterAxisSize = Vmm(8);
-    Vmm vmmVecLen = Vmm(7);
-    Vmm vmmIdxBatchSum = Vmm(10);
+    Vmm vmmAxisAndAfterAxisSize = Vmm(13);
+    Vmm vmmVecLen = Vmm(14);
+    Vmm vmmIdxBatchSum = Vmm(15);
     // Only short.
-    Vmm vmmSrcAfterBatchSize = Vmm(8);
-    Vmm vmmAux8 = Vmm(7);
-    Vmm vmmPermIdxMask = Vmm(2);
-    Vmm vmmBeforeAxisDiff = Vmm(10);
-    Vmm vmmSpecIdxDiff;
-    Vmm vmmAfterAxisSize;
+    Vmm vmmSrcAfterBatchSize = Vmm(13);
+    Vmm vmmPermIdxMask = Vmm(14);
+    Vmm vmmBeforeAxisDiff = Vmm(15);
+    Vmm vmmSpecIdxDiff = Vmm(6);
+    Vmm vmmAfterAxisSize = Vmm(2);
 
     // XMM
-    Xbyak::Xmm xmmAux0 = Xbyak::Xmm(vmmAux0.getIdx());
-    Xbyak::Xmm xmmAux1 = Xbyak::Xmm(vmmAux1.getIdx());
+    Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
     Xbyak::Xmm xmmZeros = Xbyak::Xmm(vmmZeros.getIdx());
     Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSum.getIdx());
     Xbyak::Xmm xmmSpecIdxSizeInBytes = Xbyak::Xmm(vmmSpecIdxSizeInBytes.getIdx());
@@ -151,21 +141,21 @@ protected:
     Vmm vmmBeforeBlockDiff = vmmBeforeAxisDiff;
 
 
-    void calcSrcShiftLong(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
+//    void calcSrcShiftLong(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftLong(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
-    void calcSrcShiftShort(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
+//    void calcSrcShiftShort(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
-    void calcSrcShiftShortBlock(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst);
+    void calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst);
     void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
-    void process32b(bool isShortIdx);
-    void process16b(bool isShortIdx);
-    void process8b(bool isShortIdx);
-    void processBlock32b(bool isShortIdx, bool shiftFirst = true);
+    void process32b(bool isShortIdx, bool blocked);
+    void process16b(bool isShortIdx, bool blocked);
+    void process8b(bool isShortIdx, bool blocked);
+    void processBlock32b(bool isShortIdx, bool shiftFirst, bool blocked);
     void tail(bool isShortIdx, bool shiftFirst = true);
-    void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, Xbyak::Reg64& rWorkRest, Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
-    void storeScalar(Xbyak::Reg64& rDst, Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
-    void shiftIdxAndGather(Vmm& vDst, Vmm& vAux, Vmask& mAux, bool isShortIdx, bool shiftFirst = true);
-    void shiftIdxAndGather(Vmm* vAuxPool, Vmask& mAux, bool isShortIdx, bool shiftFirst = true);
+    void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, const Xbyak::Reg64& rWorkRest, const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
+    void storeScalar(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
+//    void shiftIdxAndGather(Vmm& vDst, Vmm& vAux, Vmask& mAux, bool isShortIdx, bool shiftFirst = true);
+    void shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked);
     void uni_vpgatherdd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void uni_vpcmpeqd(Vmask& vMask, Vmm& vOp0, Vmm& vOp2);
 

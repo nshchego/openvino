@@ -169,7 +169,8 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
     const uint64_t axisAndAfterAxisSizeInBytes = srcDims[axis] * afterAxisSizeInBytes;
     const uint64_t srcAfterBatchSizeInBytes = betweenBatchAndAxis * axisAndAfterAxisSizeInBytes;
 
-    if (jitKernel) {
+    if (jitKernel && afterAxisSize == 1) {
+//    if (jitKernel) {
         const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
         const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
@@ -192,6 +193,9 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             arg.betweenBatchAndAxisSize = &betweenBatchAndAxis;
             arg.specIndicesSize = &specIndicesSize;
             arg.workAmount = workAmount;
+//    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
+//        "; end: " + std::to_string(end);
+//printf("%s\n", seqStr.c_str());
 
             const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
             const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
