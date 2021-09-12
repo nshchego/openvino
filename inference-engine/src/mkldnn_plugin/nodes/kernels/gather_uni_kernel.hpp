@@ -112,21 +112,19 @@ protected:
     Vmm vmmSrcBeforeAxisSum = Vmm(8);
     Vmm vmmSpecIndicesInBytes = Vmm(9);
     Vmm vmmSpecIdxSizeInBytes = Vmm(10);
-    Vmm vmmGatherMask = Vmm(11);
-    Vmm vmmAxisDim = Vmm(12);
-    // AVX5
-    Vmm vmmAux5 = Vmm(16);
+    Vmm vmmAxisDim = Vmm(11);
 
     // Only long.
-    Vmm vmmAxisAndAfterAxisSize = Vmm(13);
-    Vmm vmmVecLen = Vmm(14);
-    Vmm vmmIdxBatchSum = Vmm(15);
+    Vmm vmmAxisAndAfterAxisSize = Vmm(12);
+    Vmm vmmVecLen = Vmm(13);
+    Vmm vmmIdxBatchSum = Vmm(14);
     // Only short.
-    Vmm vmmSrcAfterBatchSize = Vmm(13);
-    Vmm vmmPermIdxMask = Vmm(14);
-    Vmm vmmBeforeAxisDiff = Vmm(15);
-    Vmm vmmSpecIdxDiff = Vmm(6);
-    Vmm vmmAfterAxisSize = Vmm(2);
+    Vmm vmmSrcAfterBatchSize = Vmm(12);
+    Vmm vmmPermIdxMask = Vmm(13);
+    Vmm vmmBeforeAxisDiff = Vmm(14);
+    Vmm vmmSpecIdxDiff = Vmm(15);
+    Vmm vmmAfterAxisSize = Vmm(5);
+    Vmm vmmBlockIdxInBytes = Vmm(6);
 
     // XMM
     Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
@@ -136,25 +134,22 @@ protected:
     Xbyak::Xmm xmmSpecIndicesInBytes = Xbyak::Xmm(vmmSpecIndicesInBytes.getIdx());
 
     // Blocked
-    Vmm vmmBlockIdxInBytes = vmmSpecIndicesInBytes;
-    Vmm vmmSrcBeforeBlockSum = vmmSrcBeforeAxisSum;
-    Vmm vmmBeforeBlockDiff = vmmBeforeAxisDiff;
+//    Vmm vmmBlockIdxInBytes = vmmSpecIndicesInBytes;
+//    Vmm vmmSrcBeforeBlockSum = vmmSrcBeforeAxisSum;
+//    Vmm vmmBeforeBlockDiff = vmmBeforeAxisDiff;
 
 
-//    void calcSrcShiftLong(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftLong(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
-//    void calcSrcShiftShort(Vmm& dstIndices, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst);
     void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
     void process32b(bool isShortIdx, bool blocked);
     void process16b(bool isShortIdx, bool blocked);
     void process8b(bool isShortIdx, bool blocked);
-    void processBlock32b(bool isShortIdx, bool shiftFirst, bool blocked);
+//    void processBlock32b(bool isShortIdx, bool shiftFirst, bool blocked);
     void tail(bool isShortIdx, bool shiftFirst = true);
     void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, const Xbyak::Reg64& rWorkRest, const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
     void storeScalar(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
-//    void shiftIdxAndGather(Vmm& vDst, Vmm& vAux, Vmask& mAux, bool isShortIdx, bool shiftFirst = true);
     void shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked);
     void uni_vpgatherdd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void uni_vpcmpeqd(Vmask& vMask, Vmm& vOp0, Vmm& vOp2);
