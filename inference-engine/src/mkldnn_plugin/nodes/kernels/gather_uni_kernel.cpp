@@ -8,6 +8,18 @@ using namespace mkldnn::impl::cpu;
 
 namespace MKLDNNPlugin {
 
+const unsigned jitGatherKernelBase::shufMask8bitUni[16]  = {0x0C080400, 0x80808080, 0x80808080, 0x80808080, 0x0C080400, 0x80808080, 0x80808080, 0x80808080,
+                                                            0x0C080400, 0x80808080, 0x80808080, 0x80808080, 0x0C080400, 0x80808080, 0x80808080, 0x80808080};
+const unsigned jitGatherKernelBase::permMask8bitA2[8]    = {0, 4, 1, 5, 2, 6, 3, 7};
+const unsigned jitGatherKernelBase::permMask8bitA5[16]   = {0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15};
+
+const unsigned jitGatherKernelBase::shufMask16bitUni[16] = {0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080,
+                                                            0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080};
+const unsigned jitGatherKernelBase::permMask16bitA2[8]   = {0, 1, 4, 5, 2, 3, 6, 7};
+const unsigned jitGatherKernelBase::permMask16bitA5[16]  = {0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15};
+
+const unsigned jitGatherKernelBase::incVec[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+
 #define GET_OFF(field) offsetof(gatherJitExecArgs, field)
 
 template <x64::cpu_isa_t isa>
@@ -24,15 +36,9 @@ jitUniGatherKernel<isa>::jitUniGatherKernel(jGatherConfParams jcp) :
     if (isa == x64::avx2) {
         permMask8bitUni = permMask8bitA2;
         permMask16bitUni = permMask16bitA2;
-//        vGatherMask = Vmask(vmmGatherMask.getIdx());
-        vAuxMask0 = Vmask(vmmAuxContainer[0].getIdx());
-        vAuxMask1 = Vmask(vmmAuxContainer[1].getIdx());
     } else if (isa == x64::avx512_common) {
         permMask8bitUni = permMask8bitA5;
         permMask16bitUni = permMask16bitA5;
-//        vGatherMask = Vmask(kGatherMask.getIdx());
-        vAuxMask0 = Vmask(kMaskAux0.getIdx());
-        vAuxMask1 = Vmask(kMaskAux1.getIdx());
     }
 }
 
@@ -501,6 +507,7 @@ template <x64::cpu_isa_t isa>
 void jitUniGatherKernel<isa>::calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst) {
     auto& vmmDstShifts = vAuxPool[1];
     auto& vmmAux0 = vAuxPool[0];
+    auto& vAuxMask0 = masksContainer[vAuxPool[0].getIdx()];
 //    auto& vmmAux1 = vAuxPool[2];
 
     if (shiftFirst) {

@@ -118,7 +118,7 @@ void MKLDNNGatherNode::prepareParams() {
     srcBatchStride = std::accumulate(srcDims.begin() + batchDims, srcDims.end(), 1, std::multiplies<size_t>());
     idxBatchStride = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1, std::multiplies<size_t>());
     dstBatchStride = std::accumulate(dstDims.begin() + batchDims, dstDims.end(), 1, std::multiplies<size_t>());
-    len = dataLength * dataSize;
+    len = dataLength * dataTypeSize;
     if (dataLength == 0)
         IE_THROW() << errorPrefix << "had incorrect input parameters dimension!";
 }
@@ -136,13 +136,29 @@ void MKLDNNGatherNode::createPrimitive() {
         jGatherConfParams jcp;
         jcp.dataTypeSize = dataTypeSize;
         jcp.reverseIndexing = reverseIndexing;
+        jcp.dynamicShape = isDynamicNode();
         if (x64::mayiuse(x64::avx512_common)) {
             jitKernel.reset(new jitUniGatherKernel<x64::avx512_common>(jcp));
         } else if (x64::mayiuse(x64::avx2)) {
             jitKernel.reset(new jitUniGatherKernel<x64::avx2>(jcp));
         }
-        if (jitKernel)
+        if (jitKernel) {
             jitKernel->create_ker();
+
+            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
+            if (!jcp.dynamicShape && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+                const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
+                const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+                const uint64_t nthr = parallel_get_max_threads();
+                const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
+                shortPermIdx = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+                shortBeforeAxisDiff = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+                for (int i = 0; i < shortPermIdx.size(); i++) {
+                    const uint64_t start = std::min(wpt * i, totalWork);
+                    initShortParams(shortPermIdx[i], shortBeforeAxisDiff[i], start);
+                }
+            }
+        }
     }
     if (inputShapesDefined()) {
         if (needPrepareParams())
@@ -152,25 +168,94 @@ void MKLDNNGatherNode::createPrimitive() {
 }
 
 void MKLDNNGatherNode::execute(mkldnn::stream strm) {
-    const SizeVector srcDims = getParentEdgeAt(GATHER_DATA)->getMemory().getStaticDims();
-    const SizeVector idxDims = getParentEdgeAt(GATHER_INDEXES)->getMemory().getStaticDims();
+    if (jitKernel && afterAxisSize == 1) {
+//    if (jitKernel) {
+        const void* srcIndices = getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr();
+        const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
+        uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
-    const int32_t* srcIndices = reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr());
-    const uint8_t* srcData = reinterpret_cast<const uint8_t*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
-    uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+        const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
+        const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
-    const int axisDim = srcDims[axis];
+        auto threadBody = [&](const int ithr, const int nthr) {
+            const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
+            const uint64_t start = std::min(wpt * ithr, totalWork);
+            const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
+            const uint64_t workAmount = end - start;
 
-    const uint64_t beforeBatchSize = std::accumulate(srcDims.begin(), srcDims.begin() + batchDims, 1, std::multiplies<uint64_t>());
-    const uint64_t betweenBatchAndAxis = std::accumulate(srcDims.begin() + batchDims, srcDims.begin() + axis, 1, std::multiplies<uint64_t>());
-    const uint64_t afterAxisSize = std::accumulate(srcDims.begin() + axis + 1, srcDims.end(), 1, std::multiplies<uint64_t>());
-    const uint64_t specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1, std::multiplies<uint64_t>());
-    const uint64_t afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
-    const uint64_t axisAndAfterAxisSizeInBytes = srcDims[axis] * afterAxisSizeInBytes;
-    const uint64_t srcAfterBatchSizeInBytes = betweenBatchAndAxis * axisAndAfterAxisSizeInBytes;
+            auto arg = gatherJitExecArgs();
+
+            arg.src = srcData;
+            arg.dst = dstData + afterAxisSizeInBytes * start;
+            arg.indices = srcIndices;
+            arg.start = &start;
+            arg.axisDim = &axisDim;
+            arg.afterAxSize = afterAxisSize;
+            arg.axisAndAfterAxisSizeInBytes = &axisAndAfterAxisSizeInBytes;
+            arg.srcAfterBatchSizeInBytes = &srcAfterBatchSizeInBytes;
+            arg.betweenBatchAndAxisSize = &betweenBatchAndAxis;
+            arg.specIndicesSize = &specIndicesSize;
+            arg.workAmount = workAmount;
+//    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
+//        "; end: " + std::to_string(end);
+//printf("%s\n", seqStr.c_str());
+
+            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
+            const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+                arg.permIdx = shortPermIdx[ithr].data();
+                arg.beforeAxisDiff = shortBeforeAxisDiff[ithr].data();
+            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) {
+                int beforeBlockDiff[16];
+                int div = idxElPerVec / afterAxisSize;
+                int remainder = idxElPerVec % afterAxisSize;
+                int blockIndices[16] = {0};
+                for (int i = 0; i < idxElPerVec; i++) {
+                    blockIndices[i] = (start + i) % afterAxisSize;
+                }
+                for (int i = 0; i < idxElPerVec; i++) {
+                    if (blockIndices[i] < afterAxisSize - remainder)
+                        beforeBlockDiff[i] = div;//axisDim * div;
+                    else
+                        beforeBlockDiff[i] = div + 1;//axisDim * (div + 1);
+                }
+                arg.beforeAxisDiff = beforeBlockDiff;
+            }
+
+            (*jitKernel)(&arg);
+        };
+
+        parallel_nt(0, threadBody);
+//char* tmpDst = reinterpret_cast<char*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 216 * 4; i < getChildEdgeAt(0)->getShape().getElementsCount() * 4; i++) {
+//    if (i % 4 == 0)
+//        std::cout << "_";
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
+//int* tmpDst = reinterpret_cast<int*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 0; i < getChildEdgeAt(0)->getShape().getElementsCount(); i++) {
+//    if (i % 8 == 0)
+//        std::cout << "_";
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
+    } else {
+        execReference();
+    }
+}
+
+void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
+    initParams();
 
     if (jitKernel && afterAxisSize == 1) {
 //    if (jitKernel) {
+        const void* srcIndices = getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr();
+        const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
+        uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+
         const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
         const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
@@ -260,29 +345,74 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 //}
 //std::cout << std::endl;
     } else {
-        const size_t dstIdxAndAfterAxisSize = afterAxisSizeInBytes * specIndicesSize;
-        const size_t dstAfterBatchSize = betweenBatchAndAxis * dstIdxAndAfterAxisSize;
-        parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
-            int ii = srcIndices[b * specIndicesSize + j];
-            if (ii < 0)
-                ii += axisDim;
-            size_t idx = ii;
-            size_t c2 = dstAfterBatchSize * b + afterAxisSizeInBytes * j;
-            if (idx < axisDim) {
-                size_t c1 = srcAfterBatchSizeInBytes * b + afterAxisSizeInBytes * idx;
-                for (size_t i = 0; i < betweenBatchAndAxis; i++) {
-                    size_t srcIdx = c1 + axisAndAfterAxisSizeInBytes * i;
-                    size_t dstIdx = c2 + dstIdxAndAfterAxisSize * i;
-
-                    cpu_memcpy(&dstData[dstIdx], &srcData[srcIdx], afterAxisSizeInBytes);
-                }
-            } else {
-                for (size_t i = 0; i < betweenBatchAndAxis; i++) {
-                    memset(&dstData[c2 + dstIdxAndAfterAxisSize * i], 0, afterAxisSizeInBytes);
-                }
-            }
-        });
+        execReference();
     }
+}
+
+void MKLDNNGatherNode::initParams() {
+    auto& srcDims = getParentEdgeAt(GATHER_DATA)->getMemory().getStaticDims();
+    auto& idxDims = getParentEdgeAt(GATHER_INDEXES)->getMemory().getStaticDims();
+
+    axisDim = srcDims[axis];
+    beforeBatchSize = std::accumulate(srcDims.begin(), srcDims.begin() + batchDims, 1, std::multiplies<uint64_t>());
+    betweenBatchAndAxis = std::accumulate(srcDims.begin() + batchDims, srcDims.begin() + axis, 1, std::multiplies<uint64_t>());
+    afterAxisSize = std::accumulate(srcDims.begin() + axis + 1, srcDims.end(), 1, std::multiplies<uint64_t>());
+    specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1, std::multiplies<uint64_t>());
+    afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
+    axisAndAfterAxisSizeInBytes = srcDims[axis] * afterAxisSizeInBytes;
+    srcAfterBatchSizeInBytes = betweenBatchAndAxis * axisAndAfterAxisSizeInBytes;
+}
+
+void MKLDNNGatherNode::initShortParams(std::vector<int>& shortPermIdx, std::vector<int>& shortBeforeAxisDiff, uint64_t start) {
+    const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
+
+    shortPermIdx[0] = idxElPerVec - specIndicesSize;
+    int div = idxElPerVec / specIndicesSize;
+    int remainder = idxElPerVec % specIndicesSize;
+    for (int i = 1; i < idxElPerVec; i++) {
+        shortPermIdx[i] = shortPermIdx[i - 1] + 1;
+        if (shortPermIdx[i] == idxElPerVec)
+            shortPermIdx[i] = idxElPerVec - specIndicesSize;
+    }
+    int specIndices[16] = {0};
+    for (int i = 0; i < idxElPerVec; i++) {
+        specIndices[i] = (start + i) % specIndicesSize;
+    }
+    for (int i = 0; i < idxElPerVec; i++) {
+        if (specIndices[i] < specIndicesSize - remainder)
+            shortBeforeAxisDiff[i] = axisDim * div;
+        else
+            shortBeforeAxisDiff[i] = axisDim * (div + 1);
+    }
+}
+
+void MKLDNNGatherNode::execReference() {
+    const int32_t* srcIndices = reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr());
+    const uint8_t* srcData = reinterpret_cast<const uint8_t*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
+    uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+
+    const size_t dstIdxAndAfterAxisSize = afterAxisSizeInBytes * specIndicesSize;
+    const size_t dstAfterBatchSize = betweenBatchAndAxis * dstIdxAndAfterAxisSize;
+    parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
+        int ii = srcIndices[b * specIndicesSize + j];
+        if (ii < 0)
+            ii += axisDim;
+        size_t idx = ii;
+        size_t c2 = dstAfterBatchSize * b + afterAxisSizeInBytes * j;
+        if (idx < axisDim) {
+            size_t c1 = srcAfterBatchSizeInBytes * b + afterAxisSizeInBytes * idx;
+            for (size_t i = 0; i < betweenBatchAndAxis; i++) {
+                size_t srcIdx = c1 + axisAndAfterAxisSizeInBytes * i;
+                size_t dstIdx = c2 + dstIdxAndAfterAxisSize * i;
+
+                cpu_memcpy(&dstData[dstIdx], &srcData[srcIdx], afterAxisSizeInBytes);
+            }
+        } else {
+            for (size_t i = 0; i < betweenBatchAndAxis; i++) {
+                memset(&dstData[c2 + dstIdxAndAfterAxisSize * i], 0, afterAxisSizeInBytes);
+            }
+        }
+    });
 }
 
 void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {

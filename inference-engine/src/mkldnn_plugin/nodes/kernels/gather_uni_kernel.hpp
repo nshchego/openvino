@@ -12,12 +12,13 @@ namespace MKLDNNPlugin {
 struct jGatherConfParams {
     uint64_t dataTypeSize = 1;
     bool reverseIndexing = true;
+    bool dynamicShape = false;
 };
 
 struct gatherJitExecArgs {
     const void* src;
     void* dst;
-    const int* indices;
+    const void* indices;
     const int* axisDim;
     const uint64_t* start;
     const uint64_t* specIndicesSize;
@@ -55,6 +56,16 @@ protected:
     uint64_t vlen;
     uint64_t dataElPerVec;
     uint64_t idxElPerVec;
+    static const unsigned shufMask8bitUni[16];
+    static const unsigned permMask8bitA2[8];
+    static const unsigned permMask8bitA5[16];
+    static const unsigned shufMask16bitUni[16];
+    static const unsigned permMask16bitA2[8];
+    static const unsigned permMask16bitA5[16];
+    static const unsigned incVec[16];
+
+    int shortPermIdx[16];
+    int shortBeforeAxisDiff[16];
 };
 
 template <mkldnn::impl::cpu::x64::cpu_isa_t isa>
@@ -100,10 +111,6 @@ protected:
     const Xbyak::Opmask& kMaskAux0   = k0;
     const Xbyak::Opmask& kMaskAux1   = k1;
     const Xbyak::Opmask& kGatherMask = k7;
-
-    Vmask vGatherMask;
-    Vmask vAuxMask0;
-    Vmask vAuxMask1;
 
     // Auxiliary.
     Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
@@ -154,19 +161,8 @@ protected:
     void uni_vpgatherdd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void uni_vpcmpeqd(Vmask& vMask, Vmm& vOp0, Vmm& vOp2);
 
-    const unsigned shufMask8bitUni[16]  = {0x0C080400, 0x80808080, 0x80808080, 0x80808080, 0x0C080400, 0x80808080, 0x80808080, 0x80808080,
-                                           0x0C080400, 0x80808080, 0x80808080, 0x80808080, 0x0C080400, 0x80808080, 0x80808080, 0x80808080};
-    const unsigned permMask8bitA2[8]    = {0, 4, 1, 5, 2, 6, 3, 7};
-    const unsigned permMask8bitA5[16]   = {0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15};
     const unsigned* permMask8bitUni;
-
-    const unsigned shufMask16bitUni[16] = {0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080,
-                                           0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080};
-    const unsigned permMask16bitA2[8]   = {0, 1, 4, 5, 2, 3, 6, 7};
-    const unsigned permMask16bitA5[16]  = {0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15};
     const unsigned* permMask16bitUni;
-
-    const unsigned incVec[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 };
 
 }  // namespace MKLDNNPlugin
