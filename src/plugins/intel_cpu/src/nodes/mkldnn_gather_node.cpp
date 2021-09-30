@@ -21,9 +21,8 @@ bool MKLDNNGatherNode::isSupportedOperation(const std::shared_ptr<const ov::Node
             return false;
         }
 
-        if (op->get_input_node_shared_ptr(GATHER_AXIS)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
-            // TODO: Support parameterized Axis input for dynamic shapes.
-            errorMessage = "Only Constant operation on 'axis' input is supported.";
+        if (!isDynamicNgraphNode(op) && op->get_input_node_shared_ptr(GATHER_AXIS)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+            errorMessage = "Only Constant operation on 'axis' input is supported for static node.";
             return false;
         }
     } catch (...) {
@@ -56,7 +55,7 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
         IE_THROW() << errorPrefix << "has incorrect batch_dims " << batchDims << "!";
 
     if (op->get_input_node_shared_ptr(GATHER_AXIS)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
-        isAxisInputConst = true;
+        constMap[GATHER_AXIS] = true;
         axis = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))->cast_vector<int>()[0];
         if (axis < 0)
             axis += dataSrcRank;
