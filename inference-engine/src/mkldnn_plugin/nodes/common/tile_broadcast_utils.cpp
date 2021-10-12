@@ -1,8 +1,11 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #include "tile_broadcast_utils.h"
+#include "cpu_memcpy.h"
+#include <memory_desc/cpu_memory_desc_utils.h>
+#include "memory_desc/dnnl_blocked_memory_desc.h"
 
 using namespace InferenceEngine;
 using namespace MKLDNNPlugin;
@@ -50,12 +53,12 @@ void TileBroadcastCommon::fillOptimizedDimsAndSrcStrides(const SizeVector &srcBl
     }
 }
 
-bool TileBroadcastCommon::canBeExecutedInBlockedLayout(const MKLDNNPlugin::MKLDNNDims &srcDims, const InferenceEngine::SizeVector &repeats,
+bool TileBroadcastCommon::canBeExecutedInBlockedLayout(const VectorDims& srcDims, const SizeVector& repeats,
         size_t elemsInBlock) {
     if (repeats[1] != 1 && srcDims[1] % elemsInBlock != 0)
         return false;
 
-    SizeVector srcBlockedDims = srcDims.ToSizeVector();
+    SizeVector srcBlockedDims = srcDims;
     SizeVector blockedRepeats = repeats;
     srcBlockedDims[1] = (srcBlockedDims[1] + elemsInBlock - 1) / elemsInBlock;
     srcBlockedDims.push_back(elemsInBlock);
@@ -68,8 +71,8 @@ bool TileBroadcastCommon::canBeExecutedInBlockedLayout(const MKLDNNPlugin::MKLDN
     return optimizedDims.size() <= maxNDims;
 }
 
-bool TileBroadcastCommon::canBeExecutedInNSPCLayout(MKLDNNPlugin::MKLDNNDims &srcDims, InferenceEngine::SizeVector &repeats) {
-    SizeVector srcBlockedDims = srcDims.ToSizeVector();
+bool TileBroadcastCommon::canBeExecutedInNSPCLayout(const VectorDims& srcDims, const SizeVector &repeats) {
+    SizeVector srcBlockedDims = srcDims;
     SizeVector blockedRepeats = repeats;
     srcBlockedDims.push_back(srcBlockedDims[1]);
     srcBlockedDims.erase(srcBlockedDims.begin() + 1);
@@ -83,25 +86,19 @@ bool TileBroadcastCommon::canBeExecutedInNSPCLayout(MKLDNNPlugin::MKLDNNDims &sr
     return optimizedDims.size() <= maxNDims;
 }
 
-std::vector<PrimitiveDescInfo> TileBroadcastCommon::getSupportedConfigs(MKLDNNNode *node) {
-    std::vector<PrimitiveDescInfo> supportedPrimitiveDescriptors;
-    if (node->getCnnLayer()->insData[0].lock() == nullptr)
-        IE_THROW() << "input data is absent for " << node->getTypeStr() << " node with name " << node->getName();
-    InferenceEngine::Precision precision = node->getCnnLayer()->insData[0].lock()->getPrecision();
+std::vector<NodeDesc> TileBroadcastCommon::getSupportedConfigs(MKLDNNNode *node) {
+std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
+    std::vector<NodeDesc> supportedPrimitiveDescriptors;
+    auto precision = node->getOriginalInputPrecisionAtPort(0);
     auto dataType = MKLDNNExtensionUtils::IEPrecisionToDataType(precision);
 
-    if (node->getParentEdges().size() != 2 && node->getParentEdges().size() != 3)
-        IE_THROW() << "Incorrect number of input edges for " << node->getTypeStr() <<  " node with name " << node->getName();
-    if (node->getChildEdges().empty())
-        IE_THROW() << node->getTypeStr() <<  " node with name " << node->getName() << " has no output edges";
+    const auto& srcDims = node->getInputShapeAtPort(0).getDims();
+    const auto& dstDims = node->getOutputShapeAtPort(0).getDims();
 
-    auto srcDims = node->getParentEdgeAt(0)->getDims();
-    auto dstDims = node->getChildEdgeAt(0)->getDims();
-
-    InferenceEngine::LayerConfig config;
-    if (repeats.size() != dstDims.ndims())
+    NodeConfig config;
+    if (repeats.size() != dstDims.size())
         IE_THROW() << node->getTypeStr() << " node with name " << node->getName() << " has incorrect Repeats vector."
-                "Repeats size must be equal to dstDims size. Repeats size: " << repeats.size() << ", dstDims size: " << dstDims.ndims();
+                "Repeats size must be equal to dstDims size. Repeats size: " << repeats.size() << ", dstDims size: " << dstDims.size();
 
     config.dynBatchSupport = false;
     config.inConfs.resize(node->getParentEdges().size());
@@ -109,44 +106,42 @@ std::vector<PrimitiveDescInfo> TileBroadcastCommon::getSupportedConfigs(MKLDNNNo
     config.inConfs[0].constant = false;
     config.inConfs[1].inPlace = -1;
     config.inConfs[1].constant = true;
-    config.inConfs[1].desc = MKLDNNMemoryDesc(node->getParentEdgeAt(1)->getDims(),
-                                              MKLDNNExtensionUtils::IEPrecisionToDataType(Precision::I32), mkldnn::memory::format_tag::x);
+    config.inConfs[1].desc = std::make_shared<CpuBlockedMemoryDesc>(Precision::I32, node->getInputShapeAtPort(1));
     if (config.inConfs.size() == 3) {
         config.inConfs[2].inPlace = -1;
         config.inConfs[2].constant = true;
-        config.inConfs[2].desc = MKLDNNMemoryDesc(node->getParentEdgeAt(2)->getDims(),
-                                                  MKLDNNExtensionUtils::IEPrecisionToDataType(Precision::I32), mkldnn::memory::format_tag::x);
+        config.inConfs[2].desc = std::make_shared<CpuBlockedMemoryDesc>(Precision::I32, node->getInputShapeAtPort(2));
     }
 
     config.outConfs.resize(node->getChildEdges().size());
 
     auto pushDesc = [&](mkldnn::memory::format_tag inFormat, mkldnn::memory::format_tag outFormat) {
-        config.inConfs[0].desc = MKLDNNMemoryDesc(srcDims, dataType, inFormat);
+        config.inConfs[0].desc = std::make_shared<DnnlBlockedMemoryDesc>(node->getInputShapeAtPort(0), dataType, inFormat);
         for (int i = 0; i < config.outConfs.size(); i++) {
             config.outConfs[i].inPlace = -1;
             config.outConfs[i].constant = false;
-            config.outConfs[i].desc = MKLDNNMemoryDesc(dstDims, dataType, outFormat);
+            config.outConfs[i].desc = std::make_shared<DnnlBlockedMemoryDesc>(node->getOutputShapeAtPort(0), dataType, outFormat);
         }
-        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::ref, outFormat});
+        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::ref});
     };
 
-    if (srcDims.ndims() == dstDims.ndims() && (dstDims.ndims() == 4 || dstDims.ndims() == 5)) {
+    if (srcDims.size() == dstDims.size() && (dstDims.size() == 4 || dstDims.size() == 5)) {
         if (canBeExecutedInBlockedLayout(srcDims, repeats, 16)) {
-            if (dstDims.ndims() == 4) {
+            if (dstDims.size() == 4) {
                 pushDesc(mkldnn::memory::format_tag::nChw16c, mkldnn::memory::format_tag::nChw16c);
             } else {
                 pushDesc(mkldnn::memory::format_tag::nCdhw16c, mkldnn::memory::format_tag::nCdhw16c);
             }
         }
         if (canBeExecutedInBlockedLayout(srcDims, repeats, 8)) {
-            if (dstDims.ndims() == 4) {
+            if (dstDims.size() == 4) {
                 pushDesc(mkldnn::memory::format_tag::nChw8c, mkldnn::memory::format_tag::nChw8c);
             } else {
                 pushDesc(mkldnn::memory::format_tag::nCdhw8c, mkldnn::memory::format_tag::nCdhw8c);
             }
         }
         if (canBeExecutedInNSPCLayout(srcDims, repeats)) {
-            if (dstDims.ndims() == 4) {
+            if (dstDims.size() == 4) {
                 pushDesc(mkldnn::memory::format_tag::nhwc, mkldnn::memory::format_tag::nhwc);
             } else {
                 pushDesc(mkldnn::memory::format_tag::ndhwc, mkldnn::memory::format_tag::ndhwc);
@@ -154,7 +149,7 @@ std::vector<PrimitiveDescInfo> TileBroadcastCommon::getSupportedConfigs(MKLDNNNo
         }
     }
 
-    pushDesc(MKLDNNMemory::GetPlainFormat(srcDims), MKLDNNMemory::GetPlainFormat(dstDims));
+    pushDesc(MKLDNNExtensionUtils::GetPlainFormatByRank(srcDims.size()), MKLDNNExtensionUtils::GetPlainFormatByRank(dstDims.size()));
 
     return supportedPrimitiveDescriptors;
 }
@@ -170,7 +165,7 @@ bool TileBroadcastCommon::prepareOptimizedParams(MKLDNNNode *node, SizeVector& s
         blockedRepeats.push_back(1);
     }
     // for NSPC layouts
-    if (node->getParentEdgeAt(0)->getDesc().getLayout() == NHWC || node->getParentEdgeAt(0)->getDesc().getLayout() == NDHWC) {
+    if (node->getBaseMemDescAtInputPort(0)->hasLayoutType(LayoutType::nspc) || one_of(node->getBaseMemDescAtInputPort(0)->getShape().getRank(), 4, 5)) {
         blockedRepeats.push_back(blockedRepeats[1]);
         blockedRepeats.erase(blockedRepeats.begin() + 1);
     }
@@ -189,7 +184,7 @@ bool TileBroadcastCommon::prepareOptimizedParams(MKLDNNNode *node, SizeVector& s
 
     SizeVector optimizedDstStrides = calculateStridesForDims(optimizedDims);
 
-    size_t dataSize = node->getSelectedPrimitiveDescriptor()->getConfig().inConfs[0].desc.getPrecision().size();
+    size_t dataSize = node->getSelectedPrimitiveDescriptor()->getConfig().inConfs[0].desc->getPrecision().size();
     for (int i = 0; i < optimizedDims.size(); i++) {
         optimizedSrcStrides[i] *= dataSize;
         optimizedDstStrides[i] *= dataSize;
@@ -234,29 +229,29 @@ void TileBroadcastCommon::optimizedExecute(MKLDNNNode *node) {
     }
 }
 
-void TileBroadcastCommon::ngraphExecute(MKLDNNNode *node, std::shared_ptr<ngraph::Node> ngraphNode) {
-    ngraph::HostTensorVector inputs, outputs;
-    auto srcDataPtr = node->getParentEdgeAt(0)->getMemory().GetPtr();
-    inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->input(0).get_element_type(), ngraphNode->input(0).get_shape(), srcDataPtr));
-    std::vector<int64_t> newData;
-    // WA: for Tile Node we need cast data to int64_t data type
-    if (std::string(ngraphNode->get_type_name()) == "Tile") {
-        auto dataPtr = node->getParentEdgeAt(1)->getMemory().GetPtr();
-        newData.resize(node->getParentEdgeAt(1)->getMemory().GetElementsCount());
-        for (int j = 0; j < node->getParentEdgeAt(1)->getMemory().GetElementsCount(); j++) {
-            newData[j] = reinterpret_cast<const int32_t*>(dataPtr)[j];
-        }
-        inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraph::element::i64, ngraphNode->input(1).get_shape(), newData.data()));
-    } else {
-        for (int i = 1; i < node->getParentEdges().size(); i++) {
-            auto dataPtr = node->getParentEdgeAt(i)->getMemory().GetPtr();
-            inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->input(i).get_element_type(), ngraphNode->input(i).get_shape(), dataPtr));
-        }
-    }
-
-    for (int i = 0; i < node->getChildEdges().size(); i++) {
-        auto dataPtr = node->getChildEdgeAt(i)->getMemory().GetPtr();
-        outputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->output(i).get_element_type(), ngraphNode->output(i).get_shape(), dataPtr));
-    }
-    ngraphNode->evaluate(outputs, inputs);
-}
+//void TileBroadcastCommon::ngraphExecute(MKLDNNNode *node, std::shared_ptr<ov::Node> ngraphNode) {
+//    ngraph::HostTensorVector inputs, outputs;
+//    auto srcDataPtr = node->getParentEdgeAt(0)->getMemory().GetPtr();
+//    inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->input(0).get_element_type(), ngraphNode->input(0).get_shape(), srcDataPtr));
+//    std::vector<int64_t> newData;
+//    // WA: for Tile Node we need cast data to int64_t data type
+//    if (std::string(ngraphNode->get_type_name()) == "Tile") {
+//        auto dataPtr = node->getParentEdgeAt(1)->getMemory().GetPtr();
+//        newData.resize(node->getParentEdgeAt(1)->getMemory().GetShape().getElementsCount());
+//        for (int j = 0; j < node->getParentEdgeAt(1)->getMemory().GetShape().getElementsCount(); j++) {
+//            newData[j] = reinterpret_cast<const int32_t*>(dataPtr)[j];
+//        }
+//        inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraph::element::i64, ngraphNode->input(1).get_shape(), newData.data()));
+//    } else {
+//        for (int i = 1; i < node->getParentEdges().size(); i++) {
+//            auto dataPtr = node->getParentEdgeAt(i)->getMemory().GetPtr();
+//            inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->input(i).get_element_type(), ngraphNode->input(i).get_shape(), dataPtr));
+//        }
+//    }
+//
+//    for (int i = 0; i < node->getChildEdges().size(); i++) {
+//        auto dataPtr = node->getChildEdgeAt(i)->getMemory().GetPtr();
+//        outputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->output(i).get_element_type(), ngraphNode->output(i).get_shape(), dataPtr));
+//    }
+//    ngraphNode->evaluate(outputs, inputs);
+//}

@@ -35,7 +35,7 @@ public:
     }
 
 protected:
-    void SetUp() {
+    void SetUp() override {
         TileLayerTestParamsSet basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = this->GetParam();

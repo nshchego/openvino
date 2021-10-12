@@ -12,7 +12,6 @@ using Dim = std::size_t;
 using VectorDims = std::vector<Dim>;
 
 const InferenceEngine::details::caseless_unordered_map<std::string, Type> type_to_name_tbl = {
-        { "Broadcast", Broadcast},
         { "Constant", Input },
         { "Parameter", Input },
         { "Result", Output },
@@ -199,8 +198,6 @@ std::string NameFromType(const Type type) {
             return "Generic";
         case Reorder:
             return "Reorder";
-        case Broadcast:
-            return "Broadcast";
         case Input:
             return "Input";
         case Output:

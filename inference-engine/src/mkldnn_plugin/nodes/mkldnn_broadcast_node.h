@@ -4,14 +4,13 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <mkldnn_node.h>
-#include <string>
+#include "common/tile_broadcast_utils.h"
+
 #include <memory>
+#include <string>
 #include <vector>
 
-#include "common/tile_broadcast_utils.h"
-#include <ngraph/op/broadcast.hpp>
 
 namespace MKLDNNPlugin {
 
@@ -24,13 +23,27 @@ public:
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
     void execute(mkldnn::stream strm) override;
+    void notOptimizedExecute(mkldnn::stream strm);
     bool created() const override;
 
     static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
 
+protected:
+    //bool needPrepareParams() const override;
+    //void prepareParams() override;
+
 private:
-    static const size_t BROADCAST_INPUT = 0;
-    static const size_t BROADCAST_SHAPE = 1;
+    enum AutoBroadcastType {
+        NUMPY,
+        EXPLICIT
+    };
+    AutoBroadcastType broadcastType;
+
+    static const size_t INPUT_DATA_IDX = 0;
+    static const size_t TARGET_SHAPE_IDX = 1;
+    static const size_t AXES_MAPPING_IDX = 2;
+
+    std::vector<int32_t> axesMapping;
 
     std::string errorPrefix;
 };
