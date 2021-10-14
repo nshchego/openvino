@@ -29,8 +29,8 @@ public:
     static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
 
 protected:
-    //bool needPrepareParams() const override;
-    //void prepareParams() override;
+    bool needPrepareParams() const override;
+    void prepareParams() override;
 
 private:
     enum AutoBroadcastType {

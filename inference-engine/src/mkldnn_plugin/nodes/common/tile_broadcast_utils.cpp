@@ -103,13 +103,13 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
     config.dynBatchSupport = false;
     config.inConfs.resize(node->getParentEdges().size());
     config.inConfs[0].inPlace = -1;
-    config.inConfs[0].constant = false;
+    config.inConfs[0].constant = constMap[0];
     config.inConfs[1].inPlace = -1;
-    config.inConfs[1].constant = true;
+    config.inConfs[1].constant = constMap[1];
     config.inConfs[1].desc = std::make_shared<CpuBlockedMemoryDesc>(Precision::I32, node->getInputShapeAtPort(1));
     if (config.inConfs.size() == 3) {
         config.inConfs[2].inPlace = -1;
-        config.inConfs[2].constant = true;
+        config.inConfs[2].constant = constMap[2];
         config.inConfs[2].desc = std::make_shared<CpuBlockedMemoryDesc>(Precision::I32, node->getInputShapeAtPort(2));
     }
 
@@ -149,7 +149,19 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
         }
     }
 
-    pushDesc(MKLDNNExtensionUtils::GetPlainFormatByRank(srcDims.size()), MKLDNNExtensionUtils::GetPlainFormatByRank(dstDims.size()));
+    auto inFmt = MKLDNNExtensionUtils::GetPlainFormatByRank(srcDims.size());
+    auto outFmt = MKLDNNExtensionUtils::GetPlainFormatByRank(dstDims.size());
+    if (inFmt == mkldnn::memory::format_tag::undef || outFmt == mkldnn::memory::format_tag::undef) {
+        config.inConfs[0].desc = std::make_shared<CpuBlockedMemoryDesc>(precision, node->getInputShapeAtPort(0));
+        for (int i = 0; i < config.outConfs.size(); i++) {
+            config.outConfs[i].inPlace = -1;
+            config.outConfs[i].constant = false;
+            config.outConfs[i].desc = std::make_shared<CpuBlockedMemoryDesc>(precision, node->getOutputShapeAtPort(i));
+        }
+        supportedPrimitiveDescriptors.push_back({config, impl_desc_type::ref});
+    } else {
+        pushDesc(inFmt, outFmt);
+    }
 
     return supportedPrimitiveDescriptors;
 }

@@ -1400,3 +1400,45 @@ void MKLDNNNode::createShapeInferSubgraph(const std::shared_ptr<ngraph::Node>& o
     }
     opToShapeInfer = op->clone_with_new_inputs(inputsForShapeInfer);
 }
+
+InferenceEngine::Precision MKLDNNNode::getOriginalInputPrecisionAtPort(size_t port) const {
+    if (originalInputPrecisions.size() <= port) {
+        IE_THROW() << "Incorrect input port number " << port << " for " << typeStr << " node with name '" << getName() << "'.";
+    }
+    return originalInputPrecisions[port];
+}
+
+InferenceEngine::Precision MKLDNNNode::getOriginalOutputPrecisionAtPort(size_t port) const {
+    if (originalOutputPrecisions.size() <= port) {
+        IE_THROW() << "Incorrect output port number " << port << " for " << typeStr << " node with name '" << getName() << "'.";
+    }
+    return originalOutputPrecisions[port];
+}
+
+void MKLDNNNode::setOriginalInputPrecisionAtPort(size_t port, InferenceEngine::Precision precision) {
+    if (originalInputPrecisions.size() <= port) {
+        IE_THROW() << "Incorrect input port number " << port << " for " << typeStr << " node with name '" << getName() << "'.";
+    }
+    originalInputPrecisions[port] = precision;
+}
+
+void MKLDNNNode::setOriginalOutputPrecisionAtPort(size_t port, InferenceEngine::Precision precision) {
+    if (originalOutputPrecisions.size() <= port) {
+        IE_THROW() << "Incorrect output port number " << port << " for " << typeStr << " node with name '" << getName() << "'.";
+    }
+    originalOutputPrecisions[port] = precision;
+}
+
+const Shape& MKLDNNNode::getInputShapeAtPort(size_t port) const {
+    if (inputShapes.size() <= port) {
+        IE_THROW() << "Incorrect input port number " << port << " for " << typeStr << " node with name '" << getName() << "'.";
+    }
+    return inputShapes[port];
+}
+
+const Shape& MKLDNNNode::getOutputShapeAtPort(size_t port) const {
+    if (outputShapes.size() <= port) {
+        IE_THROW() << "Incorrect output port number " << port << " for " << typeStr << " node with name '" << getName() << "'.";
+    }
+    return outputShapes[port];
+}

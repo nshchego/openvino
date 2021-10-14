@@ -29,7 +29,10 @@ bool MKLDNNBroadcastNode::isSupportedOperation(const std::shared_ptr<const ov::N
             errorMessage = "Only NUMPY and EXPLICIT broadcast types are supported.";
             return false;
         }
-        if (!isDynamicNgraphNode(op) && op->get_input_node_shared_ptr(TARGET_SHAPE_IDX)->get_type_info() != ov::op::v0::Constant::type_info) {
+        if (!isDynamicNgraphNode(op) &&
+                (op->get_input_node_ptr(TARGET_SHAPE_IDX)->get_type_info() != ov::op::v0::Constant::type_info ||
+                op->get_input_size() > AXES_MAPPING_IDX &&
+                op->get_input_node_ptr(AXES_MAPPING_IDX)->get_type_info() != ov::op::v0::Constant::type_info)) {
             errorMessage = "Only constant shape input is supported.";
             return false;
         }
@@ -52,95 +55,76 @@ MKLDNNBroadcastNode::MKLDNNBroadcastNode(const std::shared_ptr<ov::Node>& op, co
     if (op->get_output_size() == 0)
         IE_THROW() << errorPrefix << "has no output edges.";
 
-    auto shapeDims = op->get_input_shape(TARGET_SHAPE_IDX);
-    if (shapeDims.size() > 1)
-        IE_THROW() << errorPrefix << " has incorrect 'shape' input rank: " << shapeDims.size();
-
     auto broadcastOp = ov::as_type_ptr<const ov::op::v1::Broadcast>(op);
     if (broadcastOp->get_broadcast_spec().m_type == ov::op::AutoBroadcastType::NUMPY) {
         broadcastType = NUMPY;
     } else if (broadcastOp->get_broadcast_spec().m_type == ov::op::AutoBroadcastType::EXPLICIT) {
-        if (op->get_input_size() != 3)
+        if (op->get_input_size() <= AXES_MAPPING_IDX)
             IE_THROW() << errorPrefix << " and EXPLICIT mode must have tree input edges: " << getParentEdges().size();
         broadcastType = EXPLICIT;
     }
 
-    if (op->get_input_node_shared_ptr(TARGET_SHAPE_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
-        
+    if (op->get_input_node_ptr(TARGET_SHAPE_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
+        constMap[TARGET_SHAPE_IDX] = true;
+        const auto& srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
+        const auto& dstDims = getOutputShapeAtPort(0).getDims();
+        repeats = dstDims;
+
+        if (broadcastType == NUMPY) {
+            const auto ndims = dstDims.size();
+            for (int i = 0; i < srcDims.size(); i++) {
+                repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
+            }
+        } else if (broadcastType == EXPLICIT &&
+                op->get_input_node_ptr(AXES_MAPPING_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
+            constMap[AXES_MAPPING_IDX] = true;
+            auto axesMappingOp = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX));
+            axesMapping = axesMappingOp->get_vector<int32_t>();
+
+            for (size_t i = 0; i < axesMapping.size(); i++) {
+                repeats[axesMapping[i]] /= srcDims[i];
+            }
+        }
     }
 }
 
 void MKLDNNBroadcastNode::getSupportedDescriptors() {
 std::cout << "MKLDNNBroadcastNode::getSupportedDescriptors" << std::endl;
-    auto dstDims0 = getOutputShapeAtPort(0).getDims();
-    for (int i = 1; i < getChildEdges().size(); i++) {
-        auto dstDims = getOutputShapeAtPort(i).getDims();
-        if (dstDims.size() != dstDims0.size())
-            IE_THROW() << "Output edges 0 and " << i << " have different dims for Broadcast node with name " << getName();
-        for (int j = 0; j < dstDims0.size(); j++) {
-            if (dstDims0[j] != dstDims[j]) {
-                IE_THROW() << "Output edges 0 and " << i << " have different dims for Broadcast node with name " << getName();
-            }
-        }
-    }
-    if (getInputShapeAtPort(INPUT_DATA_IDX).getDims().size() > getOutputShapeAtPort(0).getDims().size())
-        IE_THROW() << "Broadcast node with name " << getName() << " has incorrect input shape. Input shape cannot be more than output shape. "
-                "Actual input shape size: " << getInputShapeAtPort(0).getDims().size() << ", output shape size: " << getOutputShapeAtPort(0).getDims().size();
-
-    if (getInputShapeAtPort(1).getDims().size() != 1)
-        IE_THROW() << "TargetShape must be 1D tensor for Broadcast node with name " << getName();
-    if (!getParentEdgeAt(1)->getParent()->isConstant())
-        IE_THROW() << "Broadcast node with name " << getName() << " has non constant parent Node on 1-st input. "
-                "This case is currently not supported in CPU plug-in.";
-
-    auto blobPrecision = getOriginalInputPrecisionAtPort(TARGET_SHAPE_IDX);
-    if (blobPrecision != Precision::I32 && blobPrecision != Precision::I64)
-        IE_THROW() << "TargetShapeBlob has unsupported precision " << blobPrecision.name() << " for Broadcast node with name " << getName();
-
-    auto ndims = getOutputShapeAtPort(0).getDims().size();
-    auto srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
-    auto dstDims = getOutputShapeAtPort(0).getDims();
-
-    if (broadcastType == NUMPY) {
-        repeats = dstDims;
-        for (int i = 0; i < srcDims.size(); i++) {
-            repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
-        }
-    } else if (broadcastType == EXPLICIT) {
-//        if (getInputShapeAtPort(AXES_MAPPING_IDX).getRank() != 1)
-//            IE_THROW() << "AxesMapping must be 1D tensor for Broadcast node with name " << getName();
-//        if (!getParentEdgeAt(AXES_MAPPING_IDX)->getParent()->isConstant())
-//            IE_THROW() << "Broadcast node with name " << getName() << " has non constant parent Node on 2-nd input. "
-//                    "This case is currently not supported in CPU plug-in.";
-//
-//        auto& axesMappingMemory = getParentEdgeAt(AXES_MAPPING_IDX)->getMemory();
-//        const int32_t* axesMappingPtr = reinterpret_cast<const int32_t*>(axesMappingMemory.GetPtr());
-//
-//        size_t axesMappingSize = axesMappingMemory.GetShape().getElementsCount();
-//        std::vector<int32_t> axesMappingData(axesMappingSize);
-//        for (int i = 0; i < axesMappingSize; i++) {
-//            axesMappingData[i] = axesMappingPtr[i];
+//    auto dstDims0 = getOutputShapeAtPort(0).getDims();
+//    for (int i = 1; i < outputShapes.size(); i++) {
+//        auto dstDims = getOutputShapeAtPort(i).getDims();
+//        if (dstDims.size() != dstDims0.size())
+//            IE_THROW() << "Output edges 0 and " << i << " have different dims for Broadcast node with name " << getName();
+//        for (int j = 0; j < dstDims0.size(); j++) {
+//            if (dstDims0[j] != dstDims[j]) {
+//                IE_THROW() << "Output edges 0 and " << i << " have different dims for Broadcast node with name " << getName();
+//            }
 //        }
-//
+//    }
+//    if (getInputShapeAtPort(INPUT_DATA_IDX).getDims().size() > getOutputShapeAtPort(0).getDims().size())
+//        IE_THROW() << "Broadcast node with name " << getName() << " has incorrect input shape. Input shape cannot be more than output shape. "
+//                "Actual input shape size: " << getInputShapeAtPort(0).getDims().size() << ", output shape size: " << getOutputShapeAtPort(0).getDims().size();
+
+//    if (getInputShapeAtPort(1).getDims().size() != 1)
+//        IE_THROW() << "TargetShape must be 1D tensor for Broadcast node with name " << getName();
+//    if (!getParentEdgeAt(1)->getParent()->isConstant())
+//        IE_THROW() << "Broadcast node with name " << getName() << " has non constant parent Node on 1-st input. "
+//                "This case is currently not supported in CPU plug-in.";
+
+//    auto blobPrecision = getOriginalInputPrecisionAtPort(TARGET_SHAPE_IDX);
+//    if (blobPrecision != Precision::I32 && blobPrecision != Precision::I64)
+//        IE_THROW() << "TargetShapeBlob has unsupported precision " << blobPrecision.name() << " for Broadcast node with name " << getName();
+
+//    auto ndims = getOutputShapeAtPort(0).getDims().size();
+//    auto srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
+//    auto dstDims = getOutputShapeAtPort(0).getDims();
+
+//    if (broadcastType == NUMPY) {
 //        repeats = dstDims;
-//        for (int i = 0; i < getInputShapeAtPort(2).getDims()[0]; i++) {
-//            repeats[axesMappingData[i]] /= srcDims[i];
-//            axesMapping.push_back(axesMappingData[i]);
+//        for (int i = 0; i < srcDims.size(); i++) {
+//            repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
 //        }
-    } else {
-        IE_THROW() << "Broadcast node with name " << getName() << " has unsupported broadcast type.";
-    }
-}
-
-void MKLDNNBroadcastNode::initSupportedPrimitiveDescriptors() {
-std::cout << "MKLDNNBroadcastNode::initSupportedPrimitiveDescriptors" << std::endl;
-    if (!supportedPrimitiveDescriptors.empty())
-        return;
-
-//    if (broadcastType == EXPLICIT) {
-//        auto srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
-//        auto dstDims = getOutputShapeAtPort(0).getDims();
-//
+//    } else if (broadcastType == EXPLICIT) {
 //        if (getInputShapeAtPort(AXES_MAPPING_IDX).getRank() != 1)
 //            IE_THROW() << "AxesMapping must be 1D tensor for Broadcast node with name " << getName();
 //        if (!getParentEdgeAt(AXES_MAPPING_IDX)->getParent()->isConstant())
@@ -162,51 +146,37 @@ std::cout << "MKLDNNBroadcastNode::initSupportedPrimitiveDescriptors" << std::en
 //            axesMapping.push_back(axesMappingData[i]);
 //        }
 //    }
+}
+
+void MKLDNNBroadcastNode::initSupportedPrimitiveDescriptors() {
+std::cout << "MKLDNNBroadcastNode::initSupportedPrimitiveDescriptors" << std::endl;
+    if (!supportedPrimitiveDescriptors.empty())
+        return;
+
     supportedPrimitiveDescriptors = getSupportedConfigs(this);
 }
 
 void MKLDNNBroadcastNode::createPrimitive() {
-    for (int i = 0; i < getChildEdges().size(); i++) {
-        auto& dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
-        if (!dstMemPtr || !dstMemPtr->GetPrimitivePtr())
-            IE_THROW() << "Destination memory " << i << "didn't allocate for Broadcast node with name " << getName();
+    if (inputShapesDefined()) {
+        if (needPrepareParams())
+            prepareParams();
+        updateLastInputDims();
     }
-    for (int i = 0; i < getParentEdges().size(); i++) {
-        auto& srcMemPtr = getParentEdgeAt(i)->getMemoryPtr();
-        if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
-            IE_THROW() << "Input memory " << i << "didn't allocate for Broadcast node with name " << getName();
-    }
-    if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << "Preferable primitive descriptor is not set for Broadcast node with name " << getName();
+//    for (int i = 0; i < getChildEdges().size(); i++) {
+//        auto& dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
+//        if (!dstMemPtr || !dstMemPtr->GetPrimitivePtr())
+//            IE_THROW() << "Destination memory " << i << "didn't allocate for Broadcast node with name " << getName();
+//    }
+//    for (int i = 0; i < getParentEdges().size(); i++) {
+//        auto& srcMemPtr = getParentEdgeAt(i)->getMemoryPtr();
+//        if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
+//            IE_THROW() << "Input memory " << i << "didn't allocate for Broadcast node with name " << getName();
+//    }
+//    if (getSelectedPrimitiveDescriptor() == nullptr)
+//        IE_THROW() << "Preferable primitive descriptor is not set for Broadcast node with name " << getName();
 
-    SizeVector srcBlockedDims = getParentEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
-    SizeVector dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
-
-    if (broadcastType == EXPLICIT) {
-        auto srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
-        auto dstDims = getOutputShapeAtPort(0).getDims();
-
-        if (getInputShapeAtPort(AXES_MAPPING_IDX).getRank() != 1)
-            IE_THROW() << "AxesMapping must be 1D tensor for Broadcast node with name " << getName();
-        if (!getParentEdgeAt(AXES_MAPPING_IDX)->getParent()->isConstant())
-            IE_THROW() << "Broadcast node with name " << getName() << " has non constant parent Node on 2-nd input. "
-                    "This case is currently not supported in CPU plug-in.";
-
-        auto& axesMappingMemory = getParentEdgeAt(AXES_MAPPING_IDX)->getMemory();
-        const int32_t* axesMappingPtr = reinterpret_cast<const int32_t*>(axesMappingMemory.GetPtr());
-
-        size_t axesMappingSize = axesMappingMemory.GetShape().getElementsCount();
-        std::vector<int32_t> axesMappingData(axesMappingSize);
-        for (int i = 0; i < axesMappingSize; i++) {
-            axesMappingData[i] = axesMappingPtr[i];
-        }
-
-        repeats = dstDims;
-        for (int i = 0; i < getInputShapeAtPort(2).getDims()[0]; i++) {
-            repeats[axesMappingData[i]] /= srcDims[i];
-            axesMapping.push_back(axesMappingData[i]);
-        }
-    }
+    auto srcBlockedDims = getParentEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
+    auto dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
 
     if (broadcastType == EXPLICIT) {
         SizeVector newSrcBlockedDims = SizeVector(dstBlockedDims.size(), 1);
@@ -221,13 +191,37 @@ void MKLDNNBroadcastNode::createPrimitive() {
     optimizedCase = prepareOptimizedParams(this, srcBlockedDims, dstBlockedDims);
 }
 
-//bool MKLDNNBroadcastNode::needPrepareParams() const {
-//    ;
-//}
-//
-//void MKLDNNBroadcastNode::prepareParams() {
-//    ;
-//}
+bool MKLDNNBroadcastNode::needPrepareParams() const {
+    return MKLDNNNode::needPrepareParams();
+}
+
+void MKLDNNBroadcastNode::prepareParams() {
+    auto ndims = getOutputShapeAtPort(0).getDims().size();
+    auto srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
+    auto dstDims = getOutputShapeAtPort(0).getDims();
+
+    if (broadcastType == NUMPY) {
+        repeats = dstDims;
+        for (int i = 0; i < srcDims.size(); i++) {
+            repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
+        }
+    } else if (broadcastType == EXPLICIT) {
+        auto& axesMappingMemory = getParentEdgeAt(AXES_MAPPING_IDX)->getMemory();
+        const int32_t* axesMappingPtr = reinterpret_cast<const int32_t*>(axesMappingMemory.GetPtr());
+
+        size_t axesMappingSize = axesMappingMemory.GetShape().getElementsCount();
+        std::vector<int32_t> axesMappingData(axesMappingSize);
+        for (int i = 0; i < axesMappingSize; i++) {
+            axesMappingData[i] = axesMappingPtr[i];
+        }
+
+        repeats = dstDims;
+        for (size_t i = 0; i < getInputShapeAtPort(AXES_MAPPING_IDX).getDims()[0]; i++) {
+            repeats[axesMappingData[i]] /= srcDims[i];
+            axesMapping.push_back(axesMappingData[i]);
+        }
+    }
+}
 
 void MKLDNNBroadcastNode::execute(mkldnn::stream strm) {
     if (optimizedCase) {

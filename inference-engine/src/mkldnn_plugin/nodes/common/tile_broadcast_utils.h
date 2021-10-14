@@ -24,6 +24,7 @@ protected:
 
     InferenceEngine::SizeVector repeats;
     bool optimizedCase = false;
+    bool constMap[3] = { false };
 
 private:
     static void fillOptimizedDimsAndSrcStrides(const InferenceEngine::SizeVector &srcBlockedDims, const InferenceEngine::SizeVector &blockedRepeats,

@@ -42,20 +42,21 @@ protected:
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
 
         InferenceEngine::SizeVector targetShape;
-        ngraph::AxisSet axesMapping;
-        ngraph::op::BroadcastType mode;
+        ov::AxisSet axesMapping;
+        ov::op::BroadcastType mode;
         InferenceEngine::SizeVector inputShape;
         InferenceEngine::Precision networkPrecision;
         std::tie(targetShape, axesMapping, mode, inputShape, networkPrecision, targetDevice) = basicParamsSet;
+        selectedType += std::string("_") + networkPrecision.name();
 
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(networkPrecision);
-        auto target_shape_const = ngraph::opset3::Constant::create(ngraph::element::i64, {targetShape.size()}, targetShape);
+        auto target_shape_const = ov::op::v0::Constant::create(ov::element::i64, {targetShape.size()}, targetShape);
         auto params = ngraph::builder::makeParams(ngPrc, {inputShape});
-        auto broadcast = std::dynamic_pointer_cast<ngraph::opset3::Broadcast>(
+        auto broadcast = std::dynamic_pointer_cast<ov::op::v3::Broadcast>(
                 ngraph::builder::makeBroadcast(params[0], target_shape_const, mode, axesMapping));
         broadcast->get_rt_info() = getCPUInfo();
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(broadcast)};
-        function = std::make_shared<ngraph::Function>(results, params, "broadcast");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(broadcast)};
+        function = std::make_shared<ov::Function>(results, params, "broadcast");
     }
 };
 
@@ -82,12 +83,9 @@ const auto cpuParams_ndhwc = CPUSpecificParams {{ndhwc}, {ndhwc}, {}, "ref"};
 /* COMMON PARAMS */
 const std::vector<InferenceEngine::Precision> inputPrecisions = {
         InferenceEngine::Precision::FP32,
-        InferenceEngine::Precision::FP16,
+        InferenceEngine::Precision::BF16,
         InferenceEngine::Precision::I32,
-        InferenceEngine::Precision::I16,
-        InferenceEngine::Precision::I8,
-        InferenceEngine::Precision::U8,
-        InferenceEngine::Precision::BOOL
+        InferenceEngine::Precision::I8
 };
 /* ============= */
 
@@ -96,14 +94,14 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
 const std::vector<CPUSpecificParams> CPUParams4D = {
         cpuParams_nChw16c,
         cpuParams_nChw8c,
-        cpuParams_nhwc,
+        cpuParams_nhwc
 };
 
 const auto numpyBroadcastParams4D = ::testing::Combine(
         ::testing::Values(std::vector<size_t>{1, 16, 1, 3},
                           std::vector<size_t>{1, 16, 3, 3}),
-        ::testing::Values(ngraph::AxisSet{}),
-        ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+        ::testing::Values(ov::AxisSet{}),
+        ::testing::Values(ov::op::BroadcastType::NUMPY),
         ::testing::Values(std::vector<size_t>({1, 16, 1, 1})),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU));
@@ -122,8 +120,8 @@ const std::vector<CPUSpecificParams> CPUParams5D = {
 const auto numpyBroadcastParams5D = ::testing::Combine(
         ::testing::Values(std::vector<size_t>{1, 16, 1, 1, 3},
                           std::vector<size_t>{1, 16, 3, 1, 3}),
-        ::testing::Values(ngraph::AxisSet{}),
-        ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+        ::testing::Values(ov::AxisSet{}),
+        ::testing::Values(ov::op::BroadcastType::NUMPY),
         ::testing::Values(std::vector<size_t>({1, 16, 1, 1, 1})),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU));

@@ -464,32 +464,13 @@ public:
         return originalOutputPrecisions;
     }
 
-    InferenceEngine::Precision getOriginalInputPrecisionAtPort(size_t port) const {
-        if (originalInputPrecisions.size() <= port) {
-            IE_THROW() << "Incorrect input port number for node " << getName();
-        }
-        return originalInputPrecisions[port];
-    }
-    InferenceEngine::Precision getOriginalOutputPrecisionAtPort(size_t port) const {
-        if (originalOutputPrecisions.size() <= port) {
-            IE_THROW() << "Incorrect output port number for node " << getName();
-        }
-        return originalOutputPrecisions[port];
-    }
+    InferenceEngine::Precision getOriginalInputPrecisionAtPort(size_t port) const;
 
-    void setOriginalInputPrecisionAtPort(size_t port, InferenceEngine::Precision precision) {
-        if (originalInputPrecisions.size() <= port) {
-            IE_THROW() << "Incorrect input port number for node " << getName();
-        }
-        originalInputPrecisions[port] = precision;
-    }
+    InferenceEngine::Precision getOriginalOutputPrecisionAtPort(size_t port) const;
 
-    void setOriginalOutputPrecisionAtPort(size_t port, InferenceEngine::Precision precision) {
-        if (originalOutputPrecisions.size() <= port) {
-            IE_THROW() << "Incorrect output port number for node " << getName();
-        }
-        originalOutputPrecisions[port] = precision;
-    }
+    void setOriginalInputPrecisionAtPort(size_t port, InferenceEngine::Precision precision);
+
+    void setOriginalOutputPrecisionAtPort(size_t port, InferenceEngine::Precision precision);
 
     void addOriginalInputPrecision(InferenceEngine::Precision precision) {
         originalInputPrecisions.push_back(precision);
@@ -542,19 +523,9 @@ public:
         return isDynamic;
     }
 
-    const Shape& getInputShapeAtPort(size_t port) const {
-        if (inputShapes.size() <= port) {
-            IE_THROW() << "Incorrect input port number for node " << getName();
-        }
-        return inputShapes[port];
-    }
+    const Shape& getInputShapeAtPort(size_t port) const;
 
-    const Shape& getOutputShapeAtPort(size_t port) const {
-        if (outputShapes.size() <= port) {
-            IE_THROW() << "Incorrect output port number for node " << getName();
-        }
-        return outputShapes[port];
-    }
+    const Shape& getOutputShapeAtPort(size_t port) const;
 
 protected:
     bool canFuseSimpleOperation(const MKLDNNNodePtr& node) const;
