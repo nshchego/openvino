@@ -19,7 +19,7 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
 //        InferenceEngine::Precision::I16,
         InferenceEngine::Precision::I8,
 //        InferenceEngine::Precision::U8,
-        InferenceEngine::Precision::BOOL
+//        InferenceEngine::Precision::BOOL
 };
 
 // NUMPY MODE //////////////////////////////////////////
