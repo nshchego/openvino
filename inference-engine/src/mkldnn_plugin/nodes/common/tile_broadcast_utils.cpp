@@ -3,7 +3,9 @@
 //
 
 #include "tile_broadcast_utils.h"
+
 #include "cpu_memcpy.h"
+#include "ie_parallel.hpp"
 #include <memory_desc/cpu_memory_desc_utils.h>
 #include "memory_desc/dnnl_blocked_memory_desc.h"
 
@@ -54,7 +56,7 @@ void TileBroadcastCommon::fillOptimizedDimsAndSrcStrides(const SizeVector &srcBl
 }
 
 bool TileBroadcastCommon::canBeExecutedInBlockedLayout(const VectorDims& srcDims, const SizeVector& repeats,
-        size_t elemsInBlock) {
+        const size_t elemsInBlock) {
     if (repeats[1] != 1 && srcDims[1] % elemsInBlock != 0)
         return false;
 
@@ -93,12 +95,13 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
     auto dataType = MKLDNNExtensionUtils::IEPrecisionToDataType(precision);
 
     const auto& srcDims = node->getInputShapeAtPort(0).getDims();
-    const auto& dstDims = node->getOutputShapeAtPort(0).getDims();
+    const auto& inDataShape = node->getInputShapeAtPort(0);
+    size_t outDataShapeRank = node->getOutputShapeAtPort(0).getRank();
 
     NodeConfig config;
-    if (repeats.size() != dstDims.size())
+    if (repeats.size() != outDataShapeRank)
         IE_THROW() << node->getTypeStr() << " node with name " << node->getName() << " has incorrect Repeats vector."
-                "Repeats size must be equal to dstDims size. Repeats size: " << repeats.size() << ", dstDims size: " << dstDims.size();
+                "Repeats rank must be equal to output shape rank. Repeats rank: " << repeats.size() << ", output shape rank: " << outDataShapeRank;
 
     config.dynBatchSupport = false;
     config.inConfs.resize(node->getParentEdges().size());
@@ -125,23 +128,23 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
         supportedPrimitiveDescriptors.push_back({config, impl_desc_type::ref});
     };
 
-    if (srcDims.size() == dstDims.size() && (dstDims.size() == 4 || dstDims.size() == 5)) {
+    if (inDataShape.getRank() == outDataShapeRank && (outDataShapeRank == 4 || outDataShapeRank == 5)) {
         if (canBeExecutedInBlockedLayout(srcDims, repeats, 16)) {
-            if (dstDims.size() == 4) {
+            if (outDataShapeRank == 4) {
                 pushDesc(mkldnn::memory::format_tag::nChw16c, mkldnn::memory::format_tag::nChw16c);
             } else {
                 pushDesc(mkldnn::memory::format_tag::nCdhw16c, mkldnn::memory::format_tag::nCdhw16c);
             }
         }
         if (canBeExecutedInBlockedLayout(srcDims, repeats, 8)) {
-            if (dstDims.size() == 4) {
+            if (outDataShapeRank == 4) {
                 pushDesc(mkldnn::memory::format_tag::nChw8c, mkldnn::memory::format_tag::nChw8c);
             } else {
                 pushDesc(mkldnn::memory::format_tag::nCdhw8c, mkldnn::memory::format_tag::nCdhw8c);
             }
         }
         if (canBeExecutedInNSPCLayout(srcDims, repeats)) {
-            if (dstDims.size() == 4) {
+            if (outDataShapeRank == 4) {
                 pushDesc(mkldnn::memory::format_tag::nhwc, mkldnn::memory::format_tag::nhwc);
             } else {
                 pushDesc(mkldnn::memory::format_tag::ndhwc, mkldnn::memory::format_tag::ndhwc);
@@ -149,8 +152,8 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
         }
     }
 
-    auto inFmt = MKLDNNExtensionUtils::GetPlainFormatByRank(srcDims.size());
-    auto outFmt = MKLDNNExtensionUtils::GetPlainFormatByRank(dstDims.size());
+    auto inFmt = MKLDNNExtensionUtils::GetPlainFormatByRank(inDataShape.getRank());
+    auto outFmt = MKLDNNExtensionUtils::GetPlainFormatByRank(outDataShapeRank);
     if (inFmt == mkldnn::memory::format_tag::undef || outFmt == mkldnn::memory::format_tag::undef) {
         config.inConfs[0].desc = std::make_shared<CpuBlockedMemoryDesc>(precision, node->getInputShapeAtPort(0));
         for (int i = 0; i < config.outConfs.size(); i++) {

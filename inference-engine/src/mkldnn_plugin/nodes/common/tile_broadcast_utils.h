@@ -1,13 +1,9 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #pragma once
 
-#include "ie_parallel.hpp"
-//#include "cpu_memcpy.h"
-//#include <mkldnn_extension_utils.h>
-//#include <ngraph/runtime/host_tensor.hpp>
 #include "mkldnn_node.h"
 
 #include <memory>
@@ -30,7 +26,7 @@ private:
     static void fillOptimizedDimsAndSrcStrides(const InferenceEngine::SizeVector &srcBlockedDims, const InferenceEngine::SizeVector &blockedRepeats,
             InferenceEngine::SizeVector &optimizedDims, InferenceEngine::SizeVector &optimizedSrcStrides);
 
-    static bool canBeExecutedInBlockedLayout(const MKLDNNPlugin::VectorDims& srcDims, const InferenceEngine::SizeVector& repeats, size_t elemsInBlock);
+    static bool canBeExecutedInBlockedLayout(const MKLDNNPlugin::VectorDims& srcDims, const InferenceEngine::SizeVector& repeats, const size_t elemsInBlock);
     static bool canBeExecutedInNSPCLayout(const MKLDNNPlugin::VectorDims& srcDims, const InferenceEngine::SizeVector& repeats);
 
     struct {

@@ -44,6 +44,7 @@ bool MKLDNNBroadcastNode::isSupportedOperation(const std::shared_ptr<const ov::N
 
 MKLDNNBroadcastNode::MKLDNNBroadcastNode(const std::shared_ptr<ov::Node>& op, const mkldnn::engine& eng,
         MKLDNNWeightsSharing::Ptr &cache) : MKLDNNNode(op, eng, cache) {
+std::cout << "MKLDNNBroadcastNode::MKLDNNBroadcastNode" << std::endl;
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
