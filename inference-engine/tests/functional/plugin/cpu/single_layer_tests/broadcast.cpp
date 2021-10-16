@@ -53,6 +53,7 @@ public:
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
 
+//std::cout << "BroadcastLayerCPUTest::getTestCaseName: " << result.str() << std::endl;
         return result.str();
     }
 
@@ -82,8 +83,6 @@ protected:
         inputDynamicShapes = { inputShapes.first };
 
         ov::Shape inputDataShape = targetStaticShapes.front().front();
-//                  targetShape = targetStaticShapes.front()[1],
-//                  axesMappingShape = targetStaticShapes.front()[2];
 
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(networkPrecision);
         ov::ParameterVector functionParams = ngraph::builder::makeParams(ngPrc, { {"data", inputDataShape} });
@@ -202,7 +201,7 @@ INSTANTIATE_TEST_CASE_P(smoke_StaticShape4D,
                     BroadcastLayerCPUTest::getTestCaseName);
 INSTANTIATE_TEST_CASE_P(smoke_DynamicShape4D,
                     BroadcastLayerCPUTest,
-                    ::testing::Combine(dynamicNumpyBroadcastParams4D, ::testing::ValuesIn(std::vector<CPUSpecificParams>{})),
+                    ::testing::Combine(dynamicNumpyBroadcastParams4D, ::testing::ValuesIn(std::vector<CPUSpecificParams>{{{}, {}, {}, "ref"}})),
                     BroadcastLayerCPUTest::getTestCaseName);
 
 // 5D

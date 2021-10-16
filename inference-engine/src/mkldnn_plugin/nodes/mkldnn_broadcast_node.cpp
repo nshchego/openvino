@@ -144,6 +144,11 @@ bool MKLDNNBroadcastNode::needPrepareParams() const {
 }
 
 void MKLDNNBroadcastNode::prepareParams() {
+    if (isDynamic) {
+        optimizedCase = false;
+        return;
+    }
+
     const auto& srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
     repeats = getOutputShapeAtPort(0).getDims();
     const auto ndims = repeats.size();
@@ -189,62 +194,55 @@ void MKLDNNBroadcastNode::execute(mkldnn::stream strm) {
 
 void MKLDNNBroadcastNode::notOptimizedExecute(mkldnn::stream strm) {
 std::cout << "MKLDNNBroadcastNode::notOptimizedExecute" << std::endl;
-    size_t shape_size = (getParentEdgeAt(TARGET_SHAPE_IDX)->getMemory().getStaticDims())[0];
-    SizeVector dst_dims = getChildEdgeAt(0)->getMemory().getStaticDims();
-    SizeVector src_dims = getParentEdgeAt(INPUT_DATA_IDX)->getMemory().getStaticDims();
+    SizeVector srcDims = getParentEdgeAt(INPUT_DATA_IDX)->getMemory().getStaticDims();
+    const auto& dstDims = getChildEdgeAt(0)->getMemory().getStaticDims();
+    const auto& dataSrcRank = getParentEdgeAt(INPUT_DATA_IDX)->getMemory().GetShape().getRank();
+    const auto& dataDstRank = getChildEdgeAt(0)->getMemory().GetShape().getRank();
 
     auto srcDesc = getParentEdgeAt(INPUT_DATA_IDX)->getMemory().GetDescWithType<BlockedMemoryDesc>();
     SizeVector srcStrides = srcDesc->getStrides();
-    size_t data_size = srcDesc->getPrecision().size();
+    const size_t dataSize = srcDesc->getPrecision().size();
 
-    if (!src_dims.size())
-        src_dims = SizeVector(1, 1);
+    if (!dataSrcRank)
+        srcDims = SizeVector(1, 1);
     if (!srcStrides.size())
         srcStrides = SizeVector(1, 1);
 
-    if (dst_dims.size() != shape_size) {
-        IE_THROW() << "Output tensor dimension mismatch";
-    }
-
-    if (src_dims.size() > dst_dims.size()) {
-        IE_THROW() << "Output tensor dimension is smaller then input tensor dimension";
-    }
-
     auto dstDesc = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>();
-    InferenceEngine::SizeVector dstStrides = dstDesc->getStrides();
-    InferenceEngine::SizeVector src_aligned(dst_dims.size());
-    InferenceEngine::SizeVector srcStrides_aligned(dst_dims.size());
-    size_t prefix_size = dst_dims.size() - src_dims.size();
-    for (size_t i = 0; i < dst_dims.size(); i++) {
-        if (i < prefix_size) {
-            src_aligned[i] = 1;
-            srcStrides_aligned[i] = srcStrides[0];
+    SizeVector dstStrides = dstDesc->getStrides();
+    SizeVector srcAligned(dataDstRank);
+    SizeVector srcStridesAligned(dataDstRank);
+    const size_t prefixSize = dataDstRank - dataSrcRank;
+    for (size_t i = 0lu; i < dataDstRank; i++) {
+        if (i < prefixSize) {
+            srcAligned[i] = 1;
+            srcStridesAligned[i] = srcStrides[0];
         } else {
-            src_aligned[i] = src_dims[i - prefix_size];
-            srcStrides_aligned[i] = srcStrides[i - prefix_size];
+            srcAligned[i] = srcDims[i - prefixSize];
+            srcStridesAligned[i] = srcStrides[i - prefixSize];
         }
     }
 
-    size_t work_amount_dst = dstStrides[0] * dst_dims[0];
-    const auto *src_data = reinterpret_cast<const uint8_t *>(getParentEdgeAt(INPUT_DATA_IDX)->getMemoryPtr()->GetPtr());
-    auto *dst_data = reinterpret_cast<uint8_t *>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+    const size_t workAmountDst = dstStrides[0] * dstDims[0];
+    const auto *srcData = reinterpret_cast<const uint8_t *>(getParentEdgeAt(INPUT_DATA_IDX)->getMemoryPtr()->GetPtr());
+    auto *dstData = reinterpret_cast<uint8_t *>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
     parallel_nt(0, [&](const int ithr, const int nthr) {
-        size_t i, src_idx, start = 0, end = 0;
-        SizeVector counters(dst_dims.size(), 0);
-        splitter(work_amount_dst, nthr, ithr, start, end);
-        for (int j = dst_dims.size() - 1, i = start; j >= 0; j--) {
-            counters[j] = i % dst_dims[j];
-            i /= dst_dims[j];
+        size_t i = 0lu, srcIdx = 0lu, start = 0lu, end = 0lu;
+        SizeVector counters(dataDstRank, 0);
+        splitter(workAmountDst, nthr, ithr, start, end);
+        for (int j = dataDstRank - 1, i = start; j >= 0; j--) {
+            counters[j] = i % dstDims[j];
+            i /= dstDims[j];
         }
-        for (size_t iwork = start * data_size; iwork < end * data_size; iwork += data_size) {
-            for (i = 0, src_idx = 0; i < dst_dims.size(); ++i)
-                src_idx += counters[i] ? ((counters[i] % src_aligned[i]) * srcStrides_aligned[i]) : 0;
+        for (size_t iwork = start * dataSize; iwork < end * dataSize; iwork += dataSize) {
+            for (i = 0lu, srcIdx = 0lu; i < dataDstRank; ++i)
+                srcIdx += counters[i] ? ((counters[i] % srcAligned[i]) * srcStridesAligned[i]) : 0;
 
-            cpu_memcpy(&dst_data[iwork], &src_data[src_idx * data_size], data_size);
+            cpu_memcpy(&dstData[iwork], &srcData[srcIdx * dataSize], dataSize);
 
-            for (int j = dst_dims.size() - 1; j >= 0; j--) {
-                counters[j] = (counters[j] + 1) % dst_dims[j];
+            for (int j = dataDstRank - 1; j >= 0; j--) {
+                counters[j] = (counters[j] + 1) % dstDims[j];
                 if (counters[j] != 0) break;
             }
         }
