@@ -67,36 +67,14 @@ std::cout << "MKLDNNBroadcastNode::MKLDNNBroadcastNode" << std::endl;
 
     if (op->get_input_node_ptr(TARGET_SHAPE_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
         constMap[TARGET_SHAPE_IDX] = true;
+//        targetDims = (ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX)))->get_vector<uint64_t>();
     }
     if (broadcastType == EXPLICIT &&
                 op->get_input_node_ptr(AXES_MAPPING_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
         constMap[AXES_MAPPING_IDX] = true;
         auto axesMappingOp = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX));
-            axesMapping = axesMappingOp->get_vector<int32_t>();
+        axesMapping = axesMappingOp->get_vector<int32_t>();
     }
-
-//    if (op->get_input_node_ptr(TARGET_SHAPE_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
-//        constMap[TARGET_SHAPE_IDX] = true;
-//        const auto& srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
-//        const auto& dstDims = getOutputShapeAtPort(0).getDims();
-//        repeats = dstDims;
-//
-//        if (broadcastType == NUMPY) {
-//            const auto ndims = dstDims.size();
-//            for (int i = 0; i < srcDims.size(); i++) {
-//                repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
-//            }
-//        } else if (broadcastType == EXPLICIT &&
-//                op->get_input_node_ptr(AXES_MAPPING_IDX)->get_type_info() == ov::op::v0::Constant::type_info) {
-//            constMap[AXES_MAPPING_IDX] = true;
-//            auto axesMappingOp = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX));
-//            axesMapping = axesMappingOp->get_vector<int32_t>();
-//
-//            for (size_t i = 0; i < axesMapping.size(); i++) {
-//                repeats[axesMapping[i]] /= srcDims[i];
-//            }
-//        }
-//    }
 }
 
 void MKLDNNBroadcastNode::getSupportedDescriptors() {
@@ -144,6 +122,7 @@ bool MKLDNNBroadcastNode::needPrepareParams() const {
 }
 
 void MKLDNNBroadcastNode::prepareParams() {
+std::cout << "MKLDNNBroadcastNode::prepareParams" << std::endl;
     if (isDynamic) {
         optimizedCase = false;
         return;

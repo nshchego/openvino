@@ -16,7 +16,6 @@ protected:
     bool prepareOptimizedParams(MKLDNNPlugin::MKLDNNNode *node, InferenceEngine::SizeVector& srcBlockedDims, InferenceEngine::SizeVector& dstBlockedDims);
 
     void optimizedExecute(MKLDNNPlugin::MKLDNNNode *node);
-//    void ngraphExecute(MKLDNNPlugin::MKLDNNNode *node, std::shared_ptr<ngraph::Node> ngraphNode);
 
     InferenceEngine::SizeVector repeats;
     bool optimizedCase = false;

@@ -15,20 +15,20 @@ bool MKLDNNTileNode::isSupportedOperation(const std::shared_ptr<const ov::Node>&
             errorMessage = "Only opset1 Tile operation is supported";
             return false;
         }
-        if (op->get_input_shape(TILE_INPUT).size() != op->get_input_shape(TILE_REPEATS)[0]) {
-            errorMessage = "Doesn't support inputs with different ranks";
-            return false;
-        }
-        const auto repeatsNode = std::dynamic_pointer_cast<const ov::op::v0::Constant>(op->get_input_node_shared_ptr(TILE_REPEATS));
-        if (repeatsNode == nullptr) {
+//        if (op->get_input_shape(TILE_INPUT).size() != op->get_input_shape(TILE_REPEATS)[0]) {
+//            errorMessage = "Doesn't support inputs with different ranks";
+//            return false;
+//        }
+        if (!isDynamicNgraphNode(op) &&
+                op->get_input_node_ptr(TILE_REPEATS)->get_type_info() != ov::op::v0::Constant::type_info) {
             errorMessage = "Only const 'repeats' input is supported";
             return false;
         }
-        const auto repeats = repeatsNode->cast_vector<int32_t>();
-        if (std::count_if(repeats.begin(), repeats.end(), [](int32_t x) { return x > 1; }) > 1) {
-            errorMessage = "Doesn't support 'repeats' with more than one specified axis";
-            return false;
-        }
+//        const auto repeats = repeatsNode->cast_vector<int32_t>();
+//        if (std::count_if(repeats.begin(), repeats.end(), [](int32_t x) { return x > 1; }) > 1) {
+//            errorMessage = "Doesn't support 'repeats' with more than one specified axis";
+//            return false;
+//        }
     } catch (...) {
         return false;
     }
@@ -44,54 +44,42 @@ MKLDNNTileNode::MKLDNNTileNode(const std::shared_ptr<ov::Node>& op, const mkldnn
 
     errorPrefix = "Tile node with name '" + getName() + "'";
 
-    const auto repeatsNode = std::dynamic_pointer_cast<const ov::op::v0::Constant>(op->get_input_node_shared_ptr(TILE_REPEATS));
-    if (!repeatsNode)
-        IE_THROW() << errorPrefix << " has non constant second input.";
-    const auto repeats = repeatsNode->cast_vector<int32_t>();
-    // At this moment CPU plug-in supports tiling only per single axis
-    // This behavoiur is guaranteed by ConvertTileToSeqTiles
-    for (size_t i = 0; i < repeats.size(); i++) {
-        if (repeats[i] > 1) {
-            axis = i;
-            tiles = repeats[i];
-            break;
+    if (op->get_input_node_ptr(TILE_REPEATS)->get_type_info() == ov::op::v0::Constant::type_info) {
+        constMap[TILE_INPUT] = true;
+        repeats = ov::as_type<const ov::op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))->cast_vector<uint64_t>();
+        while (repeats.size() < getInputShapeAtPort(TILE_INPUT).getRank()) {
+            repeats.insert(repeats.begin(), 1lu);
         }
     }
-    noTiling = axis == -1;
-    if (axis >= static_cast<int>(op->get_input_shape(TILE_INPUT).size()))
-        IE_THROW() << errorPrefix << " has incorrect tiling axis: " << axis;
-    if (tiles < 1 && !noTiling)
-        IE_THROW() << errorPrefix << " has incorrect 'repeats' value: " << tiles;
 }
 
 void MKLDNNTileNode::getSupportedDescriptors() {
     if (getParentEdges().size() != 2)
-        IE_THROW() << "Tile node with name " << getName() << " has incorrect number of input edges. "
+        IE_THROW() << errorPrefix << " has incorrect number of input edges. "
                 "Expected: 2, Actual: " << getParentEdges().size();
     if (getChildEdges().empty())
-        IE_THROW() << "Tile node with name " << getName() << " has no output edges.";
-    auto dstDims0 = getOutputShapeAtPort(0).getDims();
-    for (int i = 1; i < getChildEdges().size(); i++) {
-        auto DstDims = getOutputShapeAtPort(i).getDims();
-        if (DstDims.size() != dstDims0.size())
-            IE_THROW() << "Output edges 0 and " << i << " have different dims for Tile node with name " << getName();
-        for (int j = 0; j < dstDims0.size(); j++) {
-            if (dstDims0[j] != DstDims[j]) {
-                IE_THROW() << "Output edges 0 and " << i << " have different dims for Tile node with name " << getName();
+        IE_THROW() << errorPrefix << " has no output edges.";
+    const auto& dstDims0 = getOutputShapeAtPort(0).getDims();
+    for (size_t i = 1; i < getChildEdges().size(); i++) {
+        const auto& dstDims = getOutputShapeAtPort(i).getDims();
+        if (dstDims.size() != dstDims0.size())
+            IE_THROW() << errorPrefix << " has output edges 0 and " << i << " with different ranks.";
+        for (size_t j = 0; j < dstDims0.size(); j++) {
+            if (dstDims0[j] != dstDims[j]) {
+                IE_THROW() << errorPrefix << " has output edges 0 and " << i << " with different dims.";
             }
         }
     }
-    if (getInputShapeAtPort(0).getDims().size() > getOutputShapeAtPort(0).getDims().size())
-        IE_THROW() << "Tile node with name " << getName() << " has incorrect input shape. Input shape cannot be more than output shape. "
-                "Actual input shape size: " << getInputShapeAtPort(0).getDims().size() << ", output shape size: " << getOutputShapeAtPort(0).getDims().size();
+    if (getInputShapeAtPort(0).getRank() > getOutputShapeAtPort(0).getRank())
+        IE_THROW() << errorPrefix << " has incorrect input/output data shape rank. Input shape rank cannot be more than output shape rank. "
+                "Actual input shape size: " << getInputShapeAtPort(0).getRank() << ", output shape size: " << getOutputShapeAtPort(0).getRank();
+}
 
-    if (getInputShapeAtPort(1).getDims().size() != 1)
-        IE_THROW() << "Repeats must be 1D tensor for Tile node with name " << getName();
-    if (!getParentEdgeAt(1)->getParent()->isConstant())
-        IE_THROW() << "Tile node with name " << getName() << " has non constant parent Node on 1-st input. "
-                "This case is currently not supported in CPU plug-in.";
+void MKLDNNTileNode::initSupportedPrimitiveDescriptors() {
+    if (!supportedPrimitiveDescriptors.empty())
+        return;
 
-//    auto& srcMemory = getParentEdgeAt(1)->getMemory();
+//    auto& srcMemory = getParentEdgeAt(TILE_REPEATS)->getMemory();
 //    const int32_t* repeatsPtr = reinterpret_cast<const int32_t*>(srcMemory.GetPtr());
 //
 //    size_t repeatsSize = getParentEdgeAt(1)->getMemory().GetShape().getElementsCount();
@@ -100,53 +88,84 @@ void MKLDNNTileNode::getSupportedDescriptors() {
 //        repeatsData[i] = repeatsPtr[i];
 //    }
 //
-//    for (int i = 0; i < getInputShapeAtPort(1).getDims()[0]; i++) {
+//    for (int i = 0; i < getInputShapeAtPort(TILE_REPEATS).getDims()[0]; i++) {
 //        repeats.push_back(repeatsData[i]);
 //    }
 //    while (repeats.size() < getOutputShapeAtPort(0).getDims().size()) {
 //        repeats.insert(repeats.begin(), 1);
 //    }
-}
-
-void MKLDNNTileNode::initSupportedPrimitiveDescriptors() {
-    if (!supportedPrimitiveDescriptors.empty())
-        return;
-
-    auto& srcMemory = getParentEdgeAt(TILE_REPEATS)->getMemory();
-    const int32_t* repeatsPtr = reinterpret_cast<const int32_t*>(srcMemory.GetPtr());
-
-    size_t repeatsSize = getParentEdgeAt(1)->getMemory().GetShape().getElementsCount();
-    std::vector<int> repeatsData(repeatsSize);
-    for (int i = 0; i < repeatsSize; i++) {
-        repeatsData[i] = repeatsPtr[i];
-    }
-
-    for (int i = 0; i < getInputShapeAtPort(TILE_REPEATS).getDims()[0]; i++) {
-        repeats.push_back(repeatsData[i]);
-    }
-    while (repeats.size() < getOutputShapeAtPort(0).getDims().size()) {
-        repeats.insert(repeats.begin(), 1);
-    }
 
     supportedPrimitiveDescriptors = getSupportedConfigs(this);
 }
 
 void MKLDNNTileNode::createPrimitive() {
-    for (int i = 0; i < getChildEdges().size(); i++) {
-        auto& dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
-        if (!dstMemPtr || !dstMemPtr->GetPrimitivePtr())
-            IE_THROW() << "Destination memory " << i << "didn't allocate for Tile node with name " << getName();
+std::cout << "MKLDNNTileNode::createPrimitive" << std::endl;
+    if (inputShapesDefined()) {
+        if (needPrepareParams())
+            prepareParams();
+        updateLastInputDims();
     }
-    for (int i = 0; i < getParentEdges().size(); i++) {
-        auto& srcMemPtr = getParentEdgeAt(i)->getMemoryPtr();
-        if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
-            IE_THROW() << "Input memory " << i << "didn't allocate for Tile node with name " << getName();
-    }
-    if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << "Preferable primitive descriptor is not set for Tile node with name " << getName();
+//    for (int i = 0; i < getChildEdges().size(); i++) {
+//        auto& dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
+//        if (!dstMemPtr || !dstMemPtr->GetPrimitivePtr())
+//            IE_THROW() << "Destination memory " << i << "didn't allocate for Tile node with name " << getName();
+//    }
+//    for (int i = 0; i < getParentEdges().size(); i++) {
+//        auto& srcMemPtr = getParentEdgeAt(i)->getMemoryPtr();
+//        if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
+//            IE_THROW() << "Input memory " << i << "didn't allocate for Tile node with name " << getName();
+//    }
+//    if (getSelectedPrimitiveDescriptor() == nullptr)
+//        IE_THROW() << "Preferable primitive descriptor is not set for Tile node with name " << getName();
+//
+//    SizeVector srcBlockedDims = getParentEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
+//    SizeVector dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
+//    optimizedCase = prepareOptimizedParams(this, srcBlockedDims, dstBlockedDims);
+}
 
-    SizeVector srcBlockedDims = getParentEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
-    SizeVector dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
+bool MKLDNNTileNode::needPrepareParams() const {
+    return MKLDNNNode::needPrepareParams();
+}
+
+void MKLDNNTileNode::prepareParams() {
+std::cout << "MKLDNNTileNode::prepareParams" << std::endl;
+    if (isDynamic) {
+        optimizedCase = false;
+        return;
+    }
+
+//    const auto& srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
+//    repeats = getOutputShapeAtPort(0).getDims();
+//    const auto ndims = repeats.size();
+
+    auto srcBlockedDims = getParentEdgeAt(TILE_INPUT)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
+    auto dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
+
+//    if (broadcastType == NUMPY) {
+//        for (int i = 0; i < srcDims.size(); i++) {
+//            repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
+//        }
+//    } else if (broadcastType == EXPLICIT) {
+//        if (!constMap[AXES_MAPPING_IDX]) {
+//            auto& axesMappingMemory = getParentEdgeAt(AXES_MAPPING_IDX)->getMemory();
+//            const int32_t* axesMappingPtr = reinterpret_cast<const int32_t*>(axesMappingMemory.GetPtr());
+//
+//            const size_t axesMappingSize = axesMappingMemory.GetShape().getElementsCount();
+//            axesMapping.reserve(axesMappingSize);
+//            axesMapping.assign(axesMappingPtr, axesMappingPtr + axesMappingSize);
+//        }
+//
+//        for (size_t i = 0; i < getInputShapeAtPort(AXES_MAPPING_IDX).getDims()[0]; i++) {
+//            repeats[axesMapping[i]] /= srcDims[i];
+//        }
+//
+//        SizeVector newSrcBlockedDims = SizeVector(dstBlockedDims.size(), 1);
+//        for (size_t i = 0; i < getInputShapeAtPort(AXES_MAPPING_IDX).getDims()[0]; i++) {
+//            newSrcBlockedDims[axesMapping[i]] = srcBlockedDims[i];
+//        }
+//        srcBlockedDims = newSrcBlockedDims;
+//    }
+
     optimizedCase = prepareOptimizedParams(this, srcBlockedDims, dstBlockedDims);
 }
 

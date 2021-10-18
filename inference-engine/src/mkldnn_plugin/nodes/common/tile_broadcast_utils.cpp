@@ -22,8 +22,9 @@ SizeVector TileBroadcastCommon::calculateStridesForDims(const SizeVector &dims) 
     return strides;
 }
 
-void TileBroadcastCommon::fillOptimizedDimsAndSrcStrides(const SizeVector &srcBlockedDims, const SizeVector &blockedRepeats,
-        SizeVector &optimizedDims, SizeVector &optimizedSrcStrides) {
+void TileBroadcastCommon::fillOptimizedDimsAndSrcStrides(const SizeVector& srcBlockedDims, const SizeVector& blockedRepeats,
+        SizeVector& optimizedDims, SizeVector& optimizedSrcStrides) {
+std::cout << "TileBroadcastCommon::fillOptimizedDimsAndSrcStrides" << std::endl;
     SizeVector srcBlockedStrides = calculateStridesForDims(srcBlockedDims);
 
     for (int i = 0; i < srcBlockedDims.size(); i++) {
@@ -180,7 +181,7 @@ bool TileBroadcastCommon::prepareOptimizedParams(MKLDNNNode *node, SizeVector& s
         blockedRepeats.push_back(1);
     }
     // for NSPC layouts
-    if (node->getBaseMemDescAtInputPort(0)->hasLayoutType(LayoutType::nspc) || one_of(node->getBaseMemDescAtInputPort(0)->getShape().getRank(), 4, 5)) {
+    if (node->getBaseMemDescAtInputPort(0)->hasLayoutType(LayoutType::nspc) && one_of(node->getBaseMemDescAtInputPort(0)->getShape().getRank(), 4, 5)) {
         blockedRepeats.push_back(blockedRepeats[1]);
         blockedRepeats.erase(blockedRepeats.begin() + 1);
     }
@@ -214,6 +215,7 @@ bool TileBroadcastCommon::prepareOptimizedParams(MKLDNNNode *node, SizeVector& s
 }
 
 void TileBroadcastCommon::optimizedExecute(MKLDNNNode *node) {
+std::cout << "TileBroadcastCommon::optimizedExecute" << std::endl;
     auto srcData = reinterpret_cast<const char *>(node->getParentEdgeAt(0)->getMemory().GetPtr());
     auto dstData = reinterpret_cast<char *>(node->getChildEdgeAt(0)->getMemory().GetPtr());
 
@@ -243,30 +245,3 @@ void TileBroadcastCommon::optimizedExecute(MKLDNNNode *node) {
         });
     }
 }
-
-//void TileBroadcastCommon::ngraphExecute(MKLDNNNode *node, std::shared_ptr<ov::Node> ngraphNode) {
-//    ngraph::HostTensorVector inputs, outputs;
-//    auto srcDataPtr = node->getParentEdgeAt(0)->getMemory().GetPtr();
-//    inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->input(0).get_element_type(), ngraphNode->input(0).get_shape(), srcDataPtr));
-//    std::vector<int64_t> newData;
-//    // WA: for Tile Node we need cast data to int64_t data type
-//    if (std::string(ngraphNode->get_type_name()) == "Tile") {
-//        auto dataPtr = node->getParentEdgeAt(1)->getMemory().GetPtr();
-//        newData.resize(node->getParentEdgeAt(1)->getMemory().GetShape().getElementsCount());
-//        for (int j = 0; j < node->getParentEdgeAt(1)->getMemory().GetShape().getElementsCount(); j++) {
-//            newData[j] = reinterpret_cast<const int32_t*>(dataPtr)[j];
-//        }
-//        inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraph::element::i64, ngraphNode->input(1).get_shape(), newData.data()));
-//    } else {
-//        for (int i = 1; i < node->getParentEdges().size(); i++) {
-//            auto dataPtr = node->getParentEdgeAt(i)->getMemory().GetPtr();
-//            inputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->input(i).get_element_type(), ngraphNode->input(i).get_shape(), dataPtr));
-//        }
-//    }
-//
-//    for (int i = 0; i < node->getChildEdges().size(); i++) {
-//        auto dataPtr = node->getChildEdgeAt(i)->getMemory().GetPtr();
-//        outputs.push_back(std::make_shared<ngraph::HostTensor>(ngraphNode->output(i).get_element_type(), ngraphNode->output(i).get_shape(), dataPtr));
-//    }
-//    ngraphNode->evaluate(outputs, inputs);
-//}

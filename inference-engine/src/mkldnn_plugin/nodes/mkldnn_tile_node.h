@@ -27,9 +27,13 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
 
+protected:
+    bool needPrepareParams() const override;
+    void prepareParams() override;
+
 private:
-    static const size_t TILE_INPUT = 0;
-    static const size_t TILE_REPEATS = 1;
+    static const size_t TILE_INPUT = 0lu;
+    static const size_t TILE_REPEATS = 1lu;
 
     int axis = -1;
     int tiles = 0;

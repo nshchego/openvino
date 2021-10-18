@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <mkldnn_node.h>
+//#include <mkldnn_node.h>
 #include "common/tile_broadcast_utils.h"
 
 #include <memory>
@@ -44,6 +44,7 @@ private:
     static const size_t AXES_MAPPING_IDX = 2;
 
     std::vector<int32_t> axesMapping;
+    VectorDims targetDims;
 
     std::string errorPrefix;
 };
