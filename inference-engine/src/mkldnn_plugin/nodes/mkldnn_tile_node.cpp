@@ -79,22 +79,6 @@ void MKLDNNTileNode::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-//    auto& srcMemory = getParentEdgeAt(TILE_REPEATS)->getMemory();
-//    const int32_t* repeatsPtr = reinterpret_cast<const int32_t*>(srcMemory.GetPtr());
-//
-//    size_t repeatsSize = getParentEdgeAt(1)->getMemory().GetShape().getElementsCount();
-//    std::vector<int> repeatsData(repeatsSize);
-//    for (int i = 0; i < repeatsSize; i++) {
-//        repeatsData[i] = repeatsPtr[i];
-//    }
-//
-//    for (int i = 0; i < getInputShapeAtPort(TILE_REPEATS).getDims()[0]; i++) {
-//        repeats.push_back(repeatsData[i]);
-//    }
-//    while (repeats.size() < getOutputShapeAtPort(0).getDims().size()) {
-//        repeats.insert(repeats.begin(), 1);
-//    }
-
     supportedPrimitiveDescriptors = getSupportedConfigs(this);
 }
 
@@ -105,22 +89,6 @@ std::cout << "MKLDNNTileNode::createPrimitive" << std::endl;
             prepareParams();
         updateLastInputDims();
     }
-//    for (int i = 0; i < getChildEdges().size(); i++) {
-//        auto& dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
-//        if (!dstMemPtr || !dstMemPtr->GetPrimitivePtr())
-//            IE_THROW() << "Destination memory " << i << "didn't allocate for Tile node with name " << getName();
-//    }
-//    for (int i = 0; i < getParentEdges().size(); i++) {
-//        auto& srcMemPtr = getParentEdgeAt(i)->getMemoryPtr();
-//        if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
-//            IE_THROW() << "Input memory " << i << "didn't allocate for Tile node with name " << getName();
-//    }
-//    if (getSelectedPrimitiveDescriptor() == nullptr)
-//        IE_THROW() << "Preferable primitive descriptor is not set for Tile node with name " << getName();
-//
-//    SizeVector srcBlockedDims = getParentEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
-//    SizeVector dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
-//    optimizedCase = prepareOptimizedParams(this, srcBlockedDims, dstBlockedDims);
 }
 
 bool MKLDNNTileNode::needPrepareParams() const {
@@ -134,37 +102,8 @@ std::cout << "MKLDNNTileNode::prepareParams" << std::endl;
         return;
     }
 
-//    const auto& srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
-//    repeats = getOutputShapeAtPort(0).getDims();
-//    const auto ndims = repeats.size();
-
     auto srcBlockedDims = getParentEdgeAt(TILE_INPUT)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
     auto dstBlockedDims = getChildEdgeAt(0)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getBlockDims();
-
-//    if (broadcastType == NUMPY) {
-//        for (int i = 0; i < srcDims.size(); i++) {
-//            repeats[ndims - 1 - i] /= srcDims[srcDims.size() - 1 - i];
-//        }
-//    } else if (broadcastType == EXPLICIT) {
-//        if (!constMap[AXES_MAPPING_IDX]) {
-//            auto& axesMappingMemory = getParentEdgeAt(AXES_MAPPING_IDX)->getMemory();
-//            const int32_t* axesMappingPtr = reinterpret_cast<const int32_t*>(axesMappingMemory.GetPtr());
-//
-//            const size_t axesMappingSize = axesMappingMemory.GetShape().getElementsCount();
-//            axesMapping.reserve(axesMappingSize);
-//            axesMapping.assign(axesMappingPtr, axesMappingPtr + axesMappingSize);
-//        }
-//
-//        for (size_t i = 0; i < getInputShapeAtPort(AXES_MAPPING_IDX).getDims()[0]; i++) {
-//            repeats[axesMapping[i]] /= srcDims[i];
-//        }
-//
-//        SizeVector newSrcBlockedDims = SizeVector(dstBlockedDims.size(), 1);
-//        for (size_t i = 0; i < getInputShapeAtPort(AXES_MAPPING_IDX).getDims()[0]; i++) {
-//            newSrcBlockedDims[axesMapping[i]] = srcBlockedDims[i];
-//        }
-//        srcBlockedDims = newSrcBlockedDims;
-//    }
 
     optimizedCase = prepareOptimizedParams(this, srcBlockedDims, dstBlockedDims);
 }

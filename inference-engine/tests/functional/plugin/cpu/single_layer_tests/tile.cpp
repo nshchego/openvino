@@ -1,17 +1,22 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <shared_test_classes/single_layer/tile.hpp>
 #include "test_utils/cpu_test_utils.hpp"
+#include "ngraph_functions/builders.hpp"
 
-using namespace InferenceEngine;
 using namespace CPUTestUtils;
 
 namespace CPULayerTestsDefinitions {
 
-using TileLayerTestParamsSet = LayerTestsDefinitions::TileLayerTestParamsSet;
-using TileSpecificParams = LayerTestsDefinitions::TileSpecificParams;
+using inputShapesPair = std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>;
+
+using TileLayerTestParamsSet = typename std::tuple<
+        inputShapesPair,                       // Input shapes
+        std::vector<int64_t>,                  // Repeats
+        InferenceEngine::Precision,            // Network precision
+        std::vector<bool>,                     // Const inputs
+        std::string>;                          // Device name
 
 typedef std::tuple<
         TileLayerTestParamsSet,
@@ -25,9 +30,20 @@ public:
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
 
+        inputShapesPair inputShapes;
+        std::vector<int64_t> repeats;
+        InferenceEngine::Precision netPrecision;
+        std::vector<bool> isConstInput;
+        std::string deviceName;
+        std::tie(inputShapes, repeats, netPrecision, isConstInput, deviceName) = basicParamsSet;
+
         std::ostringstream result;
-        result << LayerTestsDefinitions::TileLayerTest::getTestCaseName(testing::TestParamInfo<TileLayerTestParamsSet>(
-                basicParamsSet, 0));
+        result << "DynShapes=" << CommonTestUtils::partialShape2str(inputShapes.first) << "_";
+        result << "StatShapes=" << CommonTestUtils::vec2str(inputShapes.second) << "_";
+        result << "Repeats=" << CommonTestUtils::vec2str(repeats)  << "_";
+        result << "netPrec=" << netPrecision << "_";
+        result << "constIn=" << CommonTestUtils::vec2str(isConstInput)  << "_";
+        result << "trgDev=" << deviceName;
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
 
@@ -42,23 +58,31 @@ protected:
 
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
 
-        TileSpecificParams tileParams;
-        std::vector<size_t> inputShape;
-        auto netPrecision = InferenceEngine::Precision::UNSPECIFIED;
-        std::tie(tileParams, netPrecision, inPrc, outPrc, inLayout, outLayout, inputShape, targetDevice) = basicParamsSet;
+//        TileSpecificParams tileParams;
+        inputShapesPair inputShapes;
+        std::vector<int64_t> repeats;
+        InferenceEngine::Precision netPrecision;
+        std::vector<bool> isConstInput;
+        std::tie(inputShapes, repeats, netPrecision, isConstInput, targetDevice) = basicParamsSet;
+
+        selectedType += std::string("_") + netPrecision.name();
+
+        targetStaticShapes.reserve(inputShapes.second.size());
+        for (const auto& staticShape : inputShapes.second) {
+            targetStaticShapes.push_back({staticShape});
+        }
+        inputDynamicShapes = { inputShapes.first };
+
+        ov::Shape inputDataShape = targetStaticShapes.front().front();
 
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
-        auto params = ngraph::builder::makeParams(ngPrc, {inputShape});
-        auto repeats = std::make_shared<ngraph::opset1::Constant>(ngraph::element::i64, std::vector<size_t>{tileParams.size()}, tileParams);
-        auto tile = std::make_shared<ngraph::opset1::Tile>(params[0], repeats);
+        auto params = ngraph::builder::makeParams(ngPrc, { inputDataShape });
+        auto repeatsOp = std::make_shared<ov::op::v0::Constant>(ov::element::i64, std::vector<size_t>{repeats.size()}, repeats);
+        auto tile = std::make_shared<ov::op::v0::Tile>(params[0], repeatsOp);
         tile->get_rt_info() = getCPUInfo();
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(tile)};
-        function = std::make_shared<ngraph::Function>(results, params, "tile");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(tile)};
+        function = std::make_shared<ov::Function>(results, params, "CPUTile");
     }
-
-//    std::vector<cpu_memory_format_t> inFmts, outFmts;
-//    std::vector<std::string> priority;
-//    std::string selectedType;
 };
 
 TEST_P(TileLayerCPUTest, CompareWithRefs) {
@@ -86,17 +110,30 @@ const auto cpuParams_ndhwc = CPUSpecificParams{{ndhwc}, {ndhwc}, {}, "ref"};
 
 /* PARAMS */
 const std::vector<InferenceEngine::Precision> netPrecisions = {
-        InferenceEngine::Precision::I8,
-        InferenceEngine::Precision::U8,
-        InferenceEngine::Precision::I16,
-        InferenceEngine::Precision::FP16,
+        InferenceEngine::Precision::FP32,
+        InferenceEngine::Precision::BF16,
         InferenceEngine::Precision::I32,
-        InferenceEngine::Precision::FP32
+        InferenceEngine::Precision::I8
 };
 
-const std::vector<std::vector<size_t>> inputShapes4D = {
-        {2, 16, 3, 4},
-        {1, 16, 1, 1},
+const std::vector<inputShapesPair>
+    staticInputShapes4D = {
+        {{}, {{{2, 16, 3, 4}}}},
+        {{}, {{{1, 16, 1, 1}}}}
+};
+const std::vector<inputShapesPair>
+    dynamicInputShapes4D = {
+        {{{2, ov::Dimension(1, 16), 3, 4}}, {{{2, 16, 3, 4}}}},
+        {{{1, ov::Dimension(1, 16), 1, 1}}, {{{1, 16, 1, 1}}}}
+};
+
+const std::vector<inputShapesPair>
+    staticInputShapes5D = {
+        {{}, {{{2, 16, 2, 3, 4}}}}
+};
+const std::vector<inputShapesPair>
+    dynamicInputShapes5D = {
+        {{{2, ov::Dimension(1, 16), 2, 3, 4}}, {{{2, 16, 2, 3, 4}}}}
 };
 
 const std::vector<std::vector<int64_t>> repeats4D = {
@@ -108,7 +145,6 @@ const std::vector<std::vector<int64_t>> repeats4D = {
         {2, 1, 1, 1},
         {2, 3, 1, 1},
 };
-
 const std::vector<std::vector<int64_t>> repeats5D = {
         {1, 2, 3},
         {1, 1, 2, 3},
@@ -134,30 +170,35 @@ const std::vector<CPUSpecificParams> CPUParams5D = {
 /* ============= */
 
 /* INSTANCES */
-INSTANTIATE_TEST_CASE_P(smoke_Tile_4D, TileLayerCPUTest,
+INSTANTIATE_TEST_CASE_P(smoke_staticShape4D, TileLayerCPUTest,
                         ::testing::Combine(
                                 ::testing::Combine(
+                                        ::testing::ValuesIn(staticInputShapes4D),
                                         ::testing::ValuesIn(repeats4D),
                                         ::testing::ValuesIn(netPrecisions),
-                                        ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
-                                        ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
-                                        ::testing::Values(InferenceEngine::Layout::ANY),
-                                        ::testing::Values(InferenceEngine::Layout::ANY),
-                                        ::testing::ValuesIn(inputShapes4D),
+                                        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true}, {false}}),
                                         ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                                 ::testing::ValuesIn(CPUParams4D)),
                         TileLayerCPUTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(smoke_Tile_5D, TileLayerCPUTest,
+INSTANTIATE_TEST_CASE_P(smoke_staticShape4D, TileLayerCPUTest,
                         ::testing::Combine(
                                 ::testing::Combine(
+                                        ::testing::ValuesIn(dynsmicInputShapes4D),
+                                        ::testing::ValuesIn(repeats4D),
+                                        ::testing::ValuesIn(netPrecisions),
+                                        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true}, {false}}),
+                                        ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                                ::testing::ValuesIn(CPUParams4D)),
+                        TileLayerCPUTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke_staticShape5D, TileLayerCPUTest,
+                        ::testing::Combine(
+                                ::testing::Combine(
+                                        ::testing::ValuesIn(staticInputShapes5D),
                                         ::testing::ValuesIn(repeats5D),
                                         ::testing::ValuesIn(netPrecisions),
-                                        ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
-                                        ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
-                                        ::testing::Values(InferenceEngine::Layout::ANY),
-                                        ::testing::Values(InferenceEngine::Layout::ANY),
-                                        ::testing::Values(std::vector<size_t >({2, 16, 2, 3, 4})),
+                                        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true}, {false}}),
                                         ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                                 ::testing::ValuesIn(CPUParams5D)),
                         TileLayerCPUTest::getTestCaseName);

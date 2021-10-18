@@ -2,24 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <shared_test_classes/single_layer/broadcast.hpp>
 #include "test_utils/cpu_test_utils.hpp"
+#include "ngraph_functions/builders.hpp"
 
-using namespace InferenceEngine;
 using namespace CPUTestUtils;
 
 namespace CPULayerTestsDefinitions {
 
-//using inputShapesSet std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>;
+using inputShapesPair = std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>;
 
 using BroadcastLayerTestParamsSet = typename std::tuple<
-        std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>,   // shapes
-        std::vector<size_t>,     // target shapes
-        std::vector<size_t>,                   // axes mapping
-        ov::op::BroadcastType,         // broadcast mode
-        InferenceEngine::Precision,        // Network precision
-        std::vector<bool>,                 // Const inputs
-        std::string>;                      // Device name
+        inputShapesPair,                       // Shapes
+        std::vector<size_t>,                   // Target shapes
+        std::vector<size_t>,                   // Axes mapping
+        ov::op::BroadcastType,                 // Broadcast mode
+        InferenceEngine::Precision,            // Network precision
+        std::vector<bool>,                     // Const inputs
+        std::string>;                          // Device name
 
 using BroadcastLayerCPUTestParamsSet = typename std::tuple<
         BroadcastLayerTestParamsSet,
@@ -33,9 +32,8 @@ public:
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
 
-        std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>> inputShapes;
+        inputShapesPair inputShapes;
         std::vector<size_t> targetShapes, axesMapping;
-//        ov::AxisSet axesMapping;
         ov::op::BroadcastType mode;
         InferenceEngine::Precision networkPrecision;
         std::vector<bool> isConstInput;
@@ -47,13 +45,12 @@ public:
         result << "targetShape=" << CommonTestUtils::vec2str(targetShapes)  << "_";
         result << "axesMapping=" << CommonTestUtils::vec2str(axesMapping)  << "_";
         result << "mode=" << mode << "_";
-        result << "inNPrec=" << networkPrecision << "_";
+        result << "netPrec=" << networkPrecision << "_";
         result << "constIn=" << CommonTestUtils::vec2str(isConstInput)  << "_";
         result << "trgDev=" << deviceName;
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
 
-//std::cout << "BroadcastLayerCPUTest::getTestCaseName: " << result.str() << std::endl;
         return result.str();
     }
 
@@ -63,7 +60,7 @@ protected:
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = this->GetParam();
 
-        std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>> inputShapes;
+        inputShapesPair inputShapes;
         std::vector<size_t> targetShape, axesMapping;
         ov::op::BroadcastType mode;
         InferenceEngine::Precision networkPrecision;
@@ -175,18 +172,13 @@ const std::vector<CPUSpecificParams> CPUParams4D = {
         cpuParams_nhwc
 };
 
-const std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>>
+const std::vector<inputShapesPair>
     staticInputShapes4D = {
         {{}, {{{1, 16, 1, 1}}}}
 };
-//const std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>>
-//    staticInputShapes4D2Params = {
-//        {{}, {{{1, 16, 1, 1}, {4}}}}
-//};
-const std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>>
+const std::vector<inputShapesPair>
     dynamicInputShapes4D = {
-        {{{1, ov::Dimension(1, 16), 1, 1}},
-        {{{1, 16, 1, 1}}}}
+        {{{1, ov::Dimension(1, 16), 1, 1}}, {{{1, 16, 1, 1}}}}
 };
 
 const auto staticNumpyBroadcastParams4D = ::testing::Combine(
@@ -231,11 +223,11 @@ INSTANTIATE_TEST_CASE_P(smoke_DynamicShape4D,
                     BroadcastLayerCPUTest::getTestCaseName);
 
 // 5D
-const std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>>
+const std::vector<inputShapesPair>
     staticInputShapes5D = {
         {{}, {{{1, 16, 1, 1, 1}}}}
 };
-const std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>>
+const std::vector<inputShapesPair>
     dynamicInputShapes5D = {
         {{{1, ov::Dimension(1, 16), 1, 1, 1}},
         {{{1, 16, 1, 1, 1}}}}
