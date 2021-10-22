@@ -55,7 +55,7 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
         IE_THROW() << errorPrefix << "has incorrect batch_dims " << batchDims << "!";
 
     if (op->get_input_node_shared_ptr(GATHER_AXIS)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
-        constMap[GATHER_AXIS] = true;
+        isAxisInputConst = true;
         axis = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))->cast_vector<int>()[0];
         if (axis < 0)
             axis += dataSrcRank;
