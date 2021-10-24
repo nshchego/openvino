@@ -145,17 +145,27 @@ void MKLDNNGatherNode::createPrimitive() {
         if (jitKernel) {
             jitKernel->create_ker();
 
-            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
-            if (!jcp.dynamicShape && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+//            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
+            if (!jcp.dynamicShape) { // && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
                 const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
                 const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
                 const uint64_t nthr = parallel_get_max_threads();
                 const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
-                shortPermIdx = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+                shortPermIdx        = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
                 shortBeforeAxisDiff = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+                specIndicesInBytes  = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+                idxBatchSumInBytes         = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+                srcBeforeAxisSum    = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
                 for (int i = 0; i < shortPermIdx.size(); i++) {
-                    const uint64_t start = std::min(wpt * i, totalWork);
+                    uint64_t start = std::min(wpt * i, totalWork);
                     initShortParams(shortPermIdx[i], shortBeforeAxisDiff[i], start);
+                    for (int j = 0; j < 16; j++, start++) {
+                        specIndicesInBytes[i][j] = (start % specIndicesSize) * sizeof(int);
+                        idxBatchSumInBytes[i][j] = (start / axisAndAfterAxisSizeInBytes / dataTypeSize) * specIndicesSize * sizeof(int);
+                        srcBeforeAxisSum[i][j] =
+                                ((start / specIndicesSize) % betweenBatchAndAxis) * axisAndAfterAxisSizeInBytes +
+                                axisAndAfterAxisSizeInBytes * idxBatchSumInBytes[i][j] / dataTypeSize;
+                    }
                 }
             }
         }
@@ -196,6 +206,9 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             arg.betweenBatchAndAxisSize = &betweenBatchAndAxis;
             arg.specIndicesSize = &specIndicesSize;
             arg.workAmount = workAmount;
+            arg.specIndicesInBytes = specIndicesInBytes[ithr].data();
+            arg.idxBatchSumInBytes = idxBatchSumInBytes[ithr].data();
+            arg.srcBeforeAxisSum = srcBeforeAxisSum[ithr].data();
 //    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
 //        "; end: " + std::to_string(end);
 //printf("%s\n", seqStr.c_str());
@@ -234,14 +247,14 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 //    std::cout << std::to_string(tmpDst[i]) << ";";
 //}
 //std::cout << std::endl;
-//int* tmpDst = reinterpret_cast<int*>(dstData);
-//std::cout << "\nOUT DATA:\n";
-//for (int i = 0; i < getChildEdgeAt(0)->getShape().getElementsCount(); i++) {
-//    if (i % 8 == 0)
-//        std::cout << "_";
-//    std::cout << std::to_string(tmpDst[i]) << ";";
-//}
-//std::cout << std::endl;
+int* tmpDst = reinterpret_cast<int*>(dstData);
+std::cout << "\nOUT DATA:\n";
+for (int i = 0; i < 8; i++) {
+    if (i % 8 == 0)
+        std::cout << "_";
+    std::cout << std::to_string(tmpDst[i]) << ";";
+}
+std::cout << std::endl;
     } else {
         execReference();
     }

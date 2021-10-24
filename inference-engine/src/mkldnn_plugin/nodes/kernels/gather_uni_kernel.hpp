@@ -17,8 +17,8 @@ struct jGatherConfParams {
 
 struct gatherJitExecArgs {
     const void* src;
-    void* dst;
     const void* indices;
+    void* dst;
     const int* axisDim;
     const uint64_t* start;
     const uint64_t* specIndicesSize;
@@ -29,6 +29,10 @@ struct gatherJitExecArgs {
     const int* beforeAxisDiff;
     uint64_t workAmount = 0;
     uint64_t afterAxSize = 0;
+    // Only static
+    const int* specIndicesInBytes;
+    const int* idxBatchSumInBytes;
+    const int* srcBeforeAxisSum;
 };
 
 struct jitGatherKernelBase {
@@ -108,9 +112,6 @@ protected:
 
     // Opmasks.
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
-    const Xbyak::Opmask& kMaskAux0   = k0;
-    const Xbyak::Opmask& kMaskAux1   = k1;
-    const Xbyak::Opmask& kGatherMask = k7;
 
     // Auxiliary.
     Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
@@ -124,7 +125,7 @@ protected:
     // Only long.
     Vmm vmmAxisAndAfterAxisSize = Vmm(12);
     Vmm vmmVecLen = Vmm(13);
-    Vmm vmmIdxBatchSum = Vmm(14);
+    Vmm vmmIdxBatchSumInBytes = Vmm(14);
     // Only short.
     Vmm vmmSrcAfterBatchSize = Vmm(12);
     Vmm vmmPermIdxMask = Vmm(13);

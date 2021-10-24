@@ -54,6 +54,9 @@ private:
 
     std::vector<std::vector<int>> shortPermIdx;
     std::vector<std::vector<int>> shortBeforeAxisDiff;
+    std::vector<std::vector<int>> specIndicesInBytes;
+    std::vector<std::vector<int>> idxBatchSumInBytes;
+    std::vector<std::vector<int>> srcBeforeAxisSum;
 
     static constexpr size_t GATHER_DATA = 0;
     static constexpr size_t GATHER_INDEXES = 1;
