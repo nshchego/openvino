@@ -73,13 +73,7 @@ public:
      * @brief return defined shape or throw exception for dynamic case
      * @return return shape
      */
-    const VectorDims& getStaticDims() const {
-        if (type != ShapeType::Static) {
-            IE_THROW() << "Cannot get dims for non static shape";
-        }
-
-        return minDims;
-    }
+    const VectorDims& getStaticDims() const;
 
     /**
      * @brief

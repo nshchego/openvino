@@ -17,7 +17,7 @@ protected:
 
     void optimizedExecute(MKLDNNPlugin::MKLDNNNode *node);
 
-    InferenceEngine::SizeVector repeats;
+    mutable InferenceEngine::SizeVector repeats;
     bool optimizedCase = false;
     bool constMap[3] = { false };
 

@@ -11,8 +11,8 @@ using namespace MKLDNNPlugin;
 bool MKLDNNTileNode::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!one_of(op->get_type_info(),
-                ov::op::v0::Tile::type_info)) {
-            errorMessage = "Only opset1 Tile operation is supported";
+                ov::op::v0::Tile::get_type_info_static())) {
+            errorMessage = "Only opset1 Tile operation is supported.";
             return false;
         }
 //        if (op->get_input_shape(TILE_INPUT).size() != op->get_input_shape(TILE_REPEATS)[0]) {
@@ -20,8 +20,8 @@ bool MKLDNNTileNode::isSupportedOperation(const std::shared_ptr<const ov::Node>&
 //            return false;
 //        }
         if (!isDynamicNgraphNode(op) &&
-                op->get_input_node_ptr(TILE_REPEATS)->get_type_info() != ov::op::v0::Constant::type_info) {
-            errorMessage = "Only const 'repeats' input is supported";
+                op->get_input_node_ptr(TILE_REPEATS)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+            errorMessage = "Only constant 'Repeats' input is supported with static shapes.";
             return false;
         }
 //        const auto repeats = repeatsNode->cast_vector<int32_t>();
@@ -44,12 +44,13 @@ MKLDNNTileNode::MKLDNNTileNode(const std::shared_ptr<ov::Node>& op, const mkldnn
 
     errorPrefix = "Tile node with name '" + getName() + "'";
 
-    if (op->get_input_node_ptr(TILE_REPEATS)->get_type_info() == ov::op::v0::Constant::type_info) {
-        constMap[TILE_INPUT] = true;
-        repeats = ov::as_type<const ov::op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))->cast_vector<uint64_t>();
+    if (op->get_input_node_ptr(TILE_REPEATS)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
+        constMap[TILE_REPEATS] = true;
+        repeats = originRepeats = ov::as_type<const ov::op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))->cast_vector<size_t>();
         while (repeats.size() < getInputShapeAtPort(TILE_INPUT).getRank()) {
             repeats.insert(repeats.begin(), 1lu);
         }
+        // TODO: if (repeats.size() > getInputShapeAtPort(TILE_INPUT).getRank())
     }
 }
 
@@ -108,6 +109,54 @@ std::cout << "MKLDNNTileNode::prepareParams" << std::endl;
     optimizedCase = prepareOptimizedParams(this, srcBlockedDims, dstBlockedDims);
 }
 
+bool MKLDNNTileNode::needShapeInfer() const {
+    if (inputShapesModified()) {
+        return true;
+    }
+    if (!constMap[TILE_REPEATS]) {
+        if (originRepeats.empty())
+            return true;
+        const int32_t* repeatsData = reinterpret_cast<const int32_t *>(getParentEdgesAtPort(TILE_REPEATS)[0]->getMemory().GetPtr());
+        for (size_t i = 0lu; i < originRepeats.size(); i++) {
+            if (originRepeats[i] != repeatsData[i])
+                return true;
+        }
+    }
+    return false;
+}
+
+std::vector<VectorDims> MKLDNNTileNode::shapeInfer() const {
+    if (!constMap[TILE_REPEATS]) {
+        const auto& repeatsMem = getParentEdgesAtPort(TILE_REPEATS)[0]->getMemory();
+
+        const int32_t* repeatsData = reinterpret_cast<const int32_t *>(repeatsMem.GetPtr());
+        originRepeats.assign(repeatsData, repeatsData + repeatsMem.getStaticDims()[0]);
+
+        repeats.assign(getOutputShapeAtPort(0).getRank(), 1lu);
+        const size_t offset = repeats.size() - originRepeats.size();
+        for (size_t i = 0lu; i < originRepeats.size(); i++) {
+            repeats[i + offset] = originRepeats[i];
+        }
+    }
+
+    ngraph::OutputVector inputsForShapeInfer;
+    inputsForShapeInfer.push_back(std::make_shared<ov::op::v0::Parameter>(opToShapeInfer->get_input_element_type(TILE_INPUT),
+                                                                              getParentEdgesAtPort(TILE_INPUT)[0]->getMemory().GetShape().toPartialShape()));
+    inputsForShapeInfer.push_back(std::make_shared<ov::op::v0::Constant>(ov::element::Type_t::i32, ov::Shape{ originRepeats.size() }, originRepeats));
+    const auto localShapeInferOp = opToShapeInfer->clone_with_new_inputs(inputsForShapeInfer);
+
+    localShapeInferOp->validate_and_infer_types();
+
+    std::vector<VectorDims> newOutputShapes(outputShapes.size());
+    for (size_t i = 0lu; i < newOutputShapes.size(); i++) {
+        const auto &partShape = localShapeInferOp->get_output_partial_shape(i);
+        if (partShape.is_dynamic())
+            IE_THROW(NotImplemented) << "CPU plug-in doesn't support default shape infer for nodes with internal dynamism";
+        newOutputShapes[i] = partShape.get_shape();
+    }
+    return newOutputShapes;
+}
+
 void MKLDNNTileNode::execute(mkldnn::stream strm) {
     if (optimizedCase) {
         optimizedExecute(this);
@@ -117,6 +166,7 @@ void MKLDNNTileNode::execute(mkldnn::stream strm) {
 }
 
 void MKLDNNTileNode::notOptimizedExecute(mkldnn::stream strm) {
+std::cout << "MKLDNNTileNode::notOptimizedExecute" << std::endl;
     if (noTiling) {
         return;
     }
@@ -129,14 +179,23 @@ void MKLDNNTileNode::notOptimizedExecute(mkldnn::stream strm) {
     int m_inner_dim = 1;
     int m_outer_dim = 1;
     auto inDims = srcMemory.getStaticDims();
-    for (int i=0; i < axis; i++ ) m_outer_dim *= inDims[i];
-    for (int i=axis; i < inDims.size(); i++ ) m_inner_dim *= inDims[i];
+    for (int i = 0; i < axis; i++ )
+        m_outer_dim *= inDims[i];
+    for (int i = axis; i < inDims.size(); i++ )
+        m_inner_dim *= inDims[i];
+
+    int MB = 0;
+    if (isDynamicNode()) {
+        MB = srcMemory.getStaticDims()[0];
+    } else {
+        MB = batchToProcess();
+    }
     if (axis > 0) {
         m_outer_dim /= inDims[0];
-        m_outer_dim *= batchToProcess();
+        m_outer_dim *= MB;
     } else {
         m_inner_dim /= inDims[0];
-        m_inner_dim *= batchToProcess();
+        m_inner_dim *= MB;
     }
 
     if (m_inner_dim == 1 && m_outer_dim % 8 == 0 && srcMemory.getDesc().hasLayoutType(LayoutType::nCsp8c)) {

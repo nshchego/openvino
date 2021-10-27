@@ -38,6 +38,8 @@ public:
     ///               size of values must match the size of the shape.
     template <typename T>
     Constant(const element::Type& type, const Shape& shape, const std::vector<T>& values) : Constant(type, shape) {
+if (values.size() != shape_size(m_shape))
+    std::cout << "Constant" <<std::endl;
         NODE_VALIDATION_CHECK(this,
                               values.size() == 1 || values.size() == shape_size(m_shape),
                               "Did not get the expected number of literals for a constant of shape ",

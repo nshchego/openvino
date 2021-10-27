@@ -15,7 +15,7 @@ using TileLayerTestParamsSet = typename std::tuple<
         inputShapesPair,                       // Input shapes
         std::vector<int64_t>,                  // Repeats
         InferenceEngine::Precision,            // Network precision
-        std::vector<bool>,                     // Const inputs
+        bool,                                  // Is Repeats input constant
         std::string>;                          // Device name
 
 typedef std::tuple<
@@ -33,16 +33,16 @@ public:
         inputShapesPair inputShapes;
         std::vector<int64_t> repeats;
         InferenceEngine::Precision netPrecision;
-        std::vector<bool> isConstInput;
+        bool isRepeatsConst;
         std::string deviceName;
-        std::tie(inputShapes, repeats, netPrecision, isConstInput, deviceName) = basicParamsSet;
+        std::tie(inputShapes, repeats, netPrecision, isRepeatsConst, deviceName) = basicParamsSet;
 
         std::ostringstream result;
         result << "DynShapes=" << CommonTestUtils::partialShape2str(inputShapes.first) << "_";
         result << "StatShapes=" << CommonTestUtils::vec2str(inputShapes.second) << "_";
         result << "Repeats=" << CommonTestUtils::vec2str(repeats)  << "_";
         result << "netPrec=" << netPrecision << "_";
-        result << "constIn=" << CommonTestUtils::vec2str(isConstInput)  << "_";
+        result << "constRepeats=" << (isRepeatsConst ? "True" : "False") << "_";
         result << "trgDev=" << deviceName;
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
@@ -58,31 +58,52 @@ protected:
 
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
 
-//        TileSpecificParams tileParams;
         inputShapesPair inputShapes;
-        std::vector<int64_t> repeats;
         InferenceEngine::Precision netPrecision;
-        std::vector<bool> isConstInput;
-        std::tie(inputShapes, repeats, netPrecision, isConstInput, targetDevice) = basicParamsSet;
+        bool isRepeatsConst;
+        std::tie(inputShapes, repeatsData, netPrecision, isRepeatsConst, targetDevice) = basicParamsSet;
 
         selectedType += std::string("_") + netPrecision.name();
 
         targetStaticShapes.reserve(inputShapes.second.size());
-        for (const auto& staticShape : inputShapes.second) {
-            targetStaticShapes.push_back({staticShape});
+        inputDynamicShapes.reserve(inputShapes.first.size());
+        for (size_t i = 0lu; i < (isRepeatsConst ? 1lu : 2lu); i++) {
+            if (inputShapes.second.size() > i)
+                targetStaticShapes.push_back({inputShapes.second[i]});
+            if (inputShapes.first.size() > i)
+                inputDynamicShapes.push_back(inputShapes.first[i]);
         }
-        inputDynamicShapes = { inputShapes.first };
 
-        ov::Shape inputDataShape = targetStaticShapes.front().front();
-
+        const auto& inputDataShape = targetStaticShapes.front().front();
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
-        auto params = ngraph::builder::makeParams(ngPrc, { inputDataShape });
-        auto repeatsOp = std::make_shared<ov::op::v0::Constant>(ov::element::i64, std::vector<size_t>{repeats.size()}, repeats);
-        auto tile = std::make_shared<ov::op::v0::Tile>(params[0], repeatsOp);
-        tile->get_rt_info() = getCPUInfo();
-        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(tile)};
-        function = std::make_shared<ov::Function>(results, params, "CPUTile");
+        ov::ParameterVector functionParams = ngraph::builder::makeParams(ngPrc, { {"data", inputDataShape} });
+        if (!isRepeatsConst) {
+            functionParams.push_back(ngraph::builder::makeParams(ov::element::i64, { {"repeats", { repeatsData.size() }} })[0]);
+        }
+
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(functionParams));
+        std::shared_ptr<ov::Node> tileNode;
+        if (isRepeatsConst) {
+            tileNode = std::make_shared<ov::op::v0::Tile>(paramOuts[0],
+                    ov::op::v0::Constant::create(ov::element::i64, { repeatsData.size() }, repeatsData));
+        } else {
+            tileNode = std::make_shared<ov::op::v0::Tile>(paramOuts[0], paramOuts[1]);
+        }
+        tileNode->get_rt_info() = getCPUInfo();
+        ov::ResultVector results{ std::make_shared<ov::op::v0::Result>(tileNode) };
+        function = std::make_shared<ov::Function>(results, functionParams, "CPUTile");
     }
+
+    InferenceEngine::Blob::Ptr GenerateInput(const InferenceEngine::InputInfo &inputInfo) const override {
+        if (inputInfo.name() == "repeats") {
+            const auto& td = inputInfo.getTensorDesc();
+            return FuncTestUtils::createAndFillBlobWithFloatArray<int64_t>(td, repeatsData.data(), repeatsData.size());
+        } else {
+            return LayerTestsCommon::GenerateInput(inputInfo);
+        }
+    }
+
+    std::vector<int64_t> repeatsData;
 };
 
 TEST_P(TileLayerCPUTest, CompareWithRefs) {
@@ -116,24 +137,56 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
         InferenceEngine::Precision::I8
 };
 
-const std::vector<inputShapesPair>
-    staticInputShapes4D = {
-        {{}, {{{2, 16, 3, 4}}}},
-        {{}, {{{1, 16, 1, 1}}}}
+const std::vector<inputShapesPair> staticInputShapes4D = {
+    {
+        {},
+        { // Static shapes
+            {{2, 16, 3, 4}}
+        }
+    },
+    {
+        {},
+        { // Static shapes
+            {{1, 16, 1, 1}}
+        }
+    }
 };
-const std::vector<inputShapesPair>
-    dynamicInputShapes4D = {
-        {{{2, ov::Dimension(1, 16), 3, 4}}, {{{2, 16, 3, 4}}}},
-        {{{1, ov::Dimension(1, 16), 1, 1}}, {{{1, 16, 1, 1}}}}
+const std::vector<inputShapesPair> dynamicInputShapes4D = {
+    {
+        { // Origin dynamic shapes
+            {2, ov::Dimension(10, 100), 3, 4}
+        },
+        { // Dynamic shapes instances
+            {{2, 16, 3, 4}}
+        }
+    },
+    {
+        { // Origin dynamic shapes
+            {1, ov::Dimension(10, 100), 1, 1}
+        },
+        { // Dynamic shapes instances
+            {{1, 16, 1, 1}}
+        }
+    }
 };
 
-const std::vector<inputShapesPair>
-    staticInputShapes5D = {
-        {{}, {{{2, 16, 2, 3, 4}}}}
+const std::vector<inputShapesPair> staticInputShapes5D = {
+    {
+        {},
+        { // Static shapes
+            {{2, 16, 2, 3, 4}}
+        }
+    }
 };
-const std::vector<inputShapesPair>
-    dynamicInputShapes5D = {
-        {{{2, ov::Dimension(1, 16), 2, 3, 4}}, {{{2, 16, 2, 3, 4}}}}
+const std::vector<inputShapesPair> dynamicInputShapes5D = {
+    {
+        { // Origin dynamic shapes
+            {2, ov::Dimension(1, 16), 2, 3, 4}
+        },
+        { // Dynamic shapes instances
+            {{2, 16, 2, 3, 4}}
+        }
+    }
 };
 
 const std::vector<std::vector<int64_t>> repeats4D = {
@@ -170,37 +223,48 @@ const std::vector<CPUSpecificParams> CPUParams5D = {
 /* ============= */
 
 /* INSTANCES */
-INSTANTIATE_TEST_CASE_P(smoke_staticShape4D, TileLayerCPUTest,
+INSTANTIATE_TEST_CASE_P(smoke_StaticShape4D, TileLayerCPUTest,
                         ::testing::Combine(
                                 ::testing::Combine(
                                         ::testing::ValuesIn(staticInputShapes4D),
                                         ::testing::ValuesIn(repeats4D),
                                         ::testing::ValuesIn(netPrecisions),
-                                        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true}, {false}}),
+                                        ::testing::Values(true),
                                         ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                                 ::testing::ValuesIn(CPUParams4D)),
                         TileLayerCPUTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(smoke_staticShape4D, TileLayerCPUTest,
+INSTANTIATE_TEST_CASE_P(smoke_DynamicShape4D, TileLayerCPUTest,
                         ::testing::Combine(
                                 ::testing::Combine(
-                                        ::testing::ValuesIn(dynsmicInputShapes4D),
+                                        ::testing::ValuesIn(dynamicInputShapes4D),
                                         ::testing::ValuesIn(repeats4D),
                                         ::testing::ValuesIn(netPrecisions),
-                                        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true}, {false}}),
+                                        ::testing::Values(true, false),
                                         ::testing::Values(CommonTestUtils::DEVICE_CPU)),
-                                ::testing::ValuesIn(CPUParams4D)),
+                                ::testing::Values(CPUSpecificParams{{}, {}, {}, "ref"})),
                         TileLayerCPUTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(smoke_staticShape5D, TileLayerCPUTest,
+INSTANTIATE_TEST_CASE_P(smoke_StaticShape5D, TileLayerCPUTest,
                         ::testing::Combine(
                                 ::testing::Combine(
                                         ::testing::ValuesIn(staticInputShapes5D),
                                         ::testing::ValuesIn(repeats5D),
                                         ::testing::ValuesIn(netPrecisions),
-                                        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true}, {false}}),
+                                        ::testing::Values(true),
                                         ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                                 ::testing::ValuesIn(CPUParams5D)),
+                        TileLayerCPUTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke_DynamicShape5D, TileLayerCPUTest,
+                        ::testing::Combine(
+                                ::testing::Combine(
+                                        ::testing::ValuesIn(dynamicInputShapes5D),
+                                        ::testing::ValuesIn(repeats5D),
+                                        ::testing::ValuesIn(netPrecisions),
+                                        ::testing::Values(true, false),
+                                        ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                                ::testing::Values(CPUSpecificParams{{}, {}, {}, "ref"})),
                         TileLayerCPUTest::getTestCaseName);
 /* ========= */
 

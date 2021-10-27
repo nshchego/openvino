@@ -36,9 +36,9 @@ public:
         std::vector<size_t> targetShapes, axesMapping;
         ov::op::BroadcastType mode;
         InferenceEngine::Precision networkPrecision;
-        std::vector<bool> isConstInput;
+        std::vector<bool> isConstInputs;
         std::string deviceName;
-        std::tie(inputShapes, targetShapes, axesMapping, mode, networkPrecision, isConstInput, deviceName) = basicParamsSet;
+        std::tie(inputShapes, targetShapes, axesMapping, mode, networkPrecision, isConstInputs, deviceName) = basicParamsSet;
 
         std::ostringstream result;
         result << "Shapes=" << CommonTestUtils::partialShape2str(inputShapes.first) << "_";
@@ -46,7 +46,7 @@ public:
         result << "axesMapping=" << CommonTestUtils::vec2str(axesMapping)  << "_";
         result << "mode=" << mode << "_";
         result << "netPrec=" << networkPrecision << "_";
-        result << "constIn=" << CommonTestUtils::vec2str(isConstInput)  << "_";
+        result << "constIn=(" << (isConstInputs[0] ? "True" : "False") << "." << (isConstInputs[1] ? "True" : "False") << ")_";
         result << "trgDev=" << deviceName;
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
@@ -172,23 +172,33 @@ const std::vector<CPUSpecificParams> CPUParams4D = {
         cpuParams_nhwc
 };
 
-const std::vector<inputShapesPair>
-    staticInputShapes4D = {
-        {{}, {{{1, 16, 1, 1}}}}
+const std::vector<inputShapesPair> staticInputShapes4D = {
+    {
+        {},
+        { // Static shapes
+            {{1, 16, 1, 1}}
+        }
+    }
 };
-const std::vector<inputShapesPair>
-    dynamicInputShapes4D = {
-        {{{1, ov::Dimension(1, 16), 1, 1}}, {{{1, 16, 1, 1}}}}
+const std::vector<inputShapesPair> dynamicInputShapes4D = {
+    {
+        { // Origin dynamic shapes
+            {1, ov::Dimension(1, 16), 1, 1}
+        },
+        { // Dynamic shapes instances
+            {{1, 16, 1, 1}}
+        }
+    }
 };
 
-const auto staticNumpyBroadcastParams4D = ::testing::Combine(
-        ::testing::ValuesIn(staticInputShapes4D),
-        ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
-        ::testing::Values(std::vector<size_t>{}),
-        ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
-        ::testing::ValuesIn(inputPrecisions),
-        ::testing::Values(std::vector<bool>{true, true}),
-        ::testing::Values(CommonTestUtils::DEVICE_CPU));
+//const auto staticNumpyBroadcastParams4D = ::testing::Combine(
+//        ::testing::ValuesIn(staticInputShapes4D),
+//        ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
+//        ::testing::Values(std::vector<size_t>{}),
+//        ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
+//        ::testing::ValuesIn(inputPrecisions),
+//        ::testing::Values(std::vector<bool>{true, true}),
+//        ::testing::Values(CommonTestUtils::DEVICE_CPU));
 
 const auto staticExplicitBroadcastParams4D = ::testing::Combine(
         ::testing::ValuesIn(staticInputShapes4D),
@@ -199,38 +209,62 @@ const auto staticExplicitBroadcastParams4D = ::testing::Combine(
         ::testing::Values(std::vector<bool>{true, true}),
         ::testing::Values(CommonTestUtils::DEVICE_CPU));
 
-const auto dynamicNumpyBroadcastParams4D = ::testing::Combine(
-        ::testing::ValuesIn(dynamicInputShapes4D),
-        ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
-        ::testing::Values(std::vector<size_t>{}),
-        ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
-        ::testing::ValuesIn(inputPrecisions),
-        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true, true}, {false, true}}),
-        ::testing::Values(CommonTestUtils::DEVICE_CPU));
+//const auto dynamicNumpyBroadcastParams4D = ::testing::Combine(
+//        ::testing::ValuesIn(dynamicInputShapes4D),
+//        ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
+//        ::testing::Values(std::vector<size_t>{}),
+//        ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
+//        ::testing::ValuesIn(inputPrecisions),
+//        ::testing::ValuesIn(std::vector<std::vector<bool>>{{true, true}, {false, true}}),
+//        ::testing::Values(CommonTestUtils::DEVICE_CPU));
 
 
-INSTANTIATE_TEST_CASE_P(smoke_StaticShape4D,
-                    BroadcastLayerCPUTest,
-                    ::testing::Combine(staticNumpyBroadcastParams4D, ::testing::ValuesIn(CPUParams4D)),
+INSTANTIATE_TEST_CASE_P(smoke_StaticShape4D, BroadcastLayerCPUTest,
+                    ::testing::Combine(
+                            ::testing::Combine(
+                            ::testing::ValuesIn(staticInputShapes4D),
+                            ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
+                            ::testing::Values(std::vector<size_t>{}),
+                            ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
+                            ::testing::ValuesIn(inputPrecisions),
+                            ::testing::Values(std::vector<bool>{true, true}),
+                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                        ::testing::ValuesIn(CPUParams4D)),
                     BroadcastLayerCPUTest::getTestCaseName);
 //INSTANTIATE_TEST_CASE_P(smoke_StaticShape4DE,
 //                    BroadcastLayerCPUTest,
 //                    ::testing::Combine(staticExplicitBroadcastParams4D, ::testing::ValuesIn(CPUParams4D)),
 //                    BroadcastLayerCPUTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_DynamicShape4D,
-                    BroadcastLayerCPUTest,
-                    ::testing::Combine(dynamicNumpyBroadcastParams4D, ::testing::ValuesIn(std::vector<CPUSpecificParams>{{{}, {}, {}, "ref"}})),
+INSTANTIATE_TEST_CASE_P(smoke_DynamicShape4D, BroadcastLayerCPUTest,
+                    ::testing::Combine(::testing::Combine(
+                            ::testing::ValuesIn(dynamicInputShapes4D),
+                            ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
+                            ::testing::Values(std::vector<size_t>{}),
+                            ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
+                            ::testing::ValuesIn(inputPrecisions),
+                            ::testing::ValuesIn(std::vector<std::vector<bool>>{{true, true}, {false, true}}),
+                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                        ::testing::ValuesIn(std::vector<CPUSpecificParams>{{{}, {}, {}, "ref"}})),
                     BroadcastLayerCPUTest::getTestCaseName);
 
 // 5D
-const std::vector<inputShapesPair>
-    staticInputShapes5D = {
-        {{}, {{{1, 16, 1, 1, 1}}}}
+const std::vector<inputShapesPair> staticInputShapes5D = {
+    {
+        {},
+        { // Static shapes
+            {{1, 16, 1, 1, 1}}
+        }
+    }
 };
-const std::vector<inputShapesPair>
-    dynamicInputShapes5D = {
-        {{{1, ov::Dimension(1, 16), 1, 1, 1}},
-        {{{1, 16, 1, 1, 1}}}}
+const std::vector<inputShapesPair> dynamicInputShapes5D = {
+    {
+        { // Origin dynamic shapes
+            {1, ov::Dimension(1, 16), 1, 1, 1}
+        },
+        { // Dynamic shapes instances
+            {{1, 16, 1, 1, 1}}
+        }
+    }
 };
 
 const std::vector<CPUSpecificParams> CPUParams5D = {

@@ -30,6 +30,8 @@ public:
 protected:
     bool needPrepareParams() const override;
     void prepareParams() override;
+    bool needShapeInfer() const override;
+    std::vector<VectorDims> shapeInfer() const override;
 
 private:
     static const size_t TILE_INPUT = 0lu;
@@ -38,6 +40,7 @@ private:
     int axis = -1;
     int tiles = 0;
     bool noTiling = false;
+    mutable InferenceEngine::SizeVector originRepeats;
 
     std::string errorPrefix;
 };

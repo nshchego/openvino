@@ -47,3 +47,11 @@ std::string Shape::toString() const  {
     output << "}";
     return output.str();
 }
+
+const VectorDims& Shape::getStaticDims() const {
+    if (type != ShapeType::Static) {
+        IE_THROW() << "Cannot get dims for non static shape";
+    }
+
+    return minDims;
+}
