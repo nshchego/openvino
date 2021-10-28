@@ -351,6 +351,7 @@ void LayerTestsCommon::Compare(const InferenceEngine::TensorDesc &actualDesc, co
 }
 
 void LayerTestsCommon::ConfigureNetwork() {
+std::cout << "LayerTestsCommon::ConfigureNetwork" << std::endl;
     for (const auto &in : cnnNetwork.getInputsInfo()) {
         if (inLayout != InferenceEngine::Layout::ANY &&
             // cannot setLayout for fully-dynamic network
@@ -383,6 +384,7 @@ void LayerTestsCommon::ConfigureNetwork() {
             if (dynamicShape.rank() == 0 && dynamicShape.is_static()) {
                 continue;
             }
+std::cout << "Shape: " << dynamicShape << "; is_static: " << dynamicShape.is_static() << std::endl;
             std::string inputName = params[i]->get_friendly_name();
             inputDataMap.insert({inputName, dynamicShape});
         }

@@ -4,7 +4,6 @@
 
 #pragma once
 
-//#include <mkldnn_node.h>
 #include "common/tile_broadcast_utils.h"
 
 #include <memory>
@@ -16,21 +15,26 @@ namespace MKLDNNPlugin {
 
 class MKLDNNBroadcastNode : public MKLDNNNode, public TileBroadcastCommon {
 public:
-    MKLDNNBroadcastNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
+    MKLDNNBroadcastNode(const std::shared_ptr<ov::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
     ~MKLDNNBroadcastNode() override = default;
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
     void execute(mkldnn::stream strm) override;
-    void notOptimizedExecute(mkldnn::stream strm);
+    void executeDynamicImpl(mkldnn::stream strm) override {
+        execute(strm);
+    }
+    void plainExecute(mkldnn::stream strm);
     bool created() const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 protected:
     bool needPrepareParams() const override;
     void prepareParams() override;
+    bool needShapeInfer() const override;
+    std::vector<VectorDims> shapeInfer() const override;
 
 private:
     enum AutoBroadcastType {
@@ -39,12 +43,15 @@ private:
     };
     AutoBroadcastType broadcastType;
 
-    static const size_t INPUT_DATA_IDX = 0;
-    static const size_t TARGET_SHAPE_IDX = 1;
-    static const size_t AXES_MAPPING_IDX = 2;
+    static constexpr size_t INPUT_DATA_IDX = 0;
+    static constexpr size_t TARGET_SHAPE_IDX = 1;
+    static constexpr size_t AXES_MAPPING_IDX = 2;
 
-    std::vector<int32_t> axesMapping;
-    VectorDims targetDims;
+    // Class members below are mutable due to they are used in constant function shapeInfer.
+    // TODO: make shapeInfer not constant?
+    mutable std::vector<int32_t> targetShape;
+    mutable std::vector<int32_t> axesMapping;
+    mutable bool needPrepareParamsVar = false;
 
     std::string errorPrefix;
 };

@@ -65,13 +65,17 @@ protected:
 
         selectedType += std::string("_") + netPrecision.name();
 
-        targetStaticShapes.reserve(inputShapes.second.size());
-        inputDynamicShapes.reserve(inputShapes.first.size());
-        for (size_t i = 0lu; i < (isRepeatsConst ? 1lu : 2lu); i++) {
-            if (inputShapes.second.size() > i)
-                targetStaticShapes.push_back({inputShapes.second[i]});
-            if (inputShapes.first.size() > i)
-                inputDynamicShapes.push_back(inputShapes.first[i]);
+        const size_t dynShapesNum = std::min(inputShapes.first.size(), isRepeatsConst ? 1lu : 2lu);
+        for (size_t i = 0lu; i < dynShapesNum; i++) {
+            inputDynamicShapes.push_back(inputShapes.first[i]);
+            if (!isRepeatsConst) {
+                inputDynamicShapes.push_back({ static_cast<int64_t>(repeatsData.size()) });
+            }
+        }
+        for (size_t i = 0lu; i < inputShapes.second.size(); i++) {
+            targetStaticShapes.push_back({inputShapes.second[i]});
+            if (!isRepeatsConst)
+                targetStaticShapes[i].push_back({ repeatsData.size() });
         }
 
         const auto& inputDataShape = targetStaticShapes.front().front();
@@ -154,18 +158,21 @@ const std::vector<inputShapesPair> staticInputShapes4D = {
 const std::vector<inputShapesPair> dynamicInputShapes4D = {
     {
         { // Origin dynamic shapes
-            {2, ov::Dimension(10, 100), 3, 4}
+            {ov::Dimension(1, 20), ov::Dimension(10, 20), ov::Dimension(1, 20), ov::Dimension(1, 20)}
         },
         { // Dynamic shapes instances
-            {{2, 16, 3, 4}}
+            {{2, 16, 3, 4}},
+            {{1, 16, 1, 1}},
+            {{1, 16, 2, 3}}
         }
     },
     {
         { // Origin dynamic shapes
-            {1, ov::Dimension(10, 100), 1, 1}
+            {-1, -1, -1, -1}
         },
         { // Dynamic shapes instances
-            {{1, 16, 1, 1}}
+            {{3, 15, 5, 7}},
+            {{4, 55, 8, 24}}
         }
     }
 };
@@ -181,10 +188,22 @@ const std::vector<inputShapesPair> staticInputShapes5D = {
 const std::vector<inputShapesPair> dynamicInputShapes5D = {
     {
         { // Origin dynamic shapes
-            {2, ov::Dimension(1, 16), 2, 3, 4}
+            {ov::Dimension(1, 20), ov::Dimension(1, 20), ov::Dimension(1, 20), ov::Dimension(1, 20), ov::Dimension(1, 70)}
         },
         { // Dynamic shapes instances
-            {{2, 16, 2, 3, 4}}
+            {{2, 16, 2, 3, 4}},
+            {{1, 16, 8, 5, 4}},
+            {{8, 1, 2, 3, 64}}
+        }
+    },
+    {
+        { // Origin dynamic shapes
+            {-1, -1, -1, -1, -1}
+        },
+        { // Dynamic shapes instances
+            {{2, 16, 2, 3, 4}},
+            {{1, 16, 8, 5, 4}},
+            {{8, 1, 2, 3, 64}}
         }
     }
 };
@@ -197,6 +216,7 @@ const std::vector<std::vector<int64_t>> repeats4D = {
         {1, 2, 1, 3},
         {2, 1, 1, 1},
         {2, 3, 1, 1},
+//        {2, 3, 2, 3, 2},
 };
 const std::vector<std::vector<int64_t>> repeats5D = {
         {1, 2, 3},
@@ -205,6 +225,7 @@ const std::vector<std::vector<int64_t>> repeats5D = {
         {1, 2, 1, 1, 3},
         {2, 1, 1, 1, 1},
         {2, 3, 1, 1, 1},
+//        {2, 3, 2, 3, 2, 3},
 };
 
 const std::vector<CPUSpecificParams> CPUParams4D = {

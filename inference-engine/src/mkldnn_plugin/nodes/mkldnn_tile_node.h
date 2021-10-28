@@ -4,28 +4,29 @@
 
 #pragma once
 
-#include <ie_common.h>
-#include <mkldnn_node.h>
-#include <string>
+//#include <ie_common.h>
+//#include <mkldnn_node.h>
 
 #include "common/tile_broadcast_utils.h"
-#include <ngraph/op/tile.hpp>
+//#include <ngraph/op/tile.hpp>
+
+#include <string>
 
 namespace MKLDNNPlugin {
 
 class MKLDNNTileNode : public MKLDNNNode, public TileBroadcastCommon {
 public:
-    MKLDNNTileNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
+    MKLDNNTileNode(const std::shared_ptr<ov::Node>& op, const mkldnn::engine& eng, MKLDNNWeightsSharing::Ptr &cache);
     ~MKLDNNTileNode() override = default;
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
     void execute(mkldnn::stream strm) override;
-    void notOptimizedExecute(mkldnn::stream strm);
+    void plainExecute(mkldnn::stream strm);
     bool created() const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 protected:
     bool needPrepareParams() const override;
@@ -34,8 +35,8 @@ protected:
     std::vector<VectorDims> shapeInfer() const override;
 
 private:
-    static const size_t TILE_INPUT = 0lu;
-    static const size_t TILE_REPEATS = 1lu;
+    static constexpr size_t TILE_INPUT = 0lu;
+    static constexpr size_t TILE_REPEATS = 1lu;
 
     int axis = -1;
     int tiles = 0;

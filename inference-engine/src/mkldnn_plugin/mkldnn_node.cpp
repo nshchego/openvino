@@ -86,7 +86,7 @@ MKLDNNNode::MKLDNNNode(const std::shared_ptr<ngraph::Node>& op, const mkldnn::en
         if (shape.rank().is_dynamic()) {
             IE_THROW(Unexpected) << "CPU plug-in doesn't support operation with dynamic rank";
         }
-
+//std::cout << "MKLDNNNode: " << i << "; shape.is_dynamic(): " << shape.is_dynamic() << std::endl;
         bool isScalar = shape.rank().get_length() == 0;
         inputShapes.emplace_back(isScalar ? ngraph::PartialShape{1} : shape);
         originalInputPrecisions.emplace_back(details::convertPrecision(op->get_input_element_type(i)));

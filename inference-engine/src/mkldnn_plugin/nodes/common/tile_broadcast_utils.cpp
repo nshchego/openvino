@@ -13,6 +13,7 @@ using namespace InferenceEngine;
 using namespace MKLDNNPlugin;
 
 SizeVector TileBroadcastCommon::calculateStridesForDims(const SizeVector &dims) {
+std::cout << "TileBroadcastCommon::calculateStridesForDims" << std::endl;
     SizeVector strides(dims.size(), 1);
 
     for (int i = strides.size() - 2; i >= 0; i--) {
@@ -100,7 +101,7 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
     size_t outDataShapeRank = node->getOutputShapeAtPort(0).getRank();
 
     NodeConfig config;
-    if (repeats.size() != outDataShapeRank)
+    if (repeats.size() != outDataShapeRank && !repeats.empty())
         IE_THROW() << node->getTypeStr() << " node with name " << node->getName() << " has incorrect Repeats vector."
                 "Repeats rank must be equal to output shape rank. Repeats rank: " << repeats.size() << ", output shape rank: " << outDataShapeRank;
 
@@ -129,7 +130,7 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
         supportedPrimitiveDescriptors.push_back({config, impl_desc_type::ref});
     };
 
-    if (inDataShape.getRank() == outDataShapeRank && (outDataShapeRank == 4 || outDataShapeRank == 5)) {
+    if (!repeats.empty() && inDataShape.getRank() == outDataShapeRank && (outDataShapeRank == 4 || outDataShapeRank == 5)) {
         if (canBeExecutedInBlockedLayout(srcDims, repeats, 16)) {
             if (outDataShapeRank == 4) {
                 pushDesc(mkldnn::memory::format_tag::nChw16c, mkldnn::memory::format_tag::nChw16c);
@@ -171,6 +172,7 @@ std::cout << "TileBroadcastCommon::getSupportedConfigs" << std::endl;
 }
 
 bool TileBroadcastCommon::prepareOptimizedParams(MKLDNNNode *node, SizeVector& srcBlockedDims, SizeVector& dstBlockedDims) {
+std::cout << "TileBroadcastCommon::prepareOptimizedParams" << std::endl;
     while (srcBlockedDims.size() < dstBlockedDims.size()) {
         srcBlockedDims.insert(srcBlockedDims.begin(), 1);
     }
