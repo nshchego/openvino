@@ -211,8 +211,41 @@ const std::vector<inputShapesPair> staticInputShapes4D = {
         { // Static shapes
             {{1, 16, 1, 1}}
         }
+    },
+    {
+        {},
+        { // Static shapes
+            {{50, 50}}
+        }
     }
 };
+
+INSTANTIATE_TEST_CASE_P(smoke_StaticShape4D, BroadcastLayerCPUTest,
+                    ::testing::Combine(
+                            ::testing::Combine(
+                            ::testing::Values(staticInputShapes4D[0]),
+                            ::testing::ValuesIn(std::vector<std::vector<int64_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
+                            ::testing::Values(std::vector<int64_t>{}),
+                            ::testing::Values(ov::op::BroadcastType::NUMPY),
+                            ::testing::ValuesIn(inputPrecisions),
+                            ::testing::Values(std::vector<bool>{true, true}),
+                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                        ::testing::ValuesIn(CPUParams4D)),
+                    BroadcastLayerCPUTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke_StaticShape4DE, BroadcastLayerCPUTest,
+                    ::testing::Combine(
+                        ::testing::Combine(
+                            ::testing::Values(staticInputShapes4D[1]),
+                            ::testing::Values(std::vector<int64_t>{1, 50, 50, 16}),
+                            ::testing::Values(std::vector<int64_t>{1, 2}),
+                            ::testing::Values(ov::op::BroadcastType::EXPLICIT),
+                            ::testing::ValuesIn(inputPrecisions),
+                            ::testing::Values(std::vector<bool>{true, true}),
+                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                        ::testing::Values(CPUSpecificParams{{}, {}, {}, "ref"})),
+                    BroadcastLayerCPUTest::getTestCaseName);
+
 const std::vector<inputShapesPair> dynamicInputShapes4D = {
     {
         { // Origin dynamic shapes
@@ -234,76 +267,18 @@ const std::vector<inputShapesPair> dynamicInputShapes4D = {
         }
     }
 };
-std::vector<std::vector<int64_t>> targetShapes4D {
-    {8, 16,  1, 7},
-    {8, 16, 10, 7}
-};
-
-//const auto staticExplicitBroadcastParams4D = ::testing::Combine(
-//        ::testing::ValuesIn(staticInputShapes4D),
-//        ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
-//        ::testing::Values(std::vector<size_t>{0, 1, 2, 3}),
-//        ::testing::ValuesIn({ov::op::BroadcastType::EXPLICIT}),
-//        ::testing::ValuesIn(inputPrecisions),
-//        ::testing::Values(std::vector<bool>{true, true}),
-//        ::testing::Values(CommonTestUtils::DEVICE_CPU));
-
-INSTANTIATE_TEST_CASE_P(smoke_StaticShape4D, BroadcastLayerCPUTest,
-                    ::testing::Combine(
-                            ::testing::Combine(
-                            ::testing::ValuesIn(staticInputShapes4D),
-                            ::testing::ValuesIn(std::vector<std::vector<int64_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
-                            ::testing::Values(std::vector<int64_t>{}),
-                            ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
-                            ::testing::ValuesIn(inputPrecisions),
-                            ::testing::Values(std::vector<bool>{true, true}),
-                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
-                        ::testing::ValuesIn(CPUParams4D)),
-                    BroadcastLayerCPUTest::getTestCaseName);
-
-INSTANTIATE_TEST_CASE_P(smoke_StaticShape4DE, BroadcastLayerCPUTest,
-                    ::testing::Combine(
-                        ::testing::Combine(
-                            ::testing::ValuesIn(staticInputShapes4D),
-                            ::testing::ValuesIn(std::vector<std::vector<int64_t>>{{1, 16, 3, 3}, {1, 16, 1, 3}}),
-                            ::testing::Values(std::vector<int64_t>{0, 1, 2, 3}),
-                            ::testing::ValuesIn({ov::op::BroadcastType::EXPLICIT}),
-                            ::testing::ValuesIn(inputPrecisions),
-                            ::testing::Values(std::vector<bool>{true, true}),
-                            ::testing::Values(CommonTestUtils::DEVICE_CPU)), ::testing::ValuesIn(CPUParams4D)),
-                    BroadcastLayerCPUTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke_DynamicShape4D, BroadcastLayerCPUTest,
                     ::testing::Combine(::testing::Combine(
                             ::testing::ValuesIn(dynamicInputShapes4D),
-                            ::testing::ValuesIn(targetShapes4D),
+                            ::testing::ValuesIn(std::vector<std::vector<int64_t>>{{8, 16,  1, 7}, {8, 16, 10, 7}}),
                             ::testing::Values(std::vector<int64_t>{}),
-                            ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
+                            ::testing::Values(ov::op::BroadcastType::NUMPY),
                             ::testing::ValuesIn(inputPrecisions),
                             ::testing::ValuesIn(std::vector<std::vector<bool>>{{true, true}, {false, true}}),
                             ::testing::Values(CommonTestUtils::DEVICE_CPU)),
-                        ::testing::ValuesIn(std::vector<CPUSpecificParams>{{{}, {}, {}, "ref"}})),
+                        ::testing::Values(CPUSpecificParams{{}, {}, {}, "ref"})),
                     BroadcastLayerCPUTest::getTestCaseName);
-
-//const std::vector<inputShapesPair> staticInputShapes4Dv2 = {
-//    {
-//        {},
-//        { // Static shapes
-//            {{16, 1, 1}}
-//        }
-//    }
-//};
-//INSTANTIATE_TEST_CASE_P(smoke_StaticShape4Dv2, BroadcastLayerCPUTest,
-//                    ::testing::Combine(::testing::Combine(
-//                            ::testing::ValuesIn(staticInputShapes4Dv2),
-//                            ::testing::Values(std::vector<int64_t>{1, 16, 50, 50}),
-//                            ::testing::Values(std::vector<int64_t>{}),
-//                            ::testing::ValuesIn({ov::op::BroadcastType::NUMPY}),
-//                            ::testing::ValuesIn(inputPrecisions),
-//                            ::testing::Values(std::vector<bool>{true, true}),
-//                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
-//                        ::testing::ValuesIn(std::vector<CPUSpecificParams>{{{}, {}, {}, "ref"}})),
-//                    BroadcastLayerCPUTest::getTestCaseName);
 
 // 5D
 const std::vector<inputShapesPair> staticInputShapes5D = {
@@ -358,10 +333,7 @@ INSTANTIATE_TEST_CASE_P(smoke_StaticShape5D, BroadcastLayerCPUTest,
                             ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                         ::testing::ValuesIn(CPUParams5D)),
                     BroadcastLayerCPUTest::getTestCaseName);
-//INSTANTIATE_TEST_CASE_P(smoke_StaticShape5DE,
-//                    BroadcastLayerCPUTest,
-//                    ::testing::Combine(staticExplicitBroadcastParams5D, ::testing::ValuesIn(CPUParams4D)),
-//                    BroadcastLayerCPUTest::getTestCaseName);
+
 INSTANTIATE_TEST_CASE_P(smoke_DynamicShape5D, BroadcastLayerCPUTest,
                     ::testing::Combine(
                         ::testing::Combine(
