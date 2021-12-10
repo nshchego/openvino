@@ -21,11 +21,11 @@ bool MKLDNNGatherNode::isSupportedOperation(const std::shared_ptr<const ov::Node
         if (!one_of(op->get_type_info(),
                 ov::op::v7::Gather::get_type_info_static(),
                 ov::op::v8::Gather::get_type_info_static())) {
-            errorMessage = "Not supported Gather operation version. CPU plug-in supports only 7 version.";
+            errorMessage = "Not supported Gather operation version. CPU plug-in supports only 7 and 8 versions.";
             return false;
         }
 
-        if (!isDynamicNgraphNode(op) && op->get_input_node_shared_ptr(GATHER_AXIS)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+        if (!isDynamicNgraphNode(op) && !ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))) {
             errorMessage = "Only Constant operation on 'axis' input is supported for static node.";
             return false;
         }
@@ -48,27 +48,27 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
         IE_THROW() << errorPrefix << "has incorrect number of input/output edges!";
 
     const auto dataSrcRank = inputShapes[GATHER_DATA].getRank();
-    const auto indicesRank = inputShapes[GATHER_INDEXES].getRank();
-    if (dataSrcRank == 0 || idxRank == 0)
+    const auto indicesRank = inputShapes[GATHER_INDICES].getRank();
+    if (dataSrcRank == 0lu || indicesRank == 0lu)
         IE_THROW() << errorPrefix << "has incorrect input parameters ranks.";
 
-    if (op->get_type_info() == ov::op::v8::Gather::type_info) {
-        batchDims = static_cast<int>(ov::as_type_ptr<ngraph::op::v8::Gather>(op)->get_batch_dims());
+    if (ov::is_type<ov::op::v8::Gather>(op)) {
+        batchDims = static_cast<int>(ov::as_type_ptr<ov::op::v8::Gather>(op)->get_batch_dims());
         reverseIndexing = true;
         // TODO: remove this WA when NMS & Gather will support dynamic shape.
         if (!op->get_input_element_type(1).is_signed())
             reverseIndexing = false;
-    } else if (op->get_type_info() == ov::op::v7::Gather::type_info) {
-        batchDims = static_cast<int>(ov::as_type_ptr<ov::op::v7::Gather>(op)->get_batch_dims())
+    } else if (ov::is_type<ov::op::v7::Gather>(op)) {
+        batchDims = static_cast<int>(ov::as_type_ptr<ov::op::v7::Gather>(op)->get_batch_dims());
         reverseIndexing = false;
     }
 
     if (batchDims < 0)
         batchDims += indicesRank;
-    if (batchDims < 0 || batchDims >= std::min(static_cast<int>(dataSrcRank), static_cast<int>(idxRank)))
+    if (batchDims < 0 || batchDims >= std::min(static_cast<int>(dataSrcRank), static_cast<int>(indicesRank)))
         IE_THROW() << errorPrefix << "has incorrect batch_dims " << batchDims << "!";
 
-    if (op->get_input_node_shared_ptr(GATHER_AXIS)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
+    if (ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))) {
         isAxisInputConst = true;
         axis = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))->cast_vector<int>()[0];
         if (axis < 0)
@@ -81,6 +81,7 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
 }
 
 void MKLDNNGatherNode::initSupportedPrimitiveDescriptors() {
+std::cout << "MKLDNNGatherNode::initSupportedPrimitiveDescriptors()" << std::endl;
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
@@ -93,15 +94,15 @@ void MKLDNNGatherNode::initSupportedPrimitiveDescriptors() {
 }
 
 void MKLDNNGatherNode::prepareParams() {
+std::cout << "MKLDNNGatherNode::prepareParams()" << std::endl;
     auto& srcMemPtr = getParentEdgeAt(GATHER_DATA)->getMemoryPtr();
     if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
         IE_THROW() << errorPrefix << " has not allocated input memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
         IE_THROW() << errorPrefix << " has unidentified preferable primitive descriptor.";
 
-    const auto& srcDims = srcMemPtr->getStaticDims();
-    const auto& idxDims = getParentEdgeAt(GATHER_INDEXES)->getMemory().getStaticDims();
-    const auto& dstDims = getChildEdgesAtPort(0)[0]->getMemory().getStaticDims();
+    const auto& dataDims = srcMemPtr->getStaticDims();
+    const auto& idxDims = getParentEdgeAt(GATHER_INDICES)->getMemory().getStaticDims();
 
     if (!isAxisInputConst) {
         axis = (reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_AXIS)->getMemoryPtr()->GetPtr()))[0];
@@ -111,16 +112,47 @@ void MKLDNNGatherNode::prepareParams() {
             IE_THROW() << errorPrefix << "has incorrect input parameter axis value: " << axis;
     }
 
-    indexRange = srcDims[axis];
-    batchSize = std::accumulate(srcDims.begin(), srcDims.begin() + batchDims, 1, std::multiplies<size_t>());
-    outerSize = std::accumulate(srcDims.begin() + batchDims, srcDims.begin() + axis, 1, std::multiplies<size_t>());
-    dataLength = std::accumulate(srcDims.begin() + axis + 1, srcDims.end(), 1, std::multiplies<size_t>());
-    srcBatchStride = std::accumulate(srcDims.begin() + batchDims, srcDims.end(), 1, std::multiplies<size_t>());
-    idxBatchStride = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1, std::multiplies<size_t>());
-    dstBatchStride = std::accumulate(dstDims.begin() + batchDims, dstDims.end(), 1, std::multiplies<size_t>());
-    len = dataLength * dataTypeSize;
-    if (dataLength == 0)
-        IE_THROW() << errorPrefix << "had incorrect input parameters dimension!";
+    axisDim = dataDims[axis];
+    beforeBatchSize = std::accumulate(dataDims.begin(), dataDims.begin() + batchDims, 1lu, std::multiplies<uint64_t>());
+    betweenBatchAndAxisSize = std::accumulate(dataDims.begin() + batchDims, dataDims.begin() + axis, 1lu, std::multiplies<uint64_t>());
+    afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<uint64_t>());
+    specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<uint64_t>());
+    afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
+    axisAndAfterAxisSizeInBytes = axisDim * afterAxisSizeInBytes;
+    srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
+    totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize;
+
+//    if (!isDynamic) { // && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+    if (jitKernel && !isDynamicNode()) {
+        const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize;
+        const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+        const uint64_t nthr = parallel_get_max_threads();
+        const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
+        shortPermIdx        = std::vector<std::vector<int>>(nthr, std::vector<int>(dataElPerVec));
+        shortBeforeAxisDiff = std::vector<std::vector<int>>(nthr, std::vector<int>(dataElPerVec));
+        specIndicesInBytes  = std::vector<std::vector<int>>(nthr, std::vector<int>(dataElPerVec));
+        idxBatchSumInBytes  = std::vector<std::vector<int>>(nthr, std::vector<int>(dataElPerVec));
+        dataBeforeAxisSumBPerTr = std::vector<std::vector<int>>(nthr, std::vector<int>(dataElPerVec));
+        betweenBatchAndAxisIters = std::vector<int>(nthr, 0);
+        for (uint64_t ithr = 0lu; ithr < nthr; ithr++) {
+            uint64_t start = std::min(wpt * ithr, totalWork);
+            initShortParams(shortPermIdx[ithr], shortBeforeAxisDiff[ithr], start);
+            betweenBatchAndAxisIters[ithr] = (start / specIndicesSize) % betweenBatchAndAxisSize;
+            for (uint64_t j = 0lu; j < dataElPerVec; j++, start++) {
+                specIndicesInBytes[ithr][j] = (start % specIndicesSize) * idxTypeSize;
+//                idxBatchSumInBytes[ithr][j] = (start / axisAndAfterAxisSizeInBytes / dataTypeSize) * specIndicesSize * idxTypeSize;
+//                idxBatchSumInBytes[ithr][j] = (start / (betweenBatchAndAxisSize * axisDim * afterAxisSize)) * specIndicesSize * idxTypeSize;
+//                idxBatchSumInBytes[ithr][j] = (((start % specIndicesSize) / specIndicesSize) / betweenBatchAndAxisSize) * specIndicesSize * idxTypeSize;
+                idxBatchSumInBytes[ithr][j] = ((start / specIndicesSize) / betweenBatchAndAxisSize) * specIndicesSize * idxTypeSize;
+//                dataBeforeAxisSumB[ithr][j] = (start / axisAndAfterAxisSizeInBytes / betweenBatchAndAxisSize) * specIndicesSize;
+//                        ((start / specIndicesSize) % betweenBatchAndAxisSize) * axisAndAfterAxisSizeInBytes +
+//                        srcAfterBatchSizeInBytes * idxBatchSumInBytes[ithr][j] / dataTypeSize;
+                dataBeforeAxisSumBPerTr[ithr][j] = ((start / specIndicesSize) % betweenBatchAndAxisSize) * axisAndAfterAxisSizeInBytes +
+                        srcAfterBatchSizeInBytes * idxBatchSumInBytes[ithr][j] / dataTypeSize / specIndicesSize;
+            }
+//            betweenBatchAndAxisIters[ithr] = (specIndicesInBytes[ithr][0] / idxTypeSize / specIndicesSize) % betweenBatchAndAxisSize;
+        }
+    }
 }
 
 bool MKLDNNGatherNode::needPrepareParams() const {
@@ -131,12 +163,18 @@ bool MKLDNNGatherNode::needPrepareParams() const {
 }
 
 void MKLDNNGatherNode::createPrimitive() {
-	// Gather instruction is not supported by SSE.
+std::cout << "MKLDNNGatherNode::createPrimitive()" << std::endl;
+    // Gather instruction is not supported by SSE.
     if ((x64::mayiuse(x64::avx512_common) || x64::mayiuse(x64::avx2))) {
         jGatherConfParams jcp;
         jcp.dataTypeSize = dataTypeSize;
         jcp.reverseIndexing = reverseIndexing;
-        jcp.dynamicShape = isDynamicNode();
+        jcp.dynamicShapes = isDynamicNode();
+        if (!jcp.dynamicShapes) {
+            auto dataDims = getInputShapeAtPort(GATHER_DATA).getDims();
+            afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
+            jcp.dataAfterAxisSize = afterAxisSize;
+        }
         if (x64::mayiuse(x64::avx512_common)) {
             jitKernel.reset(new jitUniGatherKernel<x64::avx512_common>(jcp));
         } else if (x64::mayiuse(x64::avx2)) {
@@ -146,28 +184,28 @@ void MKLDNNGatherNode::createPrimitive() {
             jitKernel->create_ker();
 
 //            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
-            if (!jcp.dynamicShape) { // && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
-                const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
-                const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
-                const uint64_t nthr = parallel_get_max_threads();
-                const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
-                shortPermIdx        = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
-                shortBeforeAxisDiff = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
-                specIndicesInBytes  = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
-                idxBatchSumInBytes         = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
-                srcBeforeAxisSum    = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
-                for (int i = 0; i < shortPermIdx.size(); i++) {
-                    uint64_t start = std::min(wpt * i, totalWork);
-                    initShortParams(shortPermIdx[i], shortBeforeAxisDiff[i], start);
-                    for (int j = 0; j < 16; j++, start++) {
-                        specIndicesInBytes[i][j] = (start % specIndicesSize) * sizeof(int);
-                        idxBatchSumInBytes[i][j] = (start / axisAndAfterAxisSizeInBytes / dataTypeSize) * specIndicesSize * sizeof(int);
-                        srcBeforeAxisSum[i][j] =
-                                ((start / specIndicesSize) % betweenBatchAndAxis) * axisAndAfterAxisSizeInBytes +
-                                axisAndAfterAxisSizeInBytes * idxBatchSumInBytes[i][j] / dataTypeSize;
-                    }
-                }
-            }
+//            if (!jcp.dynamicShape) { // && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+//                const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize;
+//                const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+//                const uint64_t nthr = parallel_get_max_threads();
+//                const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
+//                shortPermIdx        = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+//                shortBeforeAxisDiff = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+//                specIndicesInBytes  = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+//                idxBatchSumInBytes  = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+//                dataBeforeAxisSumB    = std::vector<std::vector<int>>(nthr, std::vector<int>(16));
+//                for (int i = 0; i < shortPermIdx.size(); i++) {
+//                    uint64_t start = std::min(wpt * i, totalWork);
+//                    initShortParams(shortPermIdx[i], shortBeforeAxisDiff[i], start);
+//                    for (int j = 0; j < 16; j++, start++) {
+//                        specIndicesInBytes[i][j] = (start % specIndicesSize) * sizeof(int);
+//                        idxBatchSumInBytes[i][j] = (start / axisAndAfterAxisSizeInBytes / dataTypeSize) * specIndicesSize * sizeof(int);
+//                        dataBeforeAxisSumB[i][j] =
+//                                ((start / specIndicesSize) % betweenBatchAndAxisSize) * axisAndAfterAxisSizeInBytes +
+//                                axisAndAfterAxisSizeInBytes * idxBatchSumInBytes[i][j] / dataTypeSize;
+//                    }
+//                }
+//            }
         }
     }
     if (inputShapesDefined()) {
@@ -180,17 +218,32 @@ void MKLDNNGatherNode::createPrimitive() {
 void MKLDNNGatherNode::execute(mkldnn::stream strm) {
     if (jitKernel && afterAxisSize == 1) {
 //    if (jitKernel) {
-        const void* srcIndices = getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr();
+        const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
         const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
         uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
-        const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
+const int* srcIndicesInt = reinterpret_cast<int*>(getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr());
+const int* srcDataInt = reinterpret_cast<int*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
+    std::string srcIndicesIntStr = "srcIndicesInt {", srcDataIntStr = "srcDataInt {";
+for (int i = 0; i < getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetShape().getElementsCount(); i++) {
+    srcDataIntStr += std::to_string(srcDataInt[i]) + "; ";
+}
+for (int i = 0; i < getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetShape().getElementsCount(); i++) {
+    srcIndicesIntStr += std::to_string(srcIndicesInt[i]) + "; ";
+}
+srcIndicesIntStr += "}\n";
+srcDataIntStr += "}\n";
+//printf("%s%s", srcDataIntStr.c_str(), srcIndicesIntStr.c_str());
+
+//        const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize;
         const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
         auto threadBody = [&](const int ithr, const int nthr) {
             const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
             const uint64_t start = std::min(wpt * ithr, totalWork);
             const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
+//            const uint64_t start = 0;
+//            const uint64_t end = totalWork;
             const uint64_t workAmount = end - start;
 
             auto arg = gatherJitExecArgs();
@@ -203,18 +256,35 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             arg.afterAxSize = afterAxisSize;
             arg.axisAndAfterAxisSizeInBytes = &axisAndAfterAxisSizeInBytes;
             arg.srcAfterBatchSizeInBytes = &srcAfterBatchSizeInBytes;
-            arg.betweenBatchAndAxisSize = &betweenBatchAndAxis;
+            arg.betweenBatchAndAxisSize = &betweenBatchAndAxisSize;
             arg.specIndicesSize = &specIndicesSize;
             arg.workAmount = workAmount;
             arg.specIndicesInBytes = specIndicesInBytes[ithr].data();
             arg.idxBatchSumInBytes = idxBatchSumInBytes[ithr].data();
-            arg.srcBeforeAxisSum = srcBeforeAxisSum[ithr].data();
-//    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
-//        "; end: " + std::to_string(end);
+            arg.dataBeforeAxisSumB = dataBeforeAxisSumBPerTr[ithr].data();
+            arg.betweenBatchAndAxisIter = betweenBatchAndAxisIters[ithr];
+    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
+        "; end: " + std::to_string(end) + "\n";
 //printf("%s\n", seqStr.c_str());
 
             const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
             const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+
+    std::string thrIdx = "[" + std::to_string(ithr) + "] ";
+    std::string specIndicesInBytesStr = thrIdx + "specIndicesInBytes {", idxBatchSumInBytesStr = thrIdx + "idxBatchSumInBytes {",
+        srcBeforeAxisSumStr = thrIdx + "dataBeforeAxisSumB {", betweenBatchAndAxisIterStr = thrIdx + "betweenBatchAndAxisIter: " +
+            std::to_string(betweenBatchAndAxisIters[ithr]) + "; betweenBatchAndAxisSize: " + std::to_string(betweenBatchAndAxisSize) + "\n";
+for (int i = 0; i < dataElPerVec; i++) {
+    specIndicesInBytesStr += std::to_string(specIndicesInBytes[ithr][i]) + "; ";
+    idxBatchSumInBytesStr += std::to_string(idxBatchSumInBytes[ithr][i]) + "; ";
+    srcBeforeAxisSumStr += std::to_string(dataBeforeAxisSumBPerTr[ithr][i]) + "; ";
+}
+specIndicesInBytesStr += "}\n";
+idxBatchSumInBytesStr += "}\n";
+srcBeforeAxisSumStr += "}\n";
+printf("%s%s%s%s%s", seqStr.c_str(), specIndicesInBytesStr.c_str(), idxBatchSumInBytesStr.c_str(), srcBeforeAxisSumStr.c_str(),
+    betweenBatchAndAxisIterStr.c_str());
+
             if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
                 arg.permIdx = shortPermIdx[ithr].data();
                 arg.beforeAxisDiff = shortBeforeAxisDiff[ithr].data();
@@ -236,6 +306,14 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             }
 
             (*jitKernel)(&arg);
+
+//int* tmpDst = reinterpret_cast<int*>(arg.dst);
+//    std::string outData = "[" + std::to_string(ithr) + "] OUT DATA: ";
+//for (int i = 0; i < 4; i++) {
+//    outData += std::to_string(tmpDst[i]) + ";";
+//}
+//outData += "\n";
+//printf("%s", outData.c_str());
         };
 
         parallel_nt(0, threadBody);
@@ -247,29 +325,34 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 //    std::cout << std::to_string(tmpDst[i]) << ";";
 //}
 //std::cout << std::endl;
-int* tmpDst = reinterpret_cast<int*>(dstData);
-std::cout << "\nOUT DATA:\n";
-for (int i = 0; i < 8; i++) {
-    if (i % 8 == 0)
-        std::cout << "_";
-    std::cout << std::to_string(tmpDst[i]) << ";";
-}
-std::cout << std::endl;
+
+//int* tmpDst = reinterpret_cast<int*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 0; i < getOutputShapeAtPort(0).getElementsCount(); i++) {
+//    if (i % 8 == 0)
+//        std::cout << "_";
+//    if (i % 208 == 0)
+//        std::cout << std::endl;
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
+
     } else {
         execReference();
     }
 }
 
 void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
-    initParams();
+//    initParams();
 
     if (jitKernel && afterAxisSize == 1) {
 //    if (jitKernel) {
-        const void* srcIndices = getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr();
+std::cout << "Dyn kernel" << std::endl;
+        const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
         const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
         uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
-        const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxis * specIndicesSize;
+        const uint64_t totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize;
         const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
         auto threadBody = [&](const int ithr, const int nthr) {
@@ -288,7 +371,7 @@ void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
             arg.afterAxSize = afterAxisSize;
             arg.axisAndAfterAxisSizeInBytes = &axisAndAfterAxisSizeInBytes;
             arg.srcAfterBatchSizeInBytes = &srcAfterBatchSizeInBytes;
-            arg.betweenBatchAndAxisSize = &betweenBatchAndAxis;
+            arg.betweenBatchAndAxisSize = &betweenBatchAndAxisSize;
             arg.specIndicesSize = &specIndicesSize;
             arg.workAmount = workAmount;
 //    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
@@ -362,19 +445,19 @@ void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
     }
 }
 
-void MKLDNNGatherNode::initParams() {
-    auto& srcDims = getParentEdgeAt(GATHER_DATA)->getMemory().getStaticDims();
-    auto& idxDims = getParentEdgeAt(GATHER_INDEXES)->getMemory().getStaticDims();
-
-    axisDim = srcDims[axis];
-    beforeBatchSize = std::accumulate(srcDims.begin(), srcDims.begin() + batchDims, 1, std::multiplies<uint64_t>());
-    betweenBatchAndAxis = std::accumulate(srcDims.begin() + batchDims, srcDims.begin() + axis, 1, std::multiplies<uint64_t>());
-    afterAxisSize = std::accumulate(srcDims.begin() + axis + 1, srcDims.end(), 1, std::multiplies<uint64_t>());
-    specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1, std::multiplies<uint64_t>());
-    afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
-    axisAndAfterAxisSizeInBytes = srcDims[axis] * afterAxisSizeInBytes;
-    srcAfterBatchSizeInBytes = betweenBatchAndAxis * axisAndAfterAxisSizeInBytes;
-}
+//void MKLDNNGatherNode::initParams() {
+//    auto& dataDims = getParentEdgeAt(GATHER_DATA)->getMemory().getStaticDims();
+//    auto& idxDims = getParentEdgeAt(GATHER_INDICES)->getMemory().getStaticDims();
+//
+//    axisDim = dataDims[axis];
+//    beforeBatchSize = std::accumulate(dataDims.begin(), dataDims.begin() + batchDims, 1, std::multiplies<uint64_t>());
+//    betweenBatchAndAxisSize = std::accumulate(dataDims.begin() + batchDims, dataDims.begin() + axis, 1, std::multiplies<uint64_t>());
+//    afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1, std::multiplies<uint64_t>());
+//    specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1, std::multiplies<uint64_t>());
+//    afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
+//    axisAndAfterAxisSizeInBytes = dataDims[axis] * afterAxisSizeInBytes;
+//    srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
+//}
 
 void MKLDNNGatherNode::initShortParams(std::vector<int>& shortPermIdx, std::vector<int>& shortBeforeAxisDiff, uint64_t start) {
     const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
@@ -400,12 +483,12 @@ void MKLDNNGatherNode::initShortParams(std::vector<int>& shortPermIdx, std::vect
 }
 
 void MKLDNNGatherNode::execReference() {
-    const int32_t* srcIndices = reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_INDEXES)->getMemoryPtr()->GetPtr());
+    const int32_t* srcIndices = reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr());
     const uint8_t* srcData = reinterpret_cast<const uint8_t*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
     uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
     const size_t dstIdxAndAfterAxisSize = afterAxisSizeInBytes * specIndicesSize;
-    const size_t dstAfterBatchSize = betweenBatchAndAxis * dstIdxAndAfterAxisSize;
+    const size_t dstAfterBatchSize = betweenBatchAndAxisSize * dstIdxAndAfterAxisSize;
     parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
         int ii = srcIndices[b * specIndicesSize + j];
         if (ii < 0)
@@ -414,22 +497,18 @@ void MKLDNNGatherNode::execReference() {
         size_t c2 = dstAfterBatchSize * b + afterAxisSizeInBytes * j;
         if (idx < axisDim) {
             size_t c1 = srcAfterBatchSizeInBytes * b + afterAxisSizeInBytes * idx;
-            for (size_t i = 0; i < betweenBatchAndAxis; i++) {
+            for (size_t i = 0; i < betweenBatchAndAxisSize; i++) {
                 size_t srcIdx = c1 + axisAndAfterAxisSizeInBytes * i;
                 size_t dstIdx = c2 + dstIdxAndAfterAxisSize * i;
 
                 cpu_memcpy(&dstData[dstIdx], &srcData[srcIdx], afterAxisSizeInBytes);
             }
         } else {
-            for (size_t i = 0; i < betweenBatchAndAxis; i++) {
+            for (size_t i = 0; i < betweenBatchAndAxisSize; i++) {
                 memset(&dstData[c2 + dstIdxAndAfterAxisSize * i], 0, afterAxisSizeInBytes);
             }
         }
     });
-}
-
-void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
-    execute(strm);
 }
 
 bool MKLDNNGatherNode::created() const {

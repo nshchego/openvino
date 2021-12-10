@@ -100,6 +100,8 @@ const std::vector<std::vector<size_t>> inputShapes4D = {
 const std::vector<std::vector<size_t>> indicesShapes_BD0 = {
         std::vector<size_t>{4},
         std::vector<size_t>{2, 2},
+        std::vector<size_t>{3, 3},
+        std::vector<size_t>{5, 2},
         std::vector<size_t>{3, 2, 4},
 };
 

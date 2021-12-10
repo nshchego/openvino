@@ -10,9 +10,10 @@
 namespace MKLDNNPlugin {
 
 struct jGatherConfParams {
-    uint64_t dataTypeSize = 1;
+    uint64_t dataTypeSize = 1lu;
     bool reverseIndexing = true;
-    bool dynamicShape = false;
+    bool dynamicShapes = false;
+    uint64_t dataAfterAxisSize = 1lu;
 };
 
 struct gatherJitExecArgs {
@@ -32,7 +33,8 @@ struct gatherJitExecArgs {
     // Only static
     const int* specIndicesInBytes;
     const int* idxBatchSumInBytes;
-    const int* srcBeforeAxisSum;
+    const int* dataBeforeAxisSumB;
+    uint64_t betweenBatchAndAxisIter;
 };
 
 struct jitGatherKernelBase {
@@ -86,7 +88,8 @@ protected:
     using Vmask = typename mkldnn::impl::utils::conditional<isa == mkldnn::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Opmask>::type;
     const uint32_t vlenXmm = mkldnn::impl::cpu::x64::cpu_isa_traits<mkldnn::impl::cpu::x64::sse41>::vlen;
     uint32_t dataTypeShift = 0;
-    const uint32_t indicesTypeSize = sizeof(int);
+    const uint32_t indicesTypeSize = sizeof(uint32_t);
+    const uint32_t idxTypeSizeShift = indicesTypeSize / 2;
 
     // 64b registers.
     const Xbyak::Reg64& regSrc = r8;
@@ -117,13 +120,13 @@ protected:
     Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
     // Common.
     Vmm vmmZeros = Vmm(7);
-    Vmm vmmSrcBeforeAxisSum = Vmm(8);
-    Vmm vmmSpecIndicesInBytes = Vmm(9);
+    Vmm vmmSrcBeforeAxisSumB = Vmm(8);
+    Vmm vmmSpecIdxInBytes = Vmm(9);
     Vmm vmmSpecIdxSizeInBytes = Vmm(10);
     Vmm vmmAxisDim = Vmm(11);
 
     // Only long.
-    Vmm vmmAxisAndAfterAxisSize = Vmm(12);
+    Vmm vmmAxisAndAfterAxisSizeInBytes = Vmm(12);
     Vmm vmmVecLen = Vmm(13);
     Vmm vmmIdxBatchSumInBytes = Vmm(14);
     // Only short.
@@ -137,9 +140,9 @@ protected:
     // XMM
     Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
     Xbyak::Xmm xmmZeros = Xbyak::Xmm(vmmZeros.getIdx());
-    Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSum.getIdx());
+    Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSumB.getIdx());
     Xbyak::Xmm xmmSpecIdxSizeInBytes = Xbyak::Xmm(vmmSpecIdxSizeInBytes.getIdx());
-    Xbyak::Xmm xmmSpecIndicesInBytes = Xbyak::Xmm(vmmSpecIndicesInBytes.getIdx());
+    Xbyak::Xmm xmmSpecIndicesInBytes = Xbyak::Xmm(vmmSpecIdxInBytes.getIdx());
 
     // Blocked
 //    Vmm vmmBlockIdxInBytes = vmmSpecIndicesInBytes;
