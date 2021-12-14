@@ -151,6 +151,8 @@ void compare(const ov::runtime::Tensor& expected,
         auto eps = std::numeric_limits<double>::epsilon();
         return (b - a) > (std::fmax(std::fabs(a), std::fabs(b)) * eps);
     };
+    size_t firstErrIdx = 0lu;
+    bool firstWasSet = false;
     for (size_t i = 0; i < shape_size(expected_shape); i++) {
         double expected_value = expected_data[i];
         double actual_value = actual_data[i];
@@ -165,12 +167,17 @@ void compare(const ov::runtime::Tensor& expected,
         ASSERT_FALSE(std::isnan(expected_value)) << "Expected value is NAN on coordinate: " << i;
         ASSERT_FALSE(std::isnan(actual_value)) << "Actual value is NAN on coordinate: " << i;
         auto abs = std::fabs(expected_value - actual_value);
+        if (!firstWasSet && abs != 0.f) {
+            firstErrIdx = i;
+            firstWasSet = true;
+        }
         auto rel = expected_value ? (abs/std::fabs(expected_value)) : abs;
         error(abs_error, abs, abs_threshold);
         error(rel_error, rel, rel_threshold);
     }
     abs_error.mean /= shape_size(expected_shape);
     rel_error.mean /= shape_size(expected_shape);
+printf("firstErrIdx: %lu\n", firstErrIdx);
     ASSERT_TRUE((less(abs_error.max, abs_threshold) && less(rel_error.max, rel_threshold))) <<
                     "abs_max < abs_threshold && rel_max < rel_threshold" <<
                     "\n\t abs_max: " << abs_error.max <<

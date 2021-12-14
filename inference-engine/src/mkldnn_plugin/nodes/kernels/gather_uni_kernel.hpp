@@ -24,15 +24,15 @@ struct gatherJitExecArgs {
     const uint64_t* start;
     const uint64_t* specIndicesSize;
     const uint64_t* betweenBatchAndAxisSize;
-    const uint64_t* axisAndAfterAxisSizeInBytes;
-    const uint64_t* srcAfterBatchSizeInBytes;
+    const uint64_t* axisAndAfterAxisSizeB;
+    const uint64_t* srcAfterBatchSizeB;
     const int* permIdx;
     const int* beforeAxisDiff;
     uint64_t workAmount = 0;
     uint64_t afterAxSize = 0;
     // Only static
-    const int* specIndicesInBytes;
-    const int* idxBatchSumInBytes;
+    const int* specIdxB;
+    const int* idxBatchSumB;
     const int* dataBeforeAxisSumB;
     uint64_t betweenBatchAndAxisIter;
 };
@@ -87,9 +87,9 @@ protected:
     using Vmm = typename mkldnn::impl::utils::conditional<isa == mkldnn::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
     using Vmask = typename mkldnn::impl::utils::conditional<isa == mkldnn::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Opmask>::type;
     const uint32_t vlenXmm = mkldnn::impl::cpu::x64::cpu_isa_traits<mkldnn::impl::cpu::x64::sse41>::vlen;
-    uint32_t dataTypeShift = 0;
     const uint32_t indicesTypeSize = sizeof(uint32_t);
-    const uint32_t idxTypeSizeShift = indicesTypeSize / 2;
+    const uint32_t idxTypeShift = indicesTypeSize / 2;
+    uint32_t dataTypeShift = 0;
 
     // 64b registers.
     const Xbyak::Reg64& regSrc = r8;
@@ -97,7 +97,7 @@ protected:
     const Xbyak::Reg64& regIndices = r10;
     const Xbyak::Reg64& regIdxIter = r11;
     const Xbyak::Reg64& regWorkAmount = r12;
-    const Xbyak::Reg64& regSpecIdxSizeInBytes = r13;
+    const Xbyak::Reg64& regSpecIdxSizeB = r13;
     const Xbyak::Reg64& regAux1 = r14;
     const Xbyak::Reg64& regAux2 = rsi;
     const Xbyak::Reg64& regBetweenBatchAndAxisIter = r15;
@@ -107,7 +107,7 @@ protected:
 
     // 32b registers.
     Xbyak::Reg32 reg32IdxIter = Xbyak::Reg32(regIdxIter.getIdx());
-    Xbyak::Reg32 reg32SpecIdxSizeInBytes = Xbyak::Reg32(regSpecIdxSizeInBytes.getIdx());
+    Xbyak::Reg32 reg32SpecIdxSizeB = Xbyak::Reg32(regSpecIdxSizeB.getIdx());
     Xbyak::Reg32 reg32BetweenBatchAndAxisSize = Xbyak::Reg32(regBetweenBatchAndAxisSize.getIdx());
     Xbyak::Reg32 reg32BetweenBatchAndAxisIter = Xbyak::Reg32(regBetweenBatchAndAxisIter.getIdx());
     Xbyak::Reg32 reg32Aux1 = Xbyak::Reg32(regAux1.getIdx());
@@ -121,31 +121,31 @@ protected:
     // Common.
     Vmm vmmZeros = Vmm(7);
     Vmm vmmSrcBeforeAxisSumB = Vmm(8);
-    Vmm vmmSpecIdxInBytes = Vmm(9);
-    Vmm vmmSpecIdxSizeInBytes = Vmm(10);
+    Vmm vmmSpecIdxB = Vmm(9);
+    Vmm vmmSpecIdxSizeB = Vmm(10);
     Vmm vmmAxisDim = Vmm(11);
 
     // Only long.
-    Vmm vmmAxisAndAfterAxisSizeInBytes = Vmm(12);
+    Vmm vmmAxisAndAfterAxisSizeB = Vmm(12);
     Vmm vmmVecLen = Vmm(13);
-    Vmm vmmIdxBatchSumInBytes = Vmm(14);
+    Vmm vmmIdxBatchSumB = Vmm(14);
     // Only short.
-    Vmm vmmSrcAfterBatchSize = Vmm(12);
+    Vmm vmmSrcAfterBatchSizeB = Vmm(12);
     Vmm vmmPermIdxMask = Vmm(13);
     Vmm vmmBeforeAxisDiff = Vmm(14);
     Vmm vmmSpecIdxDiff = Vmm(15);
     Vmm vmmAfterAxisSize = Vmm(5);
-    Vmm vmmBlockIdxInBytes = Vmm(6);
+    Vmm vmmBlockIdxB = Vmm(6);
 
     // XMM
     Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
     Xbyak::Xmm xmmZeros = Xbyak::Xmm(vmmZeros.getIdx());
     Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSumB.getIdx());
-    Xbyak::Xmm xmmSpecIdxSizeInBytes = Xbyak::Xmm(vmmSpecIdxSizeInBytes.getIdx());
-    Xbyak::Xmm xmmSpecIndicesInBytes = Xbyak::Xmm(vmmSpecIdxInBytes.getIdx());
+    Xbyak::Xmm xmmSpecIdxSizeB = Xbyak::Xmm(vmmSpecIdxSizeB.getIdx());
+    Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(vmmSpecIdxB.getIdx());
 
     // Blocked
-//    Vmm vmmBlockIdxInBytes = vmmSpecIndicesInBytes;
+//    Vmm vmmBlockIdxB = vmmSpecIndicesInBytes;
 //    Vmm vmmSrcBeforeBlockSum = vmmSrcBeforeAxisSum;
 //    Vmm vmmBeforeBlockDiff = vmmBeforeAxisDiff;
 
