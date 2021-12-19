@@ -13,6 +13,7 @@ struct jGatherConfParams {
     uint64_t dataTypeSize = 1lu;
     bool reverseIndexing = true;
     bool dynamicShapes = false;
+    uint64_t specIdxSize = 1lu;
     uint64_t dataAfterAxisSize = 1lu;
 };
 
@@ -28,6 +29,7 @@ struct gatherJitExecArgs {
     const uint64_t* srcAfterBatchSizeB;
     const int* permIdx;
     const int* beforeAxisDiff;
+    const int* afterAxisPerm;
     uint64_t workAmount = 0;
     uint64_t afterAxSize = 0;
     // Only static
@@ -135,6 +137,7 @@ protected:
     Vmm vmmBeforeAxisDiff = Vmm(14);
     Vmm vmmSpecIdxDiff = Vmm(15);
     Vmm vmmAfterAxisSize = Vmm(5);
+    // Blocked short
     Vmm vmmBlockIdxB = Vmm(6);
 
     // XMM
@@ -154,6 +157,7 @@ protected:
     void calcSrcShiftShort(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst);
     void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
+    void process(bool isShortIdx, bool blocked);
     void process32b(bool isShortIdx, bool blocked);
     void process16b(bool isShortIdx, bool blocked);
     void process8b(bool isShortIdx, bool blocked);

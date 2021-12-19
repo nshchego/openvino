@@ -19,6 +19,7 @@ public:
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
+    void createPrimitive() override;
     void execute(mkldnn::stream strm) override;
     bool created() const override;
 
@@ -31,8 +32,7 @@ protected:
     std::vector<VectorDims> shapeInfer() const override;
 
 private:
-    //inline void initParams();
-    void initShortParams(std::vector<int>& shortPermIdx, std::vector<int>& shortBeforeAxisDiff, uint64_t start);
+    void initShortParams(uint64_t ithr, uint64_t start);
     void execReference();
 
     int axis = 0;
@@ -54,11 +54,13 @@ private:
     uint64_t srcAfterBatchSizeInBytes;
     uint64_t totalWork;
 
-    std::vector<std::vector<int>> shortPermIdx;
-    std::vector<std::vector<int>> shortBeforeAxisDiff;
+    std::vector<std::vector<int>> shortPermIdxPerThr;
+    std::vector<std::vector<int>> shortBeforeAxisDiffPerThr;
     std::vector<std::vector<int>> specIndicesInBytes;
     std::vector<std::vector<int>> idxBatchSumInBytes;
-    std::vector<std::vector<int>> dataBeforeAxisSumBPerTr;
+    std::vector<std::vector<int>> dataBeforeAxisSumInBytesPerThr;
+    std::vector<std::vector<int>> beforeBlockDiffPerThr;
+    std::vector<std::vector<int>> afterAxPermPerThr;
     std::vector<int> betweenBatchAndAxisIters;
 
     static constexpr size_t GATHER_DATA = 0;

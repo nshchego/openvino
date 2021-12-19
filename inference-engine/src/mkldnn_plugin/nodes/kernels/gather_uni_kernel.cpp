@@ -56,6 +56,9 @@ void jitUniGatherKernel<isa>::generate() {
     mov(regDst, ptr[regParams + GET_OFF(dst)]);
     mov(regIndices, ptr[regParams + GET_OFF(indices)]);
 
+    mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+    uni_vpxor(vmmZeros, vmmZeros, vmmZeros);
+
     auto& vmmAux0 = vmmAuxContainer[0];
     auto& vmmAux1 = vmmAuxContainer[1];
     auto& xmmAux0 = xmmAuxContainer[0];
@@ -107,7 +110,7 @@ void jitUniGatherKernel<isa>::generate() {
         mov(regAux1, ptr[regParams + GET_OFF(axisDim)]);
         uni_vpbroadcastd(vmmAxisDim, ptr[regAux1]);
     } else {
-        if (jcp.dataAfterAxisSize == 1lu) {
+        if (jcp.dataAfterAxisSize == 1lu) { // Elementwise case.
             mov(regAux1, ptr[regParams + GET_OFF(specIndicesSize)]);
             uni_vpbroadcastd(vmmSpecIdxSizeB, ptr[regAux1]);
             uni_vpslld(vmmSpecIdxSizeB, vmmSpecIdxSizeB, idxTypeShift); // multiply by indices type size.
@@ -127,144 +130,152 @@ void jitUniGatherKernel<isa>::generate() {
             mov(regAux1, ptr[regParams + GET_OFF(betweenBatchAndAxisSize)]);
             mov(regBetweenBatchAndAxisSize, ptr[regAux1]);
             mov(regBetweenBatchAndAxisIter, ptr[regParams + GET_OFF(betweenBatchAndAxisIter)]);
-        } else {
-            // TODO: check vs memcpy approach.
+
+            if (jcp.specIdxSize < idxElPerVec) { // Short case.
+                mov(regAux1, ptr[regParams + GET_OFF(permIdx)]);
+                uni_vmovups(vmmPermIdxMask, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
+                uni_vmovups(vmmBeforeAxisDiff, ptr[regAux1]);
+                if (jcp.dataTypeSize != 1)
+                    vpslld(vmmBeforeAxisDiff, vmmBeforeAxisDiff, dataTypeShift); // multiply by data type size
+                mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
+                uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
+
+                process(true, false);
+            } else { // Long case.
+                vmovd(reg32IdxIter, xmmSpecIdxB);
+                mov(regAux1, reinterpret_cast<uintptr_t>(&vlen));
+                uni_vpbroadcastd(vmmVecLen, ptr[regAux1]); // TODO: uni_vpslld ?
+
+                process(false, false);
+            }
+        } else { // Blocked case.
+            mov(regAux1, ptr[regParams + GET_OFF(start)]);
+            uni_vpbroadcastd(vmmBlockIdxB, ptr[regAux1]);
+            mov(regAux1, reinterpret_cast<uintptr_t>(incVec));
+            uni_vpaddd(vmmBlockIdxB, vmmBlockIdxB, ptr[regAux1]);
+            uni_vcvtdq2ps(vmmBlockIdxB, vmmBlockIdxB);
+
+            // Formula: afterAxIdxB = (start % afterAxSize) * idxTypeSize
+            movd(xmmAux0, reg32Aux1);
+            uni_vpbroadcastd(vmmAux1, xmmAux0); // A5 broadcast from reg32Aux1
+            uni_vcvtdq2ps(vmmAux1, vmmAux1);
+            uni_vdivps(vmmSrcBeforeAxisSumB, vmmBlockIdxB, vmmAux1);
+            uni_vroundps(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, 0x1);
+            vfnmadd231ps(vmmBlockIdxB, vmmSrcBeforeAxisSumB, vmmAux1);
+            uni_vcvtps2dq(vmmBlockIdxB, vmmBlockIdxB);
+    //vmovups(ptr[regDst], vmmBlockIdxB);
+            uni_vpslld(vmmBlockIdxB, vmmBlockIdxB, 2); // multiply by indices type size.
+            if (jcp.dataAfterAxisSize < idxElPerVec) {
+                mov(regAux1, ptr[regParams + GET_OFF(afterAxisPerm)]);
+                uni_vmovups(vmmPermIdxMask, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
+                uni_vmovups(vmmBeforeAxisDiff, ptr[regAux1]);
+
+    //            mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
+    //            uni_vmovups(vmmBeforeBlockDiff, ptr[regAux1]);
+    //uni_vmovups(ptr[regDst], vmmBeforeBlockDiff);
+    //            if (jcp.dataTypeSize != 1)
+    //                vpslld(vmmBeforeBlockDiff, vmmBeforeBlockDiff, dataTypeShift); // multiply by data type size
+    //            uni_vpmulld(vmmBeforeAxisDiff, vmmBeforeBlockDiff, vmmAxisDim);
+    //            mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
+    //            uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
+
+                process(true, true);
+            } else {
+            }
         }
     }
 
-    mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+    if (jcp.dynamicShapes) {
+        Xbyak::Label lBlock, lEnd;
+        mov(regAux2, ptr[regParams + GET_OFF(afterAxSize)]);
+        cmp(regAux2, 1);
+        jg(lBlock, T_NEAR);
+        {
+            Xbyak::Label lLessThanVector1, lTail1, lTail2, lE1;
 
-    uni_vpxor(vmmZeros, vmmZeros, vmmZeros);
+            cmp(regSpecIdxSizeB, vlen);
+            jl(lLessThanVector1, T_NEAR);
+                vmovd(reg32IdxIter, xmmSpecIdxB);
+                mov(regAux1, reinterpret_cast<uintptr_t>(&vlen));
+                uni_vpbroadcastd(vmmVecLen, ptr[regAux1]); // TODO: uni_vpslld ?
 
-    Xbyak::Label lBlock, lEnd;
-    mov(regAux2, ptr[regParams + GET_OFF(afterAxSize)]);
-    cmp(regAux2, 1);
-    jg(lBlock, T_NEAR);
-    {
-        Xbyak::Label lLessThanVector1, lTail1, lTail2, lE1;
+                process(false, false);
+                jmp(lE1, T_NEAR);
+            L(lLessThanVector1);
+                mov(regAux1, ptr[regParams + GET_OFF(permIdx)]);
+                uni_vmovups(vmmPermIdxMask, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
+                uni_vmovups(vmmBeforeAxisDiff, ptr[regAux1]);
+                if (jcp.dataTypeSize != 1)
+                    vpslld(vmmBeforeAxisDiff, vmmBeforeAxisDiff, dataTypeShift); // multiply by data type size
+                mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
+                uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
 
-        cmp(regSpecIdxSizeB, vlen);
-        jl(lLessThanVector1, T_NEAR);
-            vmovd(reg32IdxIter, xmmSpecIdxB);
-            mov(regAux1, reinterpret_cast<uintptr_t>(&vlen));
-            uni_vpbroadcastd(vmmVecLen, ptr[regAux1]); // TODO: uni_vpslld ?
-            cmp(regWorkAmount, dataElPerVec);
-            jl(lTail1, T_NEAR);
-
-            if (jcp.dataTypeSize == 4)
-                process32b(false, false);
-            else if (jcp.dataTypeSize == 2)
-                process16b(false, false);
-            else if (jcp.dataTypeSize == 1)
-                process8b(false, false);
-            jmp(lE1, T_NEAR);
-
-            L(lTail1);
-            tail(false, false);
-            jmp(lE1, T_NEAR);
-        L(lLessThanVector1);
-            mov(regAux1, ptr[regParams + GET_OFF(permIdx)]);
-            uni_vmovups(vmmPermIdxMask, ptr[regAux1]);
-            mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
-            uni_vmovups(vmmBeforeAxisDiff, ptr[regAux1]);
-            if (jcp.dataTypeSize != 1)
-                vpslld(vmmBeforeAxisDiff, vmmBeforeAxisDiff, dataTypeShift); // multiply by data type size
-            mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
-            uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
-            cmp(regWorkAmount, dataElPerVec);
-            jl(lTail2, T_NEAR);
-
-            if (jcp.dataTypeSize == 4)
-                process32b(true, false);
-            else if (jcp.dataTypeSize == 2)
-                process16b(true, false);
-            else if (jcp.dataTypeSize == 1)
-                process8b(true, false);
-            jmp(lE1, T_NEAR);
-            L(lTail2);
-            tail(true, false);
-        L(lE1);
-        jmp(lEnd, T_NEAR);
-    }
-    L(lBlock); {
-        mov(regAux1, ptr[regParams + GET_OFF(start)]);
-        uni_vpbroadcastd(vmmBlockIdxB, ptr[regAux1]);
-        mov(regAux1, reinterpret_cast<uintptr_t>(incVec));
-        uni_vpaddd(vmmBlockIdxB, vmmBlockIdxB, ptr[regAux1]);
-        uni_vcvtdq2ps(vmmBlockIdxB, vmmBlockIdxB);
-
-        // afterAxIdxB = (start % afterAxSize) * idxTypeSize
-        movd(xmmAux0, reg32Aux1);
-        uni_vpbroadcastd(vmmAux1, xmmAux0); // A5 broadcast from reg32Aux1
-        uni_vcvtdq2ps(vmmAux1, vmmAux1);
-        uni_vdivps(vmmSrcBeforeAxisSumB, vmmBlockIdxB, vmmAux1);
-        uni_vroundps(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, 0x1);
-        vfnmadd231ps(vmmBlockIdxB, vmmSrcBeforeAxisSumB, vmmAux1);
-        uni_vcvtps2dq(vmmBlockIdxB, vmmBlockIdxB);
-//vmovups(ptr[regDst], vmmBlockIdxB);
-        uni_vpslld(vmmBlockIdxB, vmmBlockIdxB, 2); // multiply by indices type size.
-
-        Xbyak::Label lLessThanVector2, lTail3, lTail4, lE2;
-
-        cmp(regAux2, dataElPerVec);
-        jl(lLessThanVector2, T_NEAR);
-            vmovd(reg32IdxIter, xmmSpecIdxB);
-            mov(regAux1, reinterpret_cast<uintptr_t>(&vlen));
-            uni_vpbroadcastd(vmmVecLen, ptr[regAux1]);
-            cmp(regWorkAmount, dataElPerVec);
-            jl(lTail3, T_NEAR);
-
-//            if (jcp.dataTypeSize == 4)
-//                processBlock32b(false, true);
-//            else if (jcp.dataTypeSize == 2)
-//                process16b(false);
-//            else if (jcp.dataTypeSize == 1)
-//                process8b(false);
-//            jmp(lE2, T_NEAR);
-
-            L(lTail3);
-//            tail(false, false);
-            jmp(lE2, T_NEAR);
-        L(lLessThanVector2);
-            auto& vmmAux2 = vmmAuxContainer[2];
-            // Calculate permute mask
-            vmovd(xmmAux0, reg32Aux2);
-            uni_vpbroadcastd(vmmAux1, xmmAux0);
-            mov(regAux1, reinterpret_cast<uintptr_t>(&idxElPerVec));
-            uni_vpbroadcastd(vmmAux0, ptr[regAux1]);
-            uni_vpsubd(vmmPermIdxMask, vmmAux0, vmmAux1);
+                process(true, false);
+            L(lE1);
+            jmp(lEnd, T_NEAR);
+        }
+        L(lBlock); {
+            mov(regAux1, ptr[regParams + GET_OFF(start)]);
+            uni_vpbroadcastd(vmmBlockIdxB, ptr[regAux1]);
             mov(regAux1, reinterpret_cast<uintptr_t>(incVec));
-            uni_vpaddd(vmmPermIdxMask, vmmPermIdxMask, ptr[regAux1]);
-            for (int i = 0; i < 2; i++) { // two cycles is enough
-                vpcmpgtd(vmmAux2, vmmAux0, vmmPermIdxMask); // TODO A5
-                vpandn(vmmAux2, vmmAux2, vmmAux1);
-                uni_vpsubd(vmmPermIdxMask, vmmPermIdxMask, vmmAux2);
-            }
+            uni_vpaddd(vmmBlockIdxB, vmmBlockIdxB, ptr[regAux1]);
+            uni_vcvtdq2ps(vmmBlockIdxB, vmmBlockIdxB);
 
-//            mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
-//            uni_vmovups(vmmBeforeBlockDiff, ptr[regAux1]);
-//uni_vmovups(ptr[regDst], vmmBeforeBlockDiff);
-//            if (jcp.dataTypeSize != 1)
-//                vpslld(vmmBeforeBlockDiff, vmmBeforeBlockDiff, dataTypeShift); // multiply by data type size
-//            uni_vpmulld(vmmBeforeAxisDiff, vmmBeforeBlockDiff, vmmAxisDim);
-//            mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
-//            uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
-            cmp(regWorkAmount, dataElPerVec);
-            jl(lTail4, T_NEAR);
+            // afterAxIdxB = (start % afterAxSize) * idxTypeSize
+            movd(xmmAux0, reg32Aux1);
+            uni_vpbroadcastd(vmmAux1, xmmAux0); // A5 broadcast from reg32Aux1
+            uni_vcvtdq2ps(vmmAux1, vmmAux1);
+            uni_vdivps(vmmSrcBeforeAxisSumB, vmmBlockIdxB, vmmAux1);
+            uni_vroundps(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, 0x1);
+            vfnmadd231ps(vmmBlockIdxB, vmmSrcBeforeAxisSumB, vmmAux1);
+            uni_vcvtps2dq(vmmBlockIdxB, vmmBlockIdxB);
+    //vmovups(ptr[regDst], vmmBlockIdxB);
+            uni_vpslld(vmmBlockIdxB, vmmBlockIdxB, 2); // multiply by indices type size.
 
-//            if (jcp.dataTypeSize == 4)
-//                process32b(true, true);
-//            else if (jcp.dataTypeSize == 2)
-//                process16b(true);
-//            else if (jcp.dataTypeSize == 1)
-//                process8b(true);
-//            jmp(lE2, T_NEAR);
-            L(lTail4);
-//            tail(true, false);
-        L(lE2);
-//        jmp(lEnd, T_NEAR);
+            Xbyak::Label lLessThanVector2, lTail3, lTail4, lE2;
+
+            cmp(regAux2, dataElPerVec);
+            jl(lLessThanVector2, T_NEAR);
+                vmovd(reg32IdxIter, xmmSpecIdxB);
+                mov(regAux1, reinterpret_cast<uintptr_t>(&vlen));
+                uni_vpbroadcastd(vmmVecLen, ptr[regAux1]);
+
+                process(false, true);
+                jmp(lE2, T_NEAR);
+            L(lLessThanVector2);
+                auto& vmmAux2 = vmmAuxContainer[2];
+                // Calculate permute mask
+                vmovd(xmmAux0, reg32Aux2);
+                uni_vpbroadcastd(vmmAux1, xmmAux0);
+                mov(regAux1, reinterpret_cast<uintptr_t>(&idxElPerVec));
+                uni_vpbroadcastd(vmmAux0, ptr[regAux1]);
+                uni_vpsubd(vmmPermIdxMask, vmmAux0, vmmAux1);
+                mov(regAux1, reinterpret_cast<uintptr_t>(incVec));
+                uni_vpaddd(vmmPermIdxMask, vmmPermIdxMask, ptr[regAux1]);
+                for (int i = 0; i < 2; i++) { // two cycles is enough
+                    vpcmpgtd(vmmAux2, vmmAux0, vmmPermIdxMask); // TODO A5
+                    vpandn(vmmAux2, vmmAux2, vmmAux1);
+                    uni_vpsubd(vmmPermIdxMask, vmmPermIdxMask, vmmAux2);
+                }
+
+    //            mov(regAux1, ptr[regParams + GET_OFF(beforeAxisDiff)]);
+    //            uni_vmovups(vmmBeforeBlockDiff, ptr[regAux1]);
+    //uni_vmovups(ptr[regDst], vmmBeforeBlockDiff);
+    //            if (jcp.dataTypeSize != 1)
+    //                vpslld(vmmBeforeBlockDiff, vmmBeforeBlockDiff, dataTypeShift); // multiply by data type size
+    //            uni_vpmulld(vmmBeforeAxisDiff, vmmBeforeBlockDiff, vmmAxisDim);
+    //            mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
+    //            uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
+
+                process(true, true);
+            L(lE2);
+    //        jmp(lEnd, T_NEAR);
+        }
+        L(lEnd);
     }
-    L(lEnd);
 
     this->postamble();
 }
@@ -580,6 +591,23 @@ void jitUniGatherKernel<isa>::calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMa
     uni_vpmulld(vmmDstShifts, vmmDstShifts, vmmAfterAxisSize);
     uni_vpaddd(vmmDstShifts, vmmDstShifts, vmmSrcBeforeAxisSumB);
     uni_vpaddd(vmmDstShifts, vmmDstShifts, vmmBlockIdxB);
+}
+
+template <x64::cpu_isa_t isa>
+void jitUniGatherKernel<isa>::process(bool isShortIdx, bool blocked) {
+    Xbyak::Label lTailProc, lEndProc;
+    cmp(regWorkAmount, dataElPerVec);
+    jl(lTailProc, T_NEAR);
+        if (jcp.dataTypeSize == 4)
+            process32b(isShortIdx, blocked);
+        else if (jcp.dataTypeSize == 2)
+            process16b(isShortIdx, blocked);
+        else if (jcp.dataTypeSize == 1)
+            process8b(isShortIdx, blocked);
+    jmp(lEndProc, T_NEAR);
+    L(lTailProc);
+        tail(isShortIdx, false);
+    L(lEndProc);
 }
 
 template <x64::cpu_isa_t isa>
