@@ -38,10 +38,10 @@ private:
     int axis = 0;
     int batchDims = 0;
     bool reverseIndexing = false;
-    size_t dataTypeSize = 1lu;
     int dataSrcRank = 1;
     bool isAxisInputConst = false;
     std::string errorPrefix;
+    uint64_t dataTypeSize = 1lu;
     static constexpr uint64_t idxTypeSize = sizeof(int);
 
     int axisDim;
@@ -52,16 +52,21 @@ private:
     uint64_t afterAxisSizeInBytes;
     uint64_t axisAndAfterAxisSizeInBytes;
     uint64_t srcAfterBatchSizeInBytes;
+    uint64_t specIdxAndAfterAxSizeB;
     uint64_t totalWork;
 
-    std::vector<std::vector<int>> shortPermIdxPerThr;
-    std::vector<std::vector<int>> shortBeforeAxisDiffPerThr;
-    std::vector<std::vector<int>> specIndicesInBytes;
+    std::vector<std::vector<int>> specIdxInBytesPerThr;
+    std::vector<std::vector<int>> permIdxMaskPerThr;
+    std::vector<std::vector<int>> srcBeforeAxisDiffPerThr;
     std::vector<std::vector<int>> idxBatchSumInBytes;
     std::vector<std::vector<int>> dataBeforeAxisSumInBytesPerThr;
-    std::vector<std::vector<int>> beforeBlockDiffPerThr;
-    std::vector<std::vector<int>> afterAxPermPerThr;
+
+    std::vector<std::vector<int>> afterAxIdxInBytesPerThr;
+    std::vector<std::vector<int>> specIdxDiffPerThr;
+    std::vector<std::vector<int>> beforeAxPermMaskPerThr;
+    std::vector<std::vector<int>> afterAxPermMaskPerThr;
     std::vector<int> betweenBatchAndAxisIters;
+    std::vector<int> specIdxAndAfterAxIterBPerThr;
 
     static constexpr size_t GATHER_DATA = 0;
     static constexpr size_t GATHER_INDICES = 1;

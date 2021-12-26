@@ -208,6 +208,8 @@ const auto gather7ParamsSubset_NegativeBD = testing::Combine(
 
 INSTANTIATE_TEST_SUITE_P(smoke_Gather7_NegativeBD, Gather7LayerTest, gather7ParamsSubset_NegativeBD, Gather7LayerTest::getTestCaseName);
 
+///// GATHER-8 /////
+
 const auto gatherParamsVec1 = testing::Combine(
         testing::ValuesIn(std::vector<std::vector<size_t>>({{10, 30, 50, 1}})),
         testing::ValuesIn(std::vector<std::vector<size_t>>({{10, 16, 16}, {10, 7, 8}, {10, 5, 7}, {10, 5}})),

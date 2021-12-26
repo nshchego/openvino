@@ -13,8 +13,10 @@ struct jGatherConfParams {
     uint64_t dataTypeSize = 1lu;
     bool reverseIndexing = true;
     bool dynamicShapes = false;
+    uint64_t batchDims = 0lu;
+    uint64_t beforeAxisSize = 1lu;
     uint64_t specIdxSize = 1lu;
-    uint64_t dataAfterAxisSize = 1lu;
+    uint64_t afterAxisSize = 1lu;
 };
 
 struct gatherJitExecArgs {
@@ -27,11 +29,20 @@ struct gatherJitExecArgs {
     const uint64_t* betweenBatchAndAxisSize;
     const uint64_t* axisAndAfterAxisSizeB;
     const uint64_t* srcAfterBatchSizeB;
-    const int* permIdx;
+    const int* permIdxMask;
     const int* beforeAxisDiff;
-    const int* afterAxisPerm;
-    uint64_t workAmount = 0;
-    uint64_t afterAxSize = 0;
+
+    const int* beforeAxisPermMask;
+    const int* afterAxIdxB;
+    const int* afterAxisPermMask;
+    const int* afterAxSizePtr;
+    const int* specIdxDiff;
+
+    uint64_t workAmount = 0lu;
+    uint64_t afterAxSize = 1lu;
+    // Blocked short.
+    uint64_t specIdxAndAfterAxIterB;
+    uint64_t specIdxAndAfterAxSizeB;
     // Only static
     const int* specIdxB;
     const int* idxBatchSumB;
@@ -90,9 +101,11 @@ protected:
     using Vmask = typename mkldnn::impl::utils::conditional<isa == mkldnn::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Opmask>::type;
     const uint32_t vlenXmm = mkldnn::impl::cpu::x64::cpu_isa_traits<mkldnn::impl::cpu::x64::sse41>::vlen;
     const uint32_t indicesTypeSize = sizeof(uint32_t);
-    const uint32_t idxTypeShift = indicesTypeSize / 2;
-    uint32_t dataTypeShift = 0;
+    const uint8_t idxTypeShift = 2;
+    uint8_t vlenShift = 0;
+    uint8_t dataTypeShift = 0;
 
+    // Suffix B means "in Bytes".
     // 64b registers.
     const Xbyak::Reg64& regSrc = r8;
     const Xbyak::Reg64& regDst = r9;
@@ -104,6 +117,8 @@ protected:
     const Xbyak::Reg64& regAux2 = rsi;
     const Xbyak::Reg64& regBetweenBatchAndAxisIter = r15;
     const Xbyak::Reg64& regBetweenBatchAndAxisSize = rbx;
+    const Xbyak::Reg64& rSpecIdxAndAfterAxIterB = regIdxIter;
+    const Xbyak::Reg64& rSpecIdxAndAfterAxSizeB = regSpecIdxSizeB;
 
     const Xbyak::Reg64& regParams = mkldnn::impl::cpu::x64::abi_param1;
 
@@ -126,19 +141,21 @@ protected:
     Vmm vmmSpecIdxB = Vmm(9);
     Vmm vmmSpecIdxSizeB = Vmm(10);
     Vmm vmmAxisDim = Vmm(11);
-
-    // Only long.
     Vmm vmmAxisAndAfterAxisSizeB = Vmm(12);
-    Vmm vmmVecLen = Vmm(13);
-    Vmm vmmIdxBatchSumB = Vmm(14);
+
     // Only short.
-    Vmm vmmSrcAfterBatchSizeB = Vmm(12);
+    Vmm& vmmSrcAfterBatchSizeB = vmmAuxContainer[4];
     Vmm vmmPermIdxMask = Vmm(13);
-    Vmm vmmBeforeAxisDiff = Vmm(14);
-    Vmm vmmSpecIdxDiff = Vmm(15);
-    Vmm vmmAfterAxisSize = Vmm(5);
+    Vmm vmmBeforeAxDiffB = Vmm(14);
     // Blocked short
-    Vmm vmmBlockIdxB = Vmm(6);
+    Vmm& vmmSpecIdxDiff = vmmBeforeAxDiffB;
+    Vmm& vmmAfterAxisSize = vmmAuxContainer[5];
+    Vmm  vmmAfterAxisIdxB = Vmm(15);
+    Vmm& vmmAfterAxisPermMask = vmmPermIdxMask;
+    Vmm& vmmBeforeAxPermMask = vmmAuxContainer[6];
+    // Only long.
+    Vmm vmmVecLenB = Vmm(13);
+    Vmm vmmIdxBatchSumB = Vmm(14);
 
     // XMM
     Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
@@ -148,9 +165,9 @@ protected:
     Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(vmmSpecIdxB.getIdx());
 
     // Blocked
-//    Vmm vmmBlockIdxB = vmmSpecIndicesInBytes;
+//    Vmm vmmAfterAxisIdxB = vmmSpecIndicesInBytes;
 //    Vmm vmmSrcBeforeBlockSum = vmmSrcBeforeAxisSum;
-//    Vmm vmmBeforeBlockDiff = vmmBeforeAxisDiff;
+//    Vmm vmmBeforeBlockDiff = vmmBeforeAxDiffB;
 
 
     void calcSrcShiftLong(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
@@ -162,7 +179,7 @@ protected:
     void process16b(bool isShortIdx, bool blocked);
     void process8b(bool isShortIdx, bool blocked);
 //    void processBlock32b(bool isShortIdx, bool shiftFirst, bool blocked);
-    void tail(bool isShortIdx, bool shiftFirst = true);
+    void tail(bool isShortIdx, bool shiftFirst = true, bool blocked = false);
     void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, const Xbyak::Reg64& rWorkRest, const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
     void storeScalar(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
     void shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked);
