@@ -14,9 +14,9 @@ struct jGatherConfParams {
     bool reverseIndexing = true;
     bool dynamicShapes = false;
     uint64_t batchDims = 0lu;
-    uint64_t beforeAxisSize = 1lu;
-    uint64_t specIdxSize = 1lu;
-    uint64_t afterAxisSize = 1lu;
+    uint64_t beforeAxisSize = 0lu;
+    uint64_t specIdxSize = 0lu;
+    uint64_t afterAxisSize = 0lu;
 };
 
 struct gatherJitExecArgs {
@@ -130,10 +130,9 @@ protected:
     Xbyak::Reg32 reg32Aux1 = Xbyak::Reg32(regAux1.getIdx());
     Xbyak::Reg32 reg32Aux2 = Xbyak::Reg32(regAux2.getIdx());
 
-    // Opmasks.
+    // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
-
-    // Auxiliary.
+    // Auxiliary pool.
     Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
     // Common.
     Vmm vmmZeros = Vmm(7);
@@ -146,9 +145,10 @@ protected:
     // Only short.
     Vmm& vmmSrcAfterBatchSizeB = vmmAuxContainer[4];
     Vmm vmmPermIdxMask = Vmm(13);
-    Vmm vmmBeforeAxDiffB = Vmm(14);
-    // Blocked short
-    Vmm& vmmSpecIdxDiff = vmmBeforeAxDiffB;
+    Vmm& vmmBeforeAxDiffB = vmmAxisAndAfterAxisSizeB;
+    // Blocked short.
+//    Vmm& vmmSpecIdxDiff = vmmBeforeAxDiffB;
+    Vmm vmmSpecIdxDiff = Vmm(14);
     Vmm& vmmAfterAxisSize = vmmAuxContainer[5];
     Vmm  vmmAfterAxisIdxB = Vmm(15);
     Vmm& vmmAfterAxisPermMask = vmmPermIdxMask;
@@ -171,14 +171,15 @@ protected:
 
 
     void calcSrcShiftLong(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
+    void calcSrcShiftLongBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
     void calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst);
     void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
+    void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
     void process(bool isShortIdx, bool blocked);
     void process32b(bool isShortIdx, bool blocked);
     void process16b(bool isShortIdx, bool blocked);
     void process8b(bool isShortIdx, bool blocked);
-//    void processBlock32b(bool isShortIdx, bool shiftFirst, bool blocked);
     void tail(bool isShortIdx, bool shiftFirst = true, bool blocked = false);
     void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, const Xbyak::Reg64& rWorkRest, const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
     void storeScalar(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);

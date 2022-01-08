@@ -105,6 +105,7 @@ void MKLDNNGatherNode::prepareParams() {
 
     const auto& dataDims = srcMemPtr->getStaticDims();
     const auto& idxDims = getParentEdgeAt(GATHER_INDICES)->getMemory().getStaticDims();
+std::cout << "dataDims: " << std::string(dataDims.begin(), dataDims.end()) << "; idxDims: " << std::string(idxDims.begin(), idxDims.end()) << std::endl;
 
     if (!isAxisInputConst) {
         axis = (reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_AXIS)->getMemoryPtr()->GetPtr()))[0];
@@ -148,7 +149,8 @@ void MKLDNNGatherNode::prepareParams() {
             betweenBatchAndAxisIters[ithr] = (dstStart / specIndicesSize) % betweenBatchAndAxisSize;
             for (uint64_t j = 0lu; j < dataElPerVec; j++) {
                 specIdxInBytesPerThr[ithr][j] = (((dstStart + j) / afterAxisSize) % specIndicesSize) * idxTypeSize;
-                idxBatchSumInBytes[ithr][j] = (((dstStart + j) / specIndicesSize) / betweenBatchAndAxisSize) * specIndicesSize * idxTypeSize;
+                idxBatchSumInBytes[ithr][j] = ((dstStart + j) / (betweenBatchAndAxisSize * specIndicesSize * afterAxisSize)) *
+                        specIndicesSize * idxTypeSize;
                 dataBeforeAxisSumInBytesPerThr[ithr][j] = ((dstStart + j) / (specIndicesSize * afterAxisSize)) * axisAndAfterAxisSizeInBytes;
             }
             initShortParams(ithr, dstStart);
@@ -164,27 +166,34 @@ bool MKLDNNGatherNode::needPrepareParams() const {
 }
 
 void MKLDNNGatherNode::createPrimitive() {
-//std::cout << "MKLDNNGatherNode::createPrimitive()" << std::endl;
+    uint64_t dataElPerVec = 1;
+    if (!isDynamicNode()) {
+        const auto& dataDims = getInputShapeAtPort(GATHER_DATA).getDims();
+        afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
+        dataElPerVec = x64::mayiuse(x64::avx512_common) ? x64::cpu_isa_traits<x64::avx512_common>::vlen / dataTypeSize :
+            x64::mayiuse(x64::avx2) ? x64::cpu_isa_traits<x64::avx2>::vlen / dataTypeSize : 1;
+    }
     // Gather instruction is not supported by SSE.
-    if ((x64::mayiuse(x64::avx512_common) || x64::mayiuse(x64::avx2))) {
+    if ((x64::mayiuse(x64::avx512_common) || x64::mayiuse(x64::avx2)) &&
+            (isDynamicNode() || afterAxisSize < dataElPerVec)) {
         jGatherConfParams jcp;
         jcp.dataTypeSize = dataTypeSize;
         jcp.reverseIndexing = reverseIndexing;
         jcp.dynamicShapes = isDynamicNode();
         jcp.batchDims = batchDims;
         const auto& dataDims = getInputShapeAtPort(GATHER_DATA).getDims();
+        const auto& idxDims = getInputShapeAtPort(GATHER_INDICES).getDims();
         if (!jcp.dynamicShapes) {
-            const auto& idxDims = getInputShapeAtPort(GATHER_INDICES).getDims();
             jcp.beforeAxisSize = std::accumulate(dataDims.begin(), dataDims.begin() + axis, 1lu, std::multiplies<Dim>());
             jcp.specIdxSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<Dim>());
             jcp.afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
         } else if (getInputShapeAtPort(GATHER_DATA).isStatic() && getInputShapeAtPort(GATHER_AXIS).isStatic()) {
             jcp.beforeAxisSize = std::accumulate(dataDims.begin(), dataDims.begin() + axis, 1lu, std::multiplies<Dim>());
             jcp.afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
-        } else {
-            jcp.beforeAxisSize = 2;
+        } else if (getInputShapeAtPort(GATHER_INDICES).isStatic()) {
+            jcp.specIdxSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<Dim>());
         }
-//std::cout << "beforeAxisSize: " << jcp.beforeAxisSize << std::endl;
+
         if (x64::mayiuse(x64::avx512_common)) {
             jitKernel.reset(new jitUniGatherKernel<x64::avx512_common>(jcp));
         } else if (x64::mayiuse(x64::avx2)) {
@@ -204,9 +213,9 @@ void MKLDNNGatherNode::createPrimitive() {
 void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 //    if (jitKernel && afterAxisSize == 1) {
     if (jitKernel && (
-//            afterAxisSize < jitKernel->getDataElPerVec() ||
-            afterAxisSize == 1 ||
-            afterAxisSize > 1 && specIndicesSize * afterAxisSize < jitKernel->getDataElPerVec())) {
+            afterAxisSize < jitKernel->getDataElPerVec())) {
+//            afterAxisSize == 1 ||
+//            afterAxisSize > 1 && specIndicesSize * afterAxisSize < jitKernel->getDataElPerVec())) {
 //    if (jitKernel) {
         const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
         const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
@@ -214,7 +223,7 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 
 //const int* srcIndicesInt = reinterpret_cast<int*>(getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr());
 //const int* srcDataInt = reinterpret_cast<int*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
-////const char* srcDataInt = reinterpret_cast<char*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
+//////const char* srcDataInt = reinterpret_cast<char*>(getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr());
 //    std::string srcIndicesIntStr = "srcIndicesInt {", srcDataIntStr = "srcDataInt {";
 //for (int i = 0; i < getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetShape().getElementsCount(); i++) {
 //    srcDataIntStr += std::to_string(srcDataInt[i]) + "; ";
@@ -232,8 +241,6 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
             const uint64_t start = std::min(wpt * ithr, totalWork);
             const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
-//            const uint64_t start = 0;
-//            const uint64_t end = totalWork;
             const uint64_t workAmount = end - start;
 
             auto arg = gatherJitExecArgs();
@@ -253,13 +260,180 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
             arg.idxBatchSumB = idxBatchSumInBytes[ithr].data();
             arg.dataBeforeAxisSumB = dataBeforeAxisSumInBytesPerThr[ithr].data();
             arg.betweenBatchAndAxisIter = betweenBatchAndAxisIters[ithr];
-//    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
-//        "; end: " + std::to_string(end) + "\n";
-//printf("%s\n", seqStr.c_str());
+    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
+        "; end: " + std::to_string(end) + "\n";
 
             const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
             const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
+    std::string thrIdx = "[" + std::to_string(ithr) + "] ";
+    std::string specIndicesInBytesStr = thrIdx + "specIndicesInBytes {",
+            idxBatchSumInBytesStr = thrIdx + "idxBatchSumInBytes {",
+            srcBeforeAxisSumStr = thrIdx + "dataBeforeAxisSumB {",
+            beforeAxisDiffStr = thrIdx + "beforeAxisDiff {",
+            beforeAxPermMaskStr = thrIdx + "beforeAxPermMask {",
+            specIdxDiffStr = thrIdx + "specIdxDiff {",
+            afterAxisPermStr = thrIdx + "afterAxisPermMask {",
+            afterAxIdxBStr = thrIdx + "afterAxIdxB {",
+            betweenBatchAndAxisIterStr = thrIdx + "betweenBatchAndAxisIter: " + std::to_string(betweenBatchAndAxisIters[ithr]) +
+                "; betweenBatchAndAxisSize: " + std::to_string(betweenBatchAndAxisSize) +
+                "; srcAfterBatchSizeInBytes: " + std::to_string(srcAfterBatchSizeInBytes) +
+                "; specIdxAndAfterAxIterB: " + std::to_string(specIdxAndAfterAxIterBPerThr[ithr]) +
+                "; specIdxAndAfterAxSizeB: " + std::to_string(specIdxAndAfterAxSizeB) + "\n";
+for (int i = 0; i < dataElPerVec; i++) {
+    specIndicesInBytesStr += std::to_string(specIdxInBytesPerThr[ithr][i]) + "; ";
+    idxBatchSumInBytesStr += std::to_string(idxBatchSumInBytes[ithr][i]) + "; ";
+    srcBeforeAxisSumStr += std::to_string(dataBeforeAxisSumInBytesPerThr[ithr][i]) + "; ";
+    if (i < afterAxIdxInBytesPerThr[ithr].size())
+        afterAxIdxBStr += std::to_string(afterAxIdxInBytesPerThr[ithr][i]) + "; ";
+    if (i < srcBeforeAxisDiffPerThr[ithr].size())
+        beforeAxisDiffStr += std::to_string(srcBeforeAxisDiffPerThr[ithr][i]) + "; ";
+    if (i < beforeAxPermMaskPerThr[ithr].size())
+        beforeAxPermMaskStr += std::to_string(beforeAxPermMaskPerThr[ithr][i]) + "; ";
+    if (i < specIdxDiffPerThr[ithr].size())
+        specIdxDiffStr += std::to_string(specIdxDiffPerThr[ithr][i]) + "; ";
+    if (i < afterAxPermMaskPerThr[ithr].size())
+        afterAxisPermStr += std::to_string(afterAxPermMaskPerThr[ithr][i]) + "; ";
+}
+specIndicesInBytesStr += "}\n";
+idxBatchSumInBytesStr += "}\n";
+srcBeforeAxisSumStr += "}\n";
+afterAxIdxBStr += "}\n";
+beforeAxisDiffStr += "}\n";
+beforeAxPermMaskStr += "}\n";
+specIdxDiffStr += "}\n";
+afterAxisPermStr += "}\n";
+
+            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) { // Elementwise short case.
+                arg.permIdxMask = permIdxMaskPerThr[ithr].data();
+                arg.beforeAxisDiff = srcBeforeAxisDiffPerThr[ithr].data();
+            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) { // Blocked short case.
+                arg.afterAxIdxB = afterAxIdxInBytesPerThr[ithr].data();
+                arg.specIdxDiff = specIdxDiffPerThr[ithr].data();
+                arg.beforeAxisDiff = srcBeforeAxisDiffPerThr[ithr].data();
+                arg.beforeAxisPermMask = beforeAxPermMaskPerThr[ithr].data();
+                arg.afterAxisPermMask = afterAxPermMaskPerThr[ithr].data();
+                const int afterAxSizeB = afterAxisSize;
+                arg.afterAxSizePtr = &afterAxSizeB;
+                arg.specIdxAndAfterAxIterB = specIdxAndAfterAxIterBPerThr[ithr];
+                arg.specIdxAndAfterAxSizeB = specIdxAndAfterAxSizeB;
+            }
+
+printf("%s%s%s%s%s%s%s%s%s%s", seqStr.c_str(), specIndicesInBytesStr.c_str(), idxBatchSumInBytesStr.c_str(), srcBeforeAxisSumStr.c_str(),
+    afterAxIdxBStr.c_str(), beforeAxisDiffStr.c_str(), beforeAxPermMaskStr.c_str(),
+    specIdxDiffStr.c_str(), afterAxisPermStr.c_str(), betweenBatchAndAxisIterStr.c_str());
+
+            (*jitKernel)(&arg);
+
+//int* tmpDst = reinterpret_cast<int*>(arg.dst);
+//    std::string outData = "[" + std::to_string(ithr) + "] OUT DATA: ";
+//for (int i = 0; i < 4; i++) {
+//    outData += std::to_string(tmpDst[i]) + ";";
+//}
+//outData += "\n";
+//printf("%s", outData.c_str());
+        };
+
+        parallel_nt(0, threadBody);
+//char* tmpDst = reinterpret_cast<char*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetShape().getElementsCount(); i++) {
+//    if (i % 8 == 0)
+//        std::cout << "_";
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
+
+int* tmpDst = reinterpret_cast<int*>(dstData);
+std::cout << "\nOUT DATA:\n";
+for (int i = 0; i < getOutputShapeAtPort(0).getElementsCount(); i++) {
+    if (i % 8 == 0)
+        std::cout << "_";
+    if (i % 96 == 0)
+        std::cout << std::endl;
+    std::cout << std::to_string(tmpDst[i]) << ";";
+}
+std::cout << std::endl;
+
+    } else {
+        execReference();
+    }
+}
+
+void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
+    if (jitKernel && afterAxisSize == 1) {
+//    if (jitKernel) {
+//std::cout << "Dyn kernel" << std::endl;
+        const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
+        const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
+        uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+
+        const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+
+        auto threadBody = [&](const int ithr, const int nthr) {
+            const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
+            const uint64_t start = std::min(wpt * ithr, totalWork);
+            const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
+            const uint64_t workAmount = end - start;
+
+            auto arg = gatherJitExecArgs();
+
+            arg.src = srcData;
+            arg.dst = dstData + afterAxisSizeInBytes * start;
+            arg.indices = srcIndices;
+            arg.start = &start;
+            arg.axisDim = &axisDim;
+            arg.afterAxSize = afterAxisSize;
+            arg.axisAndAfterAxisSizeB = &axisAndAfterAxisSizeInBytes;
+            arg.srcAfterBatchSizeB = &srcAfterBatchSizeInBytes;
+            arg.betweenBatchAndAxisSize = &betweenBatchAndAxisSize;
+            arg.specIndicesSize = &specIndicesSize;
+            arg.workAmount = workAmount;
+    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
+        "; end: " + std::to_string(end);
+printf("%s\n", seqStr.c_str());
+
+            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
+            const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+                int permIdxMask[16];
+                int beforeAxisDiff[16];
+                permIdxMask[0] = idxElPerVec - specIndicesSize;
+                int div = idxElPerVec / specIndicesSize;
+                int remainder = idxElPerVec % specIndicesSize;
+                for (int i = 1; i < idxElPerVec; i++) {
+                    permIdxMask[i] = permIdxMask[i - 1] + 1;
+                    if (permIdxMask[i] == idxElPerVec)
+                        permIdxMask[i] = idxElPerVec - specIndicesSize;
+                }
+                int specIndices[16] = {0};
+                for (int i = 0; i < idxElPerVec; i++) {
+                    specIndices[i] = (start + i) % specIndicesSize;
+                }
+                for (int i = 0; i < idxElPerVec; i++) {
+                    if (specIndices[i] < specIndicesSize - remainder)
+                        beforeAxisDiff[i] = axisDim * div;
+                    else
+                        beforeAxisDiff[i] = axisDim * (div + 1);
+                }
+                arg.permIdxMask = permIdxMask;
+                arg.beforeAxisDiff = beforeAxisDiff;
+            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) {
+                int beforeBlockDiff[16];
+                int div = idxElPerVec / afterAxisSize;
+                int remainder = idxElPerVec % afterAxisSize;
+                int blockIndices[16] = {0};
+                for (int i = 0; i < idxElPerVec; i++) {
+                    blockIndices[i] = (start + i) % afterAxisSize;
+                }
+                for (int i = 0; i < idxElPerVec; i++) {
+                    if (blockIndices[i] < afterAxisSize - remainder)
+                        beforeBlockDiff[i] = div; // axisDim * div;
+                    else
+                        beforeBlockDiff[i] = div + 1; // axisDim * (div + 1);
+                }
+                arg.beforeAxisDiff = beforeBlockDiff;
+            }
 //    std::string thrIdx = "[" + std::to_string(ithr) + "] ";
 //    std::string specIndicesInBytesStr = thrIdx + "specIndicesInBytes {",
 //            idxBatchSumInBytesStr = thrIdx + "idxBatchSumInBytes {",
@@ -297,137 +471,9 @@ void MKLDNNGatherNode::execute(mkldnn::stream strm) {
 //beforeAxPermMaskStr += "}\n";
 //specIdxDiffStr += "}\n";
 //afterAxisPermStr += "}\n";
-
-            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) { // Elementwise short case.
-                arg.permIdxMask = permIdxMaskPerThr[ithr].data();
-                arg.beforeAxisDiff = srcBeforeAxisDiffPerThr[ithr].data();
-            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) { // Blocked short case.
-                arg.afterAxIdxB = afterAxIdxInBytesPerThr[ithr].data();
-                arg.specIdxDiff = specIdxDiffPerThr[ithr].data();
-                arg.beforeAxisDiff = srcBeforeAxisDiffPerThr[ithr].data();
-                arg.beforeAxisPermMask = beforeAxPermMaskPerThr[ithr].data();
-                arg.afterAxisPermMask = afterAxPermMaskPerThr[ithr].data();
-                const int afterAxSizeB = afterAxisSize;
-                arg.afterAxSizePtr = &afterAxSizeB;
-                arg.specIdxAndAfterAxIterB = specIdxAndAfterAxIterBPerThr[ithr];
-                arg.specIdxAndAfterAxSizeB = specIdxAndAfterAxSizeB;
-            }
-
 //printf("%s%s%s%s%s%s%s%s%s%s", seqStr.c_str(), specIndicesInBytesStr.c_str(), idxBatchSumInBytesStr.c_str(), srcBeforeAxisSumStr.c_str(),
 //    afterAxIdxBStr.c_str(), beforeAxisDiffStr.c_str(), beforeAxPermMaskStr.c_str(),
 //    specIdxDiffStr.c_str(), afterAxisPermStr.c_str(), betweenBatchAndAxisIterStr.c_str());
-
-            (*jitKernel)(&arg);
-
-//int* tmpDst = reinterpret_cast<int*>(arg.dst);
-//    std::string outData = "[" + std::to_string(ithr) + "] OUT DATA: ";
-//for (int i = 0; i < 4; i++) {
-//    outData += std::to_string(tmpDst[i]) + ";";
-//}
-//outData += "\n";
-//printf("%s", outData.c_str());
-        };
-
-        parallel_nt(0, threadBody);
-//char* tmpDst = reinterpret_cast<char*>(dstData);
-//std::cout << "\nOUT DATA:\n";
-//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetShape().getElementsCount(); i++) {
-//    if (i % 8 == 0)
-//        std::cout << "_";
-//    std::cout << std::to_string(tmpDst[i]) << ";";
-//}
-//std::cout << std::endl;
-
-//int* tmpDst = reinterpret_cast<int*>(dstData);
-//std::cout << "\nOUT DATA:\n";
-//for (int i = 0; i < getOutputShapeAtPort(0).getElementsCount(); i++) {
-//    if (i % 8 == 0)
-//        std::cout << "_";
-////    if (i % 16 == 0)
-////        std::cout << std::endl;
-//    std::cout << std::to_string(tmpDst[i]) << ";";
-//}
-//std::cout << std::endl;
-
-    } else {
-        execReference();
-    }
-}
-
-void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
-    if (jitKernel && afterAxisSize == 1) {
-//    if (jitKernel) {
-//std::cout << "Dyn kernel" << std::endl;
-        const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
-        const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
-        uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-
-        const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
-
-        auto threadBody = [&](const int ithr, const int nthr) {
-            const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
-            const uint64_t start = std::min(wpt * ithr, totalWork);
-            const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
-            const uint64_t workAmount = end - start;
-
-            auto arg = gatherJitExecArgs();
-
-            arg.src = srcData;
-            arg.dst = dstData + afterAxisSizeInBytes * start;
-            arg.indices = srcIndices;
-            arg.start = &start;
-            arg.axisDim = &axisDim;
-            arg.afterAxSize = afterAxisSize;
-            arg.axisAndAfterAxisSizeB = &axisAndAfterAxisSizeInBytes;
-            arg.srcAfterBatchSizeB = &srcAfterBatchSizeInBytes;
-            arg.betweenBatchAndAxisSize = &betweenBatchAndAxisSize;
-            arg.specIndicesSize = &specIndicesSize;
-            arg.workAmount = workAmount;
-//    std::string seqStr = std::string("[") + std::to_string(ithr) + "] TW: " + std::to_string(totalWork) + " start: " + std::to_string(start) +
-//        "; end: " + std::to_string(end);
-//printf("%s\n", seqStr.c_str());
-
-            const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
-            const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
-            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
-                int permIdxMask[16];
-                int beforeAxisDiff[16];
-                permIdxMask[0] = idxElPerVec - specIndicesSize;
-                int div = idxElPerVec / specIndicesSize;
-                int remainder = idxElPerVec % specIndicesSize;
-                for (int i = 1; i < idxElPerVec; i++) {
-                    permIdxMask[i] = permIdxMask[i - 1] + 1;
-                    if (permIdxMask[i] == idxElPerVec)
-                        permIdxMask[i] = idxElPerVec - specIndicesSize;
-                }
-                int specIndices[16] = {0};
-                for (int i = 0; i < idxElPerVec; i++) {
-                    specIndices[i] = (start + i) % specIndicesSize;
-                }
-                for (int i = 0; i < idxElPerVec; i++) {
-                    if (specIndices[i] < specIndicesSize - remainder)
-                        beforeAxisDiff[i] = axisDim * div;
-                    else
-                        beforeAxisDiff[i] = axisDim * (div + 1);
-                }
-                arg.permIdxMask = permIdxMask;
-                arg.beforeAxisDiff = beforeAxisDiff;
-            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) {
-                int beforeBlockDiff[16];
-                int div = idxElPerVec / afterAxisSize;
-                int remainder = idxElPerVec % afterAxisSize;
-                int blockIndices[16] = {0};
-                for (int i = 0; i < idxElPerVec; i++) {
-                    blockIndices[i] = (start + i) % afterAxisSize;
-                }
-                for (int i = 0; i < idxElPerVec; i++) {
-                    if (blockIndices[i] < afterAxisSize - remainder)
-                        beforeBlockDiff[i] = div;//axisDim * div;
-                    else
-                        beforeBlockDiff[i] = div + 1;//axisDim * (div + 1);
-                }
-                arg.beforeAxisDiff = beforeBlockDiff;
-            }
 
             (*jitKernel)(&arg);
         };
@@ -441,14 +487,15 @@ void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
 //    std::cout << std::to_string(tmpDst[i]) << ";";
 //}
 //std::cout << std::endl;
-//int* tmpDst = reinterpret_cast<int*>(dstData);
-//std::cout << "\nOUT DATA:\n";
-//for (int i = 0; i < getChildEdgeAt(0)->getShape().getElementsCount(); i++) {
-//    if (i % 8 == 0)
-//        std::cout << "_";
-//    std::cout << std::to_string(tmpDst[i]) << ";";
-//}
-//std::cout << std::endl;
+
+int* tmpDst = reinterpret_cast<int*>(dstData);
+std::cout << "\nOUT DATA:\n";
+for (int i = 0; i < beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize; i++) {
+    if (i % 8 == 0)
+        std::cout << "_";
+    std::cout << std::to_string(tmpDst[i]) << ";";
+}
+std::cout << std::endl;
     } else {
         execReference();
     }
@@ -509,37 +556,49 @@ void MKLDNNGatherNode::initShortParams(const uint64_t ithr, const uint64_t start
         auto& specIdxDiff = specIdxDiffPerThr[ithr];
         auto& srcBeforeAxisDiff = srcBeforeAxisDiffPerThr[ithr];
 
-        int divAA = idxElPerVec / afterAxisSize;
+//        int divAA = idxElPerVec / afterAxisSize;
 //        int divBA = idxElPerVec / (axis * afterAxisSize);
-        int remainder = idxElPerVec % afterAxisSize;
+//        int remainder = idxElPerVec % afterAxisSize;
         int secondStart = start + idxElPerVec;
-        int beforeAxSize = beforeBatchSize * betweenBatchAndAxisSize;
-        beforeAxPermMask[0] = idxElPerVec - axis * afterAxisSize;
+//        int beforeAxSize = beforeBatchSize * betweenBatchAndAxisSize;
+//        beforeAxPermMask[0] = idxElPerVec - axisDim * afterAxisSize;
         for (int i = 0; i < idxElPerVec; i++) {
             afterAxIdxInBytes[i] = (start + i) % afterAxisSize;
             specIdxDiff[i] = (((secondStart + i) / afterAxisSize) % specIndicesSize) * idxTypeSize - specIdxInBytesPerThr[ithr][i];
             if (specIdxDiff[i] < 0)
                 specIdxDiff[i] += specIndicesSize * idxTypeSize;
-            if (afterAxIdxInBytes[i] < afterAxisSize - remainder) {
-//                specIdxDiff[i] = (secondStart + i)//div * idxTypeSize;
-                srcBeforeAxisDiff[i] = divAA * afterAxisSize * dataTypeSize;
-            } else {
-//                specIdxDiff[i] = //(div + 1) * idxTypeSize;
-                srcBeforeAxisDiff[i] = (divAA + 1) * afterAxisSize * dataTypeSize;
-            }
-            if (srcBeforeAxisDiff[i] >= beforeAxSize) {
-                srcBeforeAxisDiff[i] = 0; // TODO: fix
-            }
+//            if (afterAxIdxInBytes[i] < afterAxisSize - remainder) {
+////                specIdxDiff[i] = (secondStart + i)//div * idxTypeSize;
+//                srcBeforeAxisDiff[i] = divAA * afterAxisSize * dataTypeSize;
+//            } else {
+////                specIdxDiff[i] = //(div + 1) * idxTypeSize;
+//                srcBeforeAxisDiff[i] = (divAA + 1) * afterAxisSize * dataTypeSize;
+//            }
+//            if (srcBeforeAxisDiff[i] >= beforeAxSize) {
+//                srcBeforeAxisDiff[i] = 0; // TODO: fix
+//            }
+            srcBeforeAxisDiff[i] = ((start + i + idxElPerVec) / (specIndicesSize * afterAxisSize)) * axisAndAfterAxisSizeInBytes -
+                    ((start + i) / (specIndicesSize * afterAxisSize)) * axisAndAfterAxisSizeInBytes;
 
-            beforeAxPermMask[i] = beforeAxPermMask[i - 1] + 1;
-            if (beforeAxPermMask[i] == idxElPerVec)
-                beforeAxPermMask[i] = idxElPerVec - axis * afterAxisSize;
+//            if (i > 0) {
+//                beforeAxPermMask[i] = beforeAxPermMask[i - 1] + 1;
+//                if (beforeAxPermMask[i] == idxElPerVec)
+//                    beforeAxPermMask[i] = idxElPerVec - axisDim * afterAxisSize;
+//            }
             afterAxIdxInBytes[i] *= dataTypeSize;
             afterAxPermMask[i] = idxElPerVec - afterAxisSize + i;
-            if (afterAxPermMask[i] >= idxElPerVec)
-                afterAxPermMask[i] -= afterAxisSize;
-            if (afterAxPermMask[i] >= idxElPerVec)
-                afterAxPermMask[i] -= afterAxisSize;
+            for (size_t j = 0lu; j < 3lu; j++) {
+                if (afterAxPermMask[i] >= idxElPerVec)
+                    afterAxPermMask[i] -= afterAxisSize;
+            }
+        }
+        if (specIndicesSize * afterAxisSize < idxElPerVec) {
+            beforeAxPermMask[0] = idxElPerVec - specIndicesSize * afterAxisSize;
+            for (int i = 1; i < idxElPerVec; i++) {
+                beforeAxPermMask[i] = beforeAxPermMask[i - 1] + 1;
+                if (beforeAxPermMask[i] == idxElPerVec)
+                    beforeAxPermMask[i] = idxElPerVec - specIndicesSize * afterAxisSize;
+            }
         }
 
         specIdxAndAfterAxIterBPerThr[ithr] = (start * dataTypeSize) % specIdxAndAfterAxSizeB;
