@@ -170,10 +170,10 @@ protected:
 //    Vmm vmmBeforeBlockDiff = vmmBeforeAxDiffB;
 
 
-    void calcSrcShiftLong(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
-    void calcSrcShiftLongBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
-    void calcSrcShiftShort(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst = true);
-    void calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst);
+    void calcSrcShiftLong(Vmm* vAuxPool, bool shiftFirst = true);
+    void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
+    void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);
+    void calcSrcShiftShortBlock(Vmm* vAuxPool, bool shiftFirst);
     void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
     void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
     void process(bool isShortIdx, bool blocked);

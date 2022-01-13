@@ -61,8 +61,8 @@ void jitUniGatherKernel<isa>::generate() {
     mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
     uni_vpxor(vmmZeros, vmmZeros, vmmZeros);
 
-    auto& vmmAux0 = vmmAuxContainer[0];
-    auto& vmmAux1 = vmmAuxContainer[1];
+    auto& vAux0 = vmmAuxContainer[0];
+    auto& vAux1 = vmmAuxContainer[1];
     auto& xmmAux0 = xmmAuxContainer[0];
     auto& xmmAux1 = xmmAuxContainer[1];
 
@@ -76,22 +76,22 @@ void jitUniGatherKernel<isa>::generate() {
         // Formula: specIndices = (start % specIndicesSize) * idxTypeSize
         mov(regAux1, ptr[regParams + GET_OFF(specIndicesSize)]);
         uni_vpbroadcastd(vmmSpecIdxSizeB, ptr[regAux1]);
-        uni_vcvtdq2ps(vmmAux1, vmmSpecIdxSizeB);
-        uni_vdivps(vmmSrcBeforeAxisSumB, vmmSpecIdxB, vmmAux1);
+        uni_vcvtdq2ps(vAux1, vmmSpecIdxSizeB);
+        uni_vdivps(vmmSrcBeforeAxisSumB, vmmSpecIdxB, vAux1);
         uni_vroundps(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, 0x1);
-        vfnmadd231ps(vmmSpecIdxB, vmmSrcBeforeAxisSumB, vmmAux1);
+        vfnmadd231ps(vmmSpecIdxB, vmmSrcBeforeAxisSumB, vAux1);
         uni_vcvtps2dq(vmmSpecIdxB, vmmSpecIdxB);
         vpslld(vmmSpecIdxB, vmmSpecIdxB, idxTypeShift); // multiply by indices type size.
         vpslld(vmmSpecIdxSizeB, vmmSpecIdxSizeB, idxTypeShift); // multiply by indices type size.
         vmovd(reg32SpecIdxSizeB, xmmSpecIdxSizeB);
 
         mov(regAux1, ptr[regParams + GET_OFF(betweenBatchAndAxisSize)]);
-        uni_vpbroadcastd(vmmAux1, ptr[regAux1]);
+        uni_vpbroadcastd(vAux1, ptr[regAux1]);
         vmovd(reg32BetweenBatchAndAxisSize, xmmAux1);
-        uni_vcvtdq2ps(vmmAux1, vmmAux1);
-        uni_vdivps(vmmIdxBatchSumB, vmmSrcBeforeAxisSumB, vmmAux1);
+        uni_vcvtdq2ps(vAux1, vAux1);
+        uni_vdivps(vmmIdxBatchSumB, vmmSrcBeforeAxisSumB, vAux1);
         uni_vroundps(vmmIdxBatchSumB, vmmIdxBatchSumB, 0x1);
-        vfnmadd231ps(vmmSrcBeforeAxisSumB, vmmIdxBatchSumB, vmmAux1);
+        vfnmadd231ps(vmmSrcBeforeAxisSumB, vmmIdxBatchSumB, vAux1);
         uni_vcvtps2dq(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB);
         vmovd(reg32BetweenBatchAndAxisIter, xmmSrcBeforeAxisSum);
         uni_vcvtps2dq(vmmIdxBatchSumB, vmmIdxBatchSumB);
@@ -100,10 +100,10 @@ void jitUniGatherKernel<isa>::generate() {
         uni_vpbroadcastd(vmmAxisAndAfterAxisSizeB, ptr[regAux1]);
         uni_vpmulld(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
         mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
-        uni_vpbroadcastd(vmmAux0, ptr[regAux1]);
-        uni_vpmulld(vmmAux0, vmmAux0, vmmIdxBatchSumB);
+        uni_vpbroadcastd(vAux0, ptr[regAux1]);
+        uni_vpmulld(vAux0, vAux0, vmmIdxBatchSumB);
         // Formula: srcBeforeAxisSum = ((start / specIndicesSize) % betweenBatchAndAxis) * axisAndAfterAxisSize + srcAfterBatchSize * idxBatchSum
-        uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAux0);
+        uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vAux0);
 
         // Formula: idxBatchSum = specIdxSize * (start / afterBatchSize)
         uni_vpmulld(vmmIdxBatchSumB, vmmIdxBatchSumB, vmmSpecIdxSizeB);
@@ -236,11 +236,11 @@ void jitUniGatherKernel<isa>::generate() {
 
             // afterAxIdxB = (start % afterAxSize) * idxTypeSize
             movd(xmmAux0, reg32Aux1); // afterAxSize ??
-            uni_vpbroadcastd(vmmAux1, xmmAux0); // A5 broadcast from reg32Aux1
-            uni_vcvtdq2ps(vmmAux1, vmmAux1);
-            uni_vdivps(vmmSrcBeforeAxisSumB, vmmAfterAxisIdxB, vmmAux1);
+            uni_vpbroadcastd(vAux1, xmmAux0); // A5 broadcast from reg32Aux1
+            uni_vcvtdq2ps(vAux1, vAux1);
+            uni_vdivps(vmmSrcBeforeAxisSumB, vmmAfterAxisIdxB, vAux1);
             uni_vroundps(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, 0x1);
-            vfnmadd231ps(vmmAfterAxisIdxB, vmmSrcBeforeAxisSumB, vmmAux1);
+            vfnmadd231ps(vmmAfterAxisIdxB, vmmSrcBeforeAxisSumB, vAux1);
             uni_vcvtps2dq(vmmAfterAxisIdxB, vmmAfterAxisIdxB);
             vpslld(vmmAfterAxisIdxB, vmmAfterAxisIdxB, idxTypeShift); // multiply by indices type size.
 
@@ -259,15 +259,15 @@ void jitUniGatherKernel<isa>::generate() {
                 auto& vmmAux2 = vmmAuxContainer[2];
                 // Calculate permute mask
                 vmovd(xmmAux0, reg32Aux2);
-                uni_vpbroadcastd(vmmAux1, xmmAux0);
+                uni_vpbroadcastd(vAux1, xmmAux0);
                 mov(regAux1, reinterpret_cast<uintptr_t>(&idxElPerVec));
-                uni_vpbroadcastd(vmmAux0, ptr[regAux1]);
-                uni_vpsubd(vmmAfterAxisPermMask, vmmAux0, vmmAux1);
+                uni_vpbroadcastd(vAux0, ptr[regAux1]);
+                uni_vpsubd(vmmAfterAxisPermMask, vAux0, vAux1);
                 mov(regAux1, reinterpret_cast<uintptr_t>(incVec));
                 uni_vpaddd(vmmAfterAxisPermMask, vmmAfterAxisPermMask, ptr[regAux1]);
                 for (int i = 0; i < 2; i++) { // two cycles is enough
-                    vpcmpgtd(vmmAux2, vmmAux0, vmmAfterAxisPermMask); // TODO A5
-                    vpandn(vmmAux2, vmmAux2, vmmAux1);
+                    vpcmpgtd(vmmAux2, vAux0, vmmAfterAxisPermMask); // TODO A5
+                    vpandn(vmmAux2, vmmAux2, vAux1);
                     uni_vpsubd(vmmAfterAxisPermMask, vmmAfterAxisPermMask, vmmAux2);
                 }
 
@@ -357,10 +357,11 @@ void jitUniGatherKernel<x64::avx512_common>::normWithUpperBound(Vmm& vTarget, Vm
 
 template <x64::cpu_isa_t isa>
 void jitUniGatherKernel<isa>::tail(bool isShortIdx, bool shiftFirst, bool blocked) {
-    auto& vmmAux0 = vmmAuxContainer[0];
-    auto& vmmAux1 = vmmAuxContainer[2];
-    auto& kGatherMask = masksContainer[vmmAuxContainer[3].getIdx()];
-    auto& kAuxMask0 = masksContainer[vmmAux0.getIdx()];
+    auto& vSrcShift = vmmAuxContainer[0];
+    auto& kGatherMask = masksContainer[vmmAuxContainer[1].getIdx()];
+    auto& vAux0 = vmmAuxContainer[2];
+    auto& vAux1 = vmmAuxContainer[3];
+    auto& kAuxMask0 = masksContainer[vAux0.getIdx()];
     Xbyak::Label lEnd;
 
     const int secondStepCycles = jcp.dataTypeSize == 4 ? 1 : jcp.dataTypeSize == 2 ? 2 : 4;
@@ -368,20 +369,19 @@ void jitUniGatherKernel<isa>::tail(bool isShortIdx, bool shiftFirst, bool blocke
         cmp(regWorkAmount, 0);
         jle(lEnd, T_NEAR);
 
-        // calcSrcShift -> vmmAuxContainer[1]
         if (isShortIdx) {
             if (blocked)
-                calcSrcShiftShortBlock(vmmAuxContainer, kGatherMask, p > 0 || shiftFirst);
+                calcSrcShiftShortBlock(vmmAuxContainer, p > 0 || shiftFirst);
             else
-                calcSrcShiftShort(vmmAuxContainer, kGatherMask, p > 0 || shiftFirst);
+                calcSrcShiftShort(vmmAuxContainer, p > 0 || shiftFirst);
         } else {
             if (blocked)
-                calcSrcShiftLongBlock(vmmAuxContainer, kGatherMask, p > 0 || shiftFirst);
+                calcSrcShiftLongBlock(vmmAuxContainer, p > 0 || shiftFirst);
             else
-                calcSrcShiftLong(vmmAuxContainer, kGatherMask, p > 0 || shiftFirst);
+                calcSrcShiftLong(vmmAuxContainer, p > 0 || shiftFirst);
         }
 
-        fillRestWorkMask(vmmAux1, vmmAux0, regWorkAmount, regAux1, rdx);
+        fillRestWorkMask(vAux1, vAux0, regWorkAmount, regAux1, rdx);
 
         // Combining masks.
         if (isa == x64::avx512_common) {
@@ -389,38 +389,39 @@ void jitUniGatherKernel<isa>::tail(bool isShortIdx, bool shiftFirst, bool blocke
             auto kMask0 = Xbyak::Opmask(kAuxMask0.getIdx());
             auto kMask1 = Xbyak::Opmask(kGatherMask.getIdx());
 
-            vpmovd2m(kMask0, vmmAux1);
+            vpmovd2m(kMask0, vAux1);
             kandd(kMask1, kMask1, kMask0);
             if (jcp.dataTypeSize == 4)
                 kmovd(kMask0, kMask1);
         } else if (isa == x64::avx2) {
             auto& vGatherMask = vmmAuxContainer[kGatherMask.getIdx()];
 
-            vpand(vGatherMask, vGatherMask, vmmAux1);
+            vpand(vGatherMask, vGatherMask, vAux1);
             if (jcp.dataTypeSize == 4)
-                vmovups(vmmAux0, vGatherMask);
+                vmovups(vAux0, vGatherMask);
         }
 
-        uni_vmovups(vmmAux1, vmmZeros);
-        uni_vpgatherdd(vmmAux1, ptr[regSrc + vmmAuxContainer[1]], kGatherMask);
+        uni_vmovups(vAux1, vmmZeros);
+        uni_vpgatherdd(vAux1, ptr[regSrc + vSrcShift], kGatherMask);
         if (jcp.dataTypeSize == 4) {
-            uni_vmovups_tail(ptr[regDst], kAuxMask0, vmmAux1);
+            uni_vmovups_tail(ptr[regDst], kAuxMask0, vAux1);
             sub(regWorkAmount, dataElPerVec);
         } else {
-            storeScalar(regDst, regWorkAmount, vmmAux1, vmmAux0);
+            storeScalar(regDst, regWorkAmount, vAux1, vAux0);
         }
     }
     L(lEnd);
 }
 
-// Requires vAuxPool length 3.
-// Returns gathered data in vAuxPool[1].
+// Requires vAuxPool length 4.
+// Returns calculated shifts in vAuxPool[0] and mask in vAuxPool[1].
 template <>
-void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, Vmask& vDstMask, bool shiftFirst) {
-    auto& vmmDstShifts = vAuxPool[1];
-    auto& vmmAux0 = vAuxPool[0];
-    auto& vmmAux1 = vAuxPool[2];
-    auto& kAuxMask0 = masksContainer[vmmAux1.getIdx()];
+void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, bool shiftFirst) {
+    auto& vDstShifts = vAuxPool[0];
+    auto& kDstMask = masksContainer[vAuxPool[1].getIdx()];
+    auto& vAux0 = vAuxPool[2];
+    auto& vAux1 = vAuxPool[3];
+    auto& kAuxMask0 = masksContainer[vAux1.getIdx()];
 
     Xbyak::Label lIdxStride, lExit;
     if (shiftFirst)
@@ -430,45 +431,45 @@ void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, Vmask& vDstM
     cmp(regIdxIter, regSpecIdxSizeB);
     jge(lIdxStride, T_NEAR);
         if (jcp.batchDims > 0lu) {
-            uni_vpaddd(vmmDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
-            auto& xmmAux = xmmAuxContainer[vmmDstShifts.getIdx()];
+            uni_vpaddd(vDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
+            auto& xmmAux = xmmAuxContainer[vDstShifts.getIdx()];
             vmovd(reg32Aux1, xmmAux);
         } else {
             auto& xmmAux = xmmAuxContainer[vmmSpecIdxB.getIdx()];
             vmovd(reg32Aux1, xmmAux);
         }
-        vmovdqu(vmmDstShifts, ptr[regIndices + regAux1]);
-        normalizeRawIndices(vmmDstShifts, vDstMask, kAuxMask0);
+        vmovdqu(vDstShifts, ptr[regIndices + regAux1]);
+        normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
         if (jcp.beforeAxisSize != 1lu)
-            uni_vpaddd(vmmDstShifts, vmmDstShifts, vmmSrcBeforeAxisSumB);
+            uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
     jmp(lExit, T_NEAR);
     L(lIdxStride);
         sub(regIdxIter, regSpecIdxSizeB);
-        uni_vpcmpeqd(vDstMask, vmmAux0, vmmAux0);
+        uni_vpcmpeqd(kDstMask, vAux0, vAux0);
         if (shiftFirst) {
-            vpcmpgtd(vmmAux0, vmmSpecIdxSizeB, vmmSpecIdxB);
-            vpandn(vmmAux1, vmmAux0, vmmSpecIdxSizeB);
-            vpsubd(vmmAux1, vmmSpecIdxB, vmmAux1);
+            vpcmpgtd(vAux0, vmmSpecIdxSizeB, vmmSpecIdxB);
+            vpandn(vAux1, vAux0, vmmSpecIdxSizeB);
+            vpsubd(vAux1, vmmSpecIdxB, vAux1);
             if (jcp.batchDims > 0lu)
-                uni_vpaddd(vmmAux1, vmmIdxBatchSumB, vmmAux1);
+                uni_vpaddd(vAux1, vmmIdxBatchSumB, vAux1);
             vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmSpecIdxSizeB);
         } else {
             if (jcp.batchDims > 0lu) {
-                uni_vpaddd(vmmAux0, vmmIdxBatchSumB, vmmSpecIdxB);
-                uni_vpgatherdd(vmmDstShifts, ptr[regIndices + vmmAux0], vDstMask);
+                uni_vpaddd(vAux0, vmmIdxBatchSumB, vmmSpecIdxB);
+                uni_vpgatherdd(vDstShifts, ptr[regIndices + vAux0], kDstMask);
             } else {
-                uni_vpgatherdd(vmmDstShifts, ptr[regIndices + vmmSpecIdxB], vDstMask);
+                uni_vpgatherdd(vDstShifts, ptr[regIndices + vmmSpecIdxB], kDstMask);
             }
-            normalizeRawIndices(vmmDstShifts, vDstMask, kAuxMask0);
-            uni_vpaddd(vmmDstShifts, vmmDstShifts, vmmSrcBeforeAxisSumB);
+            normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
+            uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
 
-            vpbroadcastd(vmmAux0, xmmSpecIdxB);
-            vpcmpgtd(vmmAux1, vmmAux0, vmmSpecIdxB);
-            vpandn(vmmAux0, vmmAux1, vmmSpecIdxSizeB);
-            uni_vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmAux0);
+            vpbroadcastd(vAux0, xmmSpecIdxB);
+            vpcmpgtd(vAux1, vAux0, vmmSpecIdxB);
+            vpandn(vAux0, vAux1, vmmSpecIdxSizeB);
+            uni_vpsubd(vmmSpecIdxB, vmmSpecIdxB, vAux0);
 
-            vpandn(vmmAux0, vmmAux1, vmmAxisAndAfterAxisSizeB);
-            uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAux0);
+            vpandn(vAux0, vAux1, vmmAxisAndAfterAxisSizeB);
+            uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vAux0);
         }
 
         if (jcp.batchDims > 0lu) {
@@ -479,37 +480,40 @@ void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, Vmask& vDstM
                 mov(regBetweenBatchAndAxisIter, 0);
                 if (shiftFirst) {
                     uni_vpaddd(vmmIdxBatchSumB, vmmIdxBatchSumB, vmmSpecIdxSizeB);
-                    vpandn(vmmDstShifts, vmmAux0, vmmSpecIdxSizeB);
-                    uni_vpaddd(vmmAux1, vmmAux1, vmmDstShifts);
+                    vpandn(vDstShifts, vAux0, vmmSpecIdxSizeB);
+                    uni_vpaddd(vAux1, vAux1, vDstShifts);
                 } else {
-                    vpandn(vmmAux0, vmmAux1, vmmSpecIdxSizeB);
-                    uni_vpaddd(vmmIdxBatchSumB, vmmIdxBatchSumB, vmmAux0);
+                    vpandn(vAux0, vAux1, vmmSpecIdxSizeB);
+                    uni_vpaddd(vmmIdxBatchSumB, vmmIdxBatchSumB, vAux0);
                 }
             L(l1);
         }
 
         if (shiftFirst) {
-            uni_vpgatherdd(vmmDstShifts, ptr[regIndices + vmmAux1], vDstMask);
-            normalizeRawIndices(vmmDstShifts, vDstMask, kAuxMask0);
+            uni_vpgatherdd(vDstShifts, ptr[regIndices + vAux1], kDstMask);
+            normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
 
             if (jcp.beforeAxisSize != 1lu) {
-                vpandn(vmmAux0, vmmAux0, vmmAxisAndAfterAxisSizeB);
-                uni_vpaddd(vmmAux0, vmmAux0, vmmSrcBeforeAxisSumB);
+                vpandn(vAux0, vAux0, vmmAxisAndAfterAxisSizeB);
+                uni_vpaddd(vAux0, vAux0, vmmSrcBeforeAxisSumB);
                 uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
 
-                uni_vpaddd(vmmDstShifts, vmmDstShifts, vmmAux0);
+                uni_vpaddd(vDstShifts, vDstShifts, vAux0);
             }
         }
     L(lExit);
 }
 
+// Requires vAuxPool length 4.
+// Returns calculated shifts in vAuxPool[0] and mask in vAuxPool[1].
 template <>
-void jitUniGatherKernel<x64::avx512_common>::calcSrcShiftLong(Vmm* vAuxPool, Vmask& vDstMask, bool shiftFirst) {
-    auto& vmmDstShifts = vAuxPool[1];
-    auto& vmmAux0 = vAuxPool[0];
-    auto& vmmAux1 = vAuxPool[2];
-    auto& kAuxMask0 = masksContainer[vmmAux1.getIdx()];
-    auto& vAuxMask1 = masksContainer[vmmAux1.getIdx() + 1];
+void jitUniGatherKernel<x64::avx512_common>::calcSrcShiftLong(Vmm* vAuxPool, bool shiftFirst) {
+    auto& vDstShifts = vAuxPool[0];
+    auto& kDstMask = masksContainer[vAuxPool[1].getIdx()];
+    auto& vAux0 = vAuxPool[2];
+    auto& vAux1 = vAuxPool[3];
+    auto& kAuxMask0 = masksContainer[vAux1.getIdx()];
+    auto& kAuxMask1 = masksContainer[vAux1.getIdx() + 1];
 
     Xbyak::Label lIdxStride, lExit;
     if (shiftFirst)
@@ -518,32 +522,32 @@ void jitUniGatherKernel<x64::avx512_common>::calcSrcShiftLong(Vmm* vAuxPool, Vma
     add(regIdxIter, vlen);
     cmp(regIdxIter, regSpecIdxSizeB);
     jge(lIdxStride, T_NEAR);
-        auto& xmmAux = xmmAuxContainer[vmmDstShifts.getIdx()];
-        uni_vpaddd(vmmDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
+        auto& xmmAux = xmmAuxContainer[vDstShifts.getIdx()];
+        uni_vpaddd(vDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
         vmovd(reg32Aux1, xmmAux);
-        vmovdqu64(vmmDstShifts, ptr[regIndices + regAux1]);
-        normalizeRawIndices(vmmDstShifts, vDstMask, kAuxMask0);
-        vpaddd(vmmDstShifts, vmmDstShifts, vmmSrcBeforeAxisSumB);
+        vmovdqu64(vDstShifts, ptr[regIndices + regAux1]);
+        normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
+        vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
     jmp(lExit, T_NEAR);
     L(lIdxStride);
         sub(regIdxIter, regSpecIdxSizeB);
-        vpcmpb(vDstMask, vmmDstShifts, vmmDstShifts, 0);
+        vpcmpb(kDstMask, vDstShifts, vDstShifts, 0);
         if (shiftFirst) {
-            vpcmpd(vAuxMask1, vmmSpecIdxSizeB, vmmSpecIdxB, 2); // 2 - LE
-            vpaddd(vmmAux1, vmmIdxBatchSumB, vmmSpecIdxB);
-            vpsubd(vmmAux1 | vAuxMask1, vmmAux1, vmmSpecIdxSizeB);
+            vpcmpd(kAuxMask1, vmmSpecIdxSizeB, vmmSpecIdxB, 2); // 2 - LE
+            vpaddd(vAux1, vmmIdxBatchSumB, vmmSpecIdxB);
+            vpsubd(vAux1 | kAuxMask1, vAux1, vmmSpecIdxSizeB);
             vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmSpecIdxSizeB);
         } else {
-            vpaddd(vmmAux0, vmmIdxBatchSumB, vmmSpecIdxB);
-            uni_vpgatherdd(vmmDstShifts, ptr[regIndices + vmmAux0], vDstMask);
-            normalizeRawIndices(vmmDstShifts, vDstMask, kAuxMask0);
-            vpaddd(vmmDstShifts, vmmDstShifts, vmmSrcBeforeAxisSumB);
+            vpaddd(vAux0, vmmIdxBatchSumB, vmmSpecIdxB);
+            uni_vpgatherdd(vDstShifts, ptr[regIndices + vAux0], kDstMask);
+            normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
+            vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
 
-            vpbroadcastd(vmmAux0, xmmSpecIdxB);
-            vpcmpd(vAuxMask1, vmmAux0, vmmSpecIdxB, 2); // 2 - LE
-            vpsubd(vmmSpecIdxB | vAuxMask1, vmmSpecIdxB, vmmSpecIdxSizeB);
+            vpbroadcastd(vAux0, xmmSpecIdxB);
+            vpcmpd(kAuxMask1, vAux0, vmmSpecIdxB, 2); // 2 - LE
+            vpsubd(vmmSpecIdxB | kAuxMask1, vmmSpecIdxB, vmmSpecIdxSizeB);
 
-            vpaddd(vmmSrcBeforeAxisSumB | vAuxMask1, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
+            vpaddd(vmmSrcBeforeAxisSumB | kAuxMask1, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
         }
 
         Xbyak::Label l1;
@@ -553,37 +557,37 @@ void jitUniGatherKernel<x64::avx512_common>::calcSrcShiftLong(Vmm* vAuxPool, Vma
             mov(regBetweenBatchAndAxisIter, 0);
             if (shiftFirst) {
                 vpaddd(vmmIdxBatchSumB, vmmIdxBatchSumB, vmmSpecIdxSizeB);
-                vpaddd(vmmAux1 | vAuxMask1, vmmAux1, vmmSpecIdxSizeB);
+                vpaddd(vAux1 | kAuxMask1, vAux1, vmmSpecIdxSizeB);
             } else {
-                vpaddd(vmmIdxBatchSumB | vAuxMask1, vmmIdxBatchSumB, vmmSpecIdxSizeB);
+                vpaddd(vmmIdxBatchSumB | kAuxMask1, vmmIdxBatchSumB, vmmSpecIdxSizeB);
             }
         L(l1);
 
         if (shiftFirst) {
-            uni_vpgatherdd(vmmDstShifts, ptr[regIndices + vmmAux1], vDstMask);
-            normalizeRawIndices(vmmDstShifts, vDstMask, kAuxMask0);
+            uni_vpgatherdd(vDstShifts, ptr[regIndices + vAux1], kDstMask);
+            normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
 
-            vpaddd(vmmDstShifts, vmmDstShifts, vmmSrcBeforeAxisSumB);
-            vpaddd(vmmDstShifts | vAuxMask1, vmmDstShifts, vmmAxisAndAfterAxisSizeB);
+            vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
+            vpaddd(vDstShifts | kAuxMask1, vDstShifts, vmmAxisAndAfterAxisSizeB);
             vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
         }
     L(lExit);
 }
 
 template <x64::cpu_isa_t isa>
-void jitUniGatherKernel<isa>::calcSrcShiftLongBlock(Vmm* vAuxPool, Vmask& dstMask, bool shiftFirst) {
+void jitUniGatherKernel<isa>::calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst) {
     // Most likely there will no significant performance gain vs memcpy in reference implementation on big blocks after axis,
     // therefore no time was invested to this case yet.
     throw std::invalid_argument("Unsupported case.");
 }
 
-// Requires vAuxPool length 2.
-// Returns gathered data in vAuxPool[1].
+// Requires vAuxPool length 3.
+// Returns calculated shifts in vAuxPool[0] and mask in vAuxPool[1].
 template <x64::cpu_isa_t isa>
-void jitUniGatherKernel<isa>::calcSrcShiftShort(Vmm* vAuxPool, Vmask& kDstMask, bool shiftFirst) {
-    auto& vDstShifts = vAuxPool[1];
-    auto& vAux0 = vAuxPool[0];
-    auto& kAuxMask0 = masksContainer[vAuxPool[0].getIdx()];
+void jitUniGatherKernel<isa>::calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst) {
+    auto& vDstShifts = vAuxPool[0];
+    auto& kDstMask = masksContainer[vAuxPool[1].getIdx()];
+    auto& vAux0 = vAuxPool[2];
 
     if (shiftFirst) {
         if (jcp.beforeAxisSize != 1lu)
@@ -613,19 +617,21 @@ void jitUniGatherKernel<isa>::calcSrcShiftShort(Vmm* vAuxPool, Vmask& kDstMask, 
         uni_vpgatherdd(vDstShifts, ptr[regIndices + vmmSpecIdxB], kDstMask);
     }
 
+    auto& kAuxMask0 = masksContainer[vAux0.getIdx()];
     normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
     if (jcp.beforeAxisSize != 1lu)
         vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
 }
 
 // Requires vAuxPool length 3.
-// Returns gathered data in vAuxPool[1].
+// Returns calculated shifts in vAuxPool[0] and mask in vAuxPool[1].
 template <x64::cpu_isa_t isa>
-void jitUniGatherKernel<isa>::calcSrcShiftShortBlock(Vmm* vAuxPool, Vmask& kDstMask, bool shiftFirst) {
-    auto& vDstShifts = vAuxPool[1];
-    auto& vAux0 = vAuxPool[0];
-    auto& vAux1 = vAuxPool[2];
-    auto& kAuxMask0 = masksContainer[vAuxPool[0].getIdx()];
+void jitUniGatherKernel<isa>::calcSrcShiftShortBlock(Vmm* vAuxPool, bool shiftFirst) {
+    auto& vDstShifts = vAuxPool[0];
+    auto& kDstMask = masksContainer[vAuxPool[1].getIdx()];
+    auto& vAux0 = vAuxPool[2];
+    auto& vAux1 = vAuxPool[3];
+    auto& kAuxMask0 = masksContainer[vAux0.getIdx()];
     const uint64_t specIdxAndAfterAxisSize = jcp.specIdxSize * jcp.afterAxisSize;
 
     if (shiftFirst) {
@@ -746,7 +752,7 @@ void jitUniGatherKernel<isa>::process32b(bool isShortIdx, bool blocked) {
 
     // First iteration
     shiftIdxAndGather(vmmAuxContainer, isShortIdx, false, blocked);
-    uni_vmovups(ptr[regDst], vmmAuxContainer[1]);
+    uni_vmovups(ptr[regDst], vmmAuxContainer[2]);
 
     // Main loop
     L(lDstIdxLoop);
@@ -757,7 +763,7 @@ void jitUniGatherKernel<isa>::process32b(bool isShortIdx, bool blocked) {
         jl(lTail, T_NEAR);
 
         shiftIdxAndGather(vmmAuxContainer, isShortIdx, true, blocked);
-        uni_vmovups(ptr[regDst], vmmAuxContainer[1]);
+        uni_vmovups(ptr[regDst], vmmAuxContainer[2]);
 
         jmp(lDstIdxLoop, T_NEAR);
     }
@@ -927,25 +933,25 @@ void jitUniGatherKernel<isa>::fillRestWorkMask(Vmm& vmmDstMask, Vmm& vmmAux, con
 }
 
 // Requires vAuxPool length 4.
-// Returns gathered data in vAuxPool[1].
+// Returns gathered data in vAuxPool[2].
 template <x64::cpu_isa_t isa>
 void jitUniGatherKernel<isa>::shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked) {
-    auto& kGatherMask = masksContainer[vAuxPool[0].getIdx()];
+    auto& kGatherMask = masksContainer[vAuxPool[1].getIdx()];
     if (blocked) {
         if (isShortIdx) {
-            calcSrcShiftShortBlock(&vAuxPool[1], kGatherMask, shiftFirst);
+            calcSrcShiftShortBlock(vAuxPool, shiftFirst);
         } else {
-            calcSrcShiftLongBlock(&vAuxPool[1], kGatherMask, shiftFirst);
+            calcSrcShiftLongBlock(vAuxPool, shiftFirst);
         }
     } else {
         if (isShortIdx) {
-            calcSrcShiftShort(&vAuxPool[1], kGatherMask, shiftFirst);
+            calcSrcShiftShort(vAuxPool, shiftFirst);
         } else {
-            calcSrcShiftLong(&vAuxPool[1], kGatherMask, shiftFirst);
+            calcSrcShiftLong(vAuxPool, shiftFirst);
         }
     }
-    uni_vmovups(vAuxPool[1], vmmZeros);
-    uni_vpgatherdd(vAuxPool[1], ptr[regSrc + vAuxPool[2]], kGatherMask);
+    uni_vmovups(vAuxPool[2], vmmZeros);
+    uni_vpgatherdd(vAuxPool[2], ptr[regSrc + vAuxPool[0]], kGatherMask);
 }
 
 template <x64::cpu_isa_t isa>
