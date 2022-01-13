@@ -102,10 +102,9 @@ protected:
     const uint32_t vlenXmm = mkldnn::impl::cpu::x64::cpu_isa_traits<mkldnn::impl::cpu::x64::sse41>::vlen;
     const uint32_t indicesTypeSize = sizeof(uint32_t);
     const uint8_t idxTypeShift = 2;
-    uint8_t vlenShift = 0;
     uint8_t dataTypeShift = 0;
 
-    // Suffix B means "in Bytes".
+    // Suffix B means "In Bytes".
     // 64b registers.
     const Xbyak::Reg64& regSrc = r8;
     const Xbyak::Reg64& regDst = r9;
@@ -131,7 +130,7 @@ protected:
     Xbyak::Reg32 reg32Aux2 = Xbyak::Reg32(regAux2.getIdx());
 
     // Masks pool. Do not use k0 with gather instruction!
-    Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
+    Vmask masksContainer[8] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6), Vmask(7)};
     // Auxiliary pool.
     Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
     // Common.
@@ -147,7 +146,6 @@ protected:
     Vmm vmmPermIdxMask = Vmm(13);
     Vmm& vmmBeforeAxDiffB = vmmAxisAndAfterAxisSizeB;
     // Blocked short.
-//    Vmm& vmmSpecIdxDiff = vmmBeforeAxDiffB;
     Vmm vmmSpecIdxDiff = Vmm(14);
     Vmm& vmmAfterAxisSize = vmmAuxContainer[5];
     Vmm  vmmAfterAxisIdxB = Vmm(15);
@@ -164,28 +162,24 @@ protected:
     Xbyak::Xmm xmmSpecIdxSizeB = Xbyak::Xmm(vmmSpecIdxSizeB.getIdx());
     Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(vmmSpecIdxB.getIdx());
 
-    // Blocked
-//    Vmm vmmAfterAxisIdxB = vmmSpecIndicesInBytes;
-//    Vmm vmmSrcBeforeBlockSum = vmmSrcBeforeAxisSum;
-//    Vmm vmmBeforeBlockDiff = vmmBeforeAxDiffB;
-
 
     void calcSrcShiftLong(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftShortBlock(Vmm* vAuxPool, bool shiftFirst);
-    void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
-    void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
     void process(bool isShortIdx, bool blocked);
     void process32b(bool isShortIdx, bool blocked);
     void process16b(bool isShortIdx, bool blocked);
     void process8b(bool isShortIdx, bool blocked);
+    void shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked);
     void tail(bool isShortIdx, bool shiftFirst = true, bool blocked = false);
+    // Aux functions.
+    void normalizeRawIndices(Vmm& rawIndices, Vmask& dstMask, Vmask& aux);
+    void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
     void fillRestWorkMask(Vmm& vmmMask, Vmm& vmmAux, const Xbyak::Reg64& rWorkRest, const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1);
     void storeScalar(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
-    void shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked);
-    void uni_vpgatherdd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
-    void uni_vpcmpeqd(Vmask& vMask, Vmm& vOp0, Vmm& vOp2);
+    void uniVpgatherdd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
+    void fillVlenVector();
 
     const unsigned* permMask8bitUni;
     const unsigned* permMask16bitUni;

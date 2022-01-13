@@ -615,7 +615,7 @@ void MKLDNNGatherNode::initShortParams(const uint64_t ithr, const uint64_t start
 //            }
             afterAxIdxInBytes[i] *= dataTypeSize;
             afterAxPermMask[i] = idxElPerVec - afterAxisSize + i;
-            for (size_t j = 0lu; j < 3lu; j++) {
+            for (size_t j = 0lu; j < 6lu; j++) {
                 if (afterAxPermMask[i] >= idxElPerVec)
                     afterAxPermMask[i] -= afterAxisSize;
             }
