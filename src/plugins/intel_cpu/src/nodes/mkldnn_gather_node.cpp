@@ -44,22 +44,23 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    errorPrefix = std::string("Layer Gather with name '") + op->get_friendly_name() + "' ";
 
     if (op->get_input_size() != 3 || op->get_output_size() != 1)
         THROW_ERROR << "has incorrect number of input/output edges!";
 
-    dataSrcRank = inputShapes[GATHER_DATA].getRank(); // TODO: class member?
-    const auto indicesRank = inputShapes[GATHER_INDICES].getRank();
+    const auto& dataShape = getInputShapeAtPort(GATHER_DATA);
+    isDataShapeStat = dataShape.isStatic();
+    dataSrcRank = dataShape.getRank();
+
+    const auto& idxShape = getInputShapeAtPort(GATHER_INDICES);
+    isIdxShapeStat = idxShape.isStatic();
+    const auto indicesRank = idxShape.getRank();
     if (dataSrcRank == 0lu || indicesRank == 0lu)
-        IE_THROW() << errorPrefix << "has incorrect input parameters ranks.";
+        THROW_ERROR << "has incorrect input parameters ranks.";
 
     if (ov::is_type<ov::op::v8::Gather>(op)) {
         batchDims = static_cast<int>(ov::as_type_ptr<ov::op::v8::Gather>(op)->get_batch_dims());
         reverseIndexing = true;
-        // TODO: remove this WA when NMS & Gather will support dynamic shape.
-        if (!op->get_input_element_type(1).is_signed())
-            reverseIndexing = false;
     } else if (ov::is_type<ov::op::v7::Gather>(op)) {
         batchDims = static_cast<int>(ov::as_type_ptr<ov::op::v7::Gather>(op)->get_batch_dims());
         reverseIndexing = false;
@@ -68,7 +69,9 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
     if (batchDims < 0)
         batchDims += indicesRank;
     if (batchDims < 0 || batchDims >= std::min(static_cast<int>(dataSrcRank), static_cast<int>(indicesRank)))
-        IE_THROW() << errorPrefix << "has incorrect batch_dims " << batchDims << "!";
+        THROW_ERROR << "has incorrect batch_dims " << batchDims << "!";
+
+    dataTypeSize = getOriginalInputPrecisionAtPort(GATHER_DATA).size();
 
     if (ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))) {
         isAxisInputConst = true;
@@ -76,14 +79,37 @@ MKLDNNGatherNode::MKLDNNGatherNode(const std::shared_ptr<ov::Node>& op, const mk
         if (axis < 0)
             axis += dataSrcRank;
         if (axis < 0 || axis >= dataSrcRank || batchDims > axis)
-            IE_THROW() << errorPrefix << "has incorrect input parameter axis value: " << axis;
+            THROW_ERROR << "has incorrect input parameter axis value: " << axis;
+
+        if (isDataShapeStat) {
+            const auto& dataDims = dataShape.getDims();
+            axisDim = dataDims[axis];
+            beforeAxisSize = std::accumulate(dataDims.begin(), dataDims.begin() + axis, 1lu, std::multiplies<Dim>());
+            betweenBatchAndAxisSize = std::accumulate(dataDims.begin() + batchDims, dataDims.begin() + axis, 1lu, std::multiplies<Dim>());
+            afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
+
+            afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
+            axisAndAfterAxisSizeInBytes = axisDim * afterAxisSizeInBytes;
+            srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
+        }
     }
 
-    dataTypeSize = getOriginalInputPrecisionAtPort(GATHER_DATA).size();
+    if (isDataShapeStat) {
+        const auto& dataDims = dataShape.getDims();
+        beforeBatchSize = std::accumulate(dataDims.begin(), dataDims.begin() + batchDims, 1lu, std::multiplies<Dim>());
+    }
+    if (isIdxShapeStat) {
+        const auto& idxDims = idxShape.getDims();
+        specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<Dim>());
+
+        if (isDataShapeStat) {
+            specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
+            totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+        }
+    }
 }
 
 void MKLDNNGatherNode::initSupportedPrimitiveDescriptors() {
-//std::cout << "MKLDNNGatherNode::initSupportedPrimitiveDescriptors()" << std::endl;
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
@@ -96,37 +122,43 @@ void MKLDNNGatherNode::initSupportedPrimitiveDescriptors() {
 }
 
 void MKLDNNGatherNode::prepareParams() {
-//std::cout << "MKLDNNGatherNode::prepareParams()" << std::endl;
-    auto& srcMemPtr = getParentEdgeAt(GATHER_DATA)->getMemoryPtr();
-    if (!srcMemPtr || !srcMemPtr->GetPrimitivePtr())
-        IE_THROW() << errorPrefix << " has not allocated input memory.";
+    auto& dataMemPtr = getParentEdgeAt(GATHER_DATA)->getMemoryPtr();
+    if (!dataMemPtr || !dataMemPtr->GetPrimitivePtr())
+        THROW_ERROR << " has not allocated input data memory.";
+    auto& idxMemPtr = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr();
+    if (!idxMemPtr || !idxMemPtr->GetPrimitivePtr())
+        THROW_ERROR << " has not allocated input indices memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << errorPrefix << " has unidentified preferable primitive descriptor.";
+        THROW_ERROR << " has unidentified preferable primitive descriptor.";
 
-    const auto& dataDims = srcMemPtr->getStaticDims();
-    const auto& idxDims = getParentEdgeAt(GATHER_INDICES)->getMemory().getStaticDims();
-std::cout << "dataDims: " << std::string(dataDims.begin(), dataDims.end()) << "; idxDims: " << std::string(idxDims.begin(), idxDims.end()) << std::endl;
+    const auto& dataDims = dataMemPtr->getStaticDims();
+    const auto& idxDims = idxMemPtr->getStaticDims();
 
     if (!isAxisInputConst) {
         axis = (reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_AXIS)->getMemoryPtr()->GetPtr()))[0];
         if (axis < 0)
             axis += dataSrcRank;
         if (axis < 0 || axis >= dataSrcRank || batchDims > axis)
-            IE_THROW() << errorPrefix << "has incorrect input parameter axis value: " << axis;
+            THROW_ERROR << "has incorrect input parameter axis value: " << axis;
     }
 
-    axisDim = dataDims[axis];
-    beforeBatchSize = std::accumulate(dataDims.begin(), dataDims.begin() + batchDims, 1lu, std::multiplies<uint64_t>());
-    betweenBatchAndAxisSize = std::accumulate(dataDims.begin() + batchDims, dataDims.begin() + axis, 1lu, std::multiplies<uint64_t>());
-    afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<uint64_t>());
-    specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<uint64_t>());
-    afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
-    axisAndAfterAxisSizeInBytes = axisDim * afterAxisSizeInBytes;
-    srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
-    specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
-    totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+    if (!isDataShapeStat || !isAxisInputConst) {
+        axisDim = dataDims[axis];
+        beforeBatchSize = std::accumulate(dataDims.begin(), dataDims.begin() + batchDims, 1lu, std::multiplies<uint64_t>());
+        betweenBatchAndAxisSize = std::accumulate(dataDims.begin() + batchDims, dataDims.begin() + axis, 1lu, std::multiplies<uint64_t>());
+        afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<uint64_t>());
 
-//    if (!isDynamic) { // && afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
+        afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
+        axisAndAfterAxisSizeInBytes = axisDim * afterAxisSizeInBytes;
+        srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
+    }
+    if (!isIdxShapeStat) {
+        specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<uint64_t>());
+
+        specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
+        totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+    }
+
     if (jitKernel && !isDynamicNode()) {
         const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
         const uint64_t nthr = parallel_get_max_threads();
@@ -168,8 +200,6 @@ bool MKLDNNGatherNode::needPrepareParams() const {
 void MKLDNNGatherNode::createPrimitive() {
     uint64_t dataElPerVec = 1;
     if (!isDynamicNode()) {
-        const auto& dataDims = getInputShapeAtPort(GATHER_DATA).getDims();
-        afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
         dataElPerVec = x64::mayiuse(x64::avx512_common) ? x64::cpu_isa_traits<x64::avx512_common>::vlen / dataTypeSize :
             x64::mayiuse(x64::avx2) ? x64::cpu_isa_traits<x64::avx2>::vlen / dataTypeSize : 1;
     }
@@ -181,17 +211,15 @@ void MKLDNNGatherNode::createPrimitive() {
         jcp.reverseIndexing = reverseIndexing;
         jcp.dynamicShapes = isDynamicNode();
         jcp.batchDims = batchDims;
-        const auto& dataDims = getInputShapeAtPort(GATHER_DATA).getDims();
-        const auto& idxDims = getInputShapeAtPort(GATHER_INDICES).getDims();
         if (!jcp.dynamicShapes) {
-            jcp.beforeAxisSize = std::accumulate(dataDims.begin(), dataDims.begin() + axis, 1lu, std::multiplies<Dim>());
-            jcp.specIdxSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<Dim>());
-            jcp.afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
-        } else if (getInputShapeAtPort(GATHER_DATA).isStatic() && getInputShapeAtPort(GATHER_AXIS).isStatic()) {
-            jcp.beforeAxisSize = std::accumulate(dataDims.begin(), dataDims.begin() + axis, 1lu, std::multiplies<Dim>());
-            jcp.afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<Dim>());
+            jcp.beforeAxisSize = beforeAxisSize;
+            jcp.specIdxSize = specIndicesSize;
+            jcp.afterAxisSize = afterAxisSize;
+        } else if (getInputShapeAtPort(GATHER_DATA).isStatic() && isAxisInputConst) {
+            jcp.beforeAxisSize = beforeAxisSize;
+            jcp.afterAxisSize = afterAxisSize;
         } else if (getInputShapeAtPort(GATHER_INDICES).isStatic()) {
-            jcp.specIdxSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<Dim>());
+            jcp.specIdxSize = specIndicesSize;
         }
 
         if (x64::mayiuse(x64::avx512_common)) {

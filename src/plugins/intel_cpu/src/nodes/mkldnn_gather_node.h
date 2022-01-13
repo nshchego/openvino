@@ -39,13 +39,15 @@ private:
     int batchDims = 0;
     bool reverseIndexing = false;
     int dataSrcRank = 1;
+    bool isDataShapeStat = false;
+    bool isIdxShapeStat = false;
     bool isAxisInputConst = false;
-    std::string errorPrefix;
     uint64_t dataTypeSize = 1lu;
     static constexpr uint64_t idxTypeSize = sizeof(int);
 
     int axisDim;
     uint64_t beforeBatchSize;
+    uint64_t beforeAxisSize;
     uint64_t betweenBatchAndAxisSize;
     uint64_t afterAxisSize;
     uint64_t specIndicesSize;

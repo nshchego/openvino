@@ -1,10 +1,10 @@
-// Copyright (C) 2021 Intel Corporation
+// Copyright (C) 2022 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #include "gather_uni_kernel.hpp"
 
-using namespace mkldnn::impl::cpu;
+using namespace dnnl::impl::cpu;
 
 namespace MKLDNNPlugin {
 
@@ -46,7 +46,9 @@ jitUniGatherKernel<isa>::jitUniGatherKernel(jGatherConfParams jcp) :
 
 template <x64::cpu_isa_t isa>
 void jitUniGatherKernel<isa>::create_ker() {
-    x64::jit_generator::create_kernel();
+    auto code = x64::jit_generator::create_kernel();
+    if (code != dnnl::impl::status::success)
+        throw std::runtime_error("Could not create Gather kernel.");
     ker_ = (decltype(ker_))jit_ker();
 }
 
