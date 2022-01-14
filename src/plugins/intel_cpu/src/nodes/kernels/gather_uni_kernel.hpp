@@ -69,6 +69,7 @@ struct jitGatherKernelBase {
     inline uint64_t getIdxElPerVec() {
         return idxElPerVec;
     }
+    virtual bool isSupportedConfiguration(uint64_t afterAxisSize) = 0;
 
 protected:
     jGatherConfParams jcp;
@@ -95,6 +96,8 @@ struct jitUniGatherKernel : public jitGatherKernelBase, public mkldnn::impl::cpu
 
     void create_ker() override;
     void generate() override;
+
+    bool isSupportedConfiguration(uint64_t afterAxisSize) override;
 
 protected:
     using Vmm = typename mkldnn::impl::utils::conditional<isa == mkldnn::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
@@ -132,7 +135,7 @@ protected:
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[8] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6), Vmask(7)};
     // Auxiliary pool.
-    Vmm vmmAuxContainer[8] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16)};
+    Vmm vmmAuxContainer[12] = {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), /*AVX5*/ Vmm(16), Vmm(17), Vmm(18), Vmm(19), Vmm(20)};
     // Common.
     Vmm vmmZeros = Vmm(7);
     Vmm vmmSrcBeforeAxisSumB = Vmm(8);
@@ -142,11 +145,11 @@ protected:
     Vmm vmmAxisAndAfterAxisSizeB = Vmm(12);
 
     // Only short.
-    Vmm& vmmSrcAfterBatchSizeB = vmmAuxContainer[4];
-    Vmm vmmPermIdxMask = Vmm(13);
+    Vmm  vmmSrcAfterBatchSizeB = Vmm(13);
+    Vmm  vmmPermIdxMask = Vmm(14);
     Vmm& vmmBeforeAxDiffB = vmmAxisAndAfterAxisSizeB;
     // Blocked short.
-    Vmm vmmSpecIdxDiff = Vmm(14);
+    Vmm& vmmSpecIdxDiff = vmmAuxContainer[4];
     Vmm& vmmAfterAxisSize = vmmAuxContainer[5];
     Vmm  vmmAfterAxisIdxB = Vmm(15);
     Vmm& vmmAfterAxisPermMask = vmmPermIdxMask;

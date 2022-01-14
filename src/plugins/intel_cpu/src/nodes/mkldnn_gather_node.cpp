@@ -198,14 +198,14 @@ bool MKLDNNGatherNode::needPrepareParams() const {
 }
 
 void MKLDNNGatherNode::createPrimitive() {
-    uint64_t dataElPerVec = 1;
+    uint64_t idxElPerVec = 1;
     if (!isDynamicNode()) {
-        dataElPerVec = x64::mayiuse(x64::avx512_common) ? x64::cpu_isa_traits<x64::avx512_common>::vlen / dataTypeSize :
-            x64::mayiuse(x64::avx2) ? x64::cpu_isa_traits<x64::avx2>::vlen / dataTypeSize : 1;
+        idxElPerVec = x64::mayiuse(x64::avx512_common) ? x64::cpu_isa_traits<x64::avx512_common>::vlen / idxTypeSize :
+            x64::mayiuse(x64::avx2) ? x64::cpu_isa_traits<x64::avx2>::vlen / idxTypeSize : 1;
     }
     // Gather instruction is not supported by SSE.
     if ((x64::mayiuse(x64::avx512_common) || x64::mayiuse(x64::avx2)) &&
-            (isDynamicNode() || afterAxisSize < dataElPerVec)) {
+            (isDynamicNode() || afterAxisSize < idxElPerVec)) {
         jGatherConfParams jcp;
         jcp.dataTypeSize = dataTypeSize;
         jcp.reverseIndexing = reverseIndexing;
@@ -239,12 +239,7 @@ void MKLDNNGatherNode::createPrimitive() {
 }
 
 void MKLDNNGatherNode::execute(mkldnn::stream strm) {
-//    if (jitKernel && afterAxisSize == 1) {
-    if (jitKernel && (
-            afterAxisSize < jitKernel->getDataElPerVec())) {
-//            afterAxisSize == 1 ||
-//            afterAxisSize > 1 && specIndicesSize * afterAxisSize < jitKernel->getDataElPerVec())) {
-//    if (jitKernel) {
+    if (jitKernel && jitKernel->isSupportedConfiguration(afterAxisSize)) {
         const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
         const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
         uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
@@ -372,16 +367,16 @@ printf("%s%s%s%s%s%s%s%s%s%s", seqStr.c_str(), specIndicesInBytesStr.c_str(), id
 //}
 //std::cout << std::endl;
 
-int* tmpDst = reinterpret_cast<int*>(dstData);
-std::cout << "\nOUT DATA:\n";
-for (int i = 0; i < getOutputShapeAtPort(0).getElementsCount(); i++) {
-    if (i % 8 == 0)
-        std::cout << "_";
-    if (i % 96 == 0)
-        std::cout << std::endl;
-    std::cout << std::to_string(tmpDst[i]) << ";";
-}
-std::cout << std::endl;
+//int* tmpDst = reinterpret_cast<int*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 0; i < getOutputShapeAtPort(0).getElementsCount(); i++) {
+//    if (i % 8 == 0)
+//        std::cout << "_";
+//    if (i % 96 == 0)
+//        std::cout << std::endl;
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
 
     } else {
         execReference();
@@ -389,9 +384,7 @@ std::cout << std::endl;
 }
 
 void MKLDNNGatherNode::executeDynamicImpl(mkldnn::stream strm) {
-    if (jitKernel && afterAxisSize == 1) {
-//    if (jitKernel) {
-//std::cout << "Dyn kernel" << std::endl;
+    if (jitKernel && jitKernel->isSupportedConfiguration(afterAxisSize)) {
         const void* srcIndices = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr()->GetPtr();
         const void* srcData = getParentEdgeAt(GATHER_DATA)->getMemoryPtr()->GetPtr();
         uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
@@ -516,14 +509,14 @@ printf("%s\n", seqStr.c_str());
 //}
 //std::cout << std::endl;
 
-int* tmpDst = reinterpret_cast<int*>(dstData);
-std::cout << "\nOUT DATA:\n";
-for (int i = 0; i < beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize; i++) {
-    if (i % 8 == 0)
-        std::cout << "_";
-    std::cout << std::to_string(tmpDst[i]) << ";";
-}
-std::cout << std::endl;
+//int* tmpDst = reinterpret_cast<int*>(dstData);
+//std::cout << "\nOUT DATA:\n";
+//for (int i = 0; i < beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize; i++) {
+//    if (i % 8 == 0)
+//        std::cout << "_";
+//    std::cout << std::to_string(tmpDst[i]) << ";";
+//}
+//std::cout << std::endl;
     } else {
         execReference();
     }
