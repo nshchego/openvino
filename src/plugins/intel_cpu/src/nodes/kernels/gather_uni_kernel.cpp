@@ -110,7 +110,7 @@ void jitUniGatherKernel<isa>::generate() {
                 process(false, false);
             }
         } else { // Blocked case.
-            if (jcp.afterAxisSize < idxElPerVec) { // Short case.
+            if (jcp.afterAxisSize <= idxElPerVec) { // Short case.
                 mov(regAux1, ptr[regParams + GET_OFF(afterAxIdxB)]);
                 uni_vmovups(vmmAfterAxisIdxB, ptr[regAux1]);
                 mov(regAux1, ptr[regParams + GET_OFF(afterAxisPermMask)]);
@@ -553,7 +553,7 @@ void jitUniGatherKernel<isa>::calcSrcShiftShortBlock(Vmm* vAuxPool, bool shiftFi
             normWithUpperBound(vmmSpecIdxB, vmmSpecIdxSizeB, kAuxMask0);
         }
         // No sense to permute if afterAxisSize is one of {1, 2, 4, 8}.
-        if (jcp.afterAxisSize != 1 && jcp.afterAxisSize != 2 && jcp.afterAxisSize != 4 && jcp.afterAxisSize != 8) {
+        if (jcp.afterAxisSize != 1 && jcp.afterAxisSize != 2 && jcp.afterAxisSize != 4 && jcp.afterAxisSize % 8 != 0) {
             vpermd(vmmAfterAxisIdxB, vmmAfterAxisPermMask, vmmAfterAxisIdxB);
             if (jcp.specIdxSize != 1)
                 vpermd(vmmSpecIdxDiff, vmmAfterAxisPermMask, vmmSpecIdxDiff);

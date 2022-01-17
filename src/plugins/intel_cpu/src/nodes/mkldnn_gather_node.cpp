@@ -113,32 +113,12 @@ void MKLDNNGatherNode::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    auto typeCandidate = ref_any, type = ref_any;
-    size_t vlen = 1;
-    if (x64::mayiuse(x64::avx512_common)) {
-        typeCandidate = jit_avx512;
-        vlen = x64::cpu_isa_traits<x64::avx512_common>::vlen / dataTypeSize;
-    } else if (x64::mayiuse(x64::avx2)) {
-        typeCandidate = jit_avx2;
-        vlen = x64::cpu_isa_traits<x64::avx2>::vlen / dataTypeSize;
-    }
-
-    if (typeCandidate != ref_any) {
-         if (isDynamicNode()) {
-            if (isDataShapeStat && isAxisInputConst && afterAxisSize == 1) {
-                type = typeCandidate;
-            }
-         } else if (afterAxisSize < vlen) {
-            type = typeCandidate;
-         }
-    }
-
     Precision dataPrecision = getOriginalInputPrecisionAtPort(GATHER_DATA);
     addSupportedPrimDesc({{LayoutType::ncsp, dataPrecision},
                           {LayoutType::ncsp, Precision::I32},
                           {LayoutType::ncsp, Precision::I32, isAxisInputConst}},
                          {{LayoutType::ncsp, dataPrecision}},
-                         type);
+                         ref_any);
 }
 
 void MKLDNNGatherNode::prepareParams() {
@@ -158,7 +138,6 @@ void MKLDNNGatherNode::prepareParams() {
         if (axis < 0 || axis >= dataSrcRank || batchDims > axis)
             THROW_ERROR << "has incorrect input parameter axis value: " << axis;
     }
-
     if (!isDataShapeStat || !isAxisInputConst) {
         const auto& dataDims = dataMemPtr->getStaticDims();
         axisDim = dataDims[axis];
@@ -170,17 +149,9 @@ void MKLDNNGatherNode::prepareParams() {
         axisAndAfterAxisSizeInBytes = axisDim * afterAxisSizeInBytes;
         srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
 
-        const auto selectedPD = getSelectedPrimitiveDescriptor();
-        if (afterAxisSize == 1) {
-            if (x64::mayiuse(x64::avx512_common)) {
-                selectedPD->setImplementationType(jit_avx512);
-            } else if (x64::mayiuse(x64::avx2)) {
-                selectedPD->setImplementationType(jit_avx2);
-            } else {
-                selectedPD->setImplementationType(ref_any);
-            }
-        } else {
-            selectedPD->setImplementationType(ref_any);
+        if (isIdxShapeStat) {
+            specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
+            totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
         }
     }
     if (!isIdxShapeStat) {
@@ -189,6 +160,17 @@ void MKLDNNGatherNode::prepareParams() {
 
         specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
         totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+    }
+
+    const auto& selectedPD = getSelectedPrimitiveDescriptor();
+    if (jitKernel && jitKernel->isSupportedConfiguration(afterAxisSize)) {
+        if (x64::mayiuse(x64::avx512_common)) {
+            selectedPD->setImplementationType(jit_avx512);
+        } else if (x64::mayiuse(x64::avx2)) {
+            selectedPD->setImplementationType(jit_avx2);
+        }
+    } else {
+        selectedPD->setImplementationType(ref_any);
     }
 
     if (jitKernel && !isDynamicNode()) {
@@ -234,7 +216,8 @@ void MKLDNNGatherNode::createPrimitive() {
     }
     // Gather instruction is not supported by SSE.
     if ((x64::mayiuse(x64::avx512_common) || x64::mayiuse(x64::avx2)) &&
-            (isDynamicNode() || afterAxisSize < idxElPerVec)) {
+            (isDynamicNode() || afterAxisSize == 1 || afterAxisSize <= idxElPerVec &&
+            (x64::mayiuse(x64::avx512_common) || x64::mayiuse(x64::avx2) && dataTypeSize == 4))) {
         jGatherConfParams jcp;
         jcp.dataTypeSize = dataTypeSize;
         jcp.reverseIndexing = reverseIndexing;
@@ -244,10 +227,10 @@ void MKLDNNGatherNode::createPrimitive() {
             jcp.beforeAxisSize = beforeAxisSize;
             jcp.specIdxSize = specIndicesSize;
             jcp.afterAxisSize = afterAxisSize;
-        } else if (getInputShapeAtPort(GATHER_DATA).isStatic() && isAxisInputConst) {
+        } else if (isDataShapeStat && isAxisInputConst) {
             jcp.beforeAxisSize = beforeAxisSize;
             jcp.afterAxisSize = afterAxisSize;
-        } else if (getInputShapeAtPort(GATHER_INDICES).isStatic()) {
+        } else if (isIdxShapeStat) {
             jcp.specIdxSize = specIndicesSize;
         }
 
