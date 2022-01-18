@@ -121,7 +121,7 @@ void jitUniGatherKernel<isa>::generate() {
                 vmovups(vmmSpecIdxB, ptr[regAux1]);
                 mov(regAux1, ptr[regParams + GET_OFF(srcAfterBatchSizeB)]);
                 uni_vpbroadcastd(vmmSrcAfterBatchSizeB, ptr[regAux1]);
-                mov(regAux1, ptr[regParams + GET_OFF(afterAxSizePtr)]);
+                mov(regAux1, ptr[regParams + GET_OFF(afterAxisSize)]);
                 uni_vpbroadcastd(vmmAfterAxisSize, ptr[regAux1]);
 
                 if (jcp.beforeAxisSize != 1lu) {

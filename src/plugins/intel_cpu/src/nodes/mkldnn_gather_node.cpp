@@ -322,14 +322,13 @@ afterAxisPermStr += "}\n";
             if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) { // Elementwise short case.
                 arg.permIdxMask = p.permIdxMask.data();
                 arg.beforeAxisDiff = p.srcBeforeAxisDiff.data();
-            } else if (afterAxisSize > 1 && afterAxisSize < dataElPerVec) { // Blocked short case.
+            } else if (afterAxisSize > 1 && afterAxisSize <= dataElPerVec) { // Blocked short case.
                 arg.afterAxIdxB = p.afterAxIdxInBytes.data();
                 arg.specIdxDiff = p.specIdxDiff.data();
                 arg.beforeAxisDiff = p.srcBeforeAxisDiff.data();
                 arg.beforeAxisPermMask = p.beforeAxPermMask.data();
                 arg.afterAxisPermMask = p.afterAxPermMask.data();
-                const int afterAxSizeB = afterAxisSize;
-                arg.afterAxSizePtr = &afterAxSizeB;
+                arg.afterAxisSize = &afterAxisSize;
                 arg.specIdxAndAfterAxIterB = p.specIdxAndAfterAxIterB;
                 arg.specIdxAndAfterAxSizeB = specIdxAndAfterAxSizeB;
             }
@@ -408,9 +407,9 @@ printf("%s\n", seqStr.c_str());
 
             const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
             const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+            int permIdxMask[16];
+            int beforeAxisDiff[16];
             if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
-                int permIdxMask[16];
-                int beforeAxisDiff[16];
                 permIdxMask[0] = idxElPerVec - specIndicesSize;
                 int div = idxElPerVec / specIndicesSize;
                 int remainder = idxElPerVec % specIndicesSize;
@@ -447,46 +446,6 @@ printf("%s\n", seqStr.c_str());
                 }
                 arg.beforeAxisDiff = beforeBlockDiff;
             }
-//    std::string thrIdx = "[" + std::to_string(ithr) + "] ";
-//    std::string specIndicesInBytesStr = thrIdx + "specIndicesInBytes {",
-//            idxBatchSumInBytesStr = thrIdx + "idxBatchSumInBytes {",
-//            srcBeforeAxisSumStr = thrIdx + "dataBeforeAxisSumB {",
-//            beforeAxisDiffStr = thrIdx + "beforeAxisDiff {",
-//            beforeAxPermMaskStr = thrIdx + "beforeAxPermMask {",
-//            specIdxDiffStr = thrIdx + "specIdxDiff {",
-//            afterAxisPermStr = thrIdx + "afterAxisPermMask {",
-//            afterAxIdxBStr = thrIdx + "afterAxIdxB {",
-//            betweenBatchAndAxisIterStr = thrIdx + "betweenBatchAndAxisIter: " + std::to_string(betweenBatchAndAxisIters[ithr]) +
-//                "; betweenBatchAndAxisSize: " + std::to_string(betweenBatchAndAxisSize) +
-//                "; srcAfterBatchSizeInBytes: " + std::to_string(srcAfterBatchSizeInBytes) +
-//                "; specIdxAndAfterAxIterB: " + std::to_string(specIdxAndAfterAxIterB) +
-//                "; specIdxAndAfterAxSizeB: " + std::to_string(specIdxAndAfterAxSizeB) + "\n";
-//for (int i = 0; i < dataElPerVec; i++) {
-//    specIndicesInBytesStr += std::to_string(specIdxInBytes[i]) + "; ";
-//    idxBatchSumInBytesStr += std::to_string(idxBatchSumInBytes[ithr][i]) + "; ";
-//    srcBeforeAxisSumStr += std::to_string(dataBeforeAxisSumInBytes[i]) + "; ";
-//    if (i < afterAxIdxInBytes.size())
-//        afterAxIdxBStr += std::to_string(afterAxIdxInBytes[i]) + "; ";
-//    if (i < srcBeforeAxisDiff.size())
-//        beforeAxisDiffStr += std::to_string(srcBeforeAxisDiff[i]) + "; ";
-//    if (i < beforeAxPermMask.size())
-//        beforeAxPermMaskStr += std::to_string(beforeAxPermMask[i]) + "; ";
-//    if (i < specIdxDiff.size())
-//        specIdxDiffStr += std::to_string(specIdxDiff[i]) + "; ";
-//    if (i < afterAxPermMask.size())
-//        afterAxisPermStr += std::to_string(afterAxPermMask[i]) + "; ";
-//}
-//specIndicesInBytesStr += "}\n";
-//idxBatchSumInBytesStr += "}\n";
-//srcBeforeAxisSumStr += "}\n";
-//afterAxIdxBStr += "}\n";
-//beforeAxisDiffStr += "}\n";
-//beforeAxPermMaskStr += "}\n";
-//specIdxDiffStr += "}\n";
-//afterAxisPermStr += "}\n";
-//printf("%s%s%s%s%s%s%s%s%s%s", seqStr.c_str(), specIndicesInBytesStr.c_str(), idxBatchSumInBytesStr.c_str(), srcBeforeAxisSumStr.c_str(),
-//    afterAxIdxBStr.c_str(), beforeAxisDiffStr.c_str(), beforeAxPermMaskStr.c_str(),
-//    specIdxDiffStr.c_str(), afterAxisPermStr.c_str(), betweenBatchAndAxisIterStr.c_str());
 
             (*jitKernel)(&arg);
         };
