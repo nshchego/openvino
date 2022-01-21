@@ -255,11 +255,11 @@ void jitUniGatherKernel<isa>::generate() {
                     if (isa == x64::avx512_common) {
                         Xbyak::Opmask kMask2 = Xbyak::Opmask(vAux2.getIdx());
                         vpcmpgtd(kMask2, vAux0, vmmAfterAxisPermMask);
-                        vpsubd(vmmAfterAxisPermMask | kMask2, vmmAfterAxisPermMask, vAux1);
+                        uni_vpsubd(vmmAfterAxisPermMask | kMask2, vmmAfterAxisPermMask, vAux1);
                     } else {
                         vpcmpgtd(vAux2, vAux0, vmmAfterAxisPermMask);
                         vpandn(vAux2, vAux2, vAux1);
-                        vpsubd(vmmAfterAxisPermMask, vmmAfterAxisPermMask, vAux2);
+                        uni_vpsubd(vmmAfterAxisPermMask, vmmAfterAxisPermMask, vAux2);
                     }
                 }
 
@@ -317,13 +317,13 @@ template <>
 void jitUniGatherKernel<x64::avx2>::normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask) {
     vpcmpgtd(kAuxMask, vMax, vTarget);
     vpandn(kAuxMask, kAuxMask, vMax);
-    vpsubd(vTarget, vTarget, kAuxMask);
+    uni_vpsubd(vTarget, vTarget, kAuxMask);
 }
 
 template <>
 void jitUniGatherKernel<x64::avx512_common>::normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask) {
     vpcmpd(kAuxMask, vMax, vTarget, 2); // 2 -> LE
-    vpsubd(vTarget | kAuxMask, vTarget, vMax);
+    uni_vpsubd(vTarget | kAuxMask, vTarget, vMax);
 }
 
 // Requires vAuxPool length 4.
@@ -345,11 +345,9 @@ void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, bool shiftFi
     jge(lIdxStride, T_NEAR);
         if (jcp.batchDims > 0lu) {
             uni_vpaddd(vDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
-            auto& xmmAux = xmmAuxContainer[vDstShifts.getIdx()];
-            uni_vmovd(reg32Aux1, xmmAux);
+            uni_vmovd(reg32Aux1, xmmAuxContainer[vDstShifts.getIdx()]);
         } else {
-            auto& xmmAux = xmmAuxContainer[vmmSpecIdxB.getIdx()];
-            uni_vmovd(reg32Aux1, xmmAux);
+            uni_vmovd(reg32Aux1, xmmSpecIdxB);
         }
         vmovdqu(vDstShifts, ptr[regIndices + regAux1]);
         normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
@@ -362,10 +360,10 @@ void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, bool shiftFi
         if (shiftFirst) {
             vpcmpgtd(vAux0, vmmSpecIdxSizeB, vmmSpecIdxB);
             vpandn(vAux1, vAux0, vmmSpecIdxSizeB);
-            vpsubd(vAux1, vmmSpecIdxB, vAux1);
+            uni_vpsubd(vAux1, vmmSpecIdxB, vAux1);
             if (jcp.batchDims > 0lu)
                 uni_vpaddd(vAux1, vmmIdxBatchSumB, vAux1);
-            vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmSpecIdxSizeB);
+            uni_vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmSpecIdxSizeB);
         } else {
             if (jcp.batchDims > 0lu) {
                 uni_vpaddd(vAux0, vmmIdxBatchSumB, vmmSpecIdxB);
@@ -374,15 +372,17 @@ void jitUniGatherKernel<x64::avx2>::calcSrcShiftLong(Vmm* vAuxPool, bool shiftFi
                 uniVpGatherDd(vDstShifts, ptr[regIndices + vmmSpecIdxB], kDstMask);
             }
             normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
-            uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
 
             uni_vpbroadcastd(vAux0, xmmSpecIdxB);
             vpcmpgtd(vAux1, vAux0, vmmSpecIdxB);
             vpandn(vAux0, vAux1, vmmSpecIdxSizeB);
             uni_vpsubd(vmmSpecIdxB, vmmSpecIdxB, vAux0);
 
-            vpandn(vAux0, vAux1, vmmAxisAndAfterAxisSizeB);
-            uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vAux0);
+            if (jcp.beforeAxisSize != 1lu) {
+                uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
+                vpandn(vAux0, vAux1, vmmAxisAndAfterAxisSizeB);
+                uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vAux0);
+            }
         }
 
         if (jcp.batchDims > 0lu) {
@@ -435,54 +435,73 @@ void jitUniGatherKernel<x64::avx512_common>::calcSrcShiftLong(Vmm* vAuxPool, boo
     add(regIdxIter, vlen);
     cmp(regIdxIter, regSpecIdxSizeB);
     jge(lIdxStride, T_NEAR);
-        auto& xmmAux = xmmAuxContainer[vDstShifts.getIdx()];
-        uni_vpaddd(vDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
-        uni_vmovd(reg32Aux1, xmmAux);
+        if (jcp.batchDims > 0lu) {
+            uni_vpaddd(vDstShifts, vmmIdxBatchSumB, vmmSpecIdxB);
+            uni_vmovd(reg32Aux1, xmmAuxContainer[vDstShifts.getIdx()]);
+        } else {
+            uni_vmovd(reg32Aux1, xmmSpecIdxB);
+        }
         vmovdqu64(vDstShifts, ptr[regIndices + regAux1]);
         normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
-        uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
+        if (jcp.beforeAxisSize != 1lu)
+            uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
     jmp(lExit, T_NEAR);
     L(lIdxStride);
         sub(regIdxIter, regSpecIdxSizeB);
-        vpcmpb(kDstMask, vDstShifts, vDstShifts, 0);
+        vpcmpeqd(kDstMask, vDstShifts, vDstShifts);
         if (shiftFirst) {
-            vpcmpd(kAuxMask1, vmmSpecIdxSizeB, vmmSpecIdxB, 2); // 2 - LE
-            uni_vpaddd(vAux1, vmmIdxBatchSumB, vmmSpecIdxB);
-            vpsubd(vAux1 | kAuxMask1, vAux1, vmmSpecIdxSizeB);
-            vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmSpecIdxSizeB);
+            vpcmpd(kAuxMask1, vmmSpecIdxSizeB, vmmSpecIdxB, 2); // 2 -> LE
+            if (jcp.batchDims > 0lu) {
+                uni_vpaddd(vAux1, vmmIdxBatchSumB, vmmSpecIdxB);
+                uni_vpsubd(vAux1 | kAuxMask1, vAux1, vmmSpecIdxSizeB);
+            } else {
+                uni_vmovups(vAux1, vmmSpecIdxB);
+                uni_vpsubd(vAux1 | kAuxMask1, vmmSpecIdxB, vmmSpecIdxSizeB);
+            }
+            uni_vpsubd(vmmSpecIdxB, vmmSpecIdxB, vmmSpecIdxSizeB);
         } else {
-            uni_vpaddd(vAux0, vmmIdxBatchSumB, vmmSpecIdxB);
-            uniVpGatherDd(vDstShifts, ptr[regIndices + vAux0], kDstMask);
+            if (jcp.batchDims > 0lu) {
+                uni_vpaddd(vAux0, vmmIdxBatchSumB, vmmSpecIdxB);
+                uniVpGatherDd(vDstShifts, ptr[regIndices + vAux0], kDstMask);
+            } else {
+                uniVpGatherDd(vDstShifts, ptr[regIndices + vmmSpecIdxB], kDstMask);
+            }
             normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
-            uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
 
             uni_vpbroadcastd(vAux0, xmmSpecIdxB);
-            vpcmpd(kAuxMask1, vAux0, vmmSpecIdxB, 2); // 2 - LE
-            vpsubd(vmmSpecIdxB | kAuxMask1, vmmSpecIdxB, vmmSpecIdxSizeB);
+            vpcmpd(kAuxMask1, vAux0, vmmSpecIdxB, 2); // 2 -> LE
+            uni_vpsubd(vmmSpecIdxB | kAuxMask1, vmmSpecIdxB, vmmSpecIdxSizeB);
 
-            uni_vpaddd(vmmSrcBeforeAxisSumB | kAuxMask1, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
+            if (jcp.beforeAxisSize != 1lu) {
+                uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
+                uni_vpaddd(vmmSrcBeforeAxisSumB | kAuxMask1, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
+            }
         }
 
-        Xbyak::Label l1;
-        inc(regBetweenBatchAndAxisIter);
-        cmp(regBetweenBatchAndAxisIter, regBetweenBatchAndAxisSize);
-        jl(l1, T_NEAR);
-            mov(regBetweenBatchAndAxisIter, 0);
-            if (shiftFirst) {
-                uni_vpaddd(vmmIdxBatchSumB, vmmIdxBatchSumB, vmmSpecIdxSizeB);
-                uni_vpaddd(vAux1 | kAuxMask1, vAux1, vmmSpecIdxSizeB);
-            } else {
-                uni_vpaddd(vmmIdxBatchSumB | kAuxMask1, vmmIdxBatchSumB, vmmSpecIdxSizeB);
-            }
-        L(l1);
+        if (jcp.batchDims > 0lu) {
+            Xbyak::Label l1;
+            inc(regBetweenBatchAndAxisIter);
+            cmp(regBetweenBatchAndAxisIter, regBetweenBatchAndAxisSize);
+            jl(l1, T_NEAR);
+                mov(regBetweenBatchAndAxisIter, 0);
+                if (shiftFirst) {
+                    uni_vpaddd(vmmIdxBatchSumB, vmmIdxBatchSumB, vmmSpecIdxSizeB);
+                    uni_vpaddd(vAux1 | kAuxMask1, vAux1, vmmSpecIdxSizeB);
+                } else {
+                    uni_vpaddd(vmmIdxBatchSumB | kAuxMask1, vmmIdxBatchSumB, vmmSpecIdxSizeB);
+                }
+            L(l1);
+        }
 
         if (shiftFirst) {
             uniVpGatherDd(vDstShifts, ptr[regIndices + vAux1], kDstMask);
             normalizeRawIndices(vDstShifts, kDstMask, kAuxMask0);
 
-            uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
-            uni_vpaddd(vDstShifts | kAuxMask1, vDstShifts, vmmAxisAndAfterAxisSizeB);
-            uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
+            if (jcp.beforeAxisSize != 1lu) {
+                uni_vpaddd(vDstShifts, vDstShifts, vmmSrcBeforeAxisSumB);
+                uni_vpaddd(vDstShifts | kAuxMask1, vDstShifts, vmmAxisAndAfterAxisSizeB);
+                uni_vpaddd(vmmSrcBeforeAxisSumB, vmmSrcBeforeAxisSumB, vmmAxisAndAfterAxisSizeB);
+            }
         }
     L(lExit);
 }
