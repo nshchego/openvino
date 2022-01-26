@@ -434,6 +434,16 @@ int main(int argc, char* argv[]) {
             // ----------------- 5. Resizing network to match image sizes and given
             // batch ----------------------------------
             next_step();
+            for (auto& item : model->inputs()) {
+                if (item.get_tensor().get_names().empty()) {
+                    item.get_tensor_ptr()->set_names(std::unordered_set<std::string> {item.get_node_shared_ptr()->get_name()});
+                }
+            }
+            for (auto& item : model->outputs()) {
+                if (item.get_tensor().get_names().empty()) {
+                    item.get_tensor_ptr()->set_names(std::unordered_set<std::string> {item.get_node_shared_ptr()->get_name()});
+                }
+            }
             // Parse input shapes if specified
             bool reshape = false;
             app_inputs_info = get_inputs_info(FLAGS_shape,
