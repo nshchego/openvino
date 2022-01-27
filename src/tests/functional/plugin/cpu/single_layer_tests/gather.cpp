@@ -81,7 +81,13 @@ protected:
         targetDevice = CommonTestUtils::DEVICE_CPU;
         init_input_shapes(inputShapes);
         configuration.insert(additionalConfig.begin(), additionalConfig.end());
-        selectedType = makeSelectedTypeStr(selectedType, netPrecision);
+
+        if (additionalConfig[InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16] == InferenceEngine::PluginConfigParams::YES) {
+            inType = outType = ElementType::bf16;
+        } else {
+            inType = outType = netPrecision;
+        }
+        selectedType = makeSelectedTypeStr(selectedType, outType);
 
         if (!isAxisConstant) {
             inputDynamicShapes.push_back({1});
