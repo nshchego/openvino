@@ -148,11 +148,14 @@ void MKLDNNGatherNode::createPrimitive() {
             jcp.beforeAxisSize = beforeAxisSize;
             jcp.specIdxSize = specIndicesSize;
             jcp.afterAxisSize = afterAxisSize;
-        } else if (isDataShapeStat && isAxisInputConst) {
-            jcp.beforeAxisSize = beforeAxisSize;
-            jcp.afterAxisSize = afterAxisSize;
-        } else if (isIdxShapeStat) {
-            jcp.specIdxSize = specIndicesSize;
+        } else {
+            if (isDataShapeStat && isAxisInputConst) {
+                jcp.beforeAxisSize = beforeAxisSize;
+                jcp.afterAxisSize = afterAxisSize;
+            }
+            if (isIdxShapeStat) {
+                jcp.specIdxSize = specIndicesSize;
+            }
         }
 
         if (x64::mayiuse(x64::avx512_common)) {

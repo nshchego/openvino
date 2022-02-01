@@ -882,7 +882,6 @@ void jitUniGatherKernel<isa>::tail(bool isShortIdx, bool shiftFirst, bool blocke
     auto& kGatherMask = masksContainer[vmmAuxContainer[1].getIdx()];
     auto& vAux0 = vmmAuxContainer[2];
     auto& vAux1 = vmmAuxContainer[3];
-    auto& kAuxMask0 = masksContainer[vAux0.getIdx()];
     auto& kAuxMask1 = masksContainer[vAux1.getIdx()];
     Xbyak::Label lEnd;
 
@@ -909,28 +908,21 @@ void jitUniGatherKernel<isa>::tail(bool isShortIdx, bool shiftFirst, bool blocke
 
         // Combining masks.
         if (isa == x64::avx512_common) {
-            auto kMask0 = Xbyak::Opmask(kAuxMask0.getIdx());
             auto kMask1 = Xbyak::Opmask(kAuxMask1.getIdx());
             auto kMaskG = Xbyak::Opmask(kGatherMask.getIdx());
-
             kandd(kMaskG, kMaskG, kMask1);
-            if (jcp.dataTypeSize == 4)
-                kmovd(kMask0, kMaskG);
         } else if (isa == x64::avx2) {
             auto& vGatherMask = vmmAuxContainer[kGatherMask.getIdx()];
-
             vpand(vGatherMask, vGatherMask, vAux1);
-            if (jcp.dataTypeSize == 4)
-                uni_vmovups(vAux0, vGatherMask);
         }
 
-        uni_vmovups(vAux1, vmmZeros);
-        uniVpGatherDd(vAux1, ptr[regSrc + vSrcShift], kGatherMask);
+        uni_vmovups(vAux0, vmmZeros);
+        uniVpGatherDd(vAux0, ptr[regSrc + vSrcShift], kGatherMask);
         if (jcp.dataTypeSize == 4) {
-            uni_vmovups_tail(ptr[regDst], kAuxMask0, vAux1);
+            uni_vmovups_tail(ptr[regDst], kAuxMask1, vAux0);
             sub(regWorkAmount, dataElPerVec);
         } else {
-            storeVectorPart(regDst, regWorkAmount, vAux1, vAux0);
+            storeVectorPart(regDst, regWorkAmount, vAux0, vAux1);
         }
     }
     L(lEnd);
