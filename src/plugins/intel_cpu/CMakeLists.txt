@@ -67,7 +67,7 @@ ie_add_api_validator_post_build_step(TARGET ${TARGET_NAME})
 #  add test object library
 
 if(BUILD_SHARED_LIBS)
-    add_library(${TARGET_NAME}_obj OBJECT ${SOURCES} ${HEADERS})
+    add_library(${TARGET_NAME}_obj OBJECT ${SOURCES} ${HEADERS} src/nodes/kernels/kernel_utils.hpp)
     link_system_libraries(${TARGET_NAME}_obj PUBLIC dnnl)
 
     target_include_directories(${TARGET_NAME}_obj

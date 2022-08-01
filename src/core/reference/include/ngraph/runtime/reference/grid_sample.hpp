@@ -32,7 +32,7 @@ T& get_single_value(T* buffer, const Shape& shape, const index_4D_t& index) {
     // assert(shape.size() == index.size());
     auto sx = shape.back();
     auto offset = index.back();
-    for (auto i = index.size() - 2; i > 0; --i) {
+    for (int64_t i = index.size() - 2; i > 0; --i) {
         offset += index[i] * sx;
         sx *= shape[i];
     }
