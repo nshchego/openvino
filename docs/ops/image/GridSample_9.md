@@ -1,4 +1,4 @@
-# GridSample {#openvino_docs_ops_image_GridSample_9}
+# vAuxContainermple {#openvino_docs_ops_image_GridSample_9}
 
 **Versioned name**: *GridSample-9*
 

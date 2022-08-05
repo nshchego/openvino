@@ -15,53 +15,41 @@ enum class InterpolationMode { BILINEAR, BICUBIC, NEAREST };
 enum class PaddingMode { ZEROS, BORDER, REFLECTION };
 
 struct jGridSampleConfParams {
-    uint64_t dataTypeSize = 1lu;
     bool dynamicShapes = false;
     bool alignCorners = false;
     InterpolationMode interpolationMode = InterpolationMode::BILINEAR;
     PaddingMode paddingMode = PaddingMode::ZEROS;
     InferenceEngine::Precision inDataPrc;
+//    uint64_t dataTypeSize = 1lu;
+//    uint64_t workAmount = 0lu;
+    uint64_t srcBatchStepB = 0lu;
+    uint64_t gridBatchStepB = 0lu;
+    uint64_t dstBatchStepB = 0lu;
 };
 
 struct jGridSamplesExecArgs {
     const void* src;
     const void* grid;
     void* dst;
-    const int* axisDim;
-    const uint64_t* start;
-    const uint64_t* specIndicesSize;
-    const uint64_t* betweenBatchAndAxisSize;
-    const uint64_t* axisAndAfterAxisSizeB;
-    const uint64_t* srcAfterBatchSizeB;
-    const int* permIdxMask;
-    const int* beforeAxisDiff;
-
-    const int* beforeAxisPermMask;
-    const int* afterAxIdxB;
-    const int* afterAxisPermMask;
-    const uint64_t* afterAxisSize;
-    const int* specIdxDiff;
-
+    float channelsNum = 1lu;
+    const float* srcWidthFl;
+    const float* srcHeightFl;
+    const void* srcBatchStepB = 0lu;
+    const void* gridBatchStepB = 0lu;
+    const void* dstBatchStepB = 0lu;
     uint64_t workAmount = 0lu;
-    uint64_t afterAxSize = 1lu;
-    // Blocked short.
-    uint64_t specIdxAndAfterAxIterB;
-    uint64_t specIdxAndAfterAxSizeB;
-    // Only static
-    const int* specIdxB;
-    const int* idxBatchSumB;
-    const int* dataBeforeAxisSumB;
-    uint64_t betweenBatchAndAxisIter;
+    uint64_t dstChStepB = 0lu;
 };
 
-struct jitGridSampleKernelBase {
+class jitGridSampleKernelBase: public jitKernelBase {
+public:
     void (*ker_)(const jGridSamplesExecArgs *);
     void operator()(const jGridSamplesExecArgs *args) {
         assert(ker_);
         ker_(args);
     }
     explicit jitGridSampleKernelBase(const jGridSampleConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
-    virtual ~jitGridSampleKernelBase() {}
+//    virtual ~jitGridSampleKernelBase() {}
 
     virtual void create_ker() = 0;
     uint64_t getVecLen() {
@@ -73,35 +61,27 @@ struct jitGridSampleKernelBase {
     uint64_t getIdxElPerVec() {
         return idxElPerVec;
     }
-    virtual bool isSupportedConfiguration(uint64_t afterAxisSize) = 0;
 
 protected:
     jGridSampleConfParams jcp;
+    uint64_t dataTypeSize = 1lu;
     uint64_t vlen = 0lu;
     uint64_t dataElPerVec = 0lu;
     uint64_t idxElPerVec = 0lu;
-    static const unsigned shufMask8bitUni[16];
-    static const unsigned permMask8bitA2[8];
-    static const unsigned permMask8bitA5[16];
-    static const unsigned shufMask16bitUni[16];
-    static const unsigned permMask16bitA2[8];
-    static const unsigned permMask16bitA5[16];
-    static const unsigned incVec[16];
 
-    int shortPermIdx[16];
-    int shortBeforeAxisDiff[16];
+    static const unsigned permGridMask32bA2[8];
+    static const unsigned permGridMask32bA5[16];
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-struct jitUniGridSampleKernel : public jitGridSampleKernelBase, public dnnl::impl::cpu::x64::jit_generator {
+class jitUniGridSampleKernel : public jitGridSampleKernelBase {
+public:
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jitUniGridSampleKernel)
 
     explicit jitUniGridSampleKernel(const jGridSampleConfParams& jcp);
 
     void create_ker() override;
     void generate() override;
-
-    bool isSupportedConfiguration(uint64_t afterAxisSize) override;
 
 protected:
     using Vmm = typename dnnl::impl::utils::conditional<isa == dnnl::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
@@ -116,20 +96,21 @@ protected:
     const Xbyak::Reg64& regSrc = r8;
     const Xbyak::Reg64& regDst = r9;
     const Xbyak::Reg64& regGrid = r10;
-    const Xbyak::Reg64& regGridIter = r11;
+    const Xbyak::Reg64& regBatch = r11;
     const Xbyak::Reg64& regWorkAmount = r12;
-    const Xbyak::Reg64& regSrcIter = r13;
+    const Xbyak::Reg64& regDstChStepB = r13;
     const Xbyak::Reg64& regChannelsNum = r14;
-    const Xbyak::Reg64& regAux1 = rsi;
+    const Xbyak::Reg64& regAux1 = r15;
+    const Xbyak::Reg64& regAux2 = rsi;
     const Xbyak::Reg64& regBetweenBatchAndAxisIter = r15;
     const Xbyak::Reg64& regBetweenBatchAndAxisSize = rbx;
-    const Xbyak::Reg64& rSpecIdxAndAfterAxIterB = regGridIter;
+//    const Xbyak::Reg64& rSpecIdxAndAfterAxIterB = regGridIter;
 //    const Xbyak::Reg64& rSpecIdxAndAfterAxSizeB = regSpecIdxSizeB;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
     // 32b registers.
-    Xbyak::Reg32 reg32IdxIter = Xbyak::Reg32(regGridIter.getIdx());
+//    Xbyak::Reg32 reg32IdxIter = Xbyak::Reg32(regGridIter.getIdx());
 //    Xbyak::Reg32 reg32SpecIdxSizeB = Xbyak::Reg32(regSpecIdxSizeB.getIdx());
     Xbyak::Reg32 reg32BetweenBatchAndAxisSize = Xbyak::Reg32(regBetweenBatchAndAxisSize.getIdx());
     Xbyak::Reg32 reg32BetweenBatchAndAxisIter = Xbyak::Reg32(regBetweenBatchAndAxisIter.getIdx());
@@ -149,7 +130,7 @@ protected:
     Vmm vHCoef = Vmm(12);
     Vmm vHalf = Vmm(13);
     Vmm vDataTypeSize = Vmm(14);
-    Vmm vPermIdxMask = Vmm(15);
+    Vmm vPermGridMask = Vmm(15);
 //    Vmm vFOnes = Vmm(15);
 
 //    // Only short.
@@ -197,7 +178,7 @@ protected:
     void fillVlenVector();
 
     const unsigned* permMask8bitUni;
-    const unsigned* permMask16bitUni;
+    const unsigned* permGridMaskUni;
 };
 
 }   // namespace intel_cpu

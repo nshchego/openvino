@@ -28,32 +28,24 @@ public:
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     struct threadExecParams {
-        std::vector<int> specIdxInBytes;
-        std::vector<int> permIdxMask;
-        std::vector<int> srcBeforeAxisDiff;
-        std::vector<int> idxBatchSumInBytes;
-        std::vector<int> dataBeforeAxisSumInBytes;
-
-        std::vector<int> afterAxIdxInBytes;
-        std::vector<int> specIdxDiff;
-        std::vector<int> beforeAxPermMask;
-        std::vector<int> afterAxPermMask;
-        int betweenBatchAndAxisIter = 0;
-        int specIdxAndAfterAxIterB = 0;
-
-        uint64_t workAmount = 0;
-        uint64_t dstStart = 0;
+        uint64_t workAmount = 0lu;
+        uint64_t dstStartB = 0lu;
+        uint64_t gridStartB = 0lu;
+        uint64_t channelsNum = 1lu;
+        uint64_t dstChStepB = 0lu;
+        float srcWidthFl;
+        float srcHeightFl;
     };
 
 protected:
     void executeDynamicImpl(dnnl::stream strm) override;
-    bool needPrepareParams() const override;
+//    bool needPrepareParams() const override;
     void prepareParams() override;
     std::vector<VectorDims> shapeInfer() const override;
 
 private:
-    void initShortParams(threadExecParams& p, uint64_t start);
-    void execReference();
+//    void initShortParams(threadExecParams& p, uint64_t start);
+//    void execReference();
 
     bool alignCorners = false;
     InterpolationMode interpolationMode = InterpolationMode::BILINEAR;
@@ -66,6 +58,7 @@ private:
 //    bool reverseIndexing = false;
 //
     uint64_t dataTypeSize = 1lu;
+    uint64_t gridTypeSize = 1lu;
 //    static constexpr uint64_t idxTypeSize = sizeof(int);
 //
 //    int axis = 0;
@@ -81,14 +74,14 @@ private:
 //    uint64_t axisAndAfterAxisSizeInBytes = 0lu;
 //    uint64_t srcAfterBatchSizeInBytes = 0lu;
 //    uint64_t specIdxAndAfterAxSizeB = 0lu;
-//    uint64_t totalWork = 0lu;
+    uint64_t totalWork = 0lu;
 //
-//    std::vector<threadExecParams> execParamsPerThread;
+    std::vector<threadExecParams> execParamsPerThread;
 
     static constexpr size_t IN_DATA = 0;
     static constexpr size_t IN_GRID = 1;
 
-//    std::shared_ptr<jitGatherKernelBase> jitKernel;
+    std::shared_ptr<jitGridSampleKernelBase> jitKernel;
 };
 
 }   // namespace node
