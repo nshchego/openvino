@@ -36,6 +36,7 @@ public:
         uint64_t dstStartB = 0lu;
         uint64_t gridStartB = 0lu;
         uint64_t srcBatchStepB = 0lu;
+        uint64_t srcChannelStepB = 0lu;
         uint64_t dstChannelStepB = 0lu;
         uint64_t dstBatchStepB = 0lu;
         uint64_t gridBatchStepB = 0lu;

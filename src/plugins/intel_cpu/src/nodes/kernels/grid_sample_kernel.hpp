@@ -41,7 +41,8 @@ struct jGridSamplesExecArgs {
     const float* srcHeightFl;
     const void* srcBatchStepB;
     const void* gridBatchStepB;
-    uint64_t dstChStepB = 0lu;
+    uint64_t srcChannelStepB = 0lu;
+    uint64_t dstChannelStepB = 0lu;
     const void* dstBatchStepB;
     const void* wDenormCoef;
     const void* hDenormCoef;
@@ -110,11 +111,12 @@ protected:
     const Xbyak::Reg64& regGrid = r10;
     const Xbyak::Reg64& regBatch = r11;
     const Xbyak::Reg64& regWorkAmount = r12;
-    const Xbyak::Reg64& regDstChStepB = r13;
+    const Xbyak::Reg64& regDstChannelStepB = r13;
     const Xbyak::Reg64& regChannelsNum = r14;
-    const Xbyak::Reg64& regAux1 = r15;
-    const Xbyak::Reg64& regAux2 = rsi;
-    const Xbyak::Reg64& regBetweenBatchAndAxisSize = rbx;
+    const Xbyak::Reg64& regSrcChannelStepB = r15;
+    const Xbyak::Reg64& regAux1 = rsi;
+    const Xbyak::Reg64& regAux2 = rbx;
+    const Xbyak::Reg64& regAux3 = rdx;
 //    const Xbyak::Reg64& rSpecIdxAndAfterAxIterB = regGridIter;
 //    const Xbyak::Reg64& rSpecIdxAndAfterAxSizeB = regSpecIdxSizeB;
 

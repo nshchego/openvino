@@ -183,6 +183,7 @@ printf("[%d] Start: %lu; End: %lu\n", ithr, dstStart, dstEnd);
                 // TODO: H alf
             }
 
+            p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
             p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
 //            p.dstBatchStepB = (dstShape[1] - 1) * p.dstChannelStepB;
 //            p.gridBatchStepB = dstShape[2] * dstShape[3] * 2 * gridTypeSize;
@@ -289,7 +290,8 @@ std::cout << std::endl;
         arg.srcWidthFl  = &p.srcWidthFl;
         arg.srcHeightFl = &p.srcHeightFl;
 //        arg.srcBatchStepB = p.srcBatchStepB; // for dynamic
-        arg.dstChStepB  = p.dstChannelStepB;
+        arg.srcChannelStepB  = p.srcChannelStepB;
+        arg.dstChannelStepB  = p.dstChannelStepB;
 //        arg.dstBatchStepB = p.dstBatchStepB; // for dynamic
         arg.wDenormCoef = &p.wDenormCoef;
         arg.hDenormCoef = &p.hDenormCoef;

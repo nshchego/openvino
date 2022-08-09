@@ -69,7 +69,8 @@ void jitGridSampleKernel<isa>::generate() {
 
 //    mov(regBatch, ptr[regParams + GET_OFF(batchNum)]);
 //    mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
-    mov(regDstChStepB, ptr[regParams + GET_OFF(dstChStepB)]);
+    mov(regSrcChannelStepB, ptr[regParams + GET_OFF(srcChannelStepB)]);
+    mov(regDstChannelStepB, ptr[regParams + GET_OFF(dstChannelStepB)]);
     mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
 
     mov(regAux1, ptr[regParams + GET_OFF(srcWidthFl)]);
@@ -414,10 +415,10 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
     if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
         const auto& vDX = vAuxPool[0];
         const auto& vDY = vAuxPool[1];
-        const auto& vAux2 = vAuxPool[2];
+        const auto& vGatherShift = vAuxPool[2];
         const auto& vAux3 = vAuxPool[3];
         const auto& vQ0 = vAuxPool[4];
-        const auto& vQ1 = vAuxPool[5];
+        const auto& vQ1 = vWCoord;
         const auto& kMask0 = k1;
         const auto& kMask1 = k2;
 
@@ -437,10 +438,15 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
         Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
         const Xbyak::Reg64& rChannel = regAux1;
         const Xbyak::Reg32& rChannel32 = Xbyak::Reg32(rChannel.getIdx());
-        const Xbyak::Reg64& rDstTmp = regAux2;
+        const Xbyak::Reg64& rSrcTmp = regAux2;
+        const Xbyak::Reg64& rDstTmp = regAux3;
         mov(rChannel, 0);
+        mov(rSrcTmp, regSrc);
         mov(rDstTmp, regDst);
         uni_vfmadd132ps(vHCoord, vWCoord, vSrcWidthFl);
+        uni_vcvtps2dq(vHCoord, vHCoord);
+        if (dataTypeSize > 1)
+            uni_vpslld(vHCoord, vHCoord, dataTypeShift); // multiply by source data type size.
         L(lChannelLoopBegin);
         {
             cmp(rChannel, regChannelsNum);
@@ -448,70 +454,57 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
 
             if (jcp.paddingMode == PaddingMode::ZEROS) {
                 // (x; y)
-//uni_vmovups(ptr[rDstTmp], vWCoord);
-                uni_vmovups(vAux2, vHCoord);
-//                uni_vfmadd132ps(vAux2, vWCoord, vSrcWidthFl);
-                vpbroadcastd(vAux3, rChannel32); // TODO: src channel step
-                uni_vcvtdq2ps(vAux3, vAux3);
-                uni_vmulps(vAux3, vAux3, vSrcWidthFl);
-                uni_vfmadd231ps(vAux2, vAux3, vSrcHeightFl);
-                uni_vcvtps2dq(vAux2, vAux2);
-                if (dataTypeSize > 1)
-                    uni_vpslld(vAux2, vAux2, dataTypeShift); // multiply by source data type size.
+                uni_vmovups(vGatherShift, vHCoord);
                 uni_vpxor(vQ0, vQ0, vQ0);
-//kmovq(rDstTmp, k7);
-//uni_vmovups(ptr[rDstTmp], vAux2);
-                uni_vpgatherdd(vQ0, ptr[regSrc + vAux2], kMask0); // v00 -> vQ0 TODO: 64b 16b 8b?
-//uni_vmovups(ptr[rDstTmp], vQ0);
+                uni_vpgatherdd(vQ0, ptr[rSrcTmp + vGatherShift], kMask0); // v00 -> vQ0 TODO: 64b 16b 8b?
                 uni_kmovq(kMask0, kMask1);
-                if (jcp.inDataPrc == InferenceEngine::Precision::FP32) {
-                    uni_vfmsub213ps(vQ0, vDX, vQ0); // q0 = -(v00 - dx * v00)
-                } else if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-                    // TODO:
+                if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+                    uni_vcvtdq2ps(vQ0, vQ0);
                 }
+                uni_vfmsub213ps(vQ0, vDX, vQ0); // q0 = -(v00 - dx * v00)
 
                 // (x + 1; y)
-//                uni_vcvtdq2ps(vAux2, vAux2);
-                uni_vpaddd(vAux2, vAux2, vDataTypeSize);
-//                uni_vcvtps2dq(vAux2, vAux2);
+                uni_vpaddd(vGatherShift, vGatherShift, vDataTypeSize);
                 uni_vpxor(vAux3, vAux3, vAux3);
-                uni_vpgatherdd(vAux3, ptr[regSrc + vAux2], kMask0); // TODO: 64b 16b 8b?
+                uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
                 uni_kmovq(kMask0, kMask1);
                 // q0 = -q0 + dx * v01
-                if (jcp.inDataPrc == InferenceEngine::Precision::FP32) {
-                    uni_vfmsub231ps(vQ0, vAux3, vDX);
-                } else if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-                    // TODO:
+                if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+                    uni_vcvtdq2ps(vAux3, vAux3);
                 }
+                uni_vfmsub231ps(vQ0, vAux3, vDX);
 
                 // (x + 1; y + 1)
-                uni_vpaddd(vAux2, vAux2, vSrcWidthB);
+                uni_vpaddd(vGatherShift, vGatherShift, vSrcWidthB);
                 uni_vpxor(vAux3, vAux3, vAux3);
-                uni_vpgatherdd(vAux3, ptr[regSrc + vAux2], kMask0); // TODO: 64b 16b 8b?
+                uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
                 uni_kmovq(kMask0, kMask1);
 
                 // (x; y + 1)
-//                uni_vcvtdq2ps(vAux2, vAux2);
-                uni_vpsubd(vAux2, vAux2, vDataTypeSize);
-//                uni_vcvtps2dq(vAux2, vAux2);
+                uni_vpsubd(vGatherShift, vGatherShift, vDataTypeSize);
                 uni_vpxor(vQ1, vQ1, vQ1);
-                uni_vpgatherdd(vQ1, ptr[regSrc + vAux2], kMask0); // TODO: 64b 16b 8b?
+                uni_vpgatherdd(vQ1, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
                 uni_kmovq(kMask0, kMask1);
-                if (jcp.inDataPrc == InferenceEngine::Precision::FP32) {
-                    uni_vfmsub213ps(vQ1, vDX, vQ1); // q1 = -(v10 - dx * v10)
-                    uni_vfmsub231ps(vQ1, vAux3, vDX); // q1 = -q1 + dx * v11
-                    // Res = q0 + dy * (q1 - q0)
-                    uni_vsubps(vQ1, vQ1, vQ0);
-                    uni_vfmadd132ps(vQ1, vQ0, vDY);
-                } else if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-                    // TODO:
+                if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+                    uni_vcvtdq2ps(vQ1, vQ1);
+                }
+
+                uni_vfmsub213ps(vQ1, vDX, vQ1); // q1 = -(v10 - dx * v10)
+                uni_vfmsub231ps(vQ1, vAux3, vDX); // q1 = -q1 + dx * v11
+                // Res = q0 + dy * (q1 - q0)
+                uni_vsubps(vQ1, vQ1, vQ0);
+                uni_vfmadd132ps(vQ1, vQ0, vDY);
+
+                if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+                    uni_vcvtps2dq(vQ1, vQ1);
                 }
             }
 
             uni_vmovups(ptr[rDstTmp], vQ1);
-//uni_vmovups(ptr[rDstTmp], vSrcWidthFl);
-            add(rDstTmp, regDstChStepB);
+            add(rSrcTmp, regSrcChannelStepB);
+            add(rDstTmp, regDstChannelStepB);
             add(rChannel, 1);
+
             jmp(lChannelLoopBegin, T_NEAR);
             L(lChannelLoopEnd);
         }
@@ -630,7 +623,7 @@ void jitGridSampleKernel<x64::avx2>::interpolation(const Vmm* vAuxPool, const Vm
 //
 ////            uni_vmovups(ptr[rDstTmp], vAux0);
 ////            uni_vmovups(ptr[rDstTmp], vSrcWidthFl);
-//            add(rDstTmp, regDstChStepB);
+//            add(rDstTmp, regDstChannelStepB);
 //
 //            add(rChannel, 1);
 //            jmp(lChannelLoopBegin, T_NEAR);
@@ -781,15 +774,9 @@ void jitGridSampleKernel<isa>::process32b(bool isShortIdx, bool blocked) {
             mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
             shiftIdxAndGather(vAuxContainer, isShortIdx, true, blocked);
 
-//            if (jcp.dynamicShapes) {
-                add(regSrc, ptr[regParams + GET_OFF(srcBatchStepB)]);
-//                add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
-                add(regDst, ptr[regParams + GET_OFF(dstBatchStepB)]);
-//            } else {
-//                add(regSrc, jcp.srcBatchStepB);
-////                add(regGrid, jcp.gridBatchStepB);
-//                add(regDst, jcp.dstBatchStepB);
-//            }
+            add(regSrc, ptr[regParams + GET_OFF(srcBatchStepB)]);
+            add(regDst, ptr[regParams + GET_OFF(dstBatchStepB)]);
+
             sub(regBatch, 1);
             jmp(lBatchLoop, T_NEAR);
         }
@@ -800,7 +787,6 @@ void jitGridSampleKernel<isa>::process32b(bool isShortIdx, bool blocked) {
             shiftIdxAndGather(vAuxContainer, isShortIdx, true, blocked);
 
             add(regSrc, jcp.srcBatchStepB);
-//            add(regGrid, jcp.gridBatchStepB);
             add(regDst, jcp.dstBatchStepB);
         }
     }
