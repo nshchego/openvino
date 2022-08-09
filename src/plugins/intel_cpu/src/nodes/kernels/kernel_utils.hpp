@@ -45,12 +45,36 @@ void uni_vfmsub231ps(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Op
 //    }
 }
 
-void uni_vpgatherdd(const Xbyak::Ymm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Ymm& vMask) {
+void uni_kmovq(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
+    kmovq(kDst, kSrc);
+}
+
+//void uni_kmovq(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc) {
+//    uni_vmovups(vDst, vSrc);
+//}
+
+void uni_kmovq(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc) {
+    uni_vmovups(vDst, vSrc);
+}
+
+//void uni_vpgatherdd(const Xbyak::Ymm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Ymm& vMask) {
+//    vpgatherdd(vDst, srcAddr, vMask);
+//}
+
+void uni_vpgatherdd(const Xbyak::Xmm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Xmm& vMask) {
     vpgatherdd(vDst, srcAddr, vMask);
 }
 
 void uni_vpgatherdd(const Xbyak::Zmm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Opmask& kMask) {
     vpgatherdd(vDst | kMask, srcAddr);
+}
+
+void uni_vpermd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vMask, const Xbyak::Operand& src) {
+    //
+}
+
+void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Operand& src) {
+    vpermd(vDst, vMask, src);
 }
 };
 

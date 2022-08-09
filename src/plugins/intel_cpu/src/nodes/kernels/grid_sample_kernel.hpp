@@ -20,25 +20,32 @@ struct jGridSampleConfParams {
     InterpolationMode interpolationMode = InterpolationMode::BILINEAR;
     PaddingMode paddingMode = PaddingMode::ZEROS;
     InferenceEngine::Precision inDataPrc;
+    InferenceEngine::Precision gridPrc;
 //    uint64_t dataTypeSize = 1lu;
 //    uint64_t workAmount = 0lu;
+    uint64_t batchNum = 0lu;
     uint64_t srcBatchStepB = 0lu;
     uint64_t gridBatchStepB = 0lu;
     uint64_t dstBatchStepB = 0lu;
+    float wDenormCoef = 1.f;
+    float hDenormCoef = 1.f;
 };
 
 struct jGridSamplesExecArgs {
     const void* src;
     const void* grid;
     void* dst;
-    float channelsNum = 1lu;
+    uint64_t batchNum = 1lu;
+    uint64_t channelsNum = 1lu;
     const float* srcWidthFl;
     const float* srcHeightFl;
-    const void* srcBatchStepB = 0lu;
-    const void* gridBatchStepB = 0lu;
-    const void* dstBatchStepB = 0lu;
-    uint64_t workAmount = 0lu;
+    const void* srcBatchStepB;
+    const void* gridBatchStepB;
     uint64_t dstChStepB = 0lu;
+    const void* dstBatchStepB;
+    const void* wDenormCoef;
+    const void* hDenormCoef;
+    uint64_t workAmount = 0lu;
 };
 
 class jitGridSampleKernelBase: public jitKernelBase {
@@ -58,37 +65,42 @@ public:
     uint64_t getDataElPerVec() {
         return dataElPerVec;
     }
-    uint64_t getIdxElPerVec() {
-        return idxElPerVec;
+    uint64_t getGridElPerVec() {
+        return gridElPerVec;
     }
 
 protected:
     jGridSampleConfParams jcp;
     uint64_t dataTypeSize = 1lu;
+    uint64_t gridTypeSize = 1lu;
     uint64_t vlen = 0lu;
     uint64_t dataElPerVec = 0lu;
-    uint64_t idxElPerVec = 0lu;
+    uint64_t gridElPerVec = 0lu;
 
     static const unsigned permGridMask32bA2[8];
     static const unsigned permGridMask32bA5[16];
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-class jitUniGridSampleKernel : public jitGridSampleKernelBase {
+class jitGridSampleKernel : public jitGridSampleKernelBase {
 public:
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jitUniGridSampleKernel)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jitGridSampleKernel)
 
-    explicit jitUniGridSampleKernel(const jGridSampleConfParams& jcp);
+    explicit jitGridSampleKernel(const jGridSampleConfParams& jcp);
 
     void create_ker() override;
     void generate() override;
 
 protected:
-    using Vmm = typename dnnl::impl::utils::conditional<isa == dnnl::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
-    using Vmask = typename dnnl::impl::utils::conditional<isa == dnnl::impl::cpu::x64::avx2, Xbyak::Ymm, Xbyak::Opmask>::type;
-    static const uint32_t vlenXmm = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen;
-    static const uint32_t indicesTypeSize = sizeof(uint32_t);
-    static const uint8_t idxTypeShift = 2;
+    using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
+                                                         isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
+                                                                                             Xbyak::Zmm>::type;
+    using Vmask = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
+                                                           isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
+                                                                                               Xbyak::Opmask>::type;
+//    static const uint32_t vlenXmm = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen;
+//    static const uint32_t gridTypeSize = sizeof(uint32_t);
+//    static const uint8_t idxTypeShift = 2;
     uint8_t dataTypeShift = 0;
 
     // Suffix B means "In Bytes".
@@ -102,7 +114,6 @@ protected:
     const Xbyak::Reg64& regChannelsNum = r14;
     const Xbyak::Reg64& regAux1 = r15;
     const Xbyak::Reg64& regAux2 = rsi;
-    const Xbyak::Reg64& regBetweenBatchAndAxisIter = r15;
     const Xbyak::Reg64& regBetweenBatchAndAxisSize = rbx;
 //    const Xbyak::Reg64& rSpecIdxAndAfterAxIterB = regGridIter;
 //    const Xbyak::Reg64& rSpecIdxAndAfterAxSizeB = regSpecIdxSizeB;
@@ -112,8 +123,8 @@ protected:
     // 32b registers.
 //    Xbyak::Reg32 reg32IdxIter = Xbyak::Reg32(regGridIter.getIdx());
 //    Xbyak::Reg32 reg32SpecIdxSizeB = Xbyak::Reg32(regSpecIdxSizeB.getIdx());
-    Xbyak::Reg32 reg32BetweenBatchAndAxisSize = Xbyak::Reg32(regBetweenBatchAndAxisSize.getIdx());
-    Xbyak::Reg32 reg32BetweenBatchAndAxisIter = Xbyak::Reg32(regBetweenBatchAndAxisIter.getIdx());
+//    Xbyak::Reg32 reg32BetweenBatchAndAxisSize = Xbyak::Reg32(regBetweenBatchAndAxisSize.getIdx());
+//    Xbyak::Reg32 reg32BetweenBatchAndAxisIter = Xbyak::Reg32(regBetweenBatchAndAxisIter.getIdx());
     Xbyak::Reg32 reg32Aux1 = Xbyak::Reg32(regAux1.getIdx());
 //    Xbyak::Reg32 reg32Aux2 = Xbyak::Reg32(regAux2.getIdx());
 
@@ -126,12 +137,13 @@ protected:
     Vmm vZeros = Vmm(8);
     Vmm vSrcWidthFl = Vmm(9);
     Vmm vSrcHeightFl = Vmm(10);
-    Vmm vWCoef = Vmm(11);
-    Vmm vHCoef = Vmm(12);
+    Vmm vWDenormCoef = Vmm(11);
+    Vmm vHDenormCoef = Vmm(12);
     Vmm vHalf = Vmm(13);
     Vmm vDataTypeSize = Vmm(14);
     Vmm vPermGridMask = Vmm(15);
-//    Vmm vFOnes = Vmm(15);
+    // AVX512
+    Vmm vSrcWidthB = Vmm(31);
 
 //    // Only short.
 //    Vmm  vmmSrcAfterBatchSizeB = Vmm(13);
@@ -148,8 +160,8 @@ protected:
 //    Vmm vmmIdxBatchSumB = Vmm(14);
 
     // XMM
-    Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
-    Xbyak::Xmm xmmZeros = Xbyak::Xmm(vZeros.getIdx());
+//    Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
+//    Xbyak::Xmm xmmZeros = Xbyak::Xmm(vZeros.getIdx());
 //    Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSumB.getIdx());
 //    Xbyak::Xmm xmmSpecIdxSizeB = Xbyak::Xmm(vmmSpecIdxSizeB.getIdx());
 //    Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(vmmSpecIdxB.getIdx());
@@ -159,7 +171,7 @@ protected:
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getPadded(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
-    void getZeroMask(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
+    void getZeroMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
 
     void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);
@@ -177,7 +189,7 @@ protected:
     void uniVpGatherDd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void fillVlenVector();
 
-    const unsigned* permMask8bitUni;
+//    const unsigned* permMask8bitUni;
     const unsigned* permGridMaskUni;
 };
 

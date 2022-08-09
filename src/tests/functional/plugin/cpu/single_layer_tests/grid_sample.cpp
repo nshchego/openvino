@@ -107,9 +107,9 @@ protected:
     }
 
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
-        SubgraphBaseTest::generate_inputs(targetInputStaticShapes);
-//        const auto& funcInputs = function->inputs();
-//        inputs.clear();
+//        SubgraphBaseTest::generate_inputs(targetInputStaticShapes);
+        inputs.clear();
+        const auto& funcInputs = function->inputs();
 
 //        auto dataInput = function->input("data");
 //        auto dataShape = dataInput.get_shape();
@@ -120,16 +120,21 @@ protected:
 //                gridInput.get_element_type(), targetInputStaticShapes[1], 2, -1, resolution);
 //        inputs.insert({gridInput.get_node_shared_ptr(), tensor});
 
-//        for (int i = 0; i < funcInputs.size(); ++i) {
-//            const auto& funcInput = funcInputs[i];
-//            ov::runtime::Tensor tensor;
-//
-//            if (funcInput.get_node()->get_friendly_name() == "grid") {
-//                tensor = utils::create_and_fill_tensor(
-//                        funcInput.get_element_type(), targetInputStaticShapes[1], 2, -1, resolution);
-//            }
-//            inputs.insert({funcInput.get_node_shared_ptr(), tensor});
-//        }
+        for (int i = 0; i < funcInputs.size(); ++i) {
+            const auto& funcInput = funcInputs[i];
+            ov::runtime::Tensor tensor;
+
+            if (funcInput.get_node()->get_friendly_name() == "data") {
+                int32_t resolution = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1, std::multiplies<int32_t>());
+                tensor = utils::create_and_fill_tensor(
+                        funcInput.get_element_type(), targetInputStaticShapes[0], resolution, -resolution / 2, 1);
+            } else if (funcInput.get_node()->get_friendly_name() == "grid") {
+                int32_t resolution = targetInputStaticShapes[0][2] * targetInputStaticShapes[0][3];
+                tensor = utils::create_and_fill_tensor(
+                        funcInput.get_element_type(), targetInputStaticShapes[1], resolution, -1, resolution / 2);
+            }
+            inputs.insert({funcInput.get_node_shared_ptr(), tensor});
+        }
     }
 };
 

@@ -28,13 +28,19 @@ public:
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     struct threadExecParams {
+        uint64_t batchNum = 1lu;
+        uint64_t channelsNum = 1lu;
+        float srcWidthFl;
+        float srcHeightFl;
         uint64_t workAmount = 0lu;
         uint64_t dstStartB = 0lu;
         uint64_t gridStartB = 0lu;
-        uint64_t channelsNum = 1lu;
-        uint64_t dstChStepB = 0lu;
-        float srcWidthFl;
-        float srcHeightFl;
+        uint64_t srcBatchStepB = 0lu;
+        uint64_t dstChannelStepB = 0lu;
+        uint64_t dstBatchStepB = 0lu;
+        uint64_t gridBatchStepB = 0lu;
+        float wDenormCoef = 1.f;
+        float hDenormCoef = 1.f;
     };
 
 protected:

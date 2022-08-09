@@ -127,13 +127,17 @@ DATA_ET bilinear(const DATA_ET* data,
                  const GRID_ET x_n,
                  const get_padded_fn_t<DATA_ET>& get_padded,
                  const denormalize_fn_t<GRID_ET>& denormalize) {
+//std::cout << "(" << y_n << ";" << x_n << ")";
     const auto y_d = denormalize(y_n, data_shape[2]);
     const auto x_d = denormalize(x_n, data_shape[3]);
+//std::cout << "(" << y_d << ";" << x_d << ")";
     const auto y_topleft = std::floor(y_d);
     const auto x_topleft = std::floor(x_d);
     const auto dy = y_d - y_topleft;
     const auto dx = x_d - x_topleft;
+//std::cout << "(" << y_topleft << ";" << x_topleft << ")";
     const auto v00 = get_padded(data, data_shape, n, c, y_topleft, x_topleft);
+std::cout << v00 << "; ";
     const auto v01 = get_padded(data, data_shape, n, c, y_topleft, x_topleft + 1);
     const auto v10 = get_padded(data, data_shape, n, c, y_topleft + 1, x_topleft);
     const auto v11 = get_padded(data, data_shape, n, c, y_topleft + 1, x_topleft + 1);
