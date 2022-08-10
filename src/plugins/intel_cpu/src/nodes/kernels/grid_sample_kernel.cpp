@@ -67,8 +67,6 @@ void jitGridSampleKernel<isa>::generate() {
     mov(regDst, ptr[regParams + GET_OFF(dst)]);
     mov(regGrid, ptr[regParams + GET_OFF(grid)]);
 
-//    mov(regBatch, ptr[regParams + GET_OFF(batchNum)]);
-//    mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
     mov(regSrcChannelStepB, ptr[regParams + GET_OFF(srcChannelStepB)]);
     mov(regDstChannelStepB, ptr[regParams + GET_OFF(dstChannelStepB)]);
     mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
@@ -92,11 +90,18 @@ void jitGridSampleKernel<isa>::generate() {
 
     uni_vpxor(vZeros, vZeros, vZeros);
 
+    mov(regAux1, ptr[regParams + GET_OFF(one)]);
+    uni_vpbroadcastd(vOnes, ptr[regAux1]);
     if (isa == dnnl::impl::cpu::x64::avx512_core) {
         mov(regAux1, dataTypeSize);
         vpbroadcastd(vDataTypeSize, reg32Aux1);
     } else {
         // TODO:
+    }
+
+    if (!jcp.alignCorners) {
+        mov(regAux1, ptr[regParams + GET_OFF(halfVal)]);
+        uni_vpbroadcastd(vHalf, ptr[regAux1]);
     }
 
 //    auto& vAux0 = vAuxContainer[0];
@@ -106,7 +111,6 @@ void jitGridSampleKernel<isa>::generate() {
 
     if (!jcp.dynamicShapes) {
         process(true, true);
-//        mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
 //        mov(regAux1, ptr[regParams + GET_OFF(specIndicesSize)]);
 //        uni_vpbroadcastd(vmmSpecIdxSizeB, ptr[regAux1]);
 //        uni_vpslld(vmmSpecIdxSizeB, vmmSpecIdxSizeB, idxTypeShift); // multiply by indices type size.
@@ -193,7 +197,6 @@ void jitGridSampleKernel<isa>::generate() {
 //            }
 //        }
     } else { // Dynamic shapes.
-//        mov(regWorkAmount, jcp.workAmount);
 //        mov(regAux1, ptr[regParams + GET_OFF(start)]);
 //        uni_vpbroadcastd(vmmSpecIdxB, ptr[regAux1]);
 //        mov(regAux1, reinterpret_cast<uintptr_t>(incVec));
@@ -326,29 +329,26 @@ void jitGridSampleKernel<isa>::generate() {
 
 template <x64::cpu_isa_t isa>
 void jitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
-    uni_vfmadd132ps(vWCoord, vWDenormCoef, vWDenormCoef);
-    uni_vfmadd132ps(vHCoord, vHDenormCoef, vHDenormCoef);
-    if (!jcp.alignCorners) {
-        uni_vsubps(vWCoord, vWCoord, vHalf);
-        uni_vsubps(vHCoord, vHCoord, vHalf);
+    if (jcp.alignCorners) {
+        uni_vfmadd132ps(vWCoord, vWDenormCoef, vWDenormCoef);
+        uni_vfmadd132ps(vHCoord, vHDenormCoef, vHDenormCoef);
+    } else {
+        uni_vfmadd132ps(vWCoord, vSrcWidthFl, vSrcWidthFl);
+        vfmsub132ps(vWCoord, vHalf, vHalf);
+        uni_vfmadd132ps(vHCoord, vSrcHeightFl, vSrcHeightFl);
+        vfmsub132ps(vHCoord, vHalf, vHalf);
+//        uni_vsubps(vWCoord, vWCoord, vHalf);
+//        uni_vsubps(vHCoord, vHCoord, vHalf);
     }
 }
 
-// TODO: Optimize for AVX5
 template <>
 void jitGridSampleKernel<x64::avx512_core>::getZeroMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
     vcmpps(kAux, vWCoord, vSrcWidthFl, 0x1); // vWCoord < vSrcWidthFl
-//kmovq(rsi, kAux);
     vcmpps(kDst | kAux, vZeros, vWCoord, 0x2); // vWCoord >= vZeros
-//kmovq(rsi, kDst);
-//    vpand(kDst, kAux, kDst);
 
     vcmpps(kAux | kDst, vHCoord, vSrcHeightFl, 0x1); // vHCoord < vSrcHeightFl
-//kmovq(rsi, kAux);
-//    uni_vpand(kDst, kAux, kDst);
     vcmpps(kDst | kAux, vZeros, vHCoord, 0x2); // vHCoord >= vZeros
-//kmovq(rsi, kDst);
-//    uni_vpand(kDst, kAux, kDst);
 }
 
 template <>
@@ -373,6 +373,29 @@ void jitGridSampleKernel<x64::sse41>::getZeroMask(const Vmm& vWCoord, const Vmm&
     uni_vpand(kDst, kAux, kDst);
     uni_vcmpps(kAux, vHCoord, vZeros, 0x2); // vHCoord >= vZeros
     uni_vpand(kDst, kAux, kDst);
+}
+
+template <>
+void jitGridSampleKernel<x64::avx512_core>::getBorderMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
+    vcmpps(kAux, vSrcWidthFl, vWCoord, 0x2); // vWCoord >= vSrcWidthFl
+    vmovups(vWCoord | kAux, vSrcWidthFl);
+    vsubps(vWCoord | kAux, vOnes); // TODO: use separate register vSrcWBorderFl
+    vcmpps(kAux, vWCoord, vZeros, 0x1); // vWCoord < vZeros
+    vmovups(vWCoord | kAux, vZeros);
+
+    vcmpps(kAux, vSrcHeightFl, vHCoord, 0x2); // vHCoord >= vSrcHeightFl
+    vmovups(vHCoord | kAux, vSrcHeightFl);
+    vsubps(vHCoord | kAux, vOnes); // TODO: use separate register vSrcHBorderFl
+    vcmpps(kAux, vHCoord, vZeros, 0x1); // vHCoord < vZeros
+    vmovups(vHCoord | kAux, vZeros);
+}
+
+template <>
+void jitGridSampleKernel<x64::avx2>::getBorderMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
+}
+
+template <>
+void jitGridSampleKernel<x64::sse41>::getBorderMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
 }
 
 // Returns source values obtained with padded coordinates in vAuxPool[0].
@@ -409,7 +432,6 @@ void jitGridSampleKernel<isa>::getPadded(const Vmm* vAuxPool, const Vmm& vWCoord
 }
 
 // Produces data interpolation.
-// Requires vAuxPool length 6.
 template <>
 void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord) {
     if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
@@ -418,9 +440,12 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
         const auto& vGatherShift = vAuxPool[2];
         const auto& vAux3 = vAuxPool[3];
         const auto& vQ0 = vAuxPool[4];
-        const auto& vQ1 = vWCoord;
-        const auto& kMask0 = k1;
-        const auto& kMask1 = k2;
+        const auto& vQ1 = vAuxPool[5];
+        const auto& kMask00 = k1;
+        const auto& kMask01 = k2;
+        const auto& kMask10 = k3;
+        const auto& kMask11 = k4;
+        const auto& kAuxMask = k5;
 
         uni_vmovups(vDX, vWCoord);
         uni_vmovups(vDY, vHCoord);
@@ -430,8 +455,16 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
         uni_vsubps(vDY, vDY, vHCoord);
 
         if (jcp.paddingMode == PaddingMode::ZEROS) {
-            getZeroMask(vWCoord, vHCoord, kMask0, kMask1);
-            uni_kmovq(kMask1, kMask0);
+            getZeroMask(vWCoord, vHCoord, kMask00, kAuxMask); // (y; x)
+            uni_vaddps(vWCoord, vWCoord, vOnes);
+            getZeroMask(vWCoord, vHCoord, kMask01, kAuxMask); // (y; x + 1)
+            uni_vaddps(vHCoord, vHCoord, vOnes);
+            getZeroMask(vWCoord, vHCoord, kMask11, kAuxMask); // (y + 1; x + 1)
+            uni_vsubps(vWCoord, vWCoord, vOnes);
+            getZeroMask(vWCoord, vHCoord, kMask10, kAuxMask); // (y + 1; x)
+            uni_vsubps(vHCoord, vHCoord, vOnes);
+        } else if (jcp.paddingMode == PaddingMode::BORDER) {
+
         }
 
         // PER CHANNEL LOOP
@@ -453,38 +486,41 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
             jge(lChannelLoopEnd, T_NEAR);
 
             if (jcp.paddingMode == PaddingMode::ZEROS) {
-                // (x; y)
                 uni_vmovups(vGatherShift, vHCoord);
+
+                // (y; x)
+                kmovw(kAuxMask, kMask00);
                 uni_vpxor(vQ0, vQ0, vQ0);
-                uni_vpgatherdd(vQ0, ptr[rSrcTmp + vGatherShift], kMask0); // v00 -> vQ0 TODO: 64b 16b 8b?
-                uni_kmovq(kMask0, kMask1);
+                uni_vpgatherdd(vQ0, ptr[rSrcTmp + vGatherShift], kAuxMask); // v00 -> vQ0
                 if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                     uni_vcvtdq2ps(vQ0, vQ0);
                 }
                 uni_vfmsub213ps(vQ0, vDX, vQ0); // q0 = -(v00 - dx * v00)
 
-                // (x + 1; y)
+                // (y; x + 1)
                 uni_vpaddd(vGatherShift, vGatherShift, vDataTypeSize);
+                kmovw(kAuxMask, kMask01);
                 uni_vpxor(vAux3, vAux3, vAux3);
-                uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
-                uni_kmovq(kMask0, kMask1);
-                // q0 = -q0 + dx * v01
+                uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kAuxMask);
                 if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                     uni_vcvtdq2ps(vAux3, vAux3);
                 }
-                uni_vfmsub231ps(vQ0, vAux3, vDX);
+                uni_vfmsub231ps(vQ0, vAux3, vDX); // q0 = -q0 + dx * v01
 
-                // (x + 1; y + 1)
+                // (y + 1; x + 1)
                 uni_vpaddd(vGatherShift, vGatherShift, vSrcWidthB);
+                kmovw(kAuxMask, kMask11);
                 uni_vpxor(vAux3, vAux3, vAux3);
-                uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
-                uni_kmovq(kMask0, kMask1);
+                uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kAuxMask);
+                if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+                    uni_vcvtdq2ps(vAux3, vAux3);
+                }
 
-                // (x; y + 1)
+                // (y + 1; x)
                 uni_vpsubd(vGatherShift, vGatherShift, vDataTypeSize);
+                kmovw(kAuxMask, kMask10);
                 uni_vpxor(vQ1, vQ1, vQ1);
-                uni_vpgatherdd(vQ1, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
-                uni_kmovq(kMask0, kMask1);
+                uni_vpgatherdd(vQ1, ptr[rSrcTmp + vGatherShift], kAuxMask);
                 if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                     uni_vcvtdq2ps(vQ1, vQ1);
                 }
@@ -517,123 +553,140 @@ void jitGridSampleKernel<x64::avx512_core>::interpolation(const Vmm* vAuxPool, c
 
 template <>
 void jitGridSampleKernel<x64::avx2>::interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord) {
-//    const auto& vAux0 = vAuxPool[0];
-//    const auto& vAux1 = vAuxPool[1];
+//    const auto& vDX = vAuxPool[0];
+//    const auto& vDY = vAuxPool[1];
+//    const auto& vGatherShift = vAuxPool[2];
+//    const auto& vAux3 = vAuxPool[3];
+//    const auto& vQ0 = vAuxPool[4];
+//    const auto& vQ1 = vAuxPool[5];
+//    const auto& kMask0 = k1;
+//    const auto& kMask1 = k2;
 //
-//    if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
-//        const auto& vAux2 = vAuxPool[2];
-//        const auto& vAux3 = vAuxPool[3];
-////        const auto& vAux4 = vAuxPool[4];
-////        const auto& vAux5 = vAuxPool[5];
-//        const auto& kMask0 = masksContainer[vAuxPool[4].getIdx()];
-//        const auto& kMask1 = masksContainer[vAuxPool[5].getIdx()];
+////uni_vmovups(ptr[regDst], vWCoord);
+//    uni_vmovups(vDX, vWCoord);
+//    uni_vmovups(vDY, vHCoord);
+//    uni_vroundps(vWCoord, vWCoord, 0x1); // Round floor
+//    uni_vroundps(vHCoord, vHCoord, 0x1); // Round floor
+//    uni_vsubps(vDX, vDX, vWCoord);
+//    uni_vsubps(vDY, vDY, vHCoord);
 //
-//        uni_vmovups(vAux0, vWCoord);
-//        uni_vmovups(vAux1, vHCoord);
-//        uni_vroundps(vWCoord, vWCoord, 0x1); // Round floor
-//        uni_vroundps(vHCoord, vHCoord, 0x1); // Round floor
-//        uni_vsubps(vAux0, vAux0, vWCoord); // dx -> vAux0
-//        uni_vsubps(vAux1, vAux1, vHCoord); // dy -> vAux1
+////uni_vmovups(ptr[regDst], vWCoord);
+////        if (jcp.paddingMode == PaddingMode::ZEROS) {
+////            getZeroMask(vWCoord, vHCoord, kMask0, kMask1);
+////            uni_kmovq(kMask1, kMask0);
+////        }
+////kmovq(regAux1, kMask0);
+////uni_vmovups(ptr[regDst], vWCoord);
+//
+//    // PER CHANNEL LOOP
+//    Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
+//    const Xbyak::Reg64& rChannel = regAux1;
+//    const Xbyak::Reg32& rChannel32 = Xbyak::Reg32(rChannel.getIdx());
+//    const Xbyak::Reg64& rSrcTmp = regAux2;
+//    const Xbyak::Reg64& rDstTmp = regAux3;
+//    mov(rChannel, 0);
+//    mov(rSrcTmp, regSrc);
+//    mov(rDstTmp, regDst);
+////        uni_vfmadd132ps(vHCoord, vWCoord, vSrcWidthFl);
+////        uni_vcvtps2dq(vHCoord, vHCoord);
+////        if (dataTypeSize > 1)
+////            uni_vpslld(vHCoord, vHCoord, dataTypeShift); // multiply by source data type size.
+//    L(lChannelLoopBegin);
+//    {
+//        cmp(rChannel, regChannelsNum);
+//        jge(lChannelLoopEnd, T_NEAR);
 //
 //        if (jcp.paddingMode == PaddingMode::ZEROS) {
+//            // (x; y)
 //            getZeroMask(vWCoord, vHCoord, kMask0, kMask1);
-//            uni_kmovq(kMask1, kMask0);
-//        }
+//            uni_vmovups(vGatherShift, vHCoord);
+//            uni_vfmadd132ps(vGatherShift, vWCoord, vSrcWidthFl);
+//            uni_vcvtps2dq(vGatherShift, vGatherShift);
+//            if (dataTypeSize > 1)
+//                uni_vpslld(vGatherShift, vGatherShift, dataTypeShift);
+//            uni_vpxor(vQ0, vQ0, vQ0);
+//            uni_vpgatherdd(vQ0, ptr[rSrcTmp + vGatherShift], kMask0); // v00 -> vQ0 TODO: 64b 16b 8b?
+////uni_vmovups(ptr[rDstTmp], vOnes);
+////                uni_kmovq(kMask0, kMask1);
+//            if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//                uni_vcvtdq2ps(vQ0, vQ0);
+//            }
+//            uni_vfmsub213ps(vQ0, vDX, vQ0); // q0 = -(v00 - dx * v00)
 //
-//        // PER CHANNEL LOOP
-//        Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
-//        const Xbyak::Reg64& rChannel = regAux1;
-//        const Xbyak::Reg32& rChannel32 = Xbyak::Reg32(regAux1.getIdx());
-//        const Xbyak::Reg64& rDstTmp = regAux2;
-//        mov(rChannel, 0);
-//        mov(rDstTmp, regDst);
-//        L(lChannelLoopBegin);
-//        {
-//            cmp(rChannel, regChannelsNum);
-//            jge(lChannelLoopEnd, T_NEAR);
+//            // (x + 1; y)
+////                uni_vpaddd(vGatherShift, vGatherShift, vDataTypeSize);
+//            uni_vaddps(vWCoord, vWCoord, vOnes);
+//            getZeroMask(vWCoord, vHCoord, kMask0, kMask1);
+//            uni_vmovups(vGatherShift, vHCoord);
+//            uni_vfmadd132ps(vGatherShift, vWCoord, vSrcWidthFl);
+//            uni_vcvtps2dq(vGatherShift, vGatherShift);
+//            if (dataTypeSize > 1)
+//                uni_vpslld(vGatherShift, vGatherShift, dataTypeShift);
+//            uni_vpxor(vAux3, vAux3, vAux3);
+////uni_vmovups(ptr[rDstTmp], vGatherShift);
+//            uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
+////uni_vmovups(ptr[rDstTmp], vAux3);
+////                uni_kmovq(kMask0, kMask1);
+//            // q0 = -q0 + dx * v01
+//            if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//                uni_vcvtdq2ps(vAux3, vAux3);
+//            }
+//            uni_vfmsub231ps(vQ0, vAux3, vDX);
 //
-//            if (jcp.paddingMode == PaddingMode::ZEROS) {
-//                // (x; y)
-////uni_vmovups(ptr[rDstTmp], vWCoord);
-//                uni_vmovups(vAux2, vHCoord);
-//                uni_vfmadd132ps(vAux2, vWCoord, vSrcWidthFl);
-//                if (isa == dnnl::impl::cpu::x64::avx512_core) {
-//                    vpbroadcastd(vAux3, rChannel32);
-//                } else {
-//                    // TODO:
-//                }
-//                uni_vmulps(vAux3, vAux3, vSrcWidthFl);
-//                uni_vfmadd231ps(vAux2, vAux3, vSrcHeightFl);
-//                uni_vcvtps2dq(vAux2, vAux2);
-//                if (dataTypeSize > 1)
-//                    uni_vpslld(vAux2, vAux2, dataTypeShift); // multiply by source data type size.
-//                uni_vpxor(vWCoord, vWCoord, vWCoord);
-////kmovq(rDstTmp, k7);
-////uni_vmovups(ptr[rDstTmp], vAux2);
-//                uni_vpgatherdd(vWCoord, ptr[regSrc + vAux2], kMask0); // v00 -> vWCoord TODO: 64b 16b 8b?
-//                uni_kmovq(kMask0, kMask1);
-//                if (jcp.inDataPrc == InferenceEngine::Precision::FP32) {
-//                    uni_vfmsub213ps(vWCoord, vAux0, vWCoord); // q0 = -(v00 - dx * v00) -> vWCoord
-//                } else if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-//                    // TODO:
-//                }
+//            // (x + 1; y + 1)
+////                uni_vpaddd(vGatherShift, vGatherShift, vSrcWidthB);
+//            uni_vaddps(vHCoord, vHCoord, vOnes);
+//            getZeroMask(vWCoord, vHCoord, kMask0, kMask1);
+//            uni_vmovups(vGatherShift, vHCoord);
+//            uni_vfmadd132ps(vGatherShift, vWCoord, vSrcWidthFl);
+//            uni_vcvtps2dq(vGatherShift, vGatherShift);
+//            if (dataTypeSize > 1)
+//                uni_vpslld(vGatherShift, vGatherShift, dataTypeShift);
+//            uni_vpxor(vAux3, vAux3, vAux3);
+//            uni_vpgatherdd(vAux3, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
+////                uni_kmovq(kMask0, kMask1);
 //
-//                // (x + 1; y)
-////                uni_vcvtdq2ps(vAux2, vAux2);
-//                uni_vpaddd(vAux2, vAux2, vDataTypeSize);
-////                uni_vcvtps2dq(vAux2, vAux2);
-//                uni_vpxor(vAux3, vAux3, vAux3);
-//                uni_vpgatherdd(vAux3, ptr[regSrc + vAux2], kMask0); // TODO: 64b 16b 8b?
-//                uni_kmovq(kMask0, kMask1);
-//                if (jcp.inDataPrc == InferenceEngine::Precision::FP32) {
-//                    uni_vfmsub231ps(vWCoord, vAux3, vAux0); // q0 = -q0 + dx * v01
-//                } else if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-//                    // TODO:
-//                }
-//
-//                // (x + 1; y + 1)
-//                if (isa == x64::avx512_core) {
-//                    uni_vpaddd(vAux2, vAux2, vSrcWidthB);
-//                } else {
-//                    uni_vcvtps2dq(vAux3, vSrcWidthFl);
-//                    if (dataTypeSize != 1)
-//                        uni_vpslld(vAux3, vAux3, dataTypeShift); // multiply by source data type size.
-//                    uni_vpaddd(vAux2, vAux2, vAux3);
-//                } // TODO: sse
-//                uni_vpxor(vAux3, vAux3, vAux3);
-//                uni_vpgatherdd(vAux3, ptr[regSrc + vAux2], kMask0); // TODO: 64b 16b 8b?
-//                uni_kmovq(kMask0, kMask1);
-//
-//                // (x; y + 1)
-////                uni_vcvtdq2ps(vAux2, vAux2);
-//                uni_vpsubd(vAux2, vAux2, vDataTypeSize);
-////                uni_vcvtps2dq(vAux2, vAux2);
-//                uni_vpxor(vHCoord, vHCoord, vHCoord);
-//                uni_vpgatherdd(vHCoord, ptr[regSrc + vAux2], kMask0); // TODO: 64b 16b 8b?
-//                if (jcp.inDataPrc == InferenceEngine::Precision::FP32) {
-//                    uni_vfmsub213ps(vHCoord, vAux0, vHCoord); // q1 = -(v10 - dx * v10) -> vHCoord
-//                    uni_vfmsub231ps(vHCoord, vAux3, vAux0); // q1 = -q1 + dx * v11
-//                    // Res = q0 + dy * (q1 - q0)
-//                    uni_vsubps(vAux0, vHCoord, vWCoord);
-//                    uni_vfmadd132ps(vAux0, vWCoord, vAux1);
-//                } else if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-//                    // TODO:
-//                }
+//            // (x; y + 1)
+////                uni_vpsubd(vGatherShift, vGatherShift, vDataTypeSize);
+//            uni_vsubps(vWCoord, vWCoord, vOnes);
+//            getZeroMask(vWCoord, vHCoord, kMask0, kMask1);
+//            uni_vmovups(vGatherShift, vHCoord);
+//            uni_vfmadd132ps(vGatherShift, vWCoord, vSrcWidthFl);
+//            uni_vcvtps2dq(vGatherShift, vGatherShift);
+//            if (dataTypeSize > 1)
+//                uni_vpslld(vGatherShift, vGatherShift, dataTypeShift);
+//            uni_vpxor(vQ1, vQ1, vQ1);
+//            uni_vpgatherdd(vQ1, ptr[rSrcTmp + vGatherShift], kMask0); // TODO: 64b 16b 8b?
+////                uni_kmovq(kMask0, kMask1);
+//            uni_vsubps(vHCoord, vHCoord, vOnes);
+//            if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//                uni_vcvtdq2ps(vQ1, vQ1);
 //            }
 //
-////            uni_vmovups(ptr[rDstTmp], vAux0);
-////            uni_vmovups(ptr[rDstTmp], vSrcWidthFl);
-//            add(rDstTmp, regDstChannelStepB);
+//            uni_vfmsub213ps(vQ1, vDX, vQ1); // q1 = -(v10 - dx * v10)
+//            uni_vfmsub231ps(vQ1, vAux3, vDX); // q1 = -q1 + dx * v11
+//            // Res = q0 + dy * (q1 - q0)
+//            uni_vsubps(vQ1, vQ1, vQ0);
+//            uni_vfmadd132ps(vQ1, vQ0, vDY);
 //
-//            add(rChannel, 1);
-//            jmp(lChannelLoopBegin, T_NEAR);
-//            L(lChannelLoopEnd);
+//            if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//                uni_vcvtps2dq(vQ1, vQ1);
+//            }
 //        }
-//    } else if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
+//
+//        uni_vmovups(ptr[rDstTmp], vQ1);
+//        add(rSrcTmp, regSrcChannelStepB);
+//        add(rDstTmp, regDstChannelStepB);
+//        add(rChannel, 1);
+//
+//        jmp(lChannelLoopBegin, T_NEAR);
+//        L(lChannelLoopEnd);
+//    }
+//} else if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
 //        // TODO:
 //    } else if (jcp.interpolationMode == InterpolationMode::NEAREST) {
-//        // TODO:
-//    }
+//    // TODO:
+//}
 }
 
 template <>

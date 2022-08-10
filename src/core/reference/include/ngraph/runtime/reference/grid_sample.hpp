@@ -137,8 +137,9 @@ DATA_ET bilinear(const DATA_ET* data,
     const auto dx = x_d - x_topleft;
 //std::cout << "(" << y_topleft << ";" << x_topleft << ")";
     const auto v00 = get_padded(data, data_shape, n, c, y_topleft, x_topleft);
-std::cout << v00 << "; ";
+//std::cout << v00 << "; ";
     const auto v01 = get_padded(data, data_shape, n, c, y_topleft, x_topleft + 1);
+//std::cout << v01 << "; ";
     const auto v10 = get_padded(data, data_shape, n, c, y_topleft + 1, x_topleft);
     const auto v11 = get_padded(data, data_shape, n, c, y_topleft + 1, x_topleft + 1);
 

@@ -46,6 +46,8 @@ struct jGridSamplesExecArgs {
     const void* dstBatchStepB;
     const void* wDenormCoef;
     const void* hDenormCoef;
+    const void* halfVal;
+    const void* one;
     uint64_t workAmount = 0lu;
 };
 
@@ -141,8 +143,9 @@ protected:
     Vmm vSrcHeightFl = Vmm(10);
     Vmm vWDenormCoef = Vmm(11);
     Vmm vHDenormCoef = Vmm(12);
-    Vmm vHalf = Vmm(13);
-    Vmm vDataTypeSize = Vmm(14);
+    Vmm vHalf = Vmm(13); // TODO: remove
+    Vmm vDataTypeSize = Vmm(30);
+    Vmm vOnes = Vmm(14);
     Vmm vPermGridMask = Vmm(15);
     // AVX512
     Vmm vSrcWidthB = Vmm(31);
@@ -174,6 +177,7 @@ protected:
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getPadded(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getZeroMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
+    void getBorderMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
 
     void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);

@@ -42,6 +42,8 @@ public:
         uint64_t gridBatchStepB = 0lu;
         float wDenormCoef = 1.f;
         float hDenormCoef = 1.f;
+        const float halfVal = 0.5f;
+        const float one = 1.f;
     };
 
 protected:

@@ -176,12 +176,14 @@ printf("[%d] Start: %lu; End: %lu\n", ithr, dstStart, dstEnd);
             p.channelsNum = srcDataShape[1];
             p.srcHeightFl = srcDataShape[2];
             p.srcWidthFl = srcDataShape[3];
-            p.wDenormCoef = (p.srcWidthFl - 1.f) / 2.f;
-            p.hDenormCoef = (p.srcHeightFl - 1.f) / 2.f;
-//            p.srcBatchStepB = srcDataShape[2] * srcDataShape[3]; for dynamic
             if (alignCorners) {
-                // TODO: H alf
+                p.wDenormCoef = (p.srcWidthFl - 1.f) / 2.f;
+                p.hDenormCoef = (p.srcHeightFl - 1.f) / 2.f;
+            } else {
+                p.wDenormCoef = p.srcWidthFl / 2.f;
+                p.hDenormCoef = p.srcHeightFl / 2.f;
             }
+//            p.srcBatchStepB = srcDataShape[2] * srcDataShape[3]; for dynamic
 
             p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
             p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
@@ -295,7 +297,9 @@ std::cout << std::endl;
 //        arg.dstBatchStepB = p.dstBatchStepB; // for dynamic
         arg.wDenormCoef = &p.wDenormCoef;
         arg.hDenormCoef = &p.hDenormCoef;
+        arg.halfVal = &p.halfVal;
         arg.workAmount  = p.workAmount;
+        arg.one  = &p.one;
 
         (*jitKernel)(&arg);
     };
