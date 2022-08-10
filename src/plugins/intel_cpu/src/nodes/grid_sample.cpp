@@ -179,10 +179,11 @@ printf("[%d] Start: %lu; End: %lu\n", ithr, dstStart, dstEnd);
             if (alignCorners) {
                 p.wDenormCoef = (p.srcWidthFl - 1.f) / 2.f;
                 p.hDenormCoef = (p.srcHeightFl - 1.f) / 2.f;
-            } else {
-                p.wDenormCoef = p.srcWidthFl / 2.f;
-                p.hDenormCoef = p.srcHeightFl / 2.f;
             }
+//            else {
+//                p.wDenormCoef = p.srcWidthFl / 2.f;
+//                p.hDenormCoef = p.srcHeightFl / 2.f;
+//            }
 //            p.srcBatchStepB = srcDataShape[2] * srcDataShape[3]; for dynamic
 
             p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
