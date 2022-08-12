@@ -40,12 +40,18 @@ struct jGridSamplesExecArgs {
     const float* srcWidthFl;
     const float* srcHeightFl;
     const void* srcBatchStepB;
-    const void* gridBatchStepB;
     uint64_t srcChannelStepB = 0lu;
     uint64_t dstChannelStepB = 0lu;
     const void* dstBatchStepB;
     const void* wDenormCoef;
     const void* hDenormCoef;
+    const void* srcWidthB;
+    const void* srcHeightMul2Fl;
+    const void* srcWidthMul2Fl;
+    const void* srcHeightMul2Sub1Fl;
+    const void* srcWidthMul2Sub1Fl;
+    const void* srcHeightSub1Fl;
+    const void* srcWidthSub1Fl;
     const void* halfVal;
     const void* one;
     uint64_t workAmount = 0lu;
@@ -59,7 +65,6 @@ public:
         ker_(args);
     }
     explicit jitGridSampleKernelBase(const jGridSampleConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
-//    virtual ~jitGridSampleKernelBase() {}
 
     virtual void create_ker() = 0;
     uint64_t getVecLen() {
@@ -119,8 +124,6 @@ protected:
     const Xbyak::Reg64& regAux1 = rsi;
     const Xbyak::Reg64& regAux2 = rbx;
     const Xbyak::Reg64& regAux3 = rdx;
-//    const Xbyak::Reg64& rSpecIdxAndAfterAxIterB = regGridIter;
-//    const Xbyak::Reg64& rSpecIdxAndAfterAxSizeB = regSpecIdxSizeB;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
@@ -138,31 +141,23 @@ protected:
     const Vmm vAuxContainer[12] =
             {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), Vmm(7), /*AVX5*/ Vmm(16), Vmm(17), Vmm(18), Vmm(19)};
     // Common.
-    Vmm vZeros = Vmm(8);
-    Vmm vSrcWidthFl = Vmm(9);
+    Vmm vZeros       = Vmm(8);
+    Vmm vSrcWidthFl  = Vmm(9);
     Vmm vSrcHeightFl = Vmm(10);
     Vmm vWDenormCoef = Vmm(11);
     Vmm vHDenormCoef = Vmm(12);
-    Vmm& vHalf = vWDenormCoef;
-    Vmm vDataTypeSize = Vmm(30);
-    Vmm vOnes = Vmm(14);
+    Vmm vOnes        = Vmm(14);
     Vmm vPermGridMask = Vmm(15);
+    Vmm& vHalf = vWDenormCoef;
     // AVX512
-    Vmm vSrcWidthB = Vmm(31);
-
-//    // Only short.
-//    Vmm  vmmSrcAfterBatchSizeB = Vmm(13);
-//    Vmm  vmmPermIdxMask = Vmm(14);
-//    Vmm& vmmBeforeAxDiffB = vmmAxisAndAfterAxisSizeB;
-//    // Blocked short.
-//    Vmm& vmmSpecIdxDiff = vAuxContainer[4];
-//    Vmm& vmmAfterAxisSize = vAuxContainer[5];
-//    Vmm  vmmAfterAxisIdxB = Vmm(15);
-//    Vmm& vmmAfterAxisPermMask = vmmPermIdxMask;
-//    Vmm& vmmBeforeAxPermMask = vAuxContainer[6];
-//    // Only long.
-//    Vmm vmmVecLenB = Vmm(13);
-//    Vmm vmmIdxBatchSumB = Vmm(14);
+    Vmm vSrcWidthSub1Fl      = Vmm(28);          // for BORDER padding
+    Vmm vSrcHeightSub1Fl     = Vmm(29);          // for BORDER padding
+    Vmm& vSrcWidthMul2Fl     = vSrcWidthSub1Fl;  // for REFLECTION padding
+    Vmm& vSrcHeightMul2Fl    = vSrcHeightSub1Fl; // for REFLECTION padding
+    Vmm vSrcWidthMul2Sub1Fl  = Vmm(30);          // for REFLECTION padding
+    Vmm vSrcHeightMul2Sub1Fl = Vmm(31);          // for REFLECTION padding
+    Vmm& vDataTypeSize       = vSrcWidthSub1Fl;  // for ZEROS padding
+    Vmm& vSrcWidthB          = vSrcHeightSub1Fl; // for ZEROS padding
 
     // XMM
 //    Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
@@ -171,13 +166,15 @@ protected:
 //    Xbyak::Xmm xmmSpecIdxSizeB = Xbyak::Xmm(vmmSpecIdxSizeB.getIdx());
 //    Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(vmmSpecIdxB.getIdx());
 
-
     void calcCoordinates(const Vmm* vAuxPool, bool shiftFirst = true);
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getPadded(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getZeroMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
     void getBorderPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kAux);
+    // dim - determines dimension. 0 - width, 1 - height.
+    void reflectionNoAlign(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
+    void reflectionWithAlign(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
 
     void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);

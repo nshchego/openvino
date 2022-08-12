@@ -89,10 +89,8 @@ void GridSample::initSupportedPrimitiveDescriptors() {
 
     const auto& dataDims = getInputShapeAtPort(IN_DATA).getDims();
 
-    // Implementation desc type will be redefined in the fn prepareParams if a kernel will be created.
     Precision dataPrecision = getOriginalInputPrecisionAtPort(IN_DATA);
     Precision gridPrecision = Precision::FP32;
-    // TODO: Extend kernel to support other precisions.
     if (dataPrecision.is_float()) {
         dataPrecision = Precision::FP32;
     } else {
@@ -118,7 +116,6 @@ void GridSample::initSupportedPrimitiveDescriptors() {
 void GridSample::createPrimitive() {
     jGridSampleConfParams jcp;
 
-//    jcp.dataTypeSize = dataTypeSize;
     jcp.inDataPrc = getRuntimePrecision(); // TODO: fix
     jcp.gridPrc = getRuntimePrecision(); // TODO: fix
     jcp.dynamicShapes = isDynamicNode();
@@ -128,14 +125,10 @@ void GridSample::createPrimitive() {
 
     if (!jcp.dynamicShapes) {
         const auto& srcDataShape = getInputShapeAtPort(IN_DATA).getDims();
-//        const auto& gridShape = getInputShapeAtPort(IN_GRID).getDims();
         const auto& dstShape = getOutputShapeAtPort(0).getDims();
         jcp.batchNum = srcDataShape[0];
         jcp.srcBatchStepB = std::accumulate(srcDataShape.begin() + 1, srcDataShape.end(), dataTypeSize, std::multiplies<Dim>());
-//        jcp.gridBatchStepB = std::accumulate(gridShape.begin() + 1, gridShape.end(), 1, std::multiplies<Dim>());
         jcp.dstBatchStepB = (dstShape[1] - 1) * dstShape[2] * dstShape[3] * dataTypeSize;
-//        totalWork = dstShape[2] * dstShape[3];
-    } else {
     }
 
     if (x64::mayiuse(x64::avx512_core)) {
@@ -172,36 +165,27 @@ printf("[%d] Start: %lu; End: %lu\n", ithr, dstStart, dstEnd);
             p.dstStartB = dstStart * dataTypeSize;
             p.gridStartB = dstStart * 2 * gridTypeSize;
 
-//            p.batchNum = srcDataShape[0];
             p.channelsNum = srcDataShape[1];
             p.srcHeightFl = srcDataShape[2];
             p.srcWidthFl = srcDataShape[3];
+            p.srcWidthB = srcDataShape[3] * dataTypeSize;
+            p.srcHeightSub1Fl = p.srcHeightFl - 1.f;
+            p.srcWidthSub1Fl = p.srcWidthFl - 1.f;
+            p.srcHeightMul2Fl = p.srcHeightFl * 2.f;
+            p.srcWidthMul2Fl = p.srcWidthFl * 2.f;
+            p.srcHeightMul2Sub1Fl = p.srcHeightMul2Fl - 1.f;
+            p.srcWidthMul2Sub1Fl = p.srcWidthMul2Fl - 1.f;
             if (alignCorners) {
                 p.wDenormCoef = (p.srcWidthFl - 1.f) / 2.f;
                 p.hDenormCoef = (p.srcHeightFl - 1.f) / 2.f;
             }
-//            else {
-//                p.wDenormCoef = p.srcWidthFl / 2.f;
-//                p.hDenormCoef = p.srcHeightFl / 2.f;
-//            }
-//            p.srcBatchStepB = srcDataShape[2] * srcDataShape[3]; for dynamic
-
             p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
             p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
-//            p.dstBatchStepB = (dstShape[1] - 1) * p.dstChannelStepB;
-//            p.gridBatchStepB = dstShape[2] * dstShape[3] * 2 * gridTypeSize;
         });
     }
 
     Node::createPrimitive();
 }
-
-//bool GridSample::needPrepareParams() const {
-//    bool result = inputShapesModified();
-//    if (!isAxisInputConst)
-//        result = result || axis != (reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_AXIS)->getMemoryPtr()->GetPtr()))[0];
-//    return result;
-//}
 
 void GridSample::prepareParams() {
     auto& dataMemPtr = getParentEdgeAt(IN_DATA)->getMemoryPtr();
@@ -212,48 +196,6 @@ void GridSample::prepareParams() {
         THROW_ERROR << " has not allocated input grid memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
         THROW_ERROR << " has unidentified preferable primitive descriptor.";
-
-//    if (!isAxisInputConst) {
-//        axis = (reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_AXIS)->getMemoryPtr()->GetPtr()))[0];
-//        if (axis < 0)
-//            axis += dataSrcRank;
-//        if (axis < 0 || axis >= dataSrcRank || batchDims > axis)
-//            THROW_ERROR << "has incorrect input parameter axis value: " << axis;
-//    }
-//
-//    if (!isDataShapeStat || !isAxisInputConst) {
-//        const auto& dataDims = dataMemPtr->getStaticDims();
-//        axisDim = dataDims[axis];
-//        beforeBatchSize = std::accumulate(dataDims.begin(), dataDims.begin() + batchDims, 1lu, std::multiplies<uint64_t>());
-//        betweenBatchAndAxisSize = std::accumulate(dataDims.begin() + batchDims, dataDims.begin() + axis, 1lu, std::multiplies<uint64_t>());
-//        afterAxisSize = std::accumulate(dataDims.begin() + axis + 1, dataDims.end(), 1lu, std::multiplies<uint64_t>());
-//
-//        afterAxisSizeInBytes = afterAxisSize * dataTypeSize;
-//        axisAndAfterAxisSizeInBytes = axisDim * afterAxisSizeInBytes;
-//        srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
-//
-//        if (isIdxShapeStat) {
-//            specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
-//            totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
-//        }
-//    }
-//
-//    if (!isIdxShapeStat) {
-//        const auto& idxDims = idxMemPtr->getStaticDims();
-//        specIndicesSize = std::accumulate(idxDims.begin() + batchDims, idxDims.end(), 1lu, std::multiplies<uint64_t>());
-//
-//        specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
-//        totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
-//    }
-
-//    const auto& selectedPD = getSelectedPrimitiveDescriptor();
-//    if (x64::mayiuse(x64::avx512_core)) {
-//        selectedPD->setImplementationType(jit_avx512);
-//    } else if (x64::mayiuse(x64::avx2)) {
-//        selectedPD->setImplementationType(jit_avx2);
-//    } else {
-//        selectedPD->setImplementationType(jit_sse42);
-//    }
 }
 
 void GridSample::execute(dnnl::stream strm) {
@@ -285,22 +227,26 @@ std::cout << std::endl;
         const auto& p = execParamsPerThread[ithr];
         auto arg = jGridSamplesExecArgs();
 
-        arg.src         = srcData;
-        arg.grid        = gridData + p.gridStartB;
-        arg.dst         = dstData + p.dstStartB;
-//        arg.batchNum    = p.batchNum; // for dynamic
-        arg.channelsNum = p.channelsNum;
-        arg.srcWidthFl  = &p.srcWidthFl;
-        arg.srcHeightFl = &p.srcHeightFl;
-//        arg.srcBatchStepB = p.srcBatchStepB; // for dynamic
-        arg.srcChannelStepB  = p.srcChannelStepB;
-        arg.dstChannelStepB  = p.dstChannelStepB;
-//        arg.dstBatchStepB = p.dstBatchStepB; // for dynamic
-        arg.wDenormCoef = &p.wDenormCoef;
-        arg.hDenormCoef = &p.hDenormCoef;
-        arg.halfVal = &p.halfVal;
-        arg.workAmount  = p.workAmount;
-        arg.one  = &p.one;
+        arg.src                 = srcData;
+        arg.grid                = gridData + p.gridStartB;
+        arg.dst                 = dstData + p.dstStartB;
+        arg.channelsNum         = p.channelsNum;
+        arg.srcHeightFl         = &p.srcHeightFl;
+        arg.srcWidthFl          = &p.srcWidthFl;
+        arg.srcWidthB           = &p.srcWidthB;
+        arg.srcChannelStepB     = p.srcChannelStepB;
+        arg.dstChannelStepB     = p.dstChannelStepB;
+        arg.srcHeightSub1Fl     = &p.srcHeightSub1Fl;
+        arg.srcWidthSub1Fl      = &p.srcWidthSub1Fl;
+        arg.srcWidthMul2Fl      = &p.srcWidthMul2Fl;
+        arg.srcHeightMul2Fl     = &p.srcHeightMul2Fl;
+        arg.srcHeightMul2Sub1Fl = &p.srcHeightMul2Sub1Fl;
+        arg.srcWidthMul2Sub1Fl  = &p.srcWidthMul2Sub1Fl;
+        arg.wDenormCoef         = &p.wDenormCoef;
+        arg.hDenormCoef         = &p.hDenormCoef;
+        arg.one                 = &p.one;
+        arg.halfVal             = &p.halfVal;
+        arg.workAmount          = p.workAmount;
 
         (*jitKernel)(&arg);
     };
@@ -325,29 +271,54 @@ void GridSample::executeDynamicImpl(dnnl::stream strm) {
     const uint8_t* gridData = reinterpret_cast<uint8_t*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
     uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
-//    const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
+    const auto& srcDataShape = getInputShapeAtPort(IN_DATA).getDims();
+    const auto& dstShape = getOutputShapeAtPort(0).getDims();
+    const uint64_t totalWork = dstShape[2] * dstShape[3];
+printf("TotalWork: %lu\n", totalWork);
+    const uint64_t dataElPerVec = jitKernel->getDataElPerVec();
 
     auto threadBody = [&](const int ithr, const int nthr) {
-//        const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
-//        const uint64_t start = std::min(wpt * ithr, totalWork);
-//        const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
-//        const uint64_t workAmount = end - start;
+        const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
+        const uint64_t start = std::min(wpt * ithr, totalWork);
+        const uint64_t end = std::min(wpt * (ithr + 1), totalWork);
+
+        const float srcHeight = srcDataShape[2], srcWidth = srcDataShape[3];
+        const float srcHeightSub1Fl = srcHeight - 1.f, srcWidthSub1Fl = srcWidth - 1.f;
+        const float srcHeightMul2Fl = srcHeight * 2.f, srcHeightMul2Sub1Fl = srcHeightMul2Fl - 1.f;
+        const float srcWidthMul2Fl  = srcWidth * 2.f,  srcWidthMul2Sub1Fl  = srcWidthMul2Fl - 1.f;
+        const float hDenormCoef = (srcHeight - 1.f) / 2.f;
+        const float wDenormCoef = (srcWidth  - 1.f) / 2.f;
+        const float halfVal = 0.5f, oneVal = 1.f;
+        const uint64_t srcWidthB = srcDataShape[3] * dataTypeSize;
+        const uint64_t srcChannelStepB = srcDataShape[2] * srcWidthB;
+        const uint64_t srcBatchStepB = srcChannelStepB * srcDataShape[1];
+        const uint64_t dstBatchStepB = (dstShape[1] - 1) * dstShape[2] * dstShape[3] * dataTypeSize;
 
         auto arg = jGridSamplesExecArgs();
 
-        arg.src         = srcData;
-//        arg.grid        = gridData + p.gridStartB;
-//        arg.dst         = dstData + p.dstStartB;
-//        arg.batchNum    = p.batchNum;
-//        arg.channelsNum = p.channelsNum;
-//        arg.srcWidthFl  = &p.srcWidthFl;
-//        arg.srcHeightFl = &p.srcHeightFl;
-//        arg.srcBatchStepB = p.srcBatchStepB; // for dynamic
-//        arg.dstChStepB  = p.dstChannelStepB;
-//        arg.dstBatchStepB = p.dstBatchStepB; // for dynamic
-//        arg.wDenormCoef = &p.wDenormCoef;
-//        arg.hDenormCoef = &p.hDenormCoef;
-//        arg.workAmount  = p.workAmount;
+        arg.src                 = srcData;
+        arg.grid                = gridData + start * 2 * dataTypeSize;
+        arg.dst                 = dstData + start * dataTypeSize;
+        arg.batchNum            = srcDataShape[0];
+        arg.channelsNum         = srcDataShape[1];
+        arg.srcHeightFl         = &srcHeight;
+        arg.srcWidthFl          = &srcWidth;
+        arg.srcWidthB           = &srcWidthB;
+        arg.srcChannelStepB     = srcChannelStepB;
+        arg.dstChannelStepB     = dstShape[2] * dstShape[3] * dataTypeSize;
+        arg.srcBatchStepB       = &srcBatchStepB;
+        arg.dstBatchStepB       = &dstBatchStepB;
+        arg.srcHeightSub1Fl     = &srcHeightSub1Fl;
+        arg.srcWidthSub1Fl      = &srcWidthSub1Fl;
+        arg.srcHeightMul2Fl     = &srcHeightMul2Fl;
+        arg.srcWidthMul2Fl      = &srcWidthMul2Fl;
+        arg.srcHeightMul2Sub1Fl = &srcHeightMul2Sub1Fl;
+        arg.srcWidthMul2Sub1Fl  = &srcWidthMul2Sub1Fl;
+        arg.hDenormCoef         = &hDenormCoef;
+        arg.wDenormCoef         = &wDenormCoef;
+        arg.one                 = &oneVal;
+        arg.halfVal             = &halfVal;
+        arg.workAmount          = end - start;
 
         (*jitKernel)(&arg);
     };
@@ -356,7 +327,7 @@ void GridSample::executeDynamicImpl(dnnl::stream strm) {
 }
 
 std::vector<VectorDims> GridSample::shapeInfer() const {
-    return Node::shapeInferGeneric(PortMask(1, 2, 3));
+    return Node::shapeInferGeneric(PortMask(1, 2));
 }
 
 bool GridSample::created() const {

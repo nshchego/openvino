@@ -89,14 +89,17 @@ DATA_ET reflection_data_no_align(const DATA_ET* data,
                                  const size_t c,
                                  long y_d,
                                  long x_d) {
+//std::cout << x_d << "; ";
     const auto H = static_cast<long>(data_shape[2]);
     const auto W = static_cast<long>(data_shape[3]);
     const auto H_2 = static_cast<long>(data_shape[2]) * 2l;
     const auto W_2 = static_cast<long>(data_shape[3]) * 2l;
+//std::cout << x_d << "; ";
     y_d = (y_d % H_2 + H_2) % H_2;
     x_d = (x_d % W_2 + W_2) % W_2;
     const auto y = static_cast<size_t>(y_d >= H ? H_2 - 1 - y_d : y_d);
     const auto x = static_cast<size_t>(x_d >= W ? W_2 - 1 - x_d : x_d);
+std::cout << x << "; ";
     return get_single_value(data, data_shape, index_4D_t{n, c, y, x});
 }
 
@@ -136,6 +139,7 @@ DATA_ET bilinear(const DATA_ET* data,
     const auto dy = y_d - y_topleft;
     const auto dx = x_d - x_topleft;
 //std::cout << "(" << y_topleft << ";" << x_topleft << ")";
+//std::cout << x_topleft << "; ";
     const auto v00 = get_padded(data, data_shape, n, c, y_topleft, x_topleft);
 //std::cout << v00 << "; ";
     const auto v01 = get_padded(data, data_shape, n, c, y_topleft, x_topleft + 1);
