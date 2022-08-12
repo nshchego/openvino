@@ -173,8 +173,8 @@ protected:
     void getZeroMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
     void getBorderPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kAux);
     // dim - determines dimension. 0 - width, 1 - height.
-    void reflectionNoAlign(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
-    void reflectionWithAlign(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
+    void reflectionPadding(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
+//    void reflectionWithAlign(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
 
     void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
     void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);
