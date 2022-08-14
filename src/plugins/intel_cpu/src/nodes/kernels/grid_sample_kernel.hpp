@@ -142,8 +142,8 @@ protected:
             {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), Vmm(7), /*AVX5*/ Vmm(16), Vmm(17), Vmm(18), Vmm(19), Vmm(20), Vmm(21)};
     // Common.
     Vmm vZeros       = Vmm(8);
-    Vmm vSrcWidthFl  = Vmm(9);
-    Vmm vSrcHeightFl = Vmm(10);
+    Vmm vSrcWidthF   = Vmm(9);
+    Vmm vSrcHeightF  = Vmm(10);
     Vmm vWDenormCoef = Vmm(11);
     Vmm vHDenormCoef = Vmm(12);
     Vmm vOnesF       = Vmm(13);
@@ -181,8 +181,9 @@ protected:
     void bicubicInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void nearestInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getPadded(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
-    void zerosPadding0(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
     void zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
+    void zerosPadding0(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
+    void zerosPadding1(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
     void borderPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kAux);
     // dim - determines dimension. 0 - width, 1 - height.
     void reflectionPadding(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
