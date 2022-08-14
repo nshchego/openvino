@@ -139,7 +139,7 @@ DATA_ET bilinear(const DATA_ET* data,
     const auto dy = y_d - y_topleft;
     const auto dx = x_d - x_topleft;
 //std::cout << "(" << y_topleft << ";" << x_topleft << ")";
-std::cout << x_topleft << "; ";
+//std::cout << x_topleft << "; ";
     const auto v00 = get_padded(data, data_shape, n, c, y_topleft, x_topleft);
 //std::cout << v00 << "; ";
     const auto v01 = get_padded(data, data_shape, n, c, y_topleft, x_topleft + 1);
@@ -181,7 +181,9 @@ vector_4_t<T> cubic_coeffs(const T r, const T A = -0.75) {
     v[0] = ((A * (r + 1) - 5 * A) * (r + 1) + 8 * A) * (r + 1) - 4 * A;
     v[1] = ((A + 2) * r - (A + 3)) * r * r + 1;
     v[2] = ((A + 2) * (1 - r) - (A + 3)) * (1 - r) * (1 - r) + 1;
-    v[3] = ((A * (2 - r) - 5 * A) * (2 - r) + 8 * A) * (2 - r) - 4 * A;
+//v[2] = (2 * A + 3) * r - ((A + 2) * r * r + A);
+//    v[3] = ((A * (2 - r) - 5 * A) * (2 - r) + 8 * A) * (2 - r) - 4 * A;
+v[3] = A * r * r * (1 - r);
     return v;
 }
 
@@ -194,9 +196,14 @@ matrix_4x4_t<DATA_ET> gather_4x4(const DATA_ET* data,
                                  const long x_topleft,
                                  const get_padded_fn_t<DATA_ET>& get_padded) {
     matrix_4x4_t<DATA_ET> s;
-    for (int j = 0; j < 4; ++j)
-        for (int i = 0; i < 4; ++i)
+    for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) {
+//if (j == 1 && i == 0) {
+//    std::cout << y_topleft + j << "; ";
+//}
             s[j][i] = get_padded(data, data_shape, n, c, y_topleft + j, x_topleft + i);
+        }
+    }
     return s;
 }
 
@@ -215,14 +222,22 @@ DATA_ET bicubic(const DATA_ET* data,
     const auto x_topleft = std::floor(x_d);
     const auto dy = y_d - y_topleft;
     const auto dx = x_d - x_topleft;
+//std::cout << dx << "; ";
+//std::cout << x_topleft - 1 << "; ";
     const auto s = gather_4x4(data, data_shape, n, c, y_topleft - 1, x_topleft - 1, get_padded);
 
     const auto cy = cubic_coeffs(dy);
     const auto cx = cubic_coeffs(dx);
+//for (auto dataVal : s[1]) {
+//    std::cout << dataVal << "; ";
+//}
+//std::cout << cx[3] << "; ";
+//std::cout << s[1][0] << "; ";
     vector_4_t<DATA_ET> p;
     std::transform(s.begin(), s.end(), p.begin(), [&cx](const vector_4_t<DATA_ET>& v) {
         return std::inner_product(cx.begin(), cx.end(), v.begin(), static_cast<DATA_ET>(0));
     });
+std::cout << p[2] << "; ";
     return std::inner_product(cy.begin(), cy.end(), p.begin(), static_cast<DATA_ET>(0));
 }
 }  // namespace

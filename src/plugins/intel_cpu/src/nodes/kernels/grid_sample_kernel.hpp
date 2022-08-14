@@ -138,26 +138,33 @@ protected:
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[8] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6), Vmask(7)};
     // Auxiliary pool.
-    const Vmm vAuxContainer[12] =
-            {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), Vmm(7), /*AVX5*/ Vmm(16), Vmm(17), Vmm(18), Vmm(19)};
+    const Vmm vAuxContainer[14] =
+            {Vmm(0), Vmm(1), Vmm(2), Vmm(3), Vmm(4), Vmm(5), Vmm(6), Vmm(7), /*AVX5*/ Vmm(16), Vmm(17), Vmm(18), Vmm(19), Vmm(20), Vmm(21)};
     // Common.
     Vmm vZeros       = Vmm(8);
     Vmm vSrcWidthFl  = Vmm(9);
     Vmm vSrcHeightFl = Vmm(10);
     Vmm vWDenormCoef = Vmm(11);
     Vmm vHDenormCoef = Vmm(12);
-    Vmm vOnes        = Vmm(14);
-    Vmm vPermGridMask = Vmm(15);
+    Vmm vOnesF       = Vmm(13);
+    Vmm vPermGridMask = Vmm(14);
     Vmm& vHalf = vWDenormCoef;
+
     // AVX512
-    Vmm vSrcWidthSub1Fl      = Vmm(28);          // for BORDER padding
-    Vmm vSrcHeightSub1Fl     = Vmm(29);          // for BORDER padding
+    Vmm vSrcWidthSub1Fl      = Vmm(23);          // for BORDER padding
+    Vmm vSrcHeightSub1Fl     = Vmm(24);          // for BORDER padding
     Vmm& vSrcWidthMul2Fl     = vSrcWidthSub1Fl;  // for REFLECTION padding
     Vmm& vSrcHeightMul2Fl    = vSrcHeightSub1Fl; // for REFLECTION padding
-    Vmm vSrcWidthMul2Sub1Fl  = Vmm(30);          // for REFLECTION padding
-    Vmm vSrcHeightMul2Sub1Fl = Vmm(31);          // for REFLECTION padding
+    Vmm vSrcWidthMul2Sub1Fl  = Vmm(25);          // for REFLECTION padding
+    Vmm vSrcHeightMul2Sub1Fl = Vmm(26);          // for REFLECTION padding
     Vmm& vDataTypeSize       = vSrcWidthSub1Fl;  // for ZEROS padding
     Vmm& vSrcWidthB          = vSrcHeightSub1Fl; // for ZEROS padding
+
+    Vmm vBicubConst          = Vmm(27);          // for BICUBIC
+    Vmm vBicub2Const         = Vmm(28);          // for BICUBIC
+    Vmm vBicub3Const         = Vmm(29);          // for BICUBIC
+    Vmm v2val                = Vmm(30);          // for BICUBIC
+    Vmm v2Bicub3Const        = Vmm(31);          // for BICUBIC
 
     // XMM
 //    Xbyak::Xmm xmmAuxContainer[6] = {Xbyak::Xmm(0), Xbyak::Xmm(1), Xbyak::Xmm(2), Xbyak::Xmm(3), Xbyak::Xmm(4), Xbyak::Xmm(16)};
@@ -166,24 +173,22 @@ protected:
 //    Xbyak::Xmm xmmSpecIdxSizeB = Xbyak::Xmm(vmmSpecIdxSizeB.getIdx());
 //    Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(vmmSpecIdxB.getIdx());
 
-    void calcCoordinates(const Vmm* vAuxPool, bool shiftFirst = true);
+    void spatialLoop(const Vmm* vAuxPool);
+    void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
+    void bilinearInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
+    void bicubicInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
+    void nearestInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void getPadded(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
-    void getZeroMask(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
-    void getBorderPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kAux);
+    void zerosPadding0(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
+    void zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
+    void borderPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kAux);
     // dim - determines dimension. 0 - width, 1 - height.
     void reflectionPadding(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
-//    void reflectionWithAlign(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
+    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, uint8_t idx);
 
-    void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shiftFirst = true);
-    void calcSrcShiftShort(Vmm* vAuxPool, bool shiftFirst = true);
-    void calcSrcShiftShortBlock(Vmm* vAuxPool, bool shiftFirst);
-    void process(bool isShortIdx, bool blocked);
-    void process32b(bool isShortIdx, bool blocked);
-    void process16b(bool isShortIdx, bool blocked);
-    void process8b(bool isShortIdx, bool blocked);
-    void shiftIdxAndGather(const Vmm* vAuxPool, bool isShortIdx, bool shiftFirst, bool blocked);
+    void process();
     void tail(bool isShortIdx, bool shiftFirst = true, bool blocked = false);
     // Aux functions.
     void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);

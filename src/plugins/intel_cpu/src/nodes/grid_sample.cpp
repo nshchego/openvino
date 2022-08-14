@@ -8,9 +8,6 @@
 #include "grid_sample.hpp"
 #include "ie_parallel.hpp"
 #include <ngraph/opsets/opset1.hpp>
-//#include "common/cpu_memcpy.h"
-//#include <utils/general_utils.h>
-//#include "kernels/grid_sample_kernel.hpp"
 
 using namespace InferenceEngine;
 using namespace dnnl::impl::cpu;
@@ -168,16 +165,23 @@ printf("[%d] Start: %lu; End: %lu\n", ithr, dstStart, dstEnd);
             p.channelsNum = srcDataShape[1];
             p.srcHeightFl = srcDataShape[2];
             p.srcWidthFl = srcDataShape[3];
-            p.srcWidthB = srcDataShape[3] * dataTypeSize;
+            if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
+                p.srcWidthB = (srcDataShape[3] - 3) * dataTypeSize;
+            } else {
+                p.srcWidthB = srcDataShape[3] * dataTypeSize;
+            }
             p.srcHeightSub1Fl = p.srcHeightFl - 1.f;
             p.srcWidthSub1Fl = p.srcWidthFl - 1.f;
             p.srcHeightMul2Fl = p.srcHeightFl * 2.f;
             p.srcWidthMul2Fl = p.srcWidthFl * 2.f;
-            p.srcHeightMul2Sub1Fl = p.srcHeightMul2Fl - 1.f;
-            p.srcWidthMul2Sub1Fl = p.srcWidthMul2Fl - 1.f;
             if (alignCorners) {
+                p.srcHeightMul2Sub1Fl = p.srcHeightSub1Fl * 2.f;
+                p.srcWidthMul2Sub1Fl = p.srcWidthSub1Fl * 2.f;
                 p.wDenormCoef = (p.srcWidthFl - 1.f) / 2.f;
                 p.hDenormCoef = (p.srcHeightFl - 1.f) / 2.f;
+            } else {
+                p.srcHeightMul2Sub1Fl = p.srcHeightMul2Fl - 1.f;
+                p.srcWidthMul2Sub1Fl = p.srcWidthMul2Fl - 1.f;
             }
             p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
             p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
@@ -284,8 +288,16 @@ printf("TotalWork: %lu\n", totalWork);
 
         const float srcHeight = srcDataShape[2], srcWidth = srcDataShape[3];
         const float srcHeightSub1Fl = srcHeight - 1.f, srcWidthSub1Fl = srcWidth - 1.f;
-        const float srcHeightMul2Fl = srcHeight * 2.f, srcHeightMul2Sub1Fl = srcHeightMul2Fl - 1.f;
-        const float srcWidthMul2Fl  = srcWidth * 2.f,  srcWidthMul2Sub1Fl  = srcWidthMul2Fl - 1.f;
+        const float srcHeightMul2Fl = srcHeight * 2.f;
+        const float srcWidthMul2Fl  = srcWidth * 2.f;
+        float srcHeightMul2Sub1Fl, srcWidthMul2Sub1Fl;
+        if (alignCorners) {
+            srcHeightMul2Sub1Fl = srcHeightSub1Fl * 2.f;
+            srcWidthMul2Sub1Fl  = srcWidthSub1Fl * 2.f;
+        } else {
+            srcHeightMul2Sub1Fl = srcHeightMul2Fl - 1.f;
+            srcWidthMul2Sub1Fl  = srcWidthMul2Fl - 1.f;
+        };
         const float hDenormCoef = (srcHeight - 1.f) / 2.f;
         const float wDenormCoef = (srcWidth  - 1.f) / 2.f;
         const float halfVal = 0.5f, oneVal = 1.f;
