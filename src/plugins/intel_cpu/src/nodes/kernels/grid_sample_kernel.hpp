@@ -153,10 +153,13 @@ protected:
     // AVX512
     Vmm vSrcWidthSub1Fl      = Vmm(23);          // for BORDER padding
     Vmm vSrcHeightSub1Fl     = Vmm(24);          // for BORDER padding
+
     Vmm& vSrcWidthMul2Fl     = vSrcWidthSub1Fl;  // for REFLECTION padding
     Vmm& vSrcHeightMul2Fl    = vSrcHeightSub1Fl; // for REFLECTION padding
     Vmm vSrcWidthMul2Sub1Fl  = Vmm(25);          // for REFLECTION padding
     Vmm vSrcHeightMul2Sub1Fl = Vmm(26);          // for REFLECTION padding
+    Vmm vAbsMask             = Vmm(22);          // for REFLECTION padding
+
     Vmm& vDataTypeSize       = vSrcWidthSub1Fl;  // for ZEROS padding
     Vmm& vSrcWidthB          = vSrcHeightSub1Fl; // for ZEROS padding
 
@@ -184,9 +187,9 @@ protected:
     void zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
     void zerosPadding0(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
     void zerosPadding1(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
-    void borderPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kAux);
+    void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vUpperBound, const Vmask& kAux);
     // dim - determines dimension. 0 - width, 1 - height.
-    void reflectionPadding(const Vmm& vCoord, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
+    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
     void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, uint8_t idx);
 
     void process();

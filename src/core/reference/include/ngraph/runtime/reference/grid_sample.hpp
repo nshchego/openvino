@@ -99,7 +99,7 @@ DATA_ET reflection_data_no_align(const DATA_ET* data,
     x_d = (x_d % W_2 + W_2) % W_2;
     const auto y = static_cast<size_t>(y_d >= H ? H_2 - 1 - y_d : y_d);
     const auto x = static_cast<size_t>(x_d >= W ? W_2 - 1 - x_d : x_d);
-std::cout << x << "; ";
+//std::cout << x << "; ";
     return get_single_value(data, data_shape, index_4D_t{n, c, y, x});
 }
 
@@ -165,6 +165,7 @@ DATA_ET nearest(const DATA_ET* data,
                 const denormalize_fn_t<GRID_ET>& denormalize) {
     const auto y_nearest = std::lrint(denormalize(y_n, data_shape[2]));
     const auto x_nearest = std::lrint(denormalize(x_n, data_shape[3]));
+std::cout << denormalize(x_n, data_shape[3]) << "; " << x_nearest << " | ";
     return get_padded(data, data_shape, n, c, y_nearest, x_nearest);
 }
 
@@ -222,8 +223,8 @@ DATA_ET bicubic(const DATA_ET* data,
     const auto x_topleft = std::floor(x_d);
     const auto dy = y_d - y_topleft;
     const auto dx = x_d - x_topleft;
-//std::cout << dx << "; ";
-//std::cout << x_topleft - 1 << "; ";
+//std::cout << std::abs(y_topleft - 1) << "; ";
+//std::cout << y_topleft - 1 << "; ";
     const auto s = gather_4x4(data, data_shape, n, c, y_topleft - 1, x_topleft - 1, get_padded);
 
     const auto cy = cubic_coeffs(dy);
@@ -232,12 +233,15 @@ DATA_ET bicubic(const DATA_ET* data,
 //    std::cout << dataVal << "; ";
 //}
 //std::cout << cx[3] << "; ";
-//std::cout << s[1][0] << "; ";
+//std::cout << s[0][0] << "; ";
     vector_4_t<DATA_ET> p;
     std::transform(s.begin(), s.end(), p.begin(), [&cx](const vector_4_t<DATA_ET>& v) {
         return std::inner_product(cx.begin(), cx.end(), v.begin(), static_cast<DATA_ET>(0));
     });
-std::cout << p[2] << "; ";
+//for (auto pv : p) {
+//    std::cout << pv << "; ";
+//}
+//std::cout << "| ";
     return std::inner_product(cy.begin(), cy.end(), p.begin(), static_cast<DATA_ET>(0));
 }
 }  // namespace
