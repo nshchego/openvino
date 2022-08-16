@@ -10,20 +10,23 @@ using namespace dnnl::impl::cpu;
 namespace ov {
 namespace intel_cpu {
 
-const unsigned jitGridSampleKernelBase::permGridMask32bA2[8]  = {0, 2, 4, 6, 1, 3, 5, 7};
-const unsigned jitGridSampleKernelBase::permGridMask32bA5[16]  = {0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15};
+template <>
+const unsigned jitGridSampleKernel<x64::avx>::gridPermMask[8]  = { 0, 2, 4, 6, 1, 3, 5, 7 };
+template <>
+const unsigned jitGridSampleKernel<x64::avx2>::gridPermMask[8]  = { 0, 2, 4, 6, 1, 3, 5, 7 };
+template <>
+const unsigned jitGridSampleKernel<x64::avx512_core>::gridPermMask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
+template <>
+const unsigned jitGridSampleKernel<x64::sse41>::gridPermMask[8]  = { 0, 2, 4, 6, 0, 2, 4, 6 };
 
-//const unsigned jitGridSmapleKernelBase::shufMask8bitUni[16]  = {0x0C080400, 0x80808080, 0x80808080, 0x80808080, 0x0C080400, 0x80808080, 0x80808080, 0x80808080,
-//                                                            0x0C080400, 0x80808080, 0x80808080, 0x80808080, 0x0C080400, 0x80808080, 0x80808080, 0x80808080};
-//const unsigned jitGridSmapleKernelBase::permMask8bitA2[8]    = {0, 4, 1, 5, 2, 6, 3, 7};
-//const unsigned jitGridSmapleKernelBase::permMask8bitA5[16]   = {0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15};
-//
-//const unsigned jitGridSmapleKernelBase::shufMask16bitUni[16] = {0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080,
-//                                                            0x05040100, 0x0D0C0908, 0x80808080, 0x80808080, 0x05040100, 0x0D0C0908, 0x80808080, 0x80808080};
-//const unsigned jitGridSmapleKernelBase::permMask16bitA2[8]   = {0, 1, 4, 5, 2, 3, 6, 7};
-//const unsigned jitGridSmapleKernelBase::permMask16bitA5[16]  = {0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15};
-//
-//const unsigned jitGridSmapleKernelBase::incVec[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+template <>
+const float jitGridSampleKernel<x64::avx512_core>::halfValuesF[1] = { 0.5f };
+template <>
+const float jitGridSampleKernel<x64::avx>::halfValuesF[1] = { 0.5f };
+template <>
+const float jitGridSampleKernel<x64::avx2>::halfValuesF[1] = { 0.5f };
+template <>
+const float jitGridSampleKernel<x64::sse41>::halfValuesF[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
 
 #define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
 
@@ -39,16 +42,6 @@ jitGridSampleKernel<isa>::jitGridSampleKernel(const jGridSampleConfParams& jcp) 
         dataTypeShift = 1;
     else if (dataTypeSize == 4)
         dataTypeShift = 2;
-
-    if (isa == x64::avx512_core) {
-//        permMask8bitUni = permMask8bitA5;
-        permGridMaskUni = permGridMask32bA5;
-    } else if (isa == x64::avx2) {
-//        permMask8bitUni = permMask8bitA2;
-        permGridMaskUni = permGridMask32bA2;
-    } else {
-        // TODO:
-    }
 }
 
 template <x64::cpu_isa_t isa>
@@ -67,69 +60,73 @@ void jitGridSampleKernel<isa>::generate() {
     mov(regDst, ptr[regParams + GET_OFF(dst)]);
     mov(regGrid, ptr[regParams + GET_OFF(grid)]);
 
-    mov(regAux1, ptr[regParams + GET_OFF(srcWidthFl)]);
+    mov(regAux1, ptr[regParams + GET_OFF(srcWidthF)]);
     uni_vpbroadcastd(vSrcWidthF, ptr[regAux1]);
-    mov(regAux1, ptr[regParams + GET_OFF(srcHeightFl)]);
+    mov(regAux1, ptr[regParams + GET_OFF(srcHeightF)]);
     uni_vpbroadcastd(vSrcHeightF, ptr[regAux1]);
 
     mov(regSrcChannelStepB, ptr[regParams + GET_OFF(srcChannelStepB)]);
     mov(regDstChannelStepB, ptr[regParams + GET_OFF(dstChannelStepB)]);
-    mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
-
-    mov(regAux1, reinterpret_cast<uintptr_t>(permGridMaskUni));
-    uni_vmovups(vPermGridMask, ptr[regAux1]);
 
     mov(regAux1, ptr[regParams + GET_OFF(one)]);
     uni_vpbroadcastd(vOnesF, ptr[regAux1]);
 
     uni_vpxor(vZeros, vZeros, vZeros);
 
-    if (jcp.alignCorners) {
-        mov(regAux1, ptr[regParams + GET_OFF(wDenormCoef)]);
-        uni_vpbroadcastd(vWDenormCoef, ptr[regAux1]);
-        mov(regAux1, ptr[regParams + GET_OFF(hDenormCoef)]);
-        uni_vpbroadcastd(vHDenormCoef, ptr[regAux1]);
-    } else {
-        mov(regAux1, ptr[regParams + GET_OFF(halfVal)]);
-        uni_vpbroadcastd(vHalf, ptr[regAux1]);
-    }
-    if (isa == x64::avx512_core) {
-        if (jcp.paddingMode == PaddingMode::ZEROS) {
-            mov(regAux1, dataTypeSize);
-            vpbroadcastd(vDataTypeSize, reg32Aux1);
-            mov(regAux1, ptr[regParams + GET_OFF(srcWidthB)]);
-            uni_vpbroadcastd(vSrcWidthB, ptr[regAux1]);
-        } else if (jcp.paddingMode == PaddingMode::BORDER) {
-            mov(regAux1, ptr[regParams + GET_OFF(srcHeightSub1Fl)]);
-            uni_vpbroadcastd(vSrcHeightSub1Fl, ptr[regAux1]);
-            mov(regAux1, ptr[regParams + GET_OFF(srcWidthSub1Fl)]);
-            uni_vpbroadcastd(vSrcWidthSub1Fl, ptr[regAux1]);
-        } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
-            mov(regAux1, ptr[regParams + GET_OFF(srcHeightMul2Fl)]);
-            uni_vpbroadcastd(vSrcHeightMul2Fl, ptr[regAux1]);
-            mov(regAux1, ptr[regParams + GET_OFF(srcWidthMul2Fl)]);
-            uni_vpbroadcastd(vSrcWidthMul2Fl, ptr[regAux1]);
-            mov(regAux1, ptr[regParams + GET_OFF(srcHeightMul2Sub1Fl)]);
-            uni_vpbroadcastd(vSrcHeightMul2Sub1Fl, ptr[regAux1]);
-            mov(regAux1, ptr[regParams + GET_OFF(srcWidthMul2Sub1Fl)]);
-            uni_vpbroadcastd(vSrcWidthMul2Sub1Fl, ptr[regAux1]);
-            if (jcp.alignCorners) {
-                mov(reg32Aux1, 0x7fffffff);
-                vpbroadcastd(vAbsMask, reg32Aux1);
-            }
+    if (isa == x64::avx512_core || isa == x64::avx2 || isa == x64::avx) {
+        mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
+
+        if (jcp.alignCorners) {
+            mov(regAux1, ptr[regParams + GET_OFF(wDenormCoef)]);
+            uni_vpbroadcastd(vWDenormCoef, ptr[regAux1]);
+            mov(regAux1, ptr[regParams + GET_OFF(hDenormCoef)]);
+            uni_vpbroadcastd(vHDenormCoef, ptr[regAux1]);
+        } else {
+            mov(regAux1, reinterpret_cast<uintptr_t>(halfValuesF));
+            uni_vpbroadcastd(vHalf, ptr[regAux1]);
         }
 
-        if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
-            mov(reg32Aux1, 0xbf400000); // -0.75f
-            vpbroadcastd(vBicubConst, reg32Aux1);
-            mov(reg32Aux1, 0x3fa00000); // 1.25f
-            vpbroadcastd(vBicub2Const, reg32Aux1);
-            mov(reg32Aux1, 0x40100000); // 2.25f
-            vpbroadcastd(vBicub3Const, reg32Aux1);
-            mov(reg32Aux1, 0x40000000); // 2.f
-            vpbroadcastd(v2val, reg32Aux1); // TODO: rename
-            mov(reg32Aux1, 0x3fc00000); // 1.5f
-            vpbroadcastd(v2Bicub3Const, reg32Aux1);
+        mov(regAux1, reinterpret_cast<uintptr_t>(gridPermMask));
+        uni_vmovups(vPermGridMask, ptr[regAux1]);
+
+        if (isa == x64::avx512_core) {
+            if (jcp.paddingMode == PaddingMode::ZEROS) {
+                mov(regAux1, dataTypeSize);
+                vpbroadcastd(vDataTypeSize, reg32Aux1);
+                mov(regAux1, ptr[regParams + GET_OFF(srcWidthB)]);
+                uni_vpbroadcastd(vSrcWidthB, ptr[regAux1]);
+            } else if (jcp.paddingMode == PaddingMode::BORDER) {
+                mov(regAux1, ptr[regParams + GET_OFF(srcHeightSub1F)]);
+                uni_vpbroadcastd(vSrcHeightSub1F, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(srcWidthSub1F)]);
+                uni_vpbroadcastd(vSrcWidthSub1F, ptr[regAux1]);
+            } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
+                mov(regAux1, ptr[regParams + GET_OFF(srcHeightMul2F)]);
+                uni_vpbroadcastd(vSrcHeightMul2F, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(srcWidthMul2F)]);
+                uni_vpbroadcastd(vSrcWidthMul2F, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(srcHeightMul2Sub1F)]);
+                uni_vpbroadcastd(vSrcHeightMul2Sub1F, ptr[regAux1]);
+                mov(regAux1, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
+                uni_vpbroadcastd(vSrcWidthMul2Sub1F, ptr[regAux1]);
+                if (jcp.alignCorners) {
+                    mov(reg32Aux1, 0x7fffffff);
+                    vpbroadcastd(vAbsMask, reg32Aux1);
+                }
+            }
+
+            if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
+                mov(reg32Aux1, 0xbf400000); // -0.75f
+                vpbroadcastd(vBicubConst, reg32Aux1);
+                mov(reg32Aux1, 0x3fa00000); // 1.25f
+                vpbroadcastd(vBicub2Const, reg32Aux1);
+                mov(reg32Aux1, 0x40100000); // 2.25f
+                vpbroadcastd(vBicub3Const, reg32Aux1);
+                mov(reg32Aux1, 0x40000000); // 2.f
+                vpbroadcastd(v2val, reg32Aux1); // TODO: rename
+                mov(reg32Aux1, 0x3fc00000); // 1.5f
+                vpbroadcastd(v2Bicub3Const, reg32Aux1);
+            }
         }
     }
 
@@ -138,16 +135,56 @@ void jitGridSampleKernel<isa>::generate() {
     this->postamble();
 }
 
-template <x64::cpu_isa_t isa>
-void jitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
+// TODO: is applicable for AVX2
+template <>
+void jitGridSampleKernel<x64::avx512_core>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
     if (jcp.alignCorners) {
         uni_vfmadd132ps(vWCoord, vWDenormCoef, vWDenormCoef);
         uni_vfmadd132ps(vHCoord, vHDenormCoef, vHDenormCoef);
     } else {
         uni_vfmadd132ps(vWCoord, vSrcWidthF, vSrcWidthF);
-        vfmsub132ps(vWCoord, vHalf, vHalf);
+        uni_vfmsub132ps(vWCoord, vHalf, vHalf);
+
         uni_vfmadd132ps(vHCoord, vSrcHeightF, vSrcHeightF);
-        vfmsub132ps(vHCoord, vHalf, vHalf);
+        uni_vfmsub132ps(vHCoord, vHalf, vHalf);
+    }
+}
+
+template <>
+void jitGridSampleKernel<x64::avx2>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
+    if (jcp.alignCorners) {
+        uni_vfmadd132ps(vWCoord, vWDenormCoef, vWDenormCoef);
+        uni_vfmadd132ps(vHCoord, vHDenormCoef, vHDenormCoef);
+    } else {
+        uni_vfmadd132ps(vWCoord, vSrcWidthF, vSrcWidthF);
+        uni_vfmsub132ps(vWCoord, vHalf, vHalf);
+
+        uni_vfmadd132ps(vHCoord, vSrcHeightF, vSrcHeightF);
+        uni_vfmsub132ps(vHCoord, vHalf, vHalf);
+    }
+}
+
+// TODO: is applicable for AVX
+template <>
+void jitGridSampleKernel<x64::sse41>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
+    if (jcp.alignCorners) {
+        mov(regAux4, ptr[regParams + GET_OFF(wDenormCoef)]);
+        uni_vmulps(vWCoord, vWCoord, ptr[regAux4]);
+        uni_vaddps(vWCoord, vWCoord, ptr[regAux4]);
+
+        mov(regAux4, ptr[regParams + GET_OFF(hDenormCoef)]);
+        uni_vmulps(vHCoord, vHCoord, ptr[regAux4]);
+        uni_vaddps(vHCoord, vHCoord, ptr[regAux4]);
+    } else {
+        mov(regAux4, reinterpret_cast<uintptr_t>(halfValuesF));
+
+        uni_vfmadd132ps(vWCoord, vSrcWidthF, vSrcWidthF);
+        uni_vmulps(vWCoord, vWCoord, ptr[regAux4]);
+        uni_vsubps(vWCoord, vWCoord, ptr[regAux4]);
+
+        uni_vfmadd132ps(vHCoord, vSrcHeightF, vSrcHeightF);
+        uni_vmulps(vHCoord, vHCoord, ptr[regAux4]);
+        uni_vsubps(vHCoord, vHCoord, ptr[regAux4]);
     }
 }
 
@@ -203,14 +240,18 @@ void jitGridSampleKernel<x64::avx2>::zerosPadding(const Vmm& vWCoord, const Vmm&
 
 template <>
 void jitGridSampleKernel<x64::sse41>::zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
-    uni_vcmpps(kAux, vSrcWidthF, vWCoord, 0x1); // vWCoord < vSrcWidthF
-    uni_vcmpps(kDst, vWCoord, vZeros, 0x2);     // vWCoord >= vZeros
-    uni_vpand(kDst, kAux, kDst);
+    uni_vmovups(kAux, vWCoord);
+    uni_vcmpps(kAux, kAux, vSrcWidthF, 0x1); // vWCoord < vSrcWidthF
+    uni_vpxor(kDst, kDst, kDst);
+    uni_vcmpps(kDst, kDst, vWCoord, 0x2);    // vWCoord >= vZeros
+    uni_vpand(kDst, kDst, kAux);
 
-    uni_vcmpps(kAux, vSrcHeightF, vHCoord, 0x1); // vHCoord < vSrcHeightF
-    uni_vpand(kDst, kAux, kDst);
-    uni_vcmpps(kAux, vHCoord, vZeros, 0x2);      // vHCoord >= vZeros
-    uni_vpand(kDst, kAux, kDst);
+    uni_vmovups(kAux, vHCoord);
+    uni_vcmpps(kAux, kAux, vSrcHeightF, 0x1); // vHCoord < vSrcHeightF
+    uni_vpand(kDst, kDst, kAux);
+    uni_vpxor(kAux, kAux, kAux);
+    uni_vcmpps(kAux, kAux, vHCoord, 0x2);     // vHCoord >= vZeros
+    uni_vpand(kDst, kDst, kAux);
 }
 
 template <>
@@ -222,12 +263,12 @@ void jitGridSampleKernel<x64::avx512_core>::borderPadding(const Vmm& vCoordDst, 
 template <>
 void jitGridSampleKernel<x64::avx2>::borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vUpperBound, const Vmask& kAux) {
 //    vcmpps(kAux, vSrcWidthF, vWCoord, 0x2); // vWCoord >= vSrcWidthF
-//    vmovups(vWCoord | kAux, vSrcWidthSub1Fl);
+//    vmovups(vWCoord | kAux, vSrcWidthSub1F);
 //    vcmpps(kAux, vWCoord, vZeros, 0x1); // vWCoord < vZeros
 //    vmovups(vWCoord | kAux, vZeros);
 //
 //    vcmpps(kAux, vSrcHeightF, vHCoord, 0x2); // vHCoord >= vSrcHeightF
-//    vmovups(vHCoord | kAux, vSrcHeightSub1Fl);
+//    vmovups(vHCoord | kAux, vSrcHeightSub1F);
 //    vcmpps(kAux, vHCoord, vZeros, 0x1); // vHCoord < vZeros
 //    vmovups(vHCoord | kAux, vZeros);
 }
@@ -238,63 +279,63 @@ void jitGridSampleKernel<x64::sse41>::borderPadding(const Vmm& vCoordDst, const 
 
 template <>
 void jitGridSampleKernel<x64::avx512_core>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const uint8_t dim) {
-    Vmm vSrcDimFl, vSrcDimMul2Fl, vSrcDimMul2Sub1Fl;
+    Vmm vSrcDimF, vSrcDimMul2F, vSrcDimMul2Sub1F;
     if (dim == 0) {
-        vSrcDimFl = vSrcWidthF;
-        vSrcDimMul2Fl = vSrcWidthMul2Fl;
-        vSrcDimMul2Sub1Fl = vSrcWidthMul2Sub1Fl;
+        vSrcDimF = vSrcWidthF;
+        vSrcDimMul2F = vSrcWidthMul2F;
+        vSrcDimMul2Sub1F = vSrcWidthMul2Sub1F;
     } else {
-        vSrcDimFl = vSrcHeightF;
-        vSrcDimMul2Fl = vSrcHeightMul2Fl;
-        vSrcDimMul2Sub1Fl = vSrcHeightMul2Sub1Fl;
+        vSrcDimF = vSrcHeightF;
+        vSrcDimMul2F = vSrcHeightMul2F;
+        vSrcDimMul2Sub1F = vSrcHeightMul2Sub1F;
     }
 
     if (jcp.alignCorners) {
         // abs(x) % D21
         uni_vandps(vCoordDst, vCoordOrigin, vAbsMask); // abs(x)
-        uni_vdivps(vAux, vCoordDst, vSrcDimMul2Sub1Fl);
+        uni_vdivps(vAux, vCoordDst, vSrcDimMul2Sub1F);
         uni_vroundps(vAux, vAux, 0x3); // Round floor
-        uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2Sub1Fl); // abs(x) % D21
+        uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2Sub1F); // abs(x) % D21
     } else {
         // (x % D2 + D2) % D2
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
-        uni_vdivps(vAux, vCoordDst, vSrcDimMul2Fl);
+        uni_vdivps(vAux, vCoordDst, vSrcDimMul2F);
         uni_vroundps(vAux, vAux, 0x3); // Round floor
-        uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2Fl); // x % D2
-        uni_vaddps(vCoordDst, vCoordDst, vSrcDimMul2Fl); // x % D2 + D2
-        uni_vdivps(vAux, vCoordDst, vSrcDimMul2Fl);
+        uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2F); // x % D2
+        uni_vaddps(vCoordDst, vCoordDst, vSrcDimMul2F); // x % D2 + D2
+        uni_vdivps(vAux, vCoordDst, vSrcDimMul2F);
         uni_vroundps(vAux, vAux, 0x3); // Round floor
-        uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2Fl); // (x % D2 + D2) % D2
+        uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2F); // (x % D2 + D2) % D2
     }
 
-    uni_vsubps(vAux, vSrcDimMul2Sub1Fl, vCoordDst);
-    vcmpps(kAux, vSrcDimFl, vCoordDst, 0x2); // vCoordDst >= vSrcDimFl
+    uni_vsubps(vAux, vSrcDimMul2Sub1F, vCoordDst);
+    vcmpps(kAux, vSrcDimF, vCoordDst, 0x2); // vCoordDst >= vSrcDimF
     vmovups(vCoordDst | kAux, vAux);
 }
 
 template <>
 void jitGridSampleKernel<x64::avx2>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const uint8_t dim) {
-    Vmm vSrcDimFl;
+    Vmm vSrcDimF;
     if (dim == 0) {
-        vSrcDimFl = vSrcWidthF;
+        vSrcDimF = vSrcWidthF;
     } else {
-        vSrcDimFl = vSrcHeightF;
+        vSrcDimF = vSrcHeightF;
     }
-    const auto& vSrcDimMul2Fl = kAux;
-//    uni_vmulps(vSrcDimMul2Fl, vSrcDimFl, 2);
+    const auto& vSrcDimMul2F = kAux;
+//    uni_vmulps(vSrcDimMul2F, vSrcDimF, 2);
     // (x % W2 + W2) % W2
-    uni_vdivps(vAux, vCoordDst, vSrcDimMul2Fl);
+    uni_vdivps(vAux, vCoordDst, vSrcDimMul2F);
     uni_vroundps(vAux, vAux, 0x1); // Round floor
-    uni_vfmsub231ps(vCoordDst, vAux, vSrcDimMul2Fl); // x % W2
-    uni_vsubps(vCoordDst, vSrcDimMul2Fl, vCoordDst); // x % W2 + W2
-    uni_vdivps(vAux, vCoordDst, vSrcDimMul2Fl);
+    uni_vfmsub231ps(vCoordDst, vAux, vSrcDimMul2F); // x % W2
+    uni_vsubps(vCoordDst, vSrcDimMul2F, vCoordDst); // x % W2 + W2
+    uni_vdivps(vAux, vCoordDst, vSrcDimMul2F);
     uni_vroundps(vAux, vAux, 0x1); // Round floor
-    uni_vfmsub231ps(vCoordDst, vAux, vSrcDimMul2Fl); // (x % W2 + W2) % W2
+    uni_vfmsub231ps(vCoordDst, vAux, vSrcDimMul2F); // (x % W2 + W2) % W2
 
-    uni_vsubps(vAux, vSrcDimMul2Fl, vOnesF);
+    uni_vsubps(vAux, vSrcDimMul2F, vOnesF);
     uni_vsubps(vAux, vAux, vCoordDst);
-    vcmpps(kAux, vSrcDimFl, vCoordDst, 0x2); // vCoordDst >= vSrcDimFl
+    vcmpps(kAux, vSrcDimF, vCoordDst, 0x2); // vCoordDst >= vSrcDimF
 //        vmovups(vCoordDst | kMask, vAux);
 }
 
@@ -385,8 +426,8 @@ void jitGridSampleKernel<x64::avx512_core>::nearestInterpolation(const Vmm* vAux
     if (jcp.paddingMode == PaddingMode::ZEROS) {
         zerosPadding(vWCoord, vHCoord, kMask0, kAuxMask);
     } else if (jcp.paddingMode == PaddingMode::BORDER) {
-        borderPadding(vWCoord, vWCoord, vSrcWidthSub1Fl, kAuxMask);
-        borderPadding(vHCoord, vHCoord, vSrcHeightSub1Fl, kAuxMask);
+        borderPadding(vWCoord, vWCoord, vSrcWidthSub1F, kAuxMask);
+        borderPadding(vHCoord, vHCoord, vSrcHeightSub1F, kAuxMask);
     } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
         reflectionPadding(vWCoord, vWCoord, vAux, kAuxMask, 0);
         reflectionPadding(vHCoord, vHCoord, vAux, kAuxMask, 1);
@@ -438,7 +479,67 @@ void jitGridSampleKernel<x64::avx2>::nearestInterpolation(const Vmm* vAuxPool, c
 
 template <>
 void jitGridSampleKernel<x64::sse41>::nearestInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord) {
+    const auto& vSrcShift = vWCoord;
+    const auto& vAux      = vAuxPool[0];
+    const auto& kMask     = vAuxPool[1];
+//uni_vmovups(ptr[regDst], vWCoord);
+    uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
+    uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
 
+    if (jcp.paddingMode == PaddingMode::ZEROS) {
+        zerosPadding(vWCoord, vHCoord, kMask, vAux);
+    } else if (jcp.paddingMode == PaddingMode::BORDER) {
+        borderPadding(vWCoord, vWCoord, vSrcWidthSub1F, kMask);
+        borderPadding(vHCoord, vHCoord, vSrcHeightSub1F, kMask);
+    } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
+        reflectionPadding(vWCoord, vWCoord, vAux, kMask, 0);
+        reflectionPadding(vHCoord, vHCoord, vAux, kMask, 1);
+    }
+
+    uni_vfmadd231ps(vWCoord, vHCoord, vSrcWidthF);
+    uni_vcvtps2dq(vSrcShift, vWCoord);
+    if (dataTypeSize > 1)
+        uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
+
+    // PER CHANNEL LOOP
+    Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
+    const Xbyak::Reg64& rChannel = regAux1;
+    const Xbyak::Reg64& rSrcTmp  = regAux2;
+    const Xbyak::Reg64& rDstTmp  = regAux3;
+    mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
+    L(lChannelLoopBegin);
+    {
+        cmp(rChannel, 0);
+        jle(lChannelLoopEnd, T_NEAR);
+
+        if (jcp.paddingMode == PaddingMode::ZEROS) {
+            uni_vpxor(vAux, vAux, vAux);
+        }
+        for (uint8_t i = 0; i < 4; i++) {
+            Xbyak::Label lLoopNext;
+            if (jcp.paddingMode == PaddingMode::ZEROS) {
+                pextrd(reg32Aux4, kMask, i);
+                cmp(reg32Aux4, 0);
+                je(lLoopNext, T_NEAR);
+            }
+            pextrd(reg32Aux4, vSrcShift, i);
+            insertps(vAux, ptr[rSrcTmp + regAux4], i << 4);
+            L(lLoopNext); // TODO: check in asm
+        }
+        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+            uni_vcvtdq2ps(vAux, vAux);
+        }
+
+        uni_vmovups(ptr[rDstTmp], vAux);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
+        dec(rChannel);
+
+        jmp(lChannelLoopBegin, T_NEAR);
+        L(lChannelLoopEnd);
+    }
 }
 
 // Produces data interpolation.
@@ -482,10 +583,10 @@ void jitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm* vAu
         uni_vpaddd(shift10, shift00, vSrcWidthB); // shift11??
         uni_vpaddd(shift11, shift10, vDataTypeSize); // sub??
     } else if (jcp.paddingMode == PaddingMode::BORDER) {
-        borderPadding(vWCoord, vWCoord, vSrcWidthSub1Fl, kAuxMask);
-        borderPadding(vHCoord, vHCoord, vSrcHeightSub1Fl, kAuxMask);
-        borderPadding(shift10, shift10, vSrcWidthSub1Fl, kAuxMask);
-        borderPadding(shift11, shift11, vSrcHeightSub1Fl, kAuxMask);
+        borderPadding(vWCoord, vWCoord, vSrcWidthSub1F, kAuxMask);
+        borderPadding(vHCoord, vHCoord, vSrcHeightSub1F, kAuxMask);
+        borderPadding(shift10, shift10, vSrcWidthSub1F, kAuxMask);
+        borderPadding(shift11, shift11, vSrcHeightSub1F, kAuxMask);
     } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
         reflectionPadding(vWCoord, vWCoord, vQ0, kAuxMask, 0);
         reflectionPadding(vHCoord, vHCoord, vQ0, kAuxMask, 1);
@@ -815,10 +916,10 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
                 kandw(kAuxMask, kMaskH, kMask0);
                 uni_vpxor(vAux, vAux, vAux);
             } else if (jcp.paddingMode == PaddingMode::BORDER) {
-                borderPadding(vSrcShift0, vHCoord, vSrcHeightSub1Fl, kAuxMask);
+                borderPadding(vSrcShift0, vHCoord, vSrcHeightSub1F, kAuxMask);
                 uni_vmulps(vSrcShift0, vSrcShift0, vSrcWidthF);
                 uni_vmovups(vWCoord, vWLeft);
-                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1Fl, kAuxMask);
+                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1F, kAuxMask);
                 uni_vaddps(vSrcShift, vSrcShift0, vSrcShift);
                 uni_vcvtps2dq(vSrcShift, vSrcShift);
                 if (dataTypeSize > 1)
@@ -854,7 +955,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
                 uni_vpaddd(vSrcShift, vSrcShift, vDataTypeSize);
             } else if (jcp.paddingMode == PaddingMode::BORDER) {
                 uni_vaddps(vWCoord, vWCoord, vOnesF);
-                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1Fl, kAuxMask);
+                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1F, kAuxMask);
                 uni_vaddps(vSrcShift, vSrcShift0, vSrcShift);
                 uni_vcvtps2dq(vSrcShift, vSrcShift);
                 if (dataTypeSize > 1)
@@ -882,7 +983,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
                 uni_vpaddd(vSrcShift, vSrcShift, vDataTypeSize);
             } else if (jcp.paddingMode == PaddingMode::BORDER) {
                 uni_vaddps(vWCoord, vWCoord, vOnesF);
-                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1Fl, kAuxMask);
+                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1F, kAuxMask);
                 uni_vaddps(vSrcShift, vSrcShift0, vSrcShift);
                 uni_vcvtps2dq(vSrcShift, vSrcShift);
                 if (dataTypeSize > 1)
@@ -910,7 +1011,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
                 uni_vpaddd(vSrcShift, vSrcShift, vDataTypeSize);
             } else if (jcp.paddingMode == PaddingMode::BORDER) {
                 uni_vaddps(vWCoord, vWCoord, vOnesF);
-                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1Fl, kAuxMask);
+                borderPadding(vSrcShift, vWCoord, vSrcWidthSub1F, kAuxMask);
                 uni_vaddps(vSrcShift, vSrcShift0, vSrcShift);
                 uni_vcvtps2dq(vSrcShift, vSrcShift);
                 if (dataTypeSize > 1)
@@ -1011,12 +1112,12 @@ void jitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vm
 
 template <>
 void jitGridSampleKernel<x64::sse41>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
-    pshufd(vWCoord, ptr[regGrid], 0xD8);
+    uni_vpshufd(vWCoord, ptr[regGrid], 0xD8);
     shufpd(vHCoord, vWCoord, 0x2);
 
     add(regGrid, vlen);
 
-    pshufd(vAux0, ptr[regGrid], 0xD8);
+    uni_vpshufd(vAux0, ptr[regGrid], 0xD8);
     shufpd(vWCoord, vAux0, 0x0);
     shufpd(vHCoord, vAux0, 0x3);
 
@@ -1027,7 +1128,7 @@ template <x64::cpu_isa_t isa>
 void jitGridSampleKernel<isa>::spatialLoop(const Vmm* vAuxPool) {
     auto& vHCoord = vAuxPool[0];
     auto& vWCoord = vAuxPool[1];
-    auto& vAux0 = vAuxPool[2];
+    auto& vAux0   = vAuxPool[2];
 
     Xbyak::Label lSpacialLoop, lTail;
     L(lSpacialLoop);
@@ -1075,7 +1176,9 @@ void jitGridSampleKernel<isa>::process() {
             spatialLoop(vAuxContainer);
 
             add(regSrc, jcp.srcBatchStepB);
-            add(regDst, jcp.dstBatchStepB);
+            add(regDst, ptr[regParams + GET_OFF(dstBatchStepB)]);
+            add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
+//            add(regDst, jcp.dstBatchStepB);
         }
     }
 
