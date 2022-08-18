@@ -95,27 +95,27 @@ public:
     void generate() override;
 
 protected:
-    using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
-                                                         isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
-                                                                                             Xbyak::Zmm>::type;
+    using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Zmm,
+                                                         isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
+                                                                                                   Xbyak::Ymm>::type;
     using Vmask = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Opmask,
-                                                           isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
-                                                                                               Xbyak::Ymm>::type;
+                                                           isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
+                                                                                                     Xbyak::Ymm>::type;
     uint8_t dataTypeShift = 0;
 
     // Suffix "B" means "In Bytes", "F" - float.
     // 64b registers
-    const Xbyak::Reg64& regSrc   = r8;
-    const Xbyak::Reg64& regDst   = r9;
-    const Xbyak::Reg64& regGrid  = r10;
-    const Xbyak::Reg64& regBatch = r11;
-    const Xbyak::Reg64& regWorkAmount      = r12;
-    const Xbyak::Reg64& regSrcChannelStepB = r13;
-    const Xbyak::Reg64& regDstChannelStepB = r14;
-    const Xbyak::Reg64& regChannelsNum     = r15;
-    const Xbyak::Reg64& regAux1 = rsi;
-    const Xbyak::Reg64& regAux2 = rbx;
-    const Xbyak::Reg64& regAux3 = rdx;
+    const Xbyak::Reg64& regSrc             = r8;
+    const Xbyak::Reg64& regDst             = r9;
+    const Xbyak::Reg64& regGrid            = r10;
+    const Xbyak::Reg64& regBatch           = r11;
+    const Xbyak::Reg64& regChannelsNum     = r12;
+    const Xbyak::Reg64& regWorkAmount      = r13;
+    const Xbyak::Reg64& regSrcChannelStepB = r14;
+    const Xbyak::Reg64& regDstChannelStepB = r15;
+    const Xbyak::Reg64& regAux1            = rsi;
+    const Xbyak::Reg64& regAux2            = rbx;
+    const Xbyak::Reg64& regAux3            = rdx;
     const Xbyak::Reg64& regAux4 = regChannelsNum;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
@@ -137,11 +137,11 @@ protected:
     Vmm vOnesF        = Vmm(5);
     Vmm vSrcWidthF    = Vmm(6);
     Vmm vSrcHeightF   = Vmm(7);
-    // > SSE
-    Vmm vWDenormCoef  = Vmm(12); // for ALIGN CORNERS
-    Vmm vHDenormCoef  = Vmm(13); // for ALIGN CORNERS
+    // >= AVX
+    Vmm vWDenormCoefF = Vmm(12); // for ALIGN CORNERS
+    Vmm vHDenormCoefF = Vmm(13); // for ALIGN CORNERS
     Vmm vPermGridMask = Vmm(14);
-    Vmm& vHalf = vWDenormCoef;
+    Vmm& vHalfF = vWDenormCoefF;
 
     // AVX512
     Vmm vSrcWidthSub1F       = Vmm(22);          // for BORDER padding
@@ -162,9 +162,10 @@ protected:
     Vmm v2val                = Vmm(30);          // for BICUBIC
     Vmm v2Bicub3Const        = Vmm(31);          // for BICUBIC
 
+    void process();
     void spatialLoop(const Vmm* vAuxPool);
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
-    void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
+    void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord, const Vmm& vAux);
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void bilinearInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
     void bicubicInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
@@ -177,16 +178,15 @@ protected:
     void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
     void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, uint8_t idx);
 
-    void process();
     void tail(const Vmm* vAuxPool);
     // Aux functions.
     void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
     void storeVectorPart(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
-    void uniVpGatherDd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void fillVlenVector();
 
     static const unsigned gridPermMask[isa == dnnl::impl::cpu::x64::sse41 ? 1 : isa == dnnl::impl::cpu::x64::avx512_core ? 16 : 8];
-    static const float halfValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : isa == dnnl::impl::cpu::x64::avx ? 8 : 1];
+    static const float halfValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
+    static const float oneValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
 };
 
 }   // namespace intel_cpu
