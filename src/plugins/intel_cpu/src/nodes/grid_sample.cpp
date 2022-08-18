@@ -173,14 +173,19 @@ printf("[%d] Start: %lu; End: %lu\n", ithr, dstStart, dstEnd);
                 p.srcWidthB = srcDataShape[3] * dataTypeSize;
             }
             p.srcHeightSub1F = p.srcHeightF - 1.f;
-            p.srcWidthSub1F = p.srcWidthF - 1.f;
+            p.srcWidthSub1F  = p.srcWidthF - 1.f;
             p.srcHeightMul2F = p.srcHeightF * 2.f;
-            p.srcWidthMul2F = p.srcWidthF * 2.f;
+            p.srcWidthMul2F  = p.srcWidthF * 2.f;
             if (alignCorners) {
                 p.srcHeightMul2Sub1F = p.srcHeightSub1F * 2.f;
                 p.srcWidthMul2Sub1F = p.srcWidthSub1F * 2.f;
-                p.wDenormCoef = (p.srcWidthF - 1.f) / 2.f;
-                p.hDenormCoef = (p.srcHeightF - 1.f) / 2.f;
+//                if (x64::mayiuse(x64::avx)) { TODO: uncomment
+//                    p.wDenormCoefF = std::vector<float>(1, (p.srcWidthF - 1.f) / 2.f);
+//                    p.hDenormCoefF = std::vector<float>(1, (p.srcHeightF - 1.f) / 2.f);
+//                } else {
+                    p.wDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcWidthF - 1.f) / 2.f);
+                    p.hDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcHeightF - 1.f) / 2.f);
+//                }
             } else {
                 p.srcHeightMul2Sub1F = p.srcHeightMul2F - 1.f;
                 p.srcWidthMul2Sub1F = p.srcWidthMul2F - 1.f;
@@ -250,11 +255,11 @@ std::cout << std::endl;
         arg.srcHeightMul2F     = &p.srcHeightMul2F;
         arg.srcHeightMul2Sub1F = &p.srcHeightMul2Sub1F;
         arg.srcWidthMul2Sub1F  = &p.srcWidthMul2Sub1F;
-        arg.wDenormCoef         = &p.wDenormCoef;
-        arg.hDenormCoef         = &p.hDenormCoef;
+        arg.wDenormCoefF       = p.wDenormCoefF.data();
+        arg.hDenormCoefF       = p.hDenormCoefF.data();
         arg.one                 = &p.one;
 //        arg.halfVal             = &p.halfVal;
-        arg.workAmount          = p.workAmount;
+        arg.workAmount         = p.workAmount;
 
         (*jitKernel)(&arg);
     };
@@ -302,8 +307,8 @@ printf("TotalWork: %lu\n", totalWork);
             srcHeightMul2Sub1F = srcHeightMul2F - 1.f;
             srcWidthMul2Sub1F  = srcWidthMul2F - 1.f;
         };
-        const float hDenormCoef = (srcHeight - 1.f) / 2.f;
-        const float wDenormCoef = (srcWidth  - 1.f) / 2.f;
+        const float hDenormCoefF = (srcHeight - 1.f) / 2.f;
+        const float wDenormCoefF = (srcWidth  - 1.f) / 2.f;
         const float halfVal = 0.5f, oneVal = 1.f;
         const uint64_t srcWidthB = srcDataShape[3] * dataTypeSize;
         const uint64_t srcChannelStepB = srcDataShape[2] * srcWidthB;
@@ -330,8 +335,8 @@ printf("TotalWork: %lu\n", totalWork);
         arg.srcWidthMul2F      = &srcWidthMul2F;
         arg.srcHeightMul2Sub1F = &srcHeightMul2Sub1F;
         arg.srcWidthMul2Sub1F  = &srcWidthMul2Sub1F;
-        arg.hDenormCoef         = &hDenormCoef;
-        arg.wDenormCoef         = &wDenormCoef;
+        arg.hDenormCoefF        = &hDenormCoefF;
+        arg.wDenormCoefF        = &wDenormCoefF;
         arg.one                 = &oneVal;
 //        arg.halfVal             = &halfVal;
         arg.workAmount          = end - start;

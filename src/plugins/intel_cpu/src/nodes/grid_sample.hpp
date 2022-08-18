@@ -45,9 +45,8 @@ public:
         float srcWidthMul2Sub1F = 1.f;
         float srcHeightSub1F = 0.f;
         float srcWidthSub1F = 0.f;
-        float wDenormCoef = 1.f;
-        float hDenormCoef = 1.f;
-        const float halfVal = 0.5f;
+        std::vector<float> wDenormCoefF{ 1.f };
+        std::vector<float> hDenormCoefF{ 1.f };
         const float one = 1.f;
         uint64_t workAmount = 0lu;
     };

@@ -44,8 +44,8 @@ struct jGridSamplesExecArgs {
     uint64_t dstChannelStepB = 0lu;
     uint64_t gridBatchStepB = 0lu;
     uint64_t dstBatchStepB = 0lu;
-    const void* wDenormCoef;
-    const void* hDenormCoef;
+    const void* wDenormCoefF;
+    const void* hDenormCoefF;
     const void* srcWidthB;
     const void* srcHeightMul2F;
     const void* srcWidthMul2F;
