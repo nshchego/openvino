@@ -51,8 +51,11 @@ struct jGridSamplesExecArgs {
     const void* srcWidthMul2Sub1F;
     const void* srcHeightSub1F;
     const void* srcWidthSub1F;
-    const void* one;
     uint64_t workAmount = 0lu;
+};
+
+enum coord {
+    w, h
 };
 
 class jitGridSampleKernelBase: public jitKernelBase {
@@ -173,18 +176,13 @@ protected:
     void zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
     void zerosPadding0(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
     void zerosPadding1(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
-    void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vUpperBound, const Vmask& kAux);
-    // dim - determines dimension. 0 - width, 1 - height.
-    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const uint8_t dim);
-    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, uint8_t idx);
-
+    void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmask& kAux, const coord dim);
+    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const coord dim);
+    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
     void tail(const Vmm* vAuxPool);
-    // Aux functions.
-    void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
-    void storeVectorPart(const Xbyak::Reg64& rDst, const Xbyak::Reg64& rToStoreCounter, Vmm& vmmSrc, Vmm& vAux);
-    void fillVlenVector();
 
     static const unsigned gridPermMask[isa == dnnl::impl::cpu::x64::sse41 ? 1 : isa == dnnl::impl::cpu::x64::avx512_core ? 16 : 8];
+    static const unsigned absMask[isa == dnnl::impl::cpu::x64::sse41 ? 4 : isa == dnnl::impl::cpu::x64::avx512_core ? 1 : 8];
     static const float halfValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
     static const float oneValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
 };

@@ -291,15 +291,15 @@ INSTANTIATE_TEST_SUITE_P(smoke_static, GridSampleLayerTestCPU,
 
 
 const std::vector<std::vector<InputShape>> dynamicInSapes = {
-    { { { ov::Dimension(1, 15), -1, -1, -1 },                           // Dynamic shape 0
+    { { { ov::Dimension(1, 15), -1, -1, -1 },                               // Dynamic shape 0
         { {1, 1, 1, 1}, {6, 3, 1, 2}, {4, 5, 3, 1}, {2, 7, 2, 2}} },        // Target shapes
-      { { ov::Dimension(4, 16), -1, -1, -1 },                           // Dynamic shape 1
+      { { ov::Dimension(4, 16), -1, -1, -1 },                               // Dynamic shape 1
         { {1, 1, 1, 2}, {6, 2, 2, 2}, {4, 1, 3, 2}, {2, 1, 2, 2} } } },     // Target shapes
     { { { -1, -1, -1, -1 },                                                 // Dynamic shape 0
         { {1, 2, 1, 5}, {3, 4, 2, 3}, {5, 6, 7, 1}, {7, 8, 2, 4}} },        // Target shapes
       { { -1, -1, -1, 2 },                                                  // Dynamic shape 1
         { {1, 2, 4, 2}, {3, 1, 7, 2}, {5, 2, 3, 2}, {7, 1, 5, 2} } } },     // Target shapes
-    { { { ov::Dimension(2, 15), -1, -1, -1 },                            // Dynamic shape 0
+    { { { ov::Dimension(2, 15), -1, -1, -1 },                               // Dynamic shape 0
         { {8, 3, 3, 3}, {6, 5, 2, 5}, {4, 7, 1, 11}, {2, 9, 3, 4}} },       // Target shapes
       { { -1, 3, 7, 2 },                                                    // Dynamic shape 1
         { {8, 3, 7, 2}, {6, 3, 7, 2}, {4, 3, 7, 2}, {2, 3, 7, 2} } } },     // Target shapes
