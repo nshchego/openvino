@@ -37,15 +37,14 @@ public:
         uint64_t dstChannelStepB = 0lu;
         uint64_t dstBatchStepB = 0lu;
         uint64_t gridBatchStepB = 0lu;
-        float srcHeightMul2F = 1.f;
-        float srcWidthMul2F = 1.f;
-        float srcHeightMul2Sub1F = 1.f;
-        float srcWidthMul2Sub1F = 1.f;
-        float srcHeightSub1F = 0.f;
-        float srcWidthSub1F = 0.f;
+        std::vector<float> srcHeightMul2F{ 1.f };
+        std::vector<float> srcWidthMul2F{ 1.f };
+        std::vector<float> srcHeightMul2Sub1F{ 1.f };
+        std::vector<float> srcWidthMul2Sub1F{ 1.f };
+        std::vector<float> srcHeightSub1F{ 1.f };
+        std::vector<float> srcWidthSub1F{ 1.f };
         std::vector<float> wDenormCoefF{ 1.f };
         std::vector<float> hDenormCoefF{ 1.f };
-        const float one = 1.f;
         uint64_t workAmount = 0lu;
     };
 

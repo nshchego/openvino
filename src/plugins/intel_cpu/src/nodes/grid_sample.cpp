@@ -131,6 +131,8 @@ void GridSample::createPrimitive() {
         jitKernel.reset(new jitGridSampleKernel<x64::avx512_core>(jcp));
     } else if (x64::mayiuse(x64::avx2)) {
         jitKernel.reset(new jitGridSampleKernel<x64::avx2>(jcp));
+    } else if (x64::mayiuse(x64::avx)) {
+        jitKernel.reset(new jitGridSampleKernel<x64::avx>(jcp));
     } else if (x64::mayiuse(x64::sse41)) {
         jitKernel.reset(new jitGridSampleKernel<x64::sse41>(jcp));
     }
@@ -156,36 +158,47 @@ void GridSample::createPrimitive() {
             auto& p = execParamsPerThread[ithr];
 
             p.workAmount = dstEnd - dstStart;
-            p.dstStartB = dstStart * dataTypeSize;
+            p.dstStartB  = dstStart * dataTypeSize;
             p.gridStartB = dstStart * 2 * gridTypeSize;
-            p.dstBatchStepB = (dstShape[1] * dstShape[2] * dstShape[3] - p.workAmount) * dataTypeSize;
+            p.dstBatchStepB  = (dstShape[1] * dstShape[2] * dstShape[3] - p.workAmount) * dataTypeSize;
             p.gridBatchStepB = (dstShape[2] * dstShape[3] - p.workAmount) * 2 * gridTypeSize;
 
             p.channelsNum = srcDataShape[1];
-            p.srcHeightF = srcDataShape[2];
-            p.srcWidthF = srcDataShape[3];
+            p.srcHeightF  = srcDataShape[2];
+            p.srcWidthF   = srcDataShape[3];
             if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
                 p.srcWidthB = (srcDataShape[3] - 3) * dataTypeSize;
             } else {
                 p.srcWidthB = srcDataShape[3] * dataTypeSize;
             }
-            p.srcHeightSub1F = p.srcHeightF - 1.f;
-            p.srcWidthSub1F  = p.srcWidthF - 1.f;
-            p.srcHeightMul2F = p.srcHeightF * 2.f;
-            p.srcWidthMul2F  = p.srcWidthF * 2.f;
-            if (alignCorners) {
-                p.srcHeightMul2Sub1F = p.srcHeightSub1F * 2.f;
-                p.srcWidthMul2Sub1F = p.srcWidthSub1F * 2.f;
-                if (x64::mayiuse(x64::avx)) {
-                    p.wDenormCoefF = std::vector<float>(1, (p.srcWidthF - 1.f) / 2.f);
-                    p.hDenormCoefF = std::vector<float>(1, (p.srcHeightF - 1.f) / 2.f);
+            if (x64::mayiuse(x64::avx)) {
+                p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
+                p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
+                p.srcHeightMul2F[0] = p.srcHeightF * 2.f;
+                p.srcWidthMul2F[0]  = p.srcWidthF  * 2.f;
+                if (alignCorners) {
+                    p.srcHeightMul2Sub1F[0] = p.srcHeightSub1F[0] * 2.f;
+                    p.srcWidthMul2Sub1F[0]  = p.srcWidthSub1F[0]  * 2.f;
+                    p.wDenormCoefF[0] = (p.srcWidthF  - 1.f) / 2.f;
+                    p.hDenormCoefF[0] = (p.srcHeightF - 1.f) / 2.f;
                 } else {
-                    p.wDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcWidthF - 1.f) / 2.f);
-                    p.hDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcHeightF - 1.f) / 2.f);
+                    p.srcHeightMul2Sub1F[0] = p.srcHeightMul2F[0] - 1.f;
+                    p.srcWidthMul2Sub1F[0]  = p.srcWidthMul2F[0]  - 1.f;
                 }
             } else {
-                p.srcHeightMul2Sub1F = p.srcHeightMul2F - 1.f;
-                p.srcWidthMul2Sub1F = p.srcWidthMul2F - 1.f;
+                p.srcHeightSub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF - 1.f);
+                p.srcWidthSub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  - 1.f);
+                p.srcHeightMul2F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF * 2.f);
+                p.srcWidthMul2F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  * 2.f);
+                if (alignCorners) {
+                    p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightSub1F[0] * 2.f);
+                    p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthSub1F[0]  * 2.f);
+                    p.wDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcWidthF  - 1.f) / 2.f);
+                    p.hDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcHeightF - 1.f) / 2.f);
+                } else {
+                    p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightMul2F[0] - 1.f);
+                    p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthMul2F[0]  - 1.f);
+                }
             }
             p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
             p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
@@ -215,26 +228,25 @@ void GridSample::execute(dnnl::stream strm) {
         const auto& p = execParamsPerThread[ithr];
         auto arg = jGridSamplesExecArgs();
 
-        arg.src                 = srcData;
-        arg.grid                = gridData + p.gridStartB;
-        arg.dst                 = dstData + p.dstStartB;
-        arg.channelsNum         = p.channelsNum;
+        arg.src                = srcData;
+        arg.grid               = gridData + p.gridStartB;
+        arg.dst                = dstData + p.dstStartB;
+        arg.channelsNum        = p.channelsNum;
         arg.srcHeightF         = &p.srcHeightF;
         arg.srcWidthF          = &p.srcWidthF;
-        arg.srcWidthB           = &p.srcWidthB;
-        arg.srcChannelStepB     = p.srcChannelStepB;
-        arg.dstChannelStepB     = p.dstChannelStepB;
-        arg.gridBatchStepB      = p.gridBatchStepB;
-        arg.dstBatchStepB       = p.dstBatchStepB;
-        arg.srcHeightSub1F     = &p.srcHeightSub1F;
-        arg.srcWidthSub1F      = &p.srcWidthSub1F;
-        arg.srcWidthMul2F      = &p.srcWidthMul2F;
-        arg.srcHeightMul2F     = &p.srcHeightMul2F;
-        arg.srcHeightMul2Sub1F = &p.srcHeightMul2Sub1F;
-        arg.srcWidthMul2Sub1F  = &p.srcWidthMul2Sub1F;
+        arg.srcWidthB          = &p.srcWidthB;
+        arg.srcChannelStepB    = p.srcChannelStepB;
+        arg.dstChannelStepB    = p.dstChannelStepB;
+        arg.gridBatchStepB     = p.gridBatchStepB;
+        arg.dstBatchStepB      = p.dstBatchStepB;
+        arg.srcHeightSub1F     = p.srcHeightSub1F.data();
+        arg.srcWidthSub1F      = p.srcWidthSub1F.data();
+        arg.srcWidthMul2F      = p.srcWidthMul2F.data();
+        arg.srcHeightMul2F     = p.srcHeightMul2F.data();
+        arg.srcHeightMul2Sub1F = p.srcHeightMul2Sub1F.data();
+        arg.srcWidthMul2Sub1F  = p.srcWidthMul2Sub1F.data();
         arg.wDenormCoefF       = p.wDenormCoefF.data();
         arg.hDenormCoefF       = p.hDenormCoefF.data();
-        arg.one                 = &p.one;
         arg.workAmount         = p.workAmount;
 
         (*jitKernel)(&arg);
@@ -272,7 +284,6 @@ void GridSample::executeDynamicImpl(dnnl::stream strm) {
         };
         const float hDenormCoefF = (srcHeight - 1.f) / 2.f;
         const float wDenormCoefF = (srcWidth  - 1.f) / 2.f;
-        const float halfVal = 0.5f, oneVal = 1.f;
         const uint64_t srcWidthB = srcDataShape[3] * dataTypeSize;
         const uint64_t srcChannelStepB = srcDataShape[2] * srcWidthB;
         const uint64_t srcBatchStepB = srcChannelStepB * srcDataShape[1];
@@ -300,7 +311,6 @@ void GridSample::executeDynamicImpl(dnnl::stream strm) {
         arg.srcWidthMul2Sub1F  = &srcWidthMul2Sub1F;
         arg.hDenormCoefF        = &hDenormCoefF;
         arg.wDenormCoefF        = &wDenormCoefF;
-        arg.one                 = &oneVal;
         arg.workAmount          = end - start;
 
         (*jitKernel)(&arg);
