@@ -262,6 +262,79 @@ void jitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
 }
 
 template <>
+void jitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
+
+}
+
+template <>
+void jitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
+
+}
+
+template <x64::cpu_isa_t isa> // Works for AVX, AVX2
+void jitGridSampleKernel<isa>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
+    Xbyak::Label lEnd;
+    cmp(regWorkAmount, 0);
+    jle(lEnd, T_NEAR);
+
+    const auto& restMask = k6;
+    Xbyak::Xmm xmmH = Xbyak::Xmm(vHCoord.getIdx());
+
+    Xbyak::Label lRest, lRest2;
+
+    mov(regAux3, regWorkAmount);
+    sal(regAux3, 0x1); // multiply by gridShape[3]
+    cmp(regWorkAmount, dataElPerVec / 2);
+    jl(lRest, T_NEAR);
+        uni_vpermd(vWCoord, vPermGridMask, ptr[regGrid]);
+        if (isa == x64::avx) { // Extract Y component
+            vextractf128(xmmH, vWCoord, 1);
+        } else {
+            vextracti128(xmmH, vWCoord, 1); // TODO: use vextractf128 as well?
+        }
+
+        add(regGrid, vlen);
+        sub(regAux3, dataElPerVec);
+        cmp(regAux3, 0);
+    jle(lRest2, T_NEAR);
+        fillRestWorkMask(restMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
+        uni_vmovups(vAux0 | restMask, ptr[regGrid]);
+        uni_vpermd(vAux0, vPermGridMask, vAux0);
+        Xbyak::Xmm xmmAux0 = Xbyak::Xmm(vAux0.getIdx());
+        if (isa == x64::avx) {
+            vinsertf128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
+            vextractf128(xmmAux0, vAux0, 1); // Extract Y component
+            vinsertf128(vHCoord, vHCoord, xmmAux0, 1);
+        } else {
+            vinserti128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
+            vextracti128(xmmAux0, vAux0, 1); // Extract Y component
+            vinserti128(vHCoord, vHCoord, xmmAux0, 1);
+        }
+
+        if (dataTypeSize > 1)
+            sal(regAux3, dataTypeShift); // multiply by source data type size.
+        add(regGrid, regAux3);
+    jmp(lRest2, T_NEAR);
+    L(lRest);
+        fillRestWorkMask(restMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
+        uni_vmovups(vWCoord | restMask, ptr[regGrid]);
+        uni_vpermd(vWCoord, vPermGridMask, vWCoord);
+        if (isa == x64::avx) { // Extract Y component
+            vextractf128(xmmH, vWCoord, 1);
+        } else {
+            vextracti128(xmmH, vWCoord, 1); // TODO: use vextractf128 as well?
+        }
+
+        if (dataTypeSize > 1)
+            sal(regAux3, dataTypeShift); // multiply by source data type size.
+        add(regGrid, regAux3);
+    jle(lRest, T_NEAR);
+    L(lRest2);
+
+    L(lEnd);
+}
+
+template <>
 void jitGridSampleKernel<x64::sse41>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord, const Vmm& vAux) {
     if (jcp.alignCorners) {
         mov(regAux4, ptr[regParams + GET_OFF(wDenormCoefF)]);
@@ -1508,7 +1581,90 @@ void jitGridSampleKernel<x64::avx512_core>::tail(const Vmm* vAuxPool) {
 
 template <x64::cpu_isa_t isa>
 void jitGridSampleKernel<isa>::tail(const Vmm* vAuxPool) {
+    Xbyak::Label lEnd;
+    cmp(regWorkAmount, 0);
+    jle(lEnd, T_NEAR);
 
+    auto& vHCoord = vAuxPool[0];
+    auto& vWCoord = vAuxPool[1];
+    auto& vAux0   = vAuxPool[2];
+    const auto& restMask = k6;
+    Xbyak::Xmm xmmH = Xbyak::Xmm(vHCoord.getIdx());
+
+//    fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux0.getIdx()), regWorkAmount, regAux1, regAux2);
+
+    Xbyak::Label lRest, lRest2;
+
+    mov(regAux3, regWorkAmount);
+    sal(regAux3, 0x1); // multiply by gridShape[3]
+    cmp(regWorkAmount, dataElPerVec / 2);
+    jl(lRest, T_NEAR);
+        uni_vpermd(vWCoord, vPermGridMask, ptr[regGrid]);
+        vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
+
+        add(regGrid, vlen);
+        sub(regAux3, dataElPerVec);
+        cmp(regAux3, 0);
+    jle(lRest2, T_NEAR);
+        fillRestWorkMask(restMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
+        uni_vmovups(vAux0 | restMask, ptr[regGrid]);
+        uni_vpermd(vAux0, vPermGridMask, vAux0);
+        Xbyak::Ymm ymmAux0 = Xbyak::Ymm(vAux0.getIdx());
+        vinsertf64x4(vWCoord, vWCoord, ymmAux0, 1); // Extract X component
+        vextractf64x4(ymmAux0, vAux0, 1); // Extract Y component
+        vinsertf64x4(vHCoord, vHCoord, ymmAux0, 1);
+
+        if (dataTypeSize > 1)
+            sal(regAux3, dataTypeShift); // multiply by source data type size.
+        add(regGrid, regAux3);
+    jmp(lRest2, T_NEAR);
+    L(lRest);
+        fillRestWorkMask(restMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
+        uni_vmovups(vWCoord | restMask, ptr[regGrid]);
+        uni_vpermd(vWCoord, vPermGridMask, vWCoord); // Permute to XXXX.YYYY
+        if (isa == x64::avx) { // Extract Y component
+            vextractf128(xmmH, vWCoord, 1);
+        } else {
+            vextracti128(xmmH, vWCoord, 1); // TODO: use vextractf128 as well?
+        }
+
+        if (dataTypeSize > 1)
+            sal(regAux3, dataTypeShift); // multiply by source data type size.
+        add(regGrid, regAux3);
+    L(lRest2);
+
+
+    uni_vpermd(vWCoord, vPermGridMask, ptr[regGrid]); // Permute to XXXX.YYYY
+    if (isa == x64::avx) { // Extract Y component
+        vextractf128(xmmH, vWCoord, 1);
+    } else {
+        vextracti128(xmmH, vWCoord, 1); // TODO: use vextractf128 as well?
+    }
+
+    add(regGrid, vlen);
+
+    uni_vpermd(vAux0, vPermGridMask, ptr[regGrid]); // Permute to XXXX.YYYY
+    Xbyak::Xmm xmmAux0 = Xbyak::Xmm(vAux0.getIdx());
+    if (isa == x64::avx) {
+        vinsertf128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
+        vextractf128(xmmAux0, vAux0, 1); // Extract Y component
+        vinsertf128(vHCoord, vHCoord, xmmAux0, 1);
+    } else {
+        vinserti128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
+        vextracti128(xmmAux0, vAux0, 1); // Extract Y component
+        vinserti128(vHCoord, vHCoord, xmmAux0, 1);
+    }
+
+    add(regGrid, vlen);
+
+    denormalizeRawCoordinates(vWCoord, vHCoord, vAux0);
+    interpolation(&vAuxPool[2], vWCoord, vHCoord, true);
+
+    if (dataTypeSize > 1)
+        sal(regWorkAmount, dataTypeShift); // multiply by source data type size.
+    add(regDst, regWorkAmount);
+
+    L(lEnd);
 }
 
 template struct jitGridSampleKernel<x64::avx512_core>;
