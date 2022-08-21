@@ -168,7 +168,7 @@ protected:
     void process();
     void spatialLoop(const Vmm* vAuxPool);
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
-    void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
+    void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool);
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord, const Vmm& vAux);
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void bilinearInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
