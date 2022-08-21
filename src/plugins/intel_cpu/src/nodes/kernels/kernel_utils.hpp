@@ -89,11 +89,15 @@ void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Op
     vpermd(vDst, vMask, src);
 }
 
-void fillRestWorkMask(const Xbyak::Opmask& kDstMask, const Xbyak::Zmm& zAux, const Xbyak::Reg64& rWorkRest,
-                      const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1) {
+void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
+                      const Xbyak::Zmm& zAux,
+                      const Xbyak::Reg64& rWorkRest,
+                      const Xbyak::Reg64& rAux0,
+                      const Xbyak::Reg64& rAux1) {
     Xbyak::Label lKmov;
     Xbyak::Reg32 rOnes(rAux1.getIdx());
-    const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx512_core>::vlen / 4;
+    const uint32_t typeSize = 4;
+    const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx512_core>::vlen / typeSize;
 
     mov(rOnes, 0x0000FFFF);
     cmp(rWorkRest, elPerVec);
@@ -106,6 +110,42 @@ void fillRestWorkMask(const Xbyak::Opmask& kDstMask, const Xbyak::Zmm& zAux, con
     }
     L(lKmov);
     kmovw(kDstMask, rOnes);
+}
+
+void partialLoad32(const Xbyak::Ymm& vDst,
+                   const Xbyak::Reg64& rSrc,
+                   const Xbyak::Ymm& vAux,
+                   const Xbyak::Reg64& rLoadNum,
+                   const Xbyak::Reg64& rAux) {
+    const uint8_t typeSize = 4;
+    const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
+    Xbyak::Label lLoopEnd0, lLoopEnd1;
+    mov(rAux, rLoadNum);
+    Xbyak::Xmm xmmAux(vDst.getIdx());
+    uni_vpxor(vDst, vDst, vDst);
+    for (uint8_t i = 0; i < elPerVec / 2; i++) {
+        cmp(rAux, 0);
+        je(lLoopEnd0, T_NEAR);
+
+        uni_vpinsrd(xmmAux, xmmAux, ptr[rSrc + i * typeSize], i);
+
+        dec(rAux);
+    }
+    // vperm2f128(01);
+    xmmAux = Xbyak::Xmm(vAux.getIdx());
+    uni_vpxor(xmmAux, xmmAux, xmmAux);
+    for (uint8_t i = 0; i < elPerVec / 2; i++) {
+        cmp(rAux, 0);
+        je(lLoopEnd1, T_NEAR);
+
+        uni_vpinsrd(xmmAux, xmmAux, ptr[rSrc + i * typeSize], i);
+
+        dec(rAux);
+    }
+    L(lLoopEnd1);
+    vinsertf128(vDst, vDst, xmmAux, 1);
+    L(lLoopEnd0);
+    // vperm2f128(10);
 }
 };
 
