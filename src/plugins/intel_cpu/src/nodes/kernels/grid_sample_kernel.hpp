@@ -159,15 +159,16 @@ protected:
     Vmm& vDataTypeSize       = vSrcWidthSub1F;   // for ZEROS padding
     Vmm& vSrcWidthB          = vSrcHeightSub1F;  // for ZEROS padding
 
-    Vmm vBicubConst          = Vmm(27);          // for BICUBIC
-    Vmm vBicub2Const         = Vmm(28);          // for BICUBIC
-    Vmm vBicub3Const         = Vmm(29);          // for BICUBIC
-    Vmm v2val                = Vmm(30);          // for BICUBIC
-    Vmm v2Bicub3Const        = Vmm(31);          // for BICUBIC
+    Vmm vBicubConst          = Vmm(27);          // for BICUBIC interpolation
+    Vmm vBicub2Const         = Vmm(28);          // for BICUBIC interpolation
+    Vmm vBicub3Const         = Vmm(29);          // for BICUBIC interpolation
+    Vmm v2val                = Vmm(30);          // for BICUBIC interpolation
+    Vmm v2Bicub3Const        = Vmm(31);          // for BICUBIC interpolation
 
     void process();
     void spatialLoop(const Vmm* vAuxPool);
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
+    void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord, const Vmm& vAux);
     void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void bilinearInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord);
