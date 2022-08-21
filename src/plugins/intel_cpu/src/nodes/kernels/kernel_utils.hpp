@@ -51,18 +51,6 @@ void uni_vfmsub231ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Op
     }
 }
 
-//void uni_vfmsub231ps(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
-////    if (is_valid_isa(avx2))
-//        vfmsub231ps(x1, x2, op);
-////    else {
-////        // Note: x1 gets overriden by x1*x2
-////        // This is incorrect if x1 == op
-////        assert(!x1.isEqualIfNotInherited(op));
-////        vmulps(x1, x1, x2);
-////        vsubps(x1, x1, op);
-////    }
-//}
-
 void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
     kmovq(kDst, kSrc);
 }
@@ -105,16 +93,16 @@ void fillRestWorkMask(const Xbyak::Opmask& kDstMask, const Xbyak::Zmm& zAux, con
                       const Xbyak::Reg64& rAux0, const Xbyak::Reg64& rAux1) {
     Xbyak::Label lKmov;
     Xbyak::Reg32 rOnes(rAux1.getIdx());
-    const uint32_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx512_core>::vlen;
+    const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx512_core>::vlen / 4;
 
     mov(rOnes, 0x0000FFFF);
     cmp(rWorkRest, elPerVec);
     jge(lKmov);
     {
-        Xbyak::Reg8 rShift(Xbyak::Operand::CL);
+        Xbyak::Reg32 rShift(rAux0.getIdx());
         mov(rShift, elPerVec);
         sub(rShift, rWorkRest);
-        shr(rOnes, rShift);
+        shrx(rOnes, rOnes, rShift);
     }
     L(lKmov);
     kmovw(kDstMask, rOnes);
