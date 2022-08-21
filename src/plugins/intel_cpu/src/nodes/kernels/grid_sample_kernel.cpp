@@ -583,7 +583,7 @@ void jitGridSampleKernel<x64::avx512_core>::nearestInterpolation(const Vmm* vAux
 //uni_vmovups(ptr[regDst], vWCoord);
     uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
     uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
-uni_vmovups(ptr[regDst] | kTailMask, vWCoord);
+//uni_vmovups(ptr[regDst] | kTailMask, vWCoord);
 //uni_vmovups(ptr[regDst], vHCoord);
 
     if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -636,11 +636,11 @@ uni_vmovups(ptr[regDst] | kTailMask, vWCoord);
 //mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
 //uni_vmovups(ptr[rDstTmp] | kTailMask, vOnesF);
 //mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
-//        if (tail) {
-//            uni_vmovups(ptr[rDstTmp] | kTailMask, vAux);
-//        } else {
-//            uni_vmovups(ptr[rDstTmp], vAux);
-//        }
+        if (tail) {
+            uni_vmovups(ptr[rDstTmp] | kTailMask, vAux);
+        } else {
+            uni_vmovups(ptr[rDstTmp], vAux);
+        }
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
         add(rChannel, 1);
@@ -1454,12 +1454,6 @@ void jitGridSampleKernel<x64::avx512_core>::tail(const Vmm* vAuxPool) {
     auto& vAux0   = vAuxPool[2];
     const auto& restMask = k6;
     Xbyak::Ymm ymmH = Xbyak::Ymm(vHCoord.getIdx());
-//mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
-
-    fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux0.getIdx()), regWorkAmount, regAux1, regAux2);
-//mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
-//vpbroadcastmw2d(vAux0, kTailMask);
-//uni_vmovups(ptr[regDst], vAux0);
 
     Xbyak::Label lRest, lRest2;
 
@@ -1474,13 +1468,11 @@ void jitGridSampleKernel<x64::avx512_core>::tail(const Vmm* vAuxPool) {
         sub(regAux3, dataElPerVec);
         cmp(regAux3, 0);
     jle(lRest2, T_NEAR);
-//sar(regAux3, 0x1);
 
         fillRestWorkMask(restMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
         uni_vmovups(vAux0 | restMask, ptr[regGrid]);
         uni_vpermd(vAux0, vPermGridMask, vAux0);
 //        uni_vpermd(vAux0 | restMask, vPermGridMask, ptr[regGrid]);
-//        uni_vpermd(vAux0, vPermGridMask, ptr[regGrid]);
         Xbyak::Ymm ymmAux0 = Xbyak::Ymm(vAux0.getIdx());
         vinsertf64x4(vWCoord, vWCoord, ymmAux0, 1); // Extract X component
         vextractf64x4(ymmAux0, vAux0, 1); // Extract Y component
@@ -1501,6 +1493,8 @@ void jitGridSampleKernel<x64::avx512_core>::tail(const Vmm* vAuxPool) {
             sal(regAux3, dataTypeShift); // multiply by source data type size.
         add(regGrid, regAux3);
     L(lRest2);
+
+    fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux0.getIdx()), regWorkAmount, regAux1, regAux2);
 
     denormalizeRawCoordinates(vWCoord, vHCoord, vAux0);
     interpolation(&vAuxPool[2], vWCoord, vHCoord, true);

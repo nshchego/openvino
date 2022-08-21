@@ -113,13 +113,14 @@ protected:
             ov::runtime::Tensor tensor;
 
             if (funcInput.get_node()->get_friendly_name() == "data") {
-                int32_t resolution = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1, std::multiplies<int32_t>());
+                uint32_t range = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1u, std::multiplies<uint32_t>());
                 tensor = utils::create_and_fill_tensor(
-                        funcInput.get_element_type(), targetInputStaticShapes[0], resolution, -resolution / 2, 1);
+                        funcInput.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
             } else if (funcInput.get_node()->get_friendly_name() == "grid") {
-                int32_t resolution = targetInputStaticShapes[0][2] * targetInputStaticShapes[0][3];
+                uint32_t range = std::max(targetInputStaticShapes[0][2], targetInputStaticShapes[0][3]) + 2;
+                int32_t resolution = range / 2;
                 tensor = utils::create_and_fill_tensor(
-                        funcInput.get_element_type(), targetInputStaticShapes[1], resolution, -1, resolution / 2);
+                        funcInput.get_element_type(), targetInputStaticShapes[1], range, -1, resolution == 0 ? 1 : resolution);
             }
             inputs.insert({funcInput.get_node_shared_ptr(), tensor});
         }

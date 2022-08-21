@@ -202,7 +202,7 @@ fill_data_random(T *pointer, std::size_t size, const uint32_t range = 10, int32_
 
     for (std::size_t i = 0; i < size; i++) {
         auto genVal = random.Generate(range);
-        std::cout << genVal << ";" << static_cast<T>(genVal) << ";" << static_cast<T>(start_from + static_cast<T>(genVal) / k) << "|";
+//        std::cout << genVal << ";" << static_cast<T>(genVal) << ";" << static_cast<T>(start_from + static_cast<T>(genVal) / k) << "|";
         pointer[i] = static_cast<T>(start_from + static_cast<T>(genVal) / k);
 //        pointer[i] = static_cast<T>(start_from + static_cast<T>(random.Generate(range)) / k);
     }
