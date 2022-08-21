@@ -154,6 +154,8 @@ DATA_ET nearest(const DATA_ET* data,
                 const denormalize_fn_t<GRID_ET>& denormalize) {
     const auto y_nearest = std::lrint(denormalize(y_n, data_shape[2]));
     const auto x_nearest = std::lrint(denormalize(x_n, data_shape[3]));
+std::cout << "X:"<< x_n << ";" << denormalize(x_n, data_shape[3]) << ";" << x_nearest
+<< ";Y:" << y_n << ";" << denormalize(y_n, data_shape[2]) << ";" << y_nearest << " | ";
     return get_padded(data, data_shape, n, c, y_nearest, x_nearest);
 }
 

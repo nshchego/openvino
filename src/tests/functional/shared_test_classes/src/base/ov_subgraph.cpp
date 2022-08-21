@@ -166,6 +166,17 @@ void SubgraphBaseTest::compare(const std::vector<ov::Tensor>& expected,
                 }
             }
             auto it = compareMap.find(inputNode->get_type_info());
+
+// DEBUG
+            std::cout << "\nEXPECTED: " << std::endl;
+            float* actData = expected[j].data<float>();
+            for (int i = 0; i < expected[j].get_size(); i++) {
+                if (i % 16 == 0)
+                    std::cout << "| ";
+                std::cout << actData[i] << "; ";
+            }
+            std::cout << std::endl;
+// DEBUG
             it->second(inputNode, i, expected[j], actual[j], abs_threshold, rel_threshold);
         }
     }
