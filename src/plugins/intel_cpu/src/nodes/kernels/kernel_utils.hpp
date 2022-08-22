@@ -147,6 +147,28 @@ void partialLoad32(const Xbyak::Ymm& vDst,
     L(lLoopEnd0);
     // vperm2f128(10);
 }
+
+void partialLoad32(const Xbyak::Xmm& vDst,
+                   const Xbyak::Reg64& rSrc,
+                   const Xbyak::Xmm& vAux,
+                   const Xbyak::Reg64& rLoadNum,
+                   const Xbyak::Reg64& rAux) {
+    const uint8_t typeSize = 4;
+    const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
+    Xbyak::Label lLoopEnd0, lLoopEnd1;
+    mov(rAux, rLoadNum);
+    Xbyak::Xmm xmmAux(vDst.getIdx());
+    uni_vpxor(vDst, vDst, vDst);
+    for (uint8_t i = 0; i < elPerVec; i++) {
+        cmp(rAux, 0);
+        je(lLoopEnd0, T_NEAR);
+
+        uni_vpinsrd(xmmAux, xmmAux, ptr[rSrc + i * typeSize], i);
+
+        dec(rAux);
+    }
+    L(lLoopEnd0);
+}
 };
 
 }
