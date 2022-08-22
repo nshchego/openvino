@@ -164,6 +164,8 @@ std::vector<std::string> disabledTestPatterns() {
         // is shared across plugins
         // passed local test and cpu has specific test cases with nms9 to cover
         R"(smoke_NmsLayerTest.*)",
+        // Division by zero in the reference implementation.
+        R"(smoke.*GridSampleLayerTestCPU.*(1.5.1.1.*1.1.1.2|2.4.7.1.*2.1.2.2).*REFLECTION.*True.*)",
     };
 
 #define FIX_62820 0
