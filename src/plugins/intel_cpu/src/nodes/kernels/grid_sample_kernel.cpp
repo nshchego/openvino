@@ -443,9 +443,9 @@ void jitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, con
 template <x64::cpu_isa_t isa>
 void jitGridSampleKernel<isa>::interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
-        bilinearInterpolation(vAuxPool, vWCoord, vHCoord, tail);
+//        bilinearInterpolation(vAuxPool, vWCoord, vHCoord, tail);
     } else if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
-        bicubicInterpolation(vAuxPool, vWCoord, vHCoord, tail);
+//        bicubicInterpolation(vAuxPool, vWCoord, vHCoord, tail);
     } else if (jcp.interpolationMode == InterpolationMode::NEAREST) {
         nearestInterpolation(vAuxPool, vWCoord, vHCoord, tail);
     }
@@ -489,12 +489,21 @@ template <x64::cpu_isa_t isa> // Works for AVX, AVX2
 void jitGridSampleKernel<isa>::zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
     uni_vcmpps(kAux, vWCoord, vSrcWidthF, 0x1);  // vWCoord < vSrcWidthF
     uni_vcmpps(kDst, vZeros, vWCoord, 0x2);      // vWCoord >= vZeros
-    uni_vpand(kDst, kAux, kDst);
+    if (isa == x64::avx)
+        uni_vandps(kDst, kDst, kAux);
+    else if (isa == x64::avx2)
+        uni_vpand(kDst, kDst, kAux); // TODO: use uni_vandps as well?
 
     uni_vcmpps(kAux, vHCoord, vSrcHeightF, 0x1); // vHCoord < vSrcHeightF
-    uni_vpand(kDst, kAux, kDst);
+    if (isa == x64::avx)
+        uni_vandps(kDst, kDst, kAux);
+    else if (isa == x64::avx2)
+        uni_vpand(kDst, kDst, kAux);
     uni_vcmpps(kAux, vZeros, vHCoord, 0x2);      // vHCoord >= vZeros
-    uni_vpand(kDst, kAux, kDst);
+    if (isa == x64::avx)
+        uni_vandps(kDst, kDst, kAux);
+    else if (isa == x64::avx2)
+        uni_vpand(kDst, kDst, kAux);
 }
 
 template <>
@@ -860,8 +869,10 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
     uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
     uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
 
+    bool useMask = false;
     if (jcp.paddingMode == PaddingMode::ZEROS) {
         zerosPadding(vWCoord, vHCoord, kMask, vAux);
+        useMask = true;
     } else if (jcp.paddingMode == PaddingMode::BORDER) {
         borderPadding(vWCoord, vWCoord, kMask, coord::w);
         borderPadding(vHCoord, vHCoord, kMask, coord::h);
@@ -872,8 +883,18 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
 
     uni_vfmadd231ps(vWCoord, vHCoord, vSrcWidthF);
     uni_vcvtps2dq(vSrcShift, vWCoord);
-    if (dataTypeSize > 1)
-        uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
+    if (dataTypeSize > 1) {
+        if (isa == x64::avx2) {
+            uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
+        } else if (isa == x64::avx) {
+            Xbyak::Xmm xmmSrcShift = Xbyak::Xmm(vSrcShift.getIdx());
+            Xbyak::Ymm ymmSrcShift = Xbyak::Ymm(vSrcShift.getIdx());
+            uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
+            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+            uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
+            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+        }
+    }
 
     // PER CHANNEL LOOP
     Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
@@ -888,25 +909,34 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
         cmp(rChannel, 0);
         jle(lChannelLoopEnd, T_NEAR);
 
-        if (jcp.paddingMode == PaddingMode::ZEROS) {
-            uni_vpxor(vAux, vAux, vAux);
-        }
-        for (uint8_t i = 0; i < 4; i++) {
-            Xbyak::Label lLoopNext;
-            if (jcp.paddingMode == PaddingMode::ZEROS) {
-                pextrd(reg32Aux4, kMask, i);
-                cmp(reg32Aux4, 0);
-                je(lLoopNext, T_NEAR);
-            }
-            pextrd(reg32Aux4, vSrcShift, i);
-            insertps(vAux, ptr[rSrcTmp + regAux4], i << 4);
-            L(lLoopNext);
-        }
-        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
-            uni_vcvtdq2ps(vAux, vAux);
-        }
+//        if (jcp.paddingMode == PaddingMode::ZEROS) {
+//            uni_vpxor(vAux, vAux, vAux);
+//        }
+//        for (uint8_t i = 0; i < 4; i++) {
+//            Xbyak::Label lLoopNext;
+//            if (jcp.paddingMode == PaddingMode::ZEROS) {
+//                pextrd(reg32Aux4, kMask, i);
+//                cmp(reg32Aux4, 0);
+//                je(lLoopNext, T_NEAR);
+//            }
+//            pextrd(reg32Aux4, vSrcShift, i);
+//            insertps(vAux, ptr[rSrcTmp + regAux4], i << 4);
+//            L(lLoopNext);
+//        }
 
-        uni_vmovups(ptr[rDstTmp], vAux);
+//        for (uint8_t i = 0; i < dataElPerVec; i++) {
+//            Xbyak::Label lLoopNext;
+//            if (jcp.paddingMode == PaddingMode::ZEROS) {
+//                pextrd(reg32Aux4, kMask, i);
+//                cmp(reg32Aux4, 0);
+//                je(lLoopNext, T_NEAR);
+//            }
+//            pextrd(reg32Aux4, vSrcShift, i);
+//        }
+        maskMov32(ptr[rDstTmp], rSrcTmp, kMask, vSrcShift, regAux4, useMask);
+        sub(rDstTmp, vlen); // TODO: sub from regSrcChannelStepB
+
+//        uni_vmovups(ptr[rDstTmp], vAux);
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
         dec(rChannel);

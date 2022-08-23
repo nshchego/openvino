@@ -101,6 +101,8 @@ void GridSample::initSupportedPrimitiveDescriptors() {
         implType = jit_avx512;
     } else if (x64::mayiuse(x64::avx2)) {
         implType = jit_avx2;
+    } else if (x64::mayiuse(x64::avx)) {
+        implType = jit_avx;
     }
 
     addSupportedPrimDesc({{LayoutType::ncsp, dataPrecision},
