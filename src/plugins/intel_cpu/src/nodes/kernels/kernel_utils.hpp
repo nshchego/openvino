@@ -89,6 +89,28 @@ void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Op
     vpermd(vDst, vMask, src);
 }
 
+void uni_vpinsrd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Operand& vSrc2, const int imm) {
+    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+        vpinsrd(vDst, vSrc1, vSrc2, imm);
+    } else {
+        if (vSrc1.getIdx() != vSrc2.getIdx()) movdqa(vSrc1, vSrc2);
+        pinsrd(vDst, vSrc2, imm);
+    }
+}
+
+//void uni_vpsrld(
+//        const Xbyak::Ymm &vDst, const Xbyak::Operand &opSrc, const int imm) {
+//    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+//        Xbyak::Xmm xmmSrcShift = Xbyak::Xmm(vDst.getIdx());
+//        uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
+//        vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+//        uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
+//        vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+//    } else {
+//        vpsrld(vDst, opSrc, imm);
+//    }
+//}
+
 void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
                       const Xbyak::Zmm& zAux,
                       const Xbyak::Reg64& rWorkRest,
@@ -155,7 +177,7 @@ void partialLoad32(const Xbyak::Xmm& vDst,
                    const Xbyak::Reg64& rAux) {
     const uint8_t typeSize = 4;
     const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
-    Xbyak::Label lLoopEnd0, lLoopEnd1;
+    Xbyak::Label lLoopEnd0;
     mov(rAux, rLoadNum);
     Xbyak::Xmm xmmAux(vDst.getIdx());
     uni_vpxor(vDst, vDst, vDst);
@@ -168,6 +190,77 @@ void partialLoad32(const Xbyak::Xmm& vDst,
         dec(rAux);
     }
     L(lLoopEnd0);
+}
+
+void maskMov32(const Xbyak::Operand& opDst,
+               const Xbyak::Operand& opSrc,
+               const Xbyak::Xmm&     vMask,
+               const Xbyak::Xmm&     vSrcShift,
+               const Xbyak::Reg64&   rAux,
+               const bool useMask  = true) {
+    Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
+    const uint8_t typeSize = 4;
+
+    for (uint8_t i = 0; i < 4; i++) {
+        Xbyak::Label lLoopNext;
+        if (useMask) {
+            uni_vpextrd(r32Aux, vMask, i);
+            cmp(r32Aux, 0);
+            je(lLoopNext, T_NEAR);
+        }
+        uni_vpextrd(r32Aux, vSrcShift, i);
+        if (opDst.isMEM()) {
+            if (opSrc.isREG()) {
+                mov(rAux, ptr[opSrc.getReg() + rAux]);
+                mov(ptr[opDst.getReg()], rAux);
+            } else {
+                // TODO
+            }
+            add(opDst.getReg(), typeSize);
+        } else {
+            if (opSrc.isMEM()) {
+                Xbyak::Xmm vDst = Xbyak::Xmm(opDst.getIdx());
+                uni_vpinsrd(vDst, vDst, ptr[opSrc.getReg() + rAux], i << 4);
+            } else {
+                // TODO
+            }
+        }
+        L(lLoopNext);
+    }
+}
+
+void maskMov32(const Xbyak::Operand& opDst,
+               const Xbyak::Operand& opSrc,
+               const Xbyak::Ymm&     vMask,
+               const Xbyak::Ymm&     vSrcShift,
+               const Xbyak::Reg64&   rAux,
+               const bool useMask  = true) {
+    Xbyak::Xmm xmmMask = Xbyak::Xmm(vMask.getIdx()),
+               xmmSrcShft = Xbyak::Xmm(vSrcShift.getIdx());
+    for (uint8_t i = 0; i < 2; i++) {
+        if (opDst.isMEM()) {
+            if (opSrc.isMEM()) {
+                maskMov32(opDst, opSrc, xmmMask, xmmSrcShft, rAux, useMask);
+            } else {
+                Xbyak::Xmm xmmSrc = Xbyak::Xmm(opSrc.getIdx());
+                maskMov32(opDst, xmmSrc, xmmMask, xmmSrcShft, rAux, useMask);
+            }
+        } else {
+            Xbyak::Xmm xmmDst = Xbyak::Xmm(opDst.getIdx());
+            if (opSrc.isMEM()) {
+                maskMov32(xmmDst, opSrc, xmmMask, xmmSrcShft, rAux, useMask);
+            } else {
+                Xbyak::Xmm xmmSrc = Xbyak::Xmm(opSrc.getIdx());
+                maskMov32(xmmDst, xmmSrc, xmmMask, xmmSrcShft, rAux, useMask);
+            }
+            Xbyak::Ymm ymmDst = Xbyak::Ymm(opDst.getIdx());
+            vperm2f128(ymmDst, ymmDst, ymmDst, 0x1);
+        }
+        if (opSrc.isREG()) {
+            Xbyak::Ymm ymmSrc = Xbyak::Ymm(opSrc.getIdx());
+            vperm2f128(ymmSrc, ymmSrc, ymmSrc, 0x1);
+        }
+    }
 }
 };
 
