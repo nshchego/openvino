@@ -285,7 +285,7 @@ for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float)
         std::cout << "| ";
     std::cout << dstDataF[i] << "; ";
 }
-std::cout << std::endl;
+std::cout << std::endl << std::endl;
 // DEBUG
 }
 
