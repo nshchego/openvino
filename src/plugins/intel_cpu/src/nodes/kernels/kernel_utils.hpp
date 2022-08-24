@@ -210,19 +210,11 @@ void maskMov32(const Xbyak::Operand& opDst,
         }
         uni_vpextrd(r32Aux, vSrcShift, i);
         if (opDst.isXMM()) {
-//            if (opSrc.isMEM()) {
             Xbyak::Xmm vDst = Xbyak::Xmm(opDst.getIdx());
             uni_vpinsrd(vDst, vDst, ptr[opSrc.getReg() + rAux], i << 4);
-//            } else {
-//                // TODO
-//            }
         } else if (opDst.isREG()) {
-//            if (opSrc.isREG()) {
             mov(rAux, ptr[opSrc.getReg() + rAux]);
             mov(ptr[opDst.getReg()], rAux);
-//            } else {
-//                // TODO
-//            }
             add(opDst.getReg(), typeSize);
         }
         L(lLoopNext);
