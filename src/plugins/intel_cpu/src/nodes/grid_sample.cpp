@@ -24,7 +24,7 @@ bool GridSample::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
             return false;
         }
         if (!x64::mayiuse(x64::sse41)) {
-            errorMessage = "Not supported CPU instruction set.";
+            errorMessage = "Not supported CPU instructions set.";
             return false;
         }
     } catch (...) {
@@ -86,8 +86,7 @@ void GridSample::initSupportedPrimitiveDescriptors() {
 
     const auto& dataDims = getInputShapeAtPort(IN_DATA).getDims();
 
-    Precision dataPrecision = getOriginalInputPrecisionAtPort(IN_DATA);
-    Precision gridPrecision = Precision::FP32;
+    dataPrecision = getOriginalInputPrecisionAtPort(IN_DATA);
     if (dataPrecision.is_float()) {
         dataPrecision = Precision::FP32;
     } else {
@@ -115,8 +114,8 @@ void GridSample::initSupportedPrimitiveDescriptors() {
 void GridSample::createPrimitive() {
     jGridSampleConfParams jcp;
 
-    jcp.inDataPrc = getRuntimePrecision(); // TODO: fix
-    jcp.gridPrc = getRuntimePrecision(); // TODO: fix
+    jcp.inDataPrc = dataPrecision;
+    jcp.gridPrc = gridPrecision;
     jcp.dynamicShapes = isDynamicNode();
     jcp.alignCorners = alignCorners;
     jcp.interpolationMode = interpolationMode;

@@ -34,6 +34,11 @@ const unsigned jitGridSampleKernel<x64::sse41>::absMask[4] = { 0x7fffffff, 0x7ff
 template <x64::cpu_isa_t isa>
 const unsigned jitGridSampleKernel<isa>::absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
 
+template <>
+unsigned jitGridSampleKernel<x64::avx>::dataTypeSizeArr[8];
+template <x64::cpu_isa_t isa>
+unsigned jitGridSampleKernel<isa>::dataTypeSizeArr[1];
+
 #define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
 
 template <x64::cpu_isa_t isa>
@@ -48,6 +53,11 @@ jitGridSampleKernel<isa>::jitGridSampleKernel(const jGridSampleConfParams& jcp) 
         dataTypeShift = 1;
     else if (dataTypeSize == 4)
         dataTypeShift = 2;
+    if (isa == x64::avx) {
+        for (int i = 0; i < dataElPerVec; i++) {
+            dataTypeSizeArr[i] = dataTypeSize;
+        }
+    }
 }
 
 template <x64::cpu_isa_t isa>
@@ -441,9 +451,9 @@ void jitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, con
 template <x64::cpu_isa_t isa>
 void jitGridSampleKernel<isa>::interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
-//        bilinearInterpolation(vAuxPool, vWCoord, vHCoord, tail);
+        bilinearInterpolation(vAuxPool, vWCoord, vHCoord, tail);
     } else if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
-//        bicubicInterpolation(vAuxPool, vWCoord, vHCoord, tail);
+        bicubicInterpolation(vAuxPool, vWCoord, vHCoord, tail);
     } else if (jcp.interpolationMode == InterpolationMode::NEAREST) {
         nearestInterpolation(vAuxPool, vWCoord, vHCoord, tail);
     }
@@ -885,14 +895,7 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
         if (isa == x64::avx2 || isa == x64::sse41) {
             uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
         } else if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vpmulld
-            uni_vpmulld(vSrcShift, vSrcShift, ptr[regParams + GET_OFF(dataTypeSize)]);
-//            Xbyak::Xmm xmmSrcShift = Xbyak::Xmm(vSrcShift.getIdx());
-//            Xbyak::Ymm ymmSrcShift = Xbyak::Ymm(vSrcShift.getIdx());
-//            vpslld(ymmSrcShift, ymmSrcShift, dataTypeShift);
-//uni_vmovups(ptr[regDst], ymmSrcShift);
-//            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
-//            uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
-//            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+            uni_vpmulld(vSrcShift, vSrcShift, ptr[reinterpret_cast<uintptr_t>(dataTypeSizeArr)]);
         }
     }
 
@@ -933,8 +936,8 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
 //            }
 //            pextrd(reg32Aux4, vSrcShift, i);
 //        }
-//        maskMov32(rDstTmp, rSrcTmp, kMask, vSrcShift, regAux4, useMask);
-//        sub(rDstTmp, vlen); // TODO: sub from regSrcChannelStepB
+        maskMov32(rDstTmp, rSrcTmp, kMask, vSrcShift, regAux4, useMask);
+        sub(rDstTmp, vlen); // TODO: sub from regSrcChannelStepB
 
 //        uni_vmovups(ptr[rDstTmp], vAux);
         add(rSrcTmp, regSrcChannelStepB);
