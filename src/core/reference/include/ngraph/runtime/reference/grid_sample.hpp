@@ -207,13 +207,31 @@ DATA_ET bicubic(const DATA_ET* data,
     const auto dy = y_d - y_topleft;
     const auto dx = x_d - x_topleft;
     const auto s = gather_4x4(data, data_shape, n, c, y_topleft - 1, x_topleft - 1, get_padded);
+std::cout << "|(Y:" << y_n << ";" << y_d << ";" << y_topleft << ";X:" << x_n << ";" << x_d << ";" << x_topleft << ")"<< std::endl;
 
     const auto cy = cubic_coeffs(dy);
     const auto cx = cubic_coeffs(dx);
+for (int i = 0; i < 4; i++) {
+    std::cout << "Coef:" << cy[i] << ";" << cx[i] << "|" << ";";
+}
+std::cout << std::endl;
+//std::cout << "cy:";
+//for (auto i : cy)
+//    std::cout << i << ";";
+//std::cout << "cx:";
+//for (auto i : cx)
+//    std::cout << i << ";";
+for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++)
+        std::cout << s[i][j] << ";";
+std::cout << std::endl;
     vector_4_t<DATA_ET> p;
     std::transform(s.begin(), s.end(), p.begin(), [&cx](const vector_4_t<DATA_ET>& v) {
         return std::inner_product(cx.begin(), cx.end(), v.begin(), static_cast<DATA_ET>(0));
     });
+for (auto val : p)
+    std::cout << val << ";";
+std::cout << std::endl;
     return std::inner_product(cy.begin(), cy.end(), p.begin(), static_cast<DATA_ET>(0));
 }
 }  // namespace
