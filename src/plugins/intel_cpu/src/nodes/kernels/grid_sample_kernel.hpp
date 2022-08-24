@@ -186,6 +186,7 @@ protected:
     static const unsigned absMask[isa == dnnl::impl::cpu::x64::sse41 ? 4 : isa == dnnl::impl::cpu::x64::avx512_core ? 1 : 8];
     static const float halfValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
     static const float oneValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
+    static const float dataTypeSize[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
 };
 
 }   // namespace intel_cpu

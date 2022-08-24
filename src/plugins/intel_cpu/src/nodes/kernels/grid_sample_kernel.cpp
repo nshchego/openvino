@@ -884,15 +884,17 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
     uni_vfmadd231ps(vWCoord, vHCoord, vSrcWidthF);
     uni_vcvtps2dq(vSrcShift, vWCoord);
     if (dataTypeSize > 1) {
-        if (isa == x64::avx2) {
+        if (isa == x64::avx2 || isa == x64::sse41) {
             uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
-        } else if (isa == x64::avx) {
-            Xbyak::Xmm xmmSrcShift = Xbyak::Xmm(vSrcShift.getIdx());
-            Xbyak::Ymm ymmSrcShift = Xbyak::Ymm(vSrcShift.getIdx());
-            uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
-            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
-            uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
-            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+        } else if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vpmulld
+            uni_vpmulld(vSrcShift, vSrcShift, ptr[regParams + GET_OFF(dataTypeSize)]);
+//            Xbyak::Xmm xmmSrcShift = Xbyak::Xmm(vSrcShift.getIdx());
+//            Xbyak::Ymm ymmSrcShift = Xbyak::Ymm(vSrcShift.getIdx());
+//            vpslld(ymmSrcShift, ymmSrcShift, dataTypeShift);
+//uni_vmovups(ptr[regDst], ymmSrcShift);
+//            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
+//            uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
+//            vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
         }
     }
 
@@ -933,8 +935,8 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
 //            }
 //            pextrd(reg32Aux4, vSrcShift, i);
 //        }
-        maskMov32(ptr[rDstTmp], rSrcTmp, kMask, vSrcShift, regAux4, useMask);
-        sub(rDstTmp, vlen); // TODO: sub from regSrcChannelStepB
+//        maskMov32(rDstTmp, rSrcTmp, kMask, vSrcShift, regAux4, useMask);
+//        sub(rDstTmp, vlen); // TODO: sub from regSrcChannelStepB
 
 //        uni_vmovups(ptr[rDstTmp], vAux);
         add(rSrcTmp, regSrcChannelStepB);

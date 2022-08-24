@@ -209,21 +209,21 @@ void maskMov32(const Xbyak::Operand& opDst,
             je(lLoopNext, T_NEAR);
         }
         uni_vpextrd(r32Aux, vSrcShift, i);
-        if (opDst.isMEM()) {
-            if (opSrc.isREG()) {
-                mov(rAux, ptr[opSrc.getReg() + rAux]);
-                mov(ptr[opDst.getReg()], rAux);
-            } else {
-                // TODO
-            }
+        if (opDst.isXMM()) {
+//            if (opSrc.isMEM()) {
+            Xbyak::Xmm vDst = Xbyak::Xmm(opDst.getIdx());
+            uni_vpinsrd(vDst, vDst, ptr[opSrc.getReg() + rAux], i << 4);
+//            } else {
+//                // TODO
+//            }
+        } else if (opDst.isREG()) {
+//            if (opSrc.isREG()) {
+            mov(rAux, ptr[opSrc.getReg() + rAux]);
+            mov(ptr[opDst.getReg()], rAux);
+//            } else {
+//                // TODO
+//            }
             add(opDst.getReg(), typeSize);
-        } else {
-            if (opSrc.isMEM()) {
-                Xbyak::Xmm vDst = Xbyak::Xmm(opDst.getIdx());
-                uni_vpinsrd(vDst, vDst, ptr[opSrc.getReg() + rAux], i << 4);
-            } else {
-                // TODO
-            }
         }
         L(lLoopNext);
     }
@@ -238,28 +238,29 @@ void maskMov32(const Xbyak::Operand& opDst,
     Xbyak::Xmm xmmMask = Xbyak::Xmm(vMask.getIdx()),
                xmmSrcShft = Xbyak::Xmm(vSrcShift.getIdx());
     for (uint8_t i = 0; i < 2; i++) {
-        if (opDst.isMEM()) {
-            if (opSrc.isMEM()) {
+//        if (opDst.isMEM()) {
+//            if (opSrc.isMEM()) {
                 maskMov32(opDst, opSrc, xmmMask, xmmSrcShft, rAux, useMask);
-            } else {
-                Xbyak::Xmm xmmSrc = Xbyak::Xmm(opSrc.getIdx());
-                maskMov32(opDst, xmmSrc, xmmMask, xmmSrcShft, rAux, useMask);
-            }
-        } else {
-            Xbyak::Xmm xmmDst = Xbyak::Xmm(opDst.getIdx());
-            if (opSrc.isMEM()) {
-                maskMov32(xmmDst, opSrc, xmmMask, xmmSrcShft, rAux, useMask);
-            } else {
-                Xbyak::Xmm xmmSrc = Xbyak::Xmm(opSrc.getIdx());
-                maskMov32(xmmDst, xmmSrc, xmmMask, xmmSrcShft, rAux, useMask);
-            }
-            Xbyak::Ymm ymmDst = Xbyak::Ymm(opDst.getIdx());
-            vperm2f128(ymmDst, ymmDst, ymmDst, 0x1);
-        }
-        if (opSrc.isREG()) {
-            Xbyak::Ymm ymmSrc = Xbyak::Ymm(opSrc.getIdx());
-            vperm2f128(ymmSrc, ymmSrc, ymmSrc, 0x1);
-        }
+//            } else {
+//                Xbyak::Xmm xmmSrc = Xbyak::Xmm(opSrc.getIdx());
+//                maskMov32(opDst, xmmSrc, xmmMask, xmmSrcShft, rAux, useMask);
+//            }
+//        } else {
+//            Xbyak::Xmm xmmDst = Xbyak::Xmm(opDst.getIdx());
+//            if (opSrc.isMEM()) {
+//                maskMov32(xmmDst, opSrc, xmmMask, xmmSrcShft, rAux, useMask);
+//            } else {
+//                Xbyak::Xmm xmmSrc = Xbyak::Xmm(opSrc.getIdx());
+//                maskMov32(xmmDst, xmmSrc, xmmMask, xmmSrcShft, rAux, useMask);
+//            }
+//            Xbyak::Ymm ymmDst = Xbyak::Ymm(opDst.getIdx());
+//            vperm2f128(ymmDst, ymmDst, ymmDst, 0x1);
+//        }
+//        if (opSrc.isREG()) {
+//            Xbyak::Ymm ymmSrc = Xbyak::Ymm(opSrc.getIdx());
+//            vperm2f128(ymmSrc, ymmSrc, ymmSrc, 0x1);
+//        }
+        vperm2f128(vSrcShift, vSrcShift, vSrcShift, 0x1);
     }
 }
 };
