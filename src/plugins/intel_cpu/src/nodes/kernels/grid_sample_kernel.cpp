@@ -72,8 +72,8 @@ template <x64::cpu_isa_t isa>
 void jitGridSampleKernel<isa>::generate() {
     this->preamble();
 
-    mov(regSrc, ptr[regParams + GET_OFF(src)]);
-    mov(regDst, ptr[regParams + GET_OFF(dst)]);
+    mov(regSrc,  ptr[regParams + GET_OFF(src)]);
+    mov(regDst,  ptr[regParams + GET_OFF(dst)]);
     mov(regGrid, ptr[regParams + GET_OFF(grid)]);
 
     mov(regAux1, ptr[regParams + GET_OFF(srcWidthF)]);
@@ -167,11 +167,11 @@ void jitGridSampleKernel<isa>::process() {
             mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
             spatialLoop(vAuxContainer);
 
-            add(regSrc, ptr[regParams + GET_OFF(srcBatchStepB)]);
-            add(regDst, ptr[regParams + GET_OFF(dstBatchStepB)]);
+            add(regSrc,  ptr[regParams + GET_OFF(srcBatchStepB)]);
             add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
+            add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
 
-            sub(regBatch, 1);
+            dec(regBatch);
             jmp(lBatchLoop, T_NEAR);
         }
         L(lEnd);
@@ -180,9 +180,9 @@ void jitGridSampleKernel<isa>::process() {
             mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
             spatialLoop(vAuxContainer);
 
-            add(regSrc, jcp.srcBatchStepB);
-            add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
+            add(regSrc,  jcp.srcBatchStepB);
             add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
+            add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
         }
     }
 }
@@ -741,14 +741,12 @@ void jitGridSampleKernel<x64::avx512_core>::nearestInterpolation(const Vmm* vAux
     const auto& kMask0   = k1;
     const auto& kAuxMask = k2;
 
+//uni_vmovups(ptr[regDst], vWCoord);
     uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
     uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
 
     if (jcp.paddingMode == PaddingMode::ZEROS) {
         zerosPadding(vWCoord, vHCoord, kMask0, kAuxMask);
-        if (tail) {
-            kandw(kMask0, kMask0, kTailMask);
-        }
     } else if (jcp.paddingMode == PaddingMode::BORDER) {
         borderPadding(vWCoord, vWCoord, kAuxMask, coord::w);
         borderPadding(vHCoord, vHCoord, kAuxMask, coord::h);
@@ -779,11 +777,7 @@ void jitGridSampleKernel<x64::avx512_core>::nearestInterpolation(const Vmm* vAux
             kmovw(kAuxMask, kMask0);
             uni_vpxor(vAux, vAux, vAux);
         } else {
-            if (tail) {
-                kmovw(kAuxMask, kTailMask);
-            } else {
-                kxnorw(kAuxMask, kAuxMask, kAuxMask);
-            }
+            kxnorw(kAuxMask, kAuxMask, kAuxMask);
         }
 
         uni_vpgatherdd(vAux, ptr[rSrcTmp + vSrcShift], kAuxMask);
@@ -795,7 +789,7 @@ void jitGridSampleKernel<x64::avx512_core>::nearestInterpolation(const Vmm* vAux
         }
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
-        add(rChannel, 1);
+        inc(rChannel);
 
         jmp(lChannelLoopBegin, T_NEAR);
         L(lChannelLoopEnd);
@@ -1271,8 +1265,8 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
     // PER CHANNEL LOOP
     Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
     const Xbyak::Reg64& rChannel = regAux1;
-    const Xbyak::Reg64& rSrcTmp = regAux2;
-    const Xbyak::Reg64& rDstTmp = regAux3;
+    const Xbyak::Reg64& rSrcTmp  = regAux2;
+    const Xbyak::Reg64& rDstTmp  = regAux3;
     mov(rChannel, 0);
     mov(rSrcTmp, regSrc);
     mov(rDstTmp, regDst);
