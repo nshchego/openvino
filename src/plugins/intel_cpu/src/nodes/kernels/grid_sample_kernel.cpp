@@ -35,9 +35,9 @@ template <x64::cpu_isa_t isa>
 const unsigned jitGridSampleKernel<isa>::absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
 
 template <>
-unsigned jitGridSampleKernel<x64::avx>::dataTypeSizeArr[8];
+float jitGridSampleKernel<x64::avx>::dataTypeSizeArr[8];
 template <x64::cpu_isa_t isa>
-unsigned jitGridSampleKernel<isa>::dataTypeSizeArr[1];
+float jitGridSampleKernel<isa>::dataTypeSizeArr[1];
 
 #define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
 
@@ -877,7 +877,7 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
     uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
     uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
 
-    bool useMask = false;
+    bool useMask = tail;
     if (jcp.paddingMode == PaddingMode::ZEROS) {
         zerosPadding(vWCoord, vHCoord, kMask, vAux);
         useMask = true;
@@ -890,14 +890,20 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
     }
 
     uni_vfmadd231ps(vWCoord, vHCoord, vSrcWidthF);
-    uni_vcvtps2dq(vSrcShift, vWCoord);
-    if (dataTypeSize > 1) {
+//    uni_vcvtps2dq(vSrcShift, vWCoord);
+//    if (dataTypeSize > 1) {
         if (isa == x64::avx2 || isa == x64::sse41) {
-            uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
-        } else if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vpmulld
-            uni_vpmulld(vSrcShift, vSrcShift, ptr[reinterpret_cast<uintptr_t>(dataTypeSizeArr)]);
+            uni_vcvtps2dq(vSrcShift, vWCoord);
+            if (dataTypeSize > 1)
+                uni_vpslld(vSrcShift, vSrcShift, dataTypeShift); // multiply by source data type size.
+        } else if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vmulps for YMM
+            if (dataTypeSize > 1) {
+                mov(regAux1, reinterpret_cast<uintptr_t>(dataTypeSizeArr));
+                uni_vmulps(vSrcShift, vSrcShift, ptr[regAux1]);
+            }
+            uni_vcvtps2dq(vSrcShift, vSrcShift);
         }
-    }
+//    }
 
     // PER CHANNEL LOOP
     Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
