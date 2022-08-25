@@ -182,6 +182,9 @@ protected:
     void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
     void tail(const Vmm* vAuxPool);
 
+    // Aux
+    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
+
     static const unsigned gridPermMask[isa == dnnl::impl::cpu::x64::sse41 ? 1 : isa == dnnl::impl::cpu::x64::avx512_core ? 16 : 8];
     static const unsigned absMask[isa == dnnl::impl::cpu::x64::sse41 ? 4 : isa == dnnl::impl::cpu::x64::avx512_core ? 1 : 8];
     static const float halfValuesF[isa == dnnl::impl::cpu::x64::sse41 ? 4 : 1];
