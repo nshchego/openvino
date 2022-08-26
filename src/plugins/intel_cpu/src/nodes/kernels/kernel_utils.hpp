@@ -395,7 +395,7 @@ void maskMov32(const Xbyak::Operand& opDst,
     } // use VMASKMOVDQU?
 }
 
-// Makes gather from memory under the vReadMask and writes to the YMM/m256 under the vWriteMask
+// Gathers data from memory under the vReadMask and writes to the YMM/m256 under the vWriteMask
 // It can fill in values not read from the source with zero.
 void maskMov32(const Xbyak::Operand& opDst,
                const Xbyak::Operand& opSrc,
