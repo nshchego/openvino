@@ -120,6 +120,7 @@ protected:
     const Xbyak::Reg64& regAux2            = rbx;
     const Xbyak::Reg64& regAux3            = rdx;
     const Xbyak::Reg64& regAux4 = regChannelsNum;
+    const Xbyak::Reg64& regAux5            = rbp;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
