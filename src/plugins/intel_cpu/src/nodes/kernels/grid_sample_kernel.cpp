@@ -224,51 +224,68 @@ void jitGridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, c
     uni_vpermd(vAux0, vPermGridMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
     Xbyak::Ymm ymmAux0 = Xbyak::Ymm(vAux0.getIdx());
     vinsertf64x4(vWCoord, vWCoord, ymmAux0, 1); // Extract X component
-    vextractf64x4(ymmAux0, vAux0, 1); // Extract Y component
+    vextractf64x4(ymmAux0, vAux0, 1);               // Extract Y component
     vinsertf64x4(vHCoord, vHCoord, ymmAux0, 1);
 
     add(regGrid, vlen);
 }
 
 template <>
-void jitGridSampleKernel<x64::sse41>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
-    uni_vpshufd(vWCoord, ptr[regGrid], 0xD8);
-    shufpd(vHCoord, vWCoord, 0x2);
-
-    add(regGrid, vlen);
-
-    uni_vpshufd(vAux0, ptr[regGrid], 0xD8);
-    shufpd(vWCoord, vAux0, 0x0);
-    shufpd(vHCoord, vAux0, 0x3);
-
-    add(regGrid, vlen);
-}
-
-template <x64::cpu_isa_t isa> // Works for AVX, AVX2
-void jitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
+void jitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0) {
     uni_vpermd(vWCoord, vPermGridMask, ptr[regGrid]); // Permute to XXXX.YYYY
     Xbyak::Xmm xmmH = Xbyak::Xmm(vHCoord.getIdx());
-    if (isa == x64::avx) { // Extract Y component
-        vextractf128(xmmH, vWCoord, 1);
-    } else {
-        vextracti128(xmmH, vWCoord, 1);
-    }
+    vextracti128(xmmH, vWCoord, 1);
 
     add(regGrid, vlen);
 
     uni_vpermd(vAux0, vPermGridMask, ptr[regGrid]); // Permute to XXXX.YYYY
     Xbyak::Xmm xmmAux0 = Xbyak::Xmm(vAux0.getIdx());
-    if (isa == x64::avx) {
-        vinsertf128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
-        vextractf128(xmmAux0, vAux0, 1); // Extract Y component
-        vinsertf128(vHCoord, vHCoord, xmmAux0, 1);
-    } else {
-        vinserti128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
-        vextracti128(xmmAux0, vAux0, 1); // Extract Y component
-        vinserti128(vHCoord, vHCoord, xmmAux0, 1);
-    }
+    vinserti128(vWCoord, vWCoord, xmmAux0, 1); // Extract X component
+    vextracti128(xmmAux0, vAux0, 1);               // Extract Y component
+    vinserti128(vHCoord, vHCoord, xmmAux0, 1);
 
     add(regGrid, vlen);
+}
+
+template <x64::cpu_isa_t isa> // Works for AVX, SSE41
+void jitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux) {
+    Xbyak::Xmm xmmWCoord = Xbyak::Xmm(vWCoord.getIdx());
+    Xbyak::Xmm xmmHCoord = Xbyak::Xmm(vHCoord.getIdx());
+    Xbyak::Xmm xmmAux    = Xbyak::Xmm(vAux.getIdx());
+    const uint64_t xmmVlen = x64::cpu_isa_traits<x64::sse41>::vlen;
+
+    pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+    shufpd(xmmHCoord, xmmWCoord, 0x2);
+
+    add(regGrid, xmmVlen);
+
+    pshufd(xmmAux, ptr[regGrid], 0xD8);
+    shufpd(xmmWCoord, xmmAux, 0x0);
+    shufpd(xmmHCoord, xmmAux, 0x3);
+
+    add(regGrid, xmmVlen);
+
+    if (isa == x64::avx) {
+        Xbyak::Ymm ymmWCoord = Xbyak::Ymm(vWCoord.getIdx());
+        Xbyak::Ymm ymmHCoord = Xbyak::Ymm(vHCoord.getIdx());
+
+        vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
+        vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
+
+        pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+        shufpd(xmmHCoord, xmmWCoord, 0x2);
+
+        add(regGrid, xmmVlen);
+
+        uni_vpshufd(xmmAux, ptr[regGrid], 0xD8);
+        shufpd(xmmWCoord, xmmAux, 0x0);
+        shufpd(xmmHCoord, xmmAux, 0x3);
+
+        add(regGrid, xmmVlen);
+
+        vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
+        vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
+    }
 }
 
 template <>
@@ -321,52 +338,7 @@ void jitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
 }
 
 template <>
-void jitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
-    Xbyak::Label lRest, lEnd;
-
-    const auto& vAux = vAuxPool[0];
-    const auto& vAux1 = vAuxPool[1];
-    Xbyak::Xmm xmmH = Xbyak::Xmm(vHCoord.getIdx());
-
-    mov(regAux3, regWorkAmount);
-    sal(regAux3, 0x1); // multiply by gridShape[3]
-    cmp(regWorkAmount, dataElPerVec / 2);
-    jl(lRest, T_NEAR);
-    {
-        uni_vpshufd(vWCoord, ptr[regGrid], 0xD8);
-        shufpd(vHCoord, vWCoord, 0x2);
-
-        add(regGrid, vlen);
-        sub(regAux3, dataElPerVec);
-        cmp(regAux3, 0);
-        jle(lEnd, T_NEAR);
-
-        partialLoad32(vAux, regGrid, vAux, regAux3, regAux2);
-        uni_vpshufd(vAux, vAux, 0xD8);
-        shufpd(vWCoord, vAux, 0x0); // Extract X component
-        shufpd(vHCoord, vAux, 0x3); // Extract Y component
-
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
-        jmp(lEnd, T_NEAR);
-    }
-    L(lRest);
-    {
-        partialLoad32(vWCoord, regGrid, vAux1, regAux3, regAux2);
-        uni_vpshufd(vWCoord, vWCoord, 0xD8);  // Extract X component
-        shufpd(vHCoord, vWCoord, 0x2); // Extract Y component
-
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
-    }
-
-    L(lEnd);
-}
-
-template <x64::cpu_isa_t isa>
-void jitGridSampleKernel<isa>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
+void jitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
     Xbyak::Label lRest, lEnd;
 
     const auto& vAux = vAuxPool[0];
@@ -403,6 +375,113 @@ void jitGridSampleKernel<isa>::getTailCoordinates(const Vmm& vHCoord, const Vmm&
         partialLoad32(vWCoord, regGrid, vAux1, regAux3, regAux2);
         vpermilps(vWCoord, vWCoord, 0xD8);
         vextractf128(xmmH, vWCoord, 1); // Extract Y component
+
+        if (dataTypeSize > 1)
+            sal(regAux3, dataTypeShift); // multiply by source data type size.
+        add(regGrid, regAux3);
+    }
+
+    L(lEnd);
+}
+
+template <x64::cpu_isa_t isa>
+void jitGridSampleKernel<isa>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
+    Xbyak::Label lRest, lEnd;
+
+    const auto& vAux = vAuxPool[0];
+    const auto& vAux1 = vAuxPool[1];
+
+    Xbyak::Xmm xmmWCoord = Xbyak::Xmm(vWCoord.getIdx());
+    Xbyak::Xmm xmmHCoord = Xbyak::Xmm(vHCoord.getIdx());
+    Xbyak::Xmm xmmAux   = Xbyak::Xmm(vAux.getIdx());
+    const uint64_t xmmVlen = x64::cpu_isa_traits<x64::sse41>::vlen;
+    const uint64_t xmmElPerVec = xmmVlen / sizeof(int32_t);
+
+    mov(regAux3, regWorkAmount);
+    sal(regAux3, 0x1); // multiply by gridShape[3]
+    cmp(regWorkAmount, xmmElPerVec / 2);
+    jl(lRest, T_NEAR);
+    {
+        pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+        shufpd(xmmHCoord, xmmWCoord, 0x2);
+
+        add(regGrid, xmmVlen);
+        sub(regAux3, xmmElPerVec);
+        cmp(regAux3, 0);
+        jle(lEnd, T_NEAR);
+
+        if (isa == x64::avx) {
+            Xbyak::Label lAvxEnd, lRestA1, lRestA2, lRestA3;
+            cmp(regWorkAmount, xmmElPerVec);
+            jl(lRestA1, T_NEAR);
+
+            pshufd(xmmAux, ptr[regGrid], 0xD8);
+            shufpd(xmmWCoord, xmmAux, 0x0);
+            shufpd(xmmHCoord, xmmAux, 0x3);
+
+            add(regGrid, xmmVlen);
+            sub(regAux3, xmmElPerVec);
+            cmp(regAux3, 0);
+            jle(lEnd, T_NEAR);
+
+            Xbyak::Ymm ymmWCoord = Xbyak::Ymm(vWCoord.getIdx());
+            Xbyak::Ymm ymmHCoord = Xbyak::Ymm(vHCoord.getIdx());
+            vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
+            vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
+
+            cmp(regWorkAmount, (3 * xmmElPerVec) / 2);
+            jl(lRestA2, T_NEAR);
+
+            pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+            shufpd(xmmHCoord, xmmWCoord, 0x2);
+
+            add(regGrid, xmmVlen);
+            sub(regAux3, xmmElPerVec);
+            cmp(regAux3, 0);
+            jle(lRestA3, T_NEAR);
+
+            L(lRestA2);
+            {
+                partialLoad32(xmmAux, regGrid, xmmAux, regAux3, regAux2);
+                pshufd(xmmAux, xmmAux, 0xD8);
+                shufpd(xmmWCoord, xmmAux, 0x0); // Extract X component
+                shufpd(xmmHCoord, xmmAux, 0x3); // Extract Y component
+            }
+
+            add(regGrid, xmmVlen);
+            sub(regAux3, xmmElPerVec);
+
+            L(lRestA3);
+            vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
+            vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
+            jle(lEnd, T_NEAR);
+
+            L(lRestA1);
+            {
+                partialLoad32(xmmAux, regGrid, xmmAux, regAux3, regAux2);
+                pshufd(xmmAux, xmmAux, 0xD8);
+                shufpd(xmmWCoord, xmmAux, 0x0); // Extract X component
+                shufpd(xmmHCoord, xmmAux, 0x3); // Extract Y component
+            }
+
+            L(lAvxEnd);
+        } else if (isa == x64::sse41) {
+            partialLoad32(xmmAux, regGrid, xmmAux, regAux3, regAux2);
+            pshufd(xmmAux, xmmAux, 0xD8);
+            shufpd(xmmWCoord, xmmAux, 0x0); // Extract X component
+            shufpd(xmmHCoord, xmmAux, 0x3); // Extract Y component
+        }
+
+        if (dataTypeSize > 1)
+            sal(regAux3, dataTypeShift); // multiply by source data type size.
+        add(regGrid, regAux3);
+        jmp(lEnd, T_NEAR);
+    }
+    L(lRest);
+    {
+        partialLoad32(xmmWCoord, regGrid, xmmAux, regAux3, regAux2);
+        pshufd(xmmWCoord, xmmWCoord, 0xD8);  // Extract X component
+        shufpd(xmmHCoord, xmmWCoord, 0x2); // Extract Y component
 
         if (dataTypeSize > 1)
             sal(regAux3, dataTypeShift); // multiply by source data type size.
@@ -654,7 +733,7 @@ void jitGridSampleKernel<x64::sse41>::reflectionPadding(const Vmm& vCoordDst, co
     uni_vaddps(vCoordDst, vCoordDst, kAux);
 }
 
-template <x64::cpu_isa_t isa> // Works for AVX, AVX2
+template <x64::cpu_isa_t isa> // Works for AVX2, AVX
 void jitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const coord dim) {
     if (jcp.alignCorners) {
         // abs(x) % D21
@@ -800,6 +879,7 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
 
     uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
     uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
+//uni_vmovups(ptr[regDst], vWCoord);
 
     bool useMask = tail, zeroMask = false;
     if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -814,22 +894,51 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
         reflectionPadding(vHCoord, vHCoord, vAux, kMask, coord::h);
     }
 
+//uni_vmovups(ptr[regDst], vWCoord);
     hwShiftPs2dq(vSrcShift, vHCoord, vWCoord, vSrcWidthF);
+
+//Xbyak::Ymm ymmMask = Xbyak::Ymm(kMask.getIdx());
+//vperm2f128(ymmMask, ymmMask, ymmMask, 0x1);
+//
+//Xbyak::Reg32 r32Aux = Xbyak::Reg32(regAux4.getIdx());
+//Xbyak::Xmm xmmMask = Xbyak::Xmm(kMask.getIdx());
+//for (uint8_t i = 0; i < 4; i++) {
+//    uni_vpextrd(r32Aux, xmmMask, i);
+//    cmp(r32Aux, 0);
+//    mov(ptr[regDst + i * 4], r32Aux);
+//}
 
     // PER CHANNEL LOOP
     Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
     const Xbyak::Reg64& rChannel = regAux1;
     const Xbyak::Reg64& rSrcTmp  = regAux2;
     const Xbyak::Reg64& rDstTmp  = regAux3;
+    const Xbyak::Reg64& rWrkTmp  = regAux5;
     mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
     mov(rSrcTmp, regSrc);
     mov(rDstTmp, regDst);
+    mov(rWrkTmp, regWorkAmount);
     L(lChannelLoopBegin);
     {
         cmp(rChannel, 0);
         jle(lChannelLoopEnd, T_NEAR);
 
-        maskMov32(rDstTmp, rSrcTmp, kMask, kMask, vSrcShift, vAux, regAux4, useMask, zeroMask);
+//Xbyak::Ymm ymmMask = Xbyak::Ymm(kMask.getIdx());
+//vperm2f128(ymmMask, ymmMask, ymmMask, 0x1);
+//
+//Xbyak::Reg32 r32Aux = Xbyak::Reg32(regAux4.getIdx());
+//Xbyak::Xmm xmmMask = Xbyak::Xmm(kMask.getIdx());
+//for (uint8_t i = 0; i < 4; i++) {
+//    uni_vpextrd(r32Aux, xmmMask, i);
+//    cmp(r32Aux, 0);
+//    mov(ptr[rDstTmp + i * 4], r32Aux);
+//}
+//uni_vmovups(ptr[rDstTmp], kMask);
+        if (!tail) {
+            maskMov32(rDstTmp, rSrcTmp, kMask, kMask, vSrcShift, vAux, regAux4, useMask, zeroMask);
+        } else {
+            maskMov32(rDstTmp, rSrcTmp, kMask, vSrcShift, vAux, rWrkTmp, regAux4, useMask, zeroMask);
+        }
 
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
