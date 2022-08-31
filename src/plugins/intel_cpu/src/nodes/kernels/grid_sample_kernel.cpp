@@ -89,8 +89,8 @@ void jitGridSampleKernel<isa>::generate() {
     if (isa == x64::avx512_core || isa == x64::avx2 || isa == x64::avx) {
         mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
 
-static const float oneValuesF[1] = { 1.f };
-        mov(regAux1, reinterpret_cast<uintptr_t>(oneValuesF));
+static const float onesArr[1] = { 1.f };
+        mov(regAux1, reinterpret_cast<uintptr_t>(onesArr));
         uni_vpbroadcastd(vOnesF, ptr[regAux1]);
 
         if (jcp.alignCorners) {
@@ -1255,7 +1255,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
         uni_vmovups(vHCoord, vHTop);
         uni_vpxor(vYDotProd, vYDotProd, vYDotProd);
         for (int h = 0; h < 4; h++) {
-            // (y - 1 + i; x - 1)
+            // (y - 1 + h; x - 1)
             if (jcp.paddingMode == PaddingMode::ZEROS) {
                 zerosPadding0(vHCoord, vSrcHeightF, kMaskH, kMaskH);
                 kandw(kAuxMask, kMaskH, kMask0);
@@ -1287,9 +1287,9 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
             }
             uni_vmulps(vXDotProd, vAux, vCX0);
 
-            // (y - 1 + i; x)
-            // (y - 1 + i; x + 1)
-            // (y - 1 + i; x + 2)
+            // (y - 1 + h; x)
+            // (y - 1 + h; x + 1)
+            // (y - 1 + h; x + 2)
             for (int w = 1; w < 4; w++) {
                 uni_vaddps(vWCoord, vWCoord, vOnesF);
                 if (jcp.paddingMode == PaddingMode::ZEROS) {
