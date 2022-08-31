@@ -89,17 +89,18 @@ void jitGridSampleKernel<isa>::generate() {
     if (isa == x64::avx512_core || isa == x64::avx2 || isa == x64::avx) {
         mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
 
+static const float oneValuesF[1] = { 1.f };
         mov(regAux1, reinterpret_cast<uintptr_t>(oneValuesF));
-        vbroadcastss(vOnesF, ptr[regAux1]);
+        uni_vpbroadcastd(vOnesF, ptr[regAux1]);
 
         if (jcp.alignCorners) {
             mov(regAux1, ptr[regParams + GET_OFF(wDenormCoefF)]);
-            vbroadcastss(vWDenormCoefF, ptr[regAux1]);
+            uni_vpbroadcastd(vWDenormCoefF, ptr[regAux1]);
             mov(regAux1, ptr[regParams + GET_OFF(hDenormCoefF)]);
-            vbroadcastss(vHDenormCoefF, ptr[regAux1]);
+            uni_vpbroadcastd(vHDenormCoefF, ptr[regAux1]);
         } else {
             mov(regAux1, reinterpret_cast<uintptr_t>(halfValuesF));
-            vbroadcastss(vHalfF, ptr[regAux1]);
+            uni_vpbroadcastd(vHalfF, ptr[regAux1]);
         }
 
         mov(regAux1, reinterpret_cast<uintptr_t>(gridPermMask));
@@ -108,7 +109,7 @@ void jitGridSampleKernel<isa>::generate() {
         if (isa == x64::avx512_core) {
             if (jcp.paddingMode == PaddingMode::ZEROS) {
                 mov(regAux1, dataTypeSize);
-                vpbroadcastd(vDataTypeSize, reg32Aux1);
+                uni_vpbroadcastd(vDataTypeSize, reg32Aux1);
                 mov(regAux1, ptr[regParams + GET_OFF(srcWidthB)]);
                 uni_vpbroadcastd(vSrcWidthB, ptr[regAux1]);
             } else if (jcp.paddingMode == PaddingMode::BORDER) {
@@ -127,21 +128,21 @@ void jitGridSampleKernel<isa>::generate() {
                 uni_vpbroadcastd(vSrcWidthMul2Sub1F, ptr[regAux1]);
                 if (jcp.alignCorners) {
                     mov(reg32Aux1, 0x7fffffff);
-                    vpbroadcastd(vAbsMask, reg32Aux1);
+                    uni_vpbroadcastd(vAbsMask, reg32Aux1);
                 }
             }
 
             if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
                 mov(reg32Aux1, 0xbf400000); // -0.75f
-                vpbroadcastd(vBicubConst, reg32Aux1);
+                uni_vpbroadcastd(vBicubConst, reg32Aux1);
                 mov(reg32Aux1, 0x3fa00000); // 1.25f
-                vpbroadcastd(vBicub2Const, reg32Aux1);
+                uni_vpbroadcastd(vBicub2Const, reg32Aux1);
                 mov(reg32Aux1, 0x40100000); // 2.25f
-                vpbroadcastd(vBicub3Const, reg32Aux1);
+                uni_vpbroadcastd(vBicub3Const, reg32Aux1);
                 mov(reg32Aux1, 0x40000000); // 2.f
-                vpbroadcastd(v2val, reg32Aux1); // TODO: rename
+                uni_vpbroadcastd(v2val, reg32Aux1); // TODO: rename
                 mov(reg32Aux1, 0x3fc00000); // 1.5f
-                vpbroadcastd(v2Bicub3Const, reg32Aux1);
+                uni_vpbroadcastd(v2Bicub3Const, reg32Aux1);
             }
         }
     } else if (isa == x64::sse41) {
@@ -576,21 +577,12 @@ template <x64::cpu_isa_t isa> // Works for AVX, AVX2
 void jitGridSampleKernel<isa>::zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux) {
     uni_vcmpps(kAux, vWCoord, vSrcWidthF, 0x1);  // vWCoord < vSrcWidthF
     uni_vcmpps(kDst, vZeros, vWCoord, 0x2);      // vWCoord >= vZeros
-    if (isa == x64::avx)
-        uni_vandps(kDst, kDst, kAux);
-    else if (isa == x64::avx2)
-        uni_vpand(kDst, kDst, kAux); // TODO: use uni_vandps as well?
+    uni_vandps(kDst, kDst, kAux);
 
     uni_vcmpps(kAux, vHCoord, vSrcHeightF, 0x1); // vHCoord < vSrcHeightF
-    if (isa == x64::avx)
-        uni_vandps(kDst, kDst, kAux);
-    else if (isa == x64::avx2)
-        uni_vpand(kDst, kDst, kAux);
+    uni_vandps(kDst, kDst, kAux);
     uni_vcmpps(kAux, vZeros, vHCoord, 0x2);      // vHCoord >= vZeros
-    if (isa == x64::avx)
-        uni_vandps(kDst, kDst, kAux);
-    else if (isa == x64::avx2)
-        uni_vpand(kDst, kDst, kAux);
+    uni_vandps(kDst, kDst, kAux);
 }
 
 template <>
@@ -616,13 +608,13 @@ void jitGridSampleKernel<x64::sse41>::borderPadding(const Vmm& vCoordDst, const 
     uni_vcmpps(kAux, kAux, ptr[regAux4], 0x2); // vCoord < vUpperBound
     if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
         uni_vmovups(vCoordDst, vCoordOrigin);
-    uni_vpand(vCoordDst, vCoordDst, kAux);
-    uni_vpand(kAux, kAux, ptr[regAux4]);
+    uni_vandps(vCoordDst, vCoordDst, kAux);
+    uni_vandps(kAux, kAux, ptr[regAux4]);
     uni_vaddps(vCoordDst, vCoordDst, kAux);
 
     uni_vpxor(kAux, kAux, kAux);
     uni_vcmpps(kAux, kAux, vCoordDst, 0x2);    // vCoord >= vZeros
-    uni_vpand(vCoordDst, vCoordDst, kAux);
+    uni_vandps(vCoordDst, vCoordDst, kAux);
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX, AVX2
@@ -633,12 +625,12 @@ void jitGridSampleKernel<isa>::borderPadding(const Vmm& vCoordDst, const Vmm& vC
         mov(regAux4, ptr[regParams + GET_OFF(srcHeightSub1F)]);
     }
     uni_vcmpps(kAux, vCoordOrigin, ptr[regAux4], 0x2); // vCoord < vUpperBound
-    uni_vpand(vCoordDst, vCoordOrigin, kAux);
-    uni_vpand(kAux, kAux, ptr[regAux4]);
+    uni_vaddps(vCoordDst, vCoordOrigin, kAux);
+    uni_vaddps(kAux, kAux, ptr[regAux4]);
     uni_vaddps(vCoordDst, vCoordDst, kAux);
 
     uni_vcmpps(kAux, vZeros, vCoordDst, 0x2); // vCoord >= vZeros
-    uni_vpand(vCoordDst, vCoordDst, kAux);
+    uni_vaddps(vCoordDst, vCoordDst, kAux);
 }
 
 template <>
@@ -783,8 +775,8 @@ void jitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
         uni_vmovups(kAux, vSrcHeightF);
     }
     vcmpps(kAux, kAux, vCoordDst, 0x2); // vCoordDst >= vSrcDimF
-    uni_vpand(vCoordDst, vCoordDst, kAux);
-    uni_vpand(kAux, kAux, vAux);
+    uni_vaddps(vCoordDst, vCoordDst, kAux);
+    uni_vaddps(kAux, kAux, vAux);
     uni_vaddps(vCoordDst, vCoordDst, kAux);
 }
 
@@ -917,7 +909,6 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
     mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
     mov(rSrcTmp, regSrc);
     mov(rDstTmp, regDst);
-    mov(rWrkTmp, regWorkAmount);
     L(lChannelLoopBegin);
     {
         cmp(rChannel, 0);
@@ -937,6 +928,7 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
         if (!tail) {
             maskMov32(rDstTmp, rSrcTmp, kMask, kMask, vSrcShift, vAux, regAux4, useMask, zeroMask);
         } else {
+            mov(rWrkTmp, regWorkAmount);
             maskMov32(rDstTmp, rSrcTmp, kMask, vSrcShift, vAux, rWrkTmp, regAux4, useMask, zeroMask);
         }
 

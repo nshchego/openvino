@@ -102,6 +102,40 @@ void uni_vpinsrd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::O
     }
 }
 
+
+void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+    if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+        vpbroadcastd(x, op);
+    } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+        if (op.isMEM()) {
+            vbroadcastss(x, op.getAddress());
+        } else {
+            vmovss(x, x, op);
+            vpshufd(x, x, 0x0);
+        }
+    } else {
+        movss(x, op);
+        pshufd(x, x, 0x0);
+    }
+}
+
+void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
+    if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+        vpbroadcastd(x, op);
+    } else {
+        if (op.isMEM()) {
+            vbroadcastss(x, op.getAddress());
+        } else {
+            const Xbyak::Xmm t(x.getIdx());
+            if (!t.isEqualIfNotInherited(op)) {
+                vmovss(t, t, op);
+            }
+            vinsertf128(x, x, t, 1);
+            vshufps(x, x, x, 0);
+        }
+    }
+}
+
 //void uni_vpsrld(
 //        const Xbyak::Ymm &vDst, const Xbyak::Operand &opSrc, const int imm) {
 //    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
