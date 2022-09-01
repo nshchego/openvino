@@ -11,30 +11,6 @@ namespace ov {
 namespace intel_cpu {
 
 template <>
-const unsigned jitGridSampleKernel<x64::avx512_core>::gridPermMask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
-template <>
-const unsigned jitGridSampleKernel<x64::sse41>::gridPermMask[1]  = { 0 };
-template <x64::cpu_isa_t isa>
-const unsigned jitGridSampleKernel<isa>::gridPermMask[8]  = { 0, 2, 4, 6, 1, 3, 5, 7 };
-
-template <>
-const float jitGridSampleKernel<x64::sse41>::halfValuesF[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-template <x64::cpu_isa_t isa>
-const float jitGridSampleKernel<isa>::halfValuesF[1] = { 0.5f };
-
-template <>
-const float jitGridSampleKernel<x64::sse41>::oneValuesF[4] = { 1.f, 1.f, 1.f, 1.f };
-template <x64::cpu_isa_t isa>
-const float jitGridSampleKernel<isa>::oneValuesF[1] = { 1.f };
-
-template <>
-const unsigned jitGridSampleKernel<x64::avx512_core>::absMask[1] = { 0x7fffffff };
-template <>
-const unsigned jitGridSampleKernel<x64::sse41>::absMask[4] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-template <x64::cpu_isa_t isa>
-const unsigned jitGridSampleKernel<isa>::absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-
-template <>
 float jitGridSampleKernel<x64::avx>::dataTypeSizeArr[8];
 template <x64::cpu_isa_t isa>
 float jitGridSampleKernel<isa>::dataTypeSizeArr[1];
@@ -89,8 +65,8 @@ void jitGridSampleKernel<isa>::generate() {
     if (isa == x64::avx512_core || isa == x64::avx2 || isa == x64::avx) {
         mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
 
-static const float onesArr[1] = { 1.f };
-        mov(regAux1, reinterpret_cast<uintptr_t>(onesArr));
+        static const float onesVal = 1.f;
+        mov(regAux1, reinterpret_cast<uintptr_t>(&onesVal));
         uni_vpbroadcastd(vOnesF, ptr[regAux1]);
 
         if (jcp.alignCorners) {
@@ -99,17 +75,25 @@ static const float onesArr[1] = { 1.f };
             mov(regAux1, ptr[regParams + GET_OFF(hDenormCoefF)]);
             uni_vpbroadcastd(vHDenormCoefF, ptr[regAux1]);
         } else {
-            mov(regAux1, reinterpret_cast<uintptr_t>(halfValuesF));
+            static const float halfVal = 0.5f;
+            mov(regAux1, reinterpret_cast<uintptr_t>(&halfVal));
             uni_vpbroadcastd(vHalfF, ptr[regAux1]);
         }
 
-        mov(regAux1, reinterpret_cast<uintptr_t>(gridPermMask));
-        uni_vmovups(vPermGridMask, ptr[regAux1]);
+        if (isa == x64::avx512_core) {
+            static const unsigned gridPermMask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
+            mov(regAux1, reinterpret_cast<uintptr_t>(gridPermMask));
+            uni_vmovups(vPermGridMask, ptr[regAux1]);
+        } else if (isa == x64::avx2) {
+            static const unsigned gridPermMask[8]  = { 0, 2, 4, 6, 1, 3, 5, 7 };
+            mov(regAux1, reinterpret_cast<uintptr_t>(gridPermMask));
+            uni_vmovups(vPermGridMask, ptr[regAux1]);
+        }
 
         if (isa == x64::avx512_core) {
             if (jcp.paddingMode == PaddingMode::ZEROS) {
                 mov(regAux1, dataTypeSize);
-                uni_vpbroadcastd(vDataTypeSize, reg32Aux1);
+                vpbroadcastd(vDataTypeSize, reg32Aux1);
                 mov(regAux1, ptr[regParams + GET_OFF(srcWidthB)]);
                 uni_vpbroadcastd(vSrcWidthB, ptr[regAux1]);
             } else if (jcp.paddingMode == PaddingMode::BORDER) {
@@ -128,25 +112,26 @@ static const float onesArr[1] = { 1.f };
                 uni_vpbroadcastd(vSrcWidthMul2Sub1F, ptr[regAux1]);
                 if (jcp.alignCorners) {
                     mov(reg32Aux1, 0x7fffffff);
-                    uni_vpbroadcastd(vAbsMask, reg32Aux1);
+                    vpbroadcastd(vAbsMask, reg32Aux1);
                 }
             }
 
             if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
                 mov(reg32Aux1, 0xbf400000); // -0.75f
-                uni_vpbroadcastd(vBicubConst, reg32Aux1);
+                vpbroadcastd(vBicubConst, reg32Aux1);
                 mov(reg32Aux1, 0x3fa00000); // 1.25f
-                uni_vpbroadcastd(vBicub2Const, reg32Aux1);
+                vpbroadcastd(vBicub2Const, reg32Aux1);
                 mov(reg32Aux1, 0x40100000); // 2.25f
-                uni_vpbroadcastd(vBicub3Const, reg32Aux1);
+                vpbroadcastd(vBicub3Const, reg32Aux1);
                 mov(reg32Aux1, 0x40000000); // 2.f
-                uni_vpbroadcastd(v2val, reg32Aux1); // TODO: rename
+                vpbroadcastd(v2val, reg32Aux1); // TODO: rename
                 mov(reg32Aux1, 0x3fc00000); // 1.5f
-                uni_vpbroadcastd(v2Bicub3Const, reg32Aux1);
+                vpbroadcastd(v2Bicub3Const, reg32Aux1);
             }
         }
     } else if (isa == x64::sse41) {
-        mov(regAux1, reinterpret_cast<uintptr_t>(oneValuesF));
+        static const float onesArr[4] = { 1.f, 1.f, 1.f, 1.f };
+        mov(regAux1, reinterpret_cast<uintptr_t>(onesArr));
         uni_vmovups(vOnesF, ptr[regAux1]);
     }
 
@@ -503,7 +488,8 @@ void jitGridSampleKernel<x64::sse41>::denormalizeRawCoordinates(const Vmm& vWCoo
         uni_vmovups(vAux, ptr[regAux4]);
         uni_vfmadd132ps(vHCoord, vAux, vAux);
     } else {
-        mov(regAux4, reinterpret_cast<uintptr_t>(halfValuesF));
+        static const float halfValues[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
+        mov(regAux4, reinterpret_cast<uintptr_t>(halfValues));
         uni_vmovups(vAux, ptr[regAux4]);
 
         uni_vfmadd132ps(vWCoord, vSrcWidthF, vSrcWidthF);
@@ -676,6 +662,7 @@ void jitGridSampleKernel<x64::sse41>::reflectionPadding(const Vmm& vCoordDst, co
         // abs(x) % D21
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
+        static const unsigned absMask[4] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
         mov(regAux4, reinterpret_cast<uintptr_t>(absMask));
         uni_vandps(vCoordDst, vCoordDst, ptr[regAux4]); // abs(x)
         if (dim == coord::w) {
@@ -731,6 +718,7 @@ void jitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
         // abs(x) % D21
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
+        const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
         mov(regAux4, reinterpret_cast<uintptr_t>(absMask));
         uni_vandps(vCoordDst, vCoordDst, ptr[regAux4]); // abs(x)
         if (dim == coord::w) {
