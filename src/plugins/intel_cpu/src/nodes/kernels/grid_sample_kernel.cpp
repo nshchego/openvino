@@ -4,6 +4,7 @@
 
 #include "grid_sample_kernel.hpp"
 #include <ie_common.h>
+#include "utils/general_utils.h"
 
 using namespace dnnl::impl::cpu;
 
@@ -52,7 +53,7 @@ void jitGridSampleKernel<isa>::generate() {
 
     uni_vpxor(vZeros, vZeros, vZeros);
 
-    if (isa == x64::avx512_core || isa == x64::avx2 || isa == x64::avx) {
+    if (one_of(isa, x64::avx512_core, x64::avx2, x64::avx)) {
         mov(regChannelsNum, ptr[regParams + GET_OFF(channelsNum)]);
 
         static const float onesVal = 1.f;

@@ -275,7 +275,7 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
             }
         };
         result.insert(result.end(), tmp.begin(), tmp.end());
-    } // AVX5
+    } // AVX512
 
     return result;
 }

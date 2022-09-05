@@ -66,6 +66,8 @@ GridSample::GridSample(const std::shared_ptr<ov::Node>& op, const dnnl::engine& 
         case op::v9::GridSample::InterpolationMode::NEAREST:
             interpolationMode = InterpolationMode::NEAREST;
             break;
+        default:
+            THROW_ERROR << "supports only BILINEAR, BICUBIC, NEAREST interpolation modes.";
     }
     switch (attributes.padding_mode) {
         case op::v9::GridSample::PaddingMode::ZEROS:
@@ -77,6 +79,8 @@ GridSample::GridSample(const std::shared_ptr<ov::Node>& op, const dnnl::engine& 
         case op::v9::GridSample::PaddingMode::REFLECTION:
             paddingMode = PaddingMode::REFLECTION;
             break;
+        default:
+            THROW_ERROR << "supports only BORDER, REFLECTION, ZEROS paddings modes.";
     }
 }
 
@@ -302,7 +306,7 @@ void GridSample::executeDynamicImpl(dnnl::stream strm) {
 }
 
 std::vector<VectorDims> GridSample::shapeInfer() const {
-    return Node::shapeInferGeneric(PortMask(1, 2));
+    return Node::shapeInferGeneric(PortMask(1));
 }
 
 bool GridSample::created() const {
