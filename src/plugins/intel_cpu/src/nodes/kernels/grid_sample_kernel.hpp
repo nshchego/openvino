@@ -180,13 +180,13 @@ protected:
     void zerosPadding1(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
     void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmask& kAux, const coord dim);
     void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const coord dim);
-    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
+    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const Vmm* vAuxPool, const uint8_t idx);
     void tail(const Vmm* vAuxPool);
 
     // Aux
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
 
-    static float dataTypeSizeArr[isa == dnnl::impl::cpu::x64::avx ? 8 : 1];
+//    static float dataTypeSizeArr[isa == dnnl::impl::cpu::x64::avx ? 8 : 1];
 };
 
 }   // namespace intel_cpu
