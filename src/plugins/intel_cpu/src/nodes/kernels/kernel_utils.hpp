@@ -18,7 +18,8 @@ inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {
     return is_subset(isa, dnnl::impl::cpu::x64::isa_all) && dnnl::impl::cpu::x64::mayiuse(isa);
 }
 
-void uni_vfmsub132ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+void uni_vfmsub132ps(const Xbyak::Xmm &x1,
+                     const Xbyak::Xmm &x2,
                      const Xbyak::Operand &op) {
     // Note: x1 gets overriden by x1*op
     // This is incorrect if x1 == x2
@@ -28,6 +29,24 @@ void uni_vfmsub132ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
         assert(x1.getIdx() != x2.getIdx());
         vmulps(x1, x1, op);
         vsubps(x1, x1, x2);
+    } else {
+        assert(x1.getIdx() != x2.getIdx());
+        mulps(x1, op);
+        subps(x1, x2);
+    }
+}
+
+void uni_vfnmadd132ps(const Xbyak::Xmm &x1,
+                      const Xbyak::Xmm &x2,
+                      const Xbyak::Operand &op) {
+    // Note: x1 gets overriden by x1*op
+    // This is incorrect if x1 == x2
+    if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+        vfnmadd132ps(x1, x2, op);
+    } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+        assert(x1.getIdx() != x2.getIdx());
+        vmulps(x1, x1, op);
+        vsubps(x1, x2, x1);
     } else {
         assert(x1.getIdx() != x2.getIdx());
         mulps(x1, op);
@@ -93,14 +112,14 @@ void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Op
     vpermd(vDst, vMask, src);
 }
 
-void uni_vpinsrd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Operand& vSrc2, const int imm) {
-    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
-        vpinsrd(vDst, vSrc1, vSrc2, imm);
-    } else {
-        if (vSrc1.getIdx() != vSrc2.getIdx()) movdqa(vSrc1, vSrc2);
-        pinsrd(vDst, vSrc2, imm);
-    }
-}
+//void uni_vpinsrd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Operand& vSrc2, const int imm) {
+//    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+//        vpinsrd(vDst, vSrc1, vSrc2, imm);
+//    } else {
+//        if (vSrc1.getIdx() != vSrc2.getIdx()) movdqa(vSrc1, vSrc2);
+//        pinsrd(vDst, vSrc2, imm);
+//    }
+//}
 
 
 void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
@@ -172,17 +191,42 @@ void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
     kmovw(kDstMask, rOnes);
 }
 
-void partialLoad32(const Xbyak::Ymm& vDst,
-                   const Xbyak::Reg64& rSrc,
-                   const Xbyak::Ymm& vAux,
-                   const Xbyak::Reg64& rLoadNum,
-                   const Xbyak::Reg64& rAux) {
+void loadEl2vec32(const Xbyak::Xmm&   xmmDst,
+                  const Xbyak::Reg64& rSrc,
+//                   const Xbyak::Xmm& vAux,
+                  const Xbyak::Reg64& rLoadNum,
+                  const Xbyak::Reg64& rAux,
+                  const bool zeroFilling = false) {
+    const int typeSize = 4;
+    const int elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
+    Xbyak::Label lLoopEnd;
+    if (rLoadNum.getIdx() != rAux.getIdx())
+        mov(rAux, rLoadNum);
+    if (zeroFilling)
+        uni_vpxor(xmmDst, xmmDst, xmmDst);
+
+    for (int i = 0; i < elPerVec; i++) {
+        cmp(rAux, 0);
+        jle(lLoopEnd, T_NEAR);
+
+        uni_vpinsrd(xmmDst, xmmDst, ptr[rSrc + i * typeSize], i);
+
+        dec(rAux);
+    }
+    L(lLoopEnd);
+}
+
+void loadEl2vec32(const Xbyak::Ymm&   vDst,
+                  const Xbyak::Reg64& rSrc,
+                  const Xbyak::Ymm&   vAux,
+                  const Xbyak::Reg64& rLoadNum,
+                  const Xbyak::Reg64& rAux) {
     const uint8_t typeSize = 4;
     const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
     Xbyak::Label lLoopEnd0, lLoopEnd1;
     mov(rAux, rLoadNum);
     Xbyak::Xmm xmmAux(vDst.getIdx());
-    uni_vpxor(vDst, vDst, vDst);
+//    uni_vpxor(vDst, vDst, vDst);
     for (uint8_t i = 0; i < elPerVec / 2; i++) {
         cmp(rAux, 0);
         je(lLoopEnd0, T_NEAR);
@@ -208,32 +252,10 @@ void partialLoad32(const Xbyak::Ymm& vDst,
     // vperm2f128(10);
 }
 
-void partialLoad32(const Xbyak::Xmm& vDst,
-                   const Xbyak::Reg64& rSrc,
-                   const Xbyak::Xmm& vAux,
-                   const Xbyak::Reg64& rLoadNum,
-                   const Xbyak::Reg64& rAux) {
-    const uint8_t typeSize = 4;
-    const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
-    Xbyak::Label lLoopEnd0;
-    mov(rAux, rLoadNum);
-    Xbyak::Xmm xmmAux(vDst.getIdx());
-    uni_vpxor(vDst, vDst, vDst);
-    for (uint8_t i = 0; i < elPerVec; i++) {
-        cmp(rAux, 0);
-        je(lLoopEnd0, T_NEAR);
-
-        uni_vpinsrd(xmmAux, xmmAux, ptr[rSrc + i * typeSize], i);
-
-        dec(rAux);
-    }
-    L(lLoopEnd0);
-}
-
 void storeVectorPart(const Xbyak::Reg64& rDst,
                      const Xbyak::Reg64& rToStoreCounter,
-                     Xbyak::Xmm& xmmSrc,
-                     const uint64_t typeSize) {
+                     const Xbyak::Xmm&   xmmSrc,
+                     const uint64_t      typeSize) {
     Xbyak::Label lEnd;
     const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
 
@@ -259,8 +281,8 @@ void storeVectorPart(const Xbyak::Reg64& rDst,
 
 void storeVectorPart(const Xbyak::Reg64& rDst,
                      const Xbyak::Reg64& rToStoreCounter,
-                     Xbyak::Ymm& ymmSrc,
-                     const uint64_t typeSize) {
+                     const Xbyak::Ymm&   ymmSrc,
+                     const uint64_t      typeSize) {
     Xbyak::Label lEnd;
     Xbyak::Xmm xmmSrc(ymmSrc.getIdx());
     for (int i = 0; i < 2; i++) {
@@ -308,7 +330,7 @@ void maskMov32(const Xbyak::Operand& opDst,
         uni_vpextrd(r32Aux, xmmSrcShift, i);
         if (opDst.isXMM()) {
             Xbyak::Xmm xmmDst = Xbyak::Xmm(opDst.getIdx());
-            uni_vpinsrd(xmmDst, xmmDst, ptr[opSrc.getReg() + rAux], i << 4);
+            pinsrd(xmmDst, ptr[opSrc.getReg() + rAux], i << 4);
         } else if (opDst.isREG()) {
             mov(r32Aux, ptr[opSrc.getReg() + rAux]);
             mov(ptr[opDst.getReg() + i * typeSize], r32Aux);
@@ -318,7 +340,7 @@ void maskMov32(const Xbyak::Operand& opDst,
         if (zeroMask) {
             if (opDst.isXMM()) {
                 Xbyak::Xmm xmmDst = Xbyak::Xmm(opDst.getIdx());
-                uni_vpinsrd(xmmDst, xmmDst, r32Aux, i << 4);
+                pinsrd(xmmDst, r32Aux, i << 4);
             } else if (opDst.isREG()) {
                 mov(ptr[opDst.getReg() + i * typeSize], r32Aux);
             }

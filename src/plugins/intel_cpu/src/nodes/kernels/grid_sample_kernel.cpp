@@ -10,11 +10,6 @@ using namespace dnnl::impl::cpu;
 namespace ov {
 namespace intel_cpu {
 
-template <>
-float jitGridSampleKernel<x64::avx>::dataTypeSizeArr[8];
-template <x64::cpu_isa_t isa>
-float jitGridSampleKernel<isa>::dataTypeSizeArr[1];
-
 #define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
 
 template <x64::cpu_isa_t isa>
@@ -29,11 +24,6 @@ jitGridSampleKernel<isa>::jitGridSampleKernel(const jGridSampleConfParams& jcp) 
         dataTypeShift = 1;
     else if (dataTypeSize == 4)
         dataTypeShift = 2;
-    if (isa == x64::avx) {
-        for (int i = 0; i < dataElPerVec; i++) {
-            dataTypeSizeArr[i] = dataTypeSize;
-        }
-    }
 }
 
 template <x64::cpu_isa_t isa>
@@ -153,6 +143,7 @@ void jitGridSampleKernel<isa>::process() {
             mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
             spatialLoop(vAuxContainer);
 
+
             add(regSrc,  ptr[regParams + GET_OFF(srcBatchStepB)]);
             add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
             add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
@@ -196,7 +187,7 @@ void jitGridSampleKernel<isa>::spatialLoop(const Vmm* vAuxPool) {
     }
 
     L(lTail);
-    tail(vAuxPool);
+//    tail(vAuxPool);
 }
 
 template <>
@@ -240,12 +231,24 @@ void jitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
     Xbyak::Xmm xmmAux    = Xbyak::Xmm(vAux.getIdx());
     const uint64_t xmmVlen = x64::cpu_isa_traits<x64::sse41>::vlen;
 
-    pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+//    if (isa == x64::avx) {
+//        movups(xmmWCoord, ptr[regGrid]);
+//        pshufd(xmmWCoord, xmmWCoord, 0xD8);
+//    } else if (isa == x64::sse41) {
+//        pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+//    }
+    uni_vpshufd(xmmWCoord, ptr[regGrid], 0xD8);
     shufpd(xmmHCoord, xmmWCoord, 0x2);
 
     add(regGrid, xmmVlen);
 
-    pshufd(xmmAux, ptr[regGrid], 0xD8);
+//    if (isa == x64::avx) {
+//        movups(xmmAux, ptr[regGrid]);
+//        pshufd(xmmAux, xmmAux, 0xD8);
+//    } else if (isa == x64::sse41) {
+//        pshufd(xmmAux, ptr[regGrid], 0xD8);
+//    }
+    uni_vpshufd(xmmAux, ptr[regGrid], 0xD8);
     shufpd(xmmWCoord, xmmAux, 0x0);
     shufpd(xmmHCoord, xmmAux, 0x3);
 
@@ -258,7 +261,11 @@ void jitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
         vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
         vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
 
-        pshufd(xmmWCoord, ptr[regGrid], 0xD8);
+        // Here is movups + pshufd instead of vpshufd for two reasons:
+        // 1. vpshufd zeroes the rest ov YMM.
+        // 2. pshufd does not work with not aligned to YMM Address.
+        movups(xmmWCoord, ptr[regGrid]);
+        pshufd(xmmWCoord, xmmWCoord, 0xD8);
         shufpd(xmmHCoord, xmmWCoord, 0x2);
 
         add(regGrid, xmmVlen);
@@ -276,9 +283,9 @@ void jitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
 
 template <>
 void jitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
-    Xbyak::Label lEnd, lRest;
+    Xbyak::Label lEnd, lGridShift, lRest;
 
-    auto& vAux0 = vAuxPool[0];
+    const auto& vAux = vAuxPool[0];
     Xbyak::Ymm ymmH = Xbyak::Ymm(vHCoord.getIdx());
 
     mov(regAux3, regWorkAmount);
@@ -294,49 +301,48 @@ void jitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
         cmp(regAux3, 0);
         jle(lEnd, T_NEAR);
 
-        fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
-        uni_vmovups(vAux0 | kTailMask, ptr[regGrid]);
-        uni_vpermd(vAux0, vPermGridMask, vAux0);
-        Xbyak::Ymm ymmAux0 = Xbyak::Ymm(vAux0.getIdx());
+        fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux.getIdx()), regAux3, regAux1, regAux2);
+        uni_vmovups(vAux | kTailMask, ptr[regGrid]);
+        uni_vpermd(vAux, vPermGridMask, vAux);
+        Xbyak::Ymm ymmAux0 = Xbyak::Ymm(vAux.getIdx());
         vinsertf64x4(vWCoord, vWCoord, ymmAux0, 1); // Extract X component
-        vextractf64x4(ymmAux0, vAux0, 1); // Extract Y component
+        vextractf64x4(ymmAux0, vAux, 1); // Extract Y component
         vinsertf64x4(vHCoord, vHCoord, ymmAux0, 1);
 
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
-        jmp(lEnd, T_NEAR);
+        jmp(lGridShift, T_NEAR);
     }
     L(lRest);
     {
-        fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux0.getIdx()), regAux3, regAux1, regAux2);
+        fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux.getIdx()), regAux3, regAux1, regAux2);
         uni_vmovups(vWCoord | kTailMask, ptr[regGrid]);
         uni_vpermd(vWCoord, vPermGridMask, vWCoord);
         vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
-
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
     }
+
+    L(lGridShift);
+    if (dataTypeSize > 1)
+        sal(regAux3, dataTypeShift); // multiply by source data type size.
+    add(regGrid, regAux3);
+
     L(lEnd);
 
-    fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux0.getIdx()), regWorkAmount, regAux1, regAux2);
+    fillRestWorkMask(kTailMask, Xbyak::Zmm(vAux.getIdx()), regWorkAmount, regAux1, regAux2);
 }
 
 template <>
 void jitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
-    Xbyak::Label lRest, lEnd;
+    Xbyak::Label lRest, lGridShift, lEnd;
 
     const auto& vAux = vAuxPool[0];
     const auto& vAux1 = vAuxPool[1];
     Xbyak::Xmm xmmH = Xbyak::Xmm(vHCoord.getIdx());
 
     mov(regAux3, regWorkAmount);
-    sal(regAux3, 0x1); // multiply by gridShape[3]
+    sal(regAux3, 0x1); // multiply by gridShape[3] == 2
     cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        vpermilps(vWCoord, ptr[regGrid], 0xD8);
+        uni_vpermd(vWCoord, vPermGridMask, ptr[regGrid]); // Permute to XXXX.YYYY
         vextractf128(xmmH, vWCoord, 1); // Extract Y component
 
         add(regGrid, vlen);
@@ -344,135 +350,118 @@ void jitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
         cmp(regAux3, 0);
         jle(lEnd, T_NEAR);
 
-        partialLoad32(vAux, regGrid, vAux1, regAux3, regAux2);
+        loadEl2vec32(vAux, regGrid, vAux1, regAux3, regAux2);
         vpermilps(vAux, vAux, 0xD8);
         Xbyak::Xmm xmmAux = Xbyak::Xmm(vAux.getIdx());
         vinsertf128(vWCoord, vWCoord, xmmAux, 1); // Extract X component
         vextractf128(xmmAux, vAux, 1); // Extract Y component
         vinsertf128(vHCoord, vHCoord, xmmAux, 1);
 
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
-        jmp(lEnd, T_NEAR);
+        jmp(lGridShift, T_NEAR);
     }
     L(lRest);
     {
-        partialLoad32(vWCoord, regGrid, vAux1, regAux3, regAux2);
-        vpermilps(vWCoord, vWCoord, 0xD8);
+        loadEl2vec32(vWCoord, regGrid, vAux1, regAux3, regAux2);
+        uni_vpermd(vWCoord, vPermGridMask, vWCoord); // Permute to XXXX.YYYY
         vextractf128(xmmH, vWCoord, 1); // Extract Y component
-
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
     }
+
+    L(lGridShift);
+    if (dataTypeSize > 1)
+        sal(regAux3, dataTypeShift); // multiply by source data type size.
+    add(regGrid, regAux3);
 
     L(lEnd);
 }
 
-template <x64::cpu_isa_t isa>
-void jitGridSampleKernel<isa>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
-    Xbyak::Label lRest, lEnd;
-
-    const auto& vAux = vAuxPool[0];
-    const auto& vAux1 = vAuxPool[1];
+template <>
+void jitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
+    Xbyak::Label lLoop2End, lEnd;
 
     Xbyak::Xmm xmmWCoord = Xbyak::Xmm(vWCoord.getIdx());
     Xbyak::Xmm xmmHCoord = Xbyak::Xmm(vHCoord.getIdx());
-    Xbyak::Xmm xmmAux   = Xbyak::Xmm(vAux.getIdx());
-    const uint64_t xmmVlen = x64::cpu_isa_traits<x64::sse41>::vlen;
-    const uint64_t xmmElPerVec = xmmVlen / sizeof(int32_t);
+
+    const auto& rGridRest = regAux3;
+    mov(rGridRest, regWorkAmount);
+    sal(rGridRest, 0x1); // multiply by gridShape[3] == 2
+
+    for (int i = 0; i < dataElPerVec; i++) {
+        cmp(rGridRest, 0);
+        jle(lEnd, T_NEAR);
+
+        if (i % 2 == 0)
+//            uni_vpinsrd(xmmWCoord, xmmWCoord, ptr[regGrid], i / 2);
+            pinsrd(xmmWCoord, ptr[regGrid], i / 2);
+        else
+//            uni_vpinsrd(xmmHCoord, xmmHCoord, ptr[regGrid], i / 2);
+            pinsrd(xmmHCoord, ptr[regGrid], i / 2);
+
+        add(regGrid, gridTypeSize);
+        dec(rGridRest);
+    }
+    cmp(rGridRest, 0);
+    jle(lEnd, T_NEAR);
+    vperm2f128(vWCoord, vWCoord, vWCoord, 0x1);
+    vperm2f128(vHCoord, vHCoord, vHCoord, 0x1);
+
+    for (int i = 0; i < dataElPerVec; i++) {
+        cmp(rGridRest, 0);
+        jle(lLoop2End, T_NEAR);
+
+        if (i % 2 == 0)
+//            uni_vpinsrd(xmmWCoord, xmmWCoord, ptr[regGrid], i / 2);
+            pinsrd(xmmWCoord, ptr[regGrid], i / 2);
+        else
+//            uni_vpinsrd(xmmHCoord, xmmHCoord, ptr[regGrid], i / 2);
+            pinsrd(xmmHCoord, ptr[regGrid], i / 2);
+
+        add(regGrid, gridTypeSize);
+        dec(rGridRest);
+    }
+
+    L(lLoop2End);
+    vperm2f128(vWCoord, vWCoord, vWCoord, 0x1);
+    vperm2f128(vHCoord, vHCoord, vHCoord, 0x1);
+
+    L(lEnd);
+}
+
+template <>
+void jitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool) {
+    Xbyak::Label lRest, lGridShift, lEnd;
+    const auto& vAux = vAuxPool[0];
 
     mov(regAux3, regWorkAmount);
-    sal(regAux3, 0x1); // multiply by gridShape[3]
-    cmp(regWorkAmount, xmmElPerVec / 2);
+    sal(regAux3, 0x1); // multiply by gridShape[3] == 2
+    cmp(regWorkAmount, gridElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        pshufd(xmmWCoord, ptr[regGrid], 0xD8);
-        shufpd(xmmHCoord, xmmWCoord, 0x2);
+        pshufd(vWCoord, ptr[regGrid], 0xD8);
+        shufpd(vHCoord, vWCoord, 0x2);
 
-        add(regGrid, xmmVlen);
-        sub(regAux3, xmmElPerVec);
+        add(regGrid, vlen);
+        sub(regAux3, gridElPerVec);
         cmp(regAux3, 0);
         jle(lEnd, T_NEAR);
 
-        if (isa == x64::avx) {
-            Xbyak::Label lAvxEnd, lRestA1, lRestA2, lRestA3;
-            cmp(regWorkAmount, xmmElPerVec);
-            jl(lRestA1, T_NEAR);
+        loadEl2vec32(vAux, regGrid, regAux3, regAux2);
+        pshufd(vAux, vAux, 0xD8);
+        shufpd(vWCoord, vAux, 0x0); // Extract X component
+        shufpd(vHCoord, vAux, 0x3); // Extract Y component
 
-            pshufd(xmmAux, ptr[regGrid], 0xD8);
-            shufpd(xmmWCoord, xmmAux, 0x0);
-            shufpd(xmmHCoord, xmmAux, 0x3);
-
-            add(regGrid, xmmVlen);
-            sub(regAux3, xmmElPerVec);
-            cmp(regAux3, 0);
-            jle(lEnd, T_NEAR);
-
-            Xbyak::Ymm ymmWCoord = Xbyak::Ymm(vWCoord.getIdx());
-            Xbyak::Ymm ymmHCoord = Xbyak::Ymm(vHCoord.getIdx());
-            vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
-            vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
-
-            cmp(regWorkAmount, (3 * xmmElPerVec) / 2);
-            jl(lRestA2, T_NEAR);
-
-            pshufd(xmmWCoord, ptr[regGrid], 0xD8);
-            shufpd(xmmHCoord, xmmWCoord, 0x2);
-
-            add(regGrid, xmmVlen);
-            sub(regAux3, xmmElPerVec);
-            cmp(regAux3, 0);
-            jle(lRestA3, T_NEAR);
-
-            L(lRestA2);
-            {
-                partialLoad32(xmmAux, regGrid, xmmAux, regAux3, regAux2);
-                pshufd(xmmAux, xmmAux, 0xD8);
-                shufpd(xmmWCoord, xmmAux, 0x0); // Extract X component
-                shufpd(xmmHCoord, xmmAux, 0x3); // Extract Y component
-            }
-
-            add(regGrid, xmmVlen);
-            sub(regAux3, xmmElPerVec);
-
-            L(lRestA3);
-            vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
-            vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
-            jle(lEnd, T_NEAR);
-
-            L(lRestA1);
-            {
-                partialLoad32(xmmAux, regGrid, xmmAux, regAux3, regAux2);
-                pshufd(xmmAux, xmmAux, 0xD8);
-                shufpd(xmmWCoord, xmmAux, 0x0); // Extract X component
-                shufpd(xmmHCoord, xmmAux, 0x3); // Extract Y component
-            }
-
-            L(lAvxEnd);
-        } else if (isa == x64::sse41) {
-            partialLoad32(xmmAux, regGrid, xmmAux, regAux3, regAux2);
-            pshufd(xmmAux, xmmAux, 0xD8);
-            shufpd(xmmWCoord, xmmAux, 0x0); // Extract X component
-            shufpd(xmmHCoord, xmmAux, 0x3); // Extract Y component
-        }
-
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
-        jmp(lEnd, T_NEAR);
+        jmp(lGridShift, T_NEAR);
     }
     L(lRest);
     {
-        partialLoad32(xmmWCoord, regGrid, xmmAux, regAux3, regAux2);
-        pshufd(xmmWCoord, xmmWCoord, 0xD8);  // Extract X component
-        shufpd(xmmHCoord, xmmWCoord, 0x2); // Extract Y component
-
-        if (dataTypeSize > 1)
-            sal(regAux3, dataTypeShift); // multiply by source data type size.
-        add(regGrid, regAux3);
+        loadEl2vec32(vWCoord, regGrid, regAux3, regAux2);
+        pshufd(vWCoord, vWCoord, 0xD8);  // Extract X component
+        shufpd(vHCoord, vWCoord, 0x2);   // Extract Y component
     }
+
+    L(lGridShift);
+    if (dataTypeSize > 1)
+        sal(regAux3, dataTypeShift); // multiply by source data type size.
+    add(regGrid, regAux3);
 
     L(lEnd);
 }
@@ -663,7 +652,7 @@ void jitGridSampleKernel<x64::sse41>::reflectionPadding(const Vmm& vCoordDst, co
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
         static const unsigned absMask[4] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-        mov(regAux4, reinterpret_cast<uintptr_t>(absMask));
+        mov(regAux4, reinterpret_cast<uintptr_t>(absMask)); // TODO: use PSIGND
         uni_vandps(vCoordDst, vCoordDst, ptr[regAux4]); // abs(x)
         if (dim == coord::w) {
             mov(regAux4, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
@@ -719,7 +708,7 @@ void jitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
         const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-        mov(regAux4, reinterpret_cast<uintptr_t>(absMask));
+        mov(regAux4, reinterpret_cast<uintptr_t>(absMask)); // TODO: use PSIGND
         uni_vandps(vCoordDst, vCoordDst, ptr[regAux4]); // abs(x)
         if (dim == coord::w) {
             mov(regAux4, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
@@ -768,8 +757,63 @@ void jitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
     uni_vaddps(vCoordDst, vCoordDst, kAux);
 }
 
+template <>
+void jitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const Vmm* vAuxPool, const uint8_t idx) {
+    if (idx == 0) {
+        uni_vmovups(vCoef, vDDim);
+        vfnmadd132ps(vCoef, vOnesF, v2val);
+        uni_vfmadd231ps(vCoef, vDDim, vDDim);
+        uni_vmulps(vCoef, vCoef, vDDim);
+        uni_vmulps(vCoef, vCoef, vBicubConst);
+    } else if (idx == 1) {
+        uni_vmovups(vCoef, vDDim);
+        vfmsub132ps(vCoef, vBicub3Const, vBicub2Const);
+        uni_vmulps(vCoef, vCoef, vDDim);
+        uni_vfmadd132ps(vCoef, vOnesF, vDDim);
+    } else if (idx == 2) {
+        uni_vmulps(vCoef, vDDim, vDDim);
+        vfmadd132ps(vCoef, vBicubConst, vBicub2Const);
+        vfmsub231ps(vCoef, vDDim, v2Bicub3Const);
+        uni_vmulps(vCoef, vCoef, vDDim);
+    } else if (idx == 3) {
+        uni_vmulps(vCoef, vBicubConst, vDDim);
+        uni_vmulps(vCoef, vCoef, vDDim);
+        vfnmadd132ps(vCoef, vCoef, vDDim);
+    }
+}
+
+template <>
+void jitGridSampleKernel<x64::sse41>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const Vmm* vAuxPool, const uint8_t idx) {
+    const auto& vAux = vAuxPool[0];
+    if (idx == 0) {
+        static const float values2[4] = { 2.f, 2.f, 2.f, 2.f };
+        mov(regAux1, reinterpret_cast<uintptr_t>(values2));
+//        mov(regAux4, ptr[regParams + GET_OFF(wDenormCoefF)]);
+//        uni_vmovups(vAux, ptr[regAux4]);
+        uni_vmovups(vCoef, vDDim);
+        vfnmadd132ps(vCoef, vOnesF, v2val);
+        uni_vfmadd231ps(vCoef, vDDim, vDDim);
+        uni_vmulps(vCoef, vCoef, vDDim);
+        uni_vmulps(vCoef, vCoef, vBicubConst);
+    } else if (idx == 1) {
+        uni_vmovups(vCoef, vDDim);
+        vfmsub132ps(vCoef, vBicub3Const, vBicub2Const);
+        uni_vmulps(vCoef, vCoef, vDDim);
+        uni_vfmadd132ps(vCoef, vOnesF, vDDim);
+    } else if (idx == 2) {
+        uni_vmulps(vCoef, vDDim, vDDim);
+        vfmadd132ps(vCoef, vBicubConst, vBicub2Const);
+        vfmsub231ps(vCoef, vDDim, v2Bicub3Const);
+        uni_vmulps(vCoef, vCoef, vDDim);
+    } else if (idx == 3) {
+        uni_vmulps(vCoef, vBicubConst, vDDim);
+        uni_vmulps(vCoef, vCoef, vDDim);
+        vfnmadd132ps(vCoef, vCoef, vDDim);
+    }
+}
+
 template <x64::cpu_isa_t isa>
-void jitGridSampleKernel<isa>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
+void jitGridSampleKernel<isa>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const Vmm* vAuxPool, const uint8_t idx) {
     if (idx == 0) {
         uni_vmovups(vCoef, vDDim);
         vfnmadd132ps(vCoef, vOnesF, v2val);
@@ -857,14 +901,16 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
     const auto& vAux      = vAuxPool[0];
     const auto& kMask     = vAuxPool[1];
 
+//storeVectorPart(regDst, regWorkAmount, vWCoord, 4);
+//uni_vmovups(ptr[regDst], vWCoord);
     uni_vroundps(vWCoord, vWCoord, 0x0); // Round near
     uni_vroundps(vHCoord, vHCoord, 0x0); // Round near
-//uni_vmovups(ptr[regDst], vWCoord);
+//uni_vmovups(ptr[regDst], vHCoord);
 
     bool useMask = tail, zeroMask = false;
     if (jcp.paddingMode == PaddingMode::ZEROS) {
         zerosPadding(vWCoord, vHCoord, kMask, vAux);
-        useMask = true;
+        useMask  = true;
         zeroMask = true;
     } else if (jcp.paddingMode == PaddingMode::BORDER) {
         borderPadding(vWCoord, vWCoord, kMask, coord::w);
@@ -874,7 +920,7 @@ void jitGridSampleKernel<isa>::nearestInterpolation(const Vmm* vAuxPool, const V
         reflectionPadding(vHCoord, vHCoord, vAux, kMask, coord::h);
     }
 
-//uni_vmovups(ptr[regDst], vWCoord);
+//uni_vmovups(ptr[regDst], kMask);
     hwShiftPs2dq(vSrcShift, vHCoord, vWCoord, vSrcWidthF);
 
 //Xbyak::Ymm ymmMask = Xbyak::Ymm(kMask.getIdx());
@@ -1214,7 +1260,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
     uni_vsubps(vWLeft, vWLeft, vOnesF);
 
     for (int i = 0; i < 4; i++) {
-        bicubicCoefficients((&vCX0)[i], vDX, i);
+        bicubicCoefficients((&vCX0)[i], vDX, &vAux, i);
     }
 
     if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -1307,7 +1353,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm* vAux
                 uni_vaddps(vHCoord, vHCoord, vOnesF);
             }
 
-            bicubicCoefficients(vAux, vDY, h);
+            bicubicCoefficients(vAux, vDY, &vAux, h);
             uni_vfmadd231ps(vYDotProd, vXDotProd, vAux);
         }
 
@@ -1358,10 +1404,10 @@ void jitGridSampleKernel<isa>::bicubicInterpolation(const Vmm* vAuxPool, const V
     uni_vsubps(vWLeft, vWLeft, vOnesF);
     uni_vsubps(vHTop, vHTop, vOnesF);
 
-    bicubicCoefficients(vCX0, vDX, 0); // TODO: for
-    bicubicCoefficients(vCX1, vDX, 1);
-    bicubicCoefficients(vCX2, vDX, 2);
-    bicubicCoefficients(vCX3, vDX, 3);
+    bicubicCoefficients(vCX0, vDX, &vAux, 0); // TODO: for
+    bicubicCoefficients(vCX1, vDX, &vAux, 1);
+    bicubicCoefficients(vCX2, vDX, &vAux, 2);
+    bicubicCoefficients(vCX3, vDX, &vAux, 3);
 
     if (jcp.paddingMode == PaddingMode::ZEROS) {
         hwShiftPs2dq(vSrcShift0, vHTop, vWLeft, vSrcWidthF);
@@ -1493,7 +1539,7 @@ void jitGridSampleKernel<isa>::bicubicInterpolation(const Vmm* vAuxPool, const V
                 }
             }
 
-            bicubicCoefficients(vAux, vDY, i);
+            bicubicCoefficients(vAux, vDY, &vAux, i);
             uni_vfmadd231ps(vYDotProd, vXDotProd, vAux);
         }
 
@@ -1519,10 +1565,10 @@ void jitGridSampleKernel<isa>::tail(const Vmm* vAuxPool) {
 
     auto& vHCoord = vAuxPool[0];
     auto& vWCoord = vAuxPool[1];
-    auto& vAux0   = vAuxPool[2];
+    auto& vAux    = vAuxPool[2];
 
     getTailCoordinates(vHCoord, vWCoord, &vAuxPool[2]);
-    denormalizeRawCoordinates(vWCoord, vHCoord, vAux0);
+    denormalizeRawCoordinates(vWCoord, vHCoord, vAux);
     interpolation(&vAuxPool[2], vWCoord, vHCoord, true);
 
     if (dataTypeSize > 1)
@@ -1547,6 +1593,8 @@ void jitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
 
     if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vmulps for YMM
         if (dataTypeSize > 1) {
+            const float val = dataTypeSize;
+            static const float dataTypeSizeArr[8] = {val, val, val, val, val, val, val, val};
             mov(regAux1, reinterpret_cast<uintptr_t>(dataTypeSizeArr));
             uni_vmulps(vDst, vDst, ptr[regAux1]);
         }
