@@ -100,6 +100,41 @@ void uni_vpgatherdd(const Xbyak::Zmm& vDst, const Xbyak::Address& srcAddr, const
     vpgatherdd(vDst | kMask, srcAddr);
 }
 
+//void uni_vpgatherdd(const Xbyak::Ymm&   vDst,
+//                    const Xbyak::Reg64& rSrc,
+//                    const Xbyak::Ymm&   vShift,
+//                    const Xbyak::Reg64& rAux) {
+//    const uint8_t typeSize = 4;
+//    const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
+//    Xbyak::Label lLoopEnd0, lLoopEnd1;
+////    mov(rAux, rLoadNum);
+//    Xbyak::Xmm xmmDst(vDst.getIdx());
+////    uni_vpxor(vDst, vDst, vDst);
+//    for (uint8_t i = 0; i < elPerVec / 2; i++) {
+////        cmp(rAux, 0);
+////        je(lLoopEnd0, T_NEAR);
+//
+//        uni_vpinsrd(xmmDst, xmmDst, ptr[rSrc + i * typeSize], i);
+//
+////        dec(rAux);
+//    }
+//    // vperm2f128(01);
+//    xmmDst = Xbyak::Xmm(vAux.getIdx());
+//    uni_vpxor(xmmDst, xmmDst, xmmDst);
+//    for (uint8_t i = 0; i < elPerVec / 2; i++) {
+//        cmp(rAux, 0);
+//        je(lLoopEnd1, T_NEAR);
+//
+//        uni_vpinsrd(xmmDst, xmmDst, ptr[rSrc + i * typeSize], i);
+//
+//        dec(rAux);
+//    }
+//    L(lLoopEnd1);
+//    vinsertf128(vDst, vDst, xmmDst, 1);
+//    L(lLoopEnd0);
+//    // vperm2f128(10);
+//}
+
 void uni_vpermd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vMask, const Xbyak::Operand& src) {
     if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
         vpermd(vDst, vMask, src);
