@@ -772,19 +772,27 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef
 template <>
 void jitGridSampleKernel<x64::sse41>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const Vmm* vAuxPool, const uint8_t idx) {
     const auto& vAux = vAuxPool[0];
+    static const float const_0_75[4] = { 0.75f, 0.75f, 0.75f, 0.75f };
+    static const float const_1_25[4] = { 1.25f, 1.25f, 1.25f, 1.25f };
+    static const float const_2_00[4] = { 2.f, 2.f, 2.f, 2.f };
+    static const float const_2_25[4] = { 2.25f, 2.25f, 2.25f, 2.25f };
     if (idx == 0) {
-        static const float values2[4] = { 2.f, 2.f, 2.f, 2.f };
-        mov(regAux1, reinterpret_cast<uintptr_t>(values2));
-//        mov(regAux4, ptr[regParams + GET_OFF(wDenormCoefF)]);
-//        uni_vmovups(vAux, ptr[regAux4]);
+        uni_vmovups(vAux, vDDim);
+        mov(regAux1, reinterpret_cast<uintptr_t>(const_2_00));
+        uni_vmulps(vAux, vAux, ptr[regAux1]);
+        uni_vsubps(vAux, vAux, vOnesF);
         uni_vmovups(vCoef, vDDim);
-        vfnmadd132ps(vCoef, vOnesF, v2val);
-        uni_vfmadd231ps(vCoef, vDDim, vDDim);
+        uni_vmulps(vCoef, vCoef, vCoef);
+        uni_vsubps(vCoef, vCoef, vAux);
         uni_vmulps(vCoef, vCoef, vDDim);
-        uni_vmulps(vCoef, vCoef, vBicubConst);
+        mov(regAux1, reinterpret_cast<uintptr_t>(const_0_75));
+        uni_vmulps(vCoef, vCoef, ptr[regAux1]);
     } else if (idx == 1) {
         uni_vmovups(vCoef, vDDim);
-        vfmsub132ps(vCoef, vBicub3Const, vBicub2Const);
+        mov(regAux1, reinterpret_cast<uintptr_t>(const_1_25));
+        uni_vmulps(vCoef, vCoef, ptr[regAux1]);
+        mov(regAux1, reinterpret_cast<uintptr_t>(const_2_25));
+        uni_vsubps(vCoef, vCoef, ptr[regAux1]);
         uni_vmulps(vCoef, vCoef, vDDim);
         uni_vfmadd132ps(vCoef, vOnesF, vDDim);
     } else if (idx == 2) {
