@@ -171,6 +171,7 @@ void GridSample::prepareParams() {
     parallel_nt(nthr, [&](const int ithr, const int nthr) {
         const uint64_t dstStart = std::min(wpt * ithr, totalWork);
         const uint64_t dstEnd = std::min(wpt * (ithr + 1), totalWork);
+printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - dstStart);
 
         auto& p = execParamsPerThread[ithr];
 
@@ -192,14 +193,14 @@ void GridSample::prepareParams() {
         } else {
             p.srcWidthB = srcDataShape[3] * dataTypeSize;
         }
-        if (x64::mayiuse(x64::avx)) {
+        if (x64::mayiuse(x64::avx512_core)) {
             p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
             p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
             p.srcHeightMul2F[0] = p.srcHeightF * 2.f;
             p.srcWidthMul2F[0]  = p.srcWidthF  * 2.f;
             if (alignCorners) {
-                p.srcHeightMul2Sub1F[0] = p.srcHeightSub1F[0] * 2.f;
-                p.srcWidthMul2Sub1F[0]  = p.srcWidthSub1F[0]  * 2.f;
+                p.srcHeightMul2Sub1F[0] = p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f;
+                p.srcWidthMul2Sub1F[0]  = p.srcWidthF == 1.f ? 1.f : p.srcWidthSub1F[0] * 2.f;
                 p.wDenormCoefF[0] = (p.srcWidthF  - 1.f) / 2.f;
                 p.hDenormCoefF[0] = (p.srcHeightF - 1.f) / 2.f;
             } else {
@@ -212,8 +213,8 @@ void GridSample::prepareParams() {
             p.srcHeightMul2F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF * 2.f);
             p.srcWidthMul2F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  * 2.f);
             if (alignCorners) {
-                p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightSub1F[0] * 2.f);
-                p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthSub1F[0]  * 2.f);
+                p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f);
+                p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF == 1.f ? 1.f : p.srcWidthSub1F[0]  * 2.f);
                 p.wDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcWidthF  - 1.f) / 2.f);
                 p.hDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcHeightF - 1.f) / 2.f);
             } else {

@@ -184,7 +184,7 @@ protected:
     void tail(const Vmm* vAuxPool);
 
     // Aux
-    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
+    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth, const Xbyak::Reg64& rAux);
 
 //    static float dataTypeSizeArr[isa == dnnl::impl::cpu::x64::avx ? 8 : 1];
 };

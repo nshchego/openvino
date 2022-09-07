@@ -29,8 +29,8 @@ public:
     struct threadExecParams {
         uint64_t batchNum    = 1lu;
         uint64_t channelsNum = 1lu;
-        float srcWidthF;
-        float srcHeightF;
+        float srcWidthF  = 1.f;
+        float srcHeightF = 1.f;
         uint64_t srcWidthB  = 1lu;
         uint64_t gridStartB = 0lu;
         uint64_t dstStartB  = 0lu;

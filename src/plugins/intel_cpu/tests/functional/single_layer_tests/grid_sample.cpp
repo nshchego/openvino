@@ -214,7 +214,7 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
         }
     }; // SSE42
 
-    if (InferenceEngine::with_cpu_x86_avx2()) {
+    if (InferenceEngine::with_cpu_x86_avx2() || InferenceEngine::with_cpu_x86_avx()) {
         std::vector<std::vector<InputShape>> tmp = {
             { { {}, { {1, 7, 5, 3} } },   // Static shapes
               { {}, { {1, 1, 11, 2} } }
