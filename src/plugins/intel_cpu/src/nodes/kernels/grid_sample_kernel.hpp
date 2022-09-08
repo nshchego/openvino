@@ -7,6 +7,7 @@
 
 #include "kernel_utils.hpp"
 #include "ie_precision.hpp"
+#include <set>
 
 namespace ov {
 namespace intel_cpu {
@@ -97,13 +98,13 @@ public:
     void create_ker() override;
     void generate() override;
 
-protected:
     using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Zmm,
                                                          isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
                                                                                                    Xbyak::Ymm>::type;
     using Vmask = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Opmask,
                                                            isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
                                                                                                      Xbyak::Ymm>::type;
+private:
     uint8_t dataTypeShift = 0;
 
     // Suffix "B" means "In Bytes", "F" - float.
@@ -131,6 +132,21 @@ protected:
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
     const Xbyak::Opmask& kTailMask = k7;
+
+    // Vectors pool
+    static const size_t vecNum = isa == dnnl::impl::cpu::x64::avx512_core ? 32 : isa == dnnl::impl::cpu::x64::sse41 ? 8 : 16;
+    static const Vmm vPool[vecNum];
+    std::set<int> vecSet;
+
+    int srcHeightFIdx = -1;
+    int srcWidthFIdx = -1;
+    int zerosIdx = -1;
+    int onesFIdx = -1;
+    int wDenormCoefFIdx = -1;
+    int hDenormCoefFIdx = -1;
+    int halfFIdx = -1;
+    int gridPermMaskIdx = -1;
+
     // Auxiliary pool
     const Vmm vAuxContainer[14] =
             { /*SSE*/  Vmm(0),  Vmm(1),  Vmm(2),  Vmm(3),
@@ -185,8 +201,29 @@ protected:
 
     // Aux
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth, const Xbyak::Reg64& rAux);
-
-//    static float dataTypeSizeArr[isa == dnnl::impl::cpu::x64::avx ? 8 : 1];
+    int getVecIdx() {
+        if (vecSet.empty())
+            return -1;
+        return *vecSet.erase(vecSet.end());
+    };
+    int getVecIdx(int& idx) {
+        if (vecSet.empty()) {
+            idx = -1;
+        } else {
+            idx = *vecSet.erase(vecSet.begin());
+        }
+        return idx;
+    };
+//    void releaseVecIdx(int& idx) {
+//        if (idx >= 0 && idx < vecNum) {
+//            vecSet.insert(idx);
+//            idx = -1;
+//        }
+//    };
+    void releaseVecIdx(int idx) {
+        if (idx >= 0 && idx < vecNum)
+            vecSet.insert(idx);
+    };
 };
 
 }   // namespace intel_cpu
