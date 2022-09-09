@@ -398,10 +398,8 @@ void jitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
         jle(lEnd, T_NEAR);
 
         if (i % 2 == 0)
-//            uni_vpinsrd(xmmWCoord, xmmWCoord, ptr[regGrid], i / 2);
             pinsrd(xmmWCoord, ptr[regGrid], i / 2);
         else
-//            uni_vpinsrd(xmmHCoord, xmmHCoord, ptr[regGrid], i / 2);
             pinsrd(xmmHCoord, ptr[regGrid], i / 2);
 
         add(regGrid, gridTypeSize);
@@ -417,10 +415,8 @@ void jitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
         jle(lLoop2End, T_NEAR);
 
         if (i % 2 == 0)
-//            uni_vpinsrd(xmmWCoord, xmmWCoord, ptr[regGrid], i / 2);
             pinsrd(xmmWCoord, ptr[regGrid], i / 2);
         else
-//            uni_vpinsrd(xmmHCoord, xmmHCoord, ptr[regGrid], i / 2);
             pinsrd(xmmHCoord, ptr[regGrid], i / 2);
 
         add(regGrid, gridTypeSize);
@@ -1170,6 +1166,159 @@ void jitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
         jmp(lChannelLoopBegin, T_NEAR);
         L(lChannelLoopEnd);
     }
+}
+
+template <>
+void jitGridSampleKernel<x64::avx>::bilinearInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+    auto vDX     = vmmRef();
+    auto vDY     = vmmRef();
+    auto vQ0     = vmmRef();
+    auto vQ1     = vmmRef();
+    const auto &shift00 = vWCoord;
+    const auto &shift01 = vHCoord;
+    auto shift10 = vmmRef();
+    auto shift11 = vmmRef();
+    auto vAux3   = vmmRef();
+    const auto &kMask00  = k1;
+    const auto &kMask01  = k2;
+    const auto &kMask10  = k3;
+    const auto &kMask11  = k4;
+    const auto &kAuxMask = k5;
+
+    uni_vmovups(vDX, vWCoord);
+    uni_vmovups(vDY, vHCoord);
+    uni_vroundps(vWCoord, vWCoord, 0x1); // Round floor
+    uni_vroundps(vHCoord, vHCoord, 0x1); // Round floor
+    uni_vsubps(vDX, vDX, vWCoord);
+    uni_vsubps(vDY, vDY, vHCoord);
+
+    uni_vaddps(shift10, vWCoord, vPool[onesFIdx]);
+    uni_vaddps(shift11, vHCoord, vPool[onesFIdx]);
+    if (jcp.paddingMode == PaddingMode::ZEROS) {
+//        zerosPadding(kMask00, vHCoord, vWCoord); // (y; x)
+//        zerosPadding(kMask01, vHCoord, shift10); // (y; x + 1)
+//        zerosPadding(kMask11, shift11, shift10); // (y + 1; x + 1)
+//        zerosPadding(kMask10, shift11, vWCoord); // (y + 1; x)
+
+        hwShiftPs2dq(shift00, vHCoord, vWCoord, vPool[srcWidthFIdx], regAux1);
+        uni_vpaddd(shift01, shift00, vPool[dataTypeSizeIdx]);
+        uni_vpaddd(shift10, shift00, vPool[srcWidthBIdx]); // shift11??
+        uni_vpaddd(shift11, shift10, vPool[dataTypeSizeIdx]); // sub??
+    } else if (jcp.paddingMode == PaddingMode::BORDER) {
+        borderPadding(vWCoord, vWCoord, coord::w);
+        borderPadding(vHCoord, vHCoord, coord::h);
+        borderPadding(shift10, shift10, coord::w);
+        borderPadding(shift11, shift11, coord::h);
+    } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
+//        reflectionPadding(vWCoord, vWCoord, vQ0, kAuxMask, coord::w);
+//        reflectionPadding(vHCoord, vHCoord, vQ0, kAuxMask, coord::h);
+//        reflectionPadding(shift10, shift10, vQ0, kAuxMask, coord::w);
+//        reflectionPadding(shift11, shift11, vQ0, kAuxMask, coord::h);
+    }
+//    if (jcp.paddingMode == PaddingMode::BORDER || jcp.paddingMode == PaddingMode::REFLECTION) {
+//        uni_vmovups(vAux3, shift11);
+//        // W * y + x
+//        uni_vfmadd132ps(vAux3, vWCoord, vPool[srcWidthFIdx]);   // (y + 1; x)
+//        uni_vfmadd231ps(vWCoord, vHCoord, vPool[srcWidthFIdx]); // (y; x)
+//        uni_vfmadd132ps(vHCoord, shift10, vPool[srcWidthFIdx]); // (y; x + 1)
+//        uni_vfmadd132ps(shift11, shift10, vPool[srcWidthFIdx]); // (y + 1; x + 1)
+//        uni_vcvtps2dq(shift00, vWCoord);
+//        uni_vcvtps2dq(shift01, vHCoord);
+//        uni_vcvtps2dq(shift10, vAux3);
+//        uni_vcvtps2dq(shift11, shift11);
+//        if (dataTypeSize > 1) {
+//            uni_vpslld(shift00, shift00, dataTypeShift);
+//            uni_vpslld(shift01, shift01, dataTypeShift);
+//            uni_vpslld(shift10, shift10, dataTypeShift);
+//            uni_vpslld(shift11, shift11, dataTypeShift);
+//        }
+//    }
+//
+//    // PER CHANNEL LOOP
+//    Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
+//    const Xbyak::Reg64 &rChannel = regAux1;
+//    const Xbyak::Reg64 &rSrcTmp  = regAux2;
+//    const Xbyak::Reg64 &rDstTmp  = regAux3;
+//    mov(rChannel, 0);
+//    mov(rSrcTmp, regSrc);
+//    mov(rDstTmp, regDst);
+//    L(lChannelLoopBegin);
+//    {
+//        cmp(rChannel, regChannelsNum);
+//        jge(lChannelLoopEnd, T_NEAR);
+//
+//        // (y; x)
+//        if (jcp.paddingMode == PaddingMode::ZEROS) {
+//            kmovw(kAuxMask, kMask00);
+//            uni_vpxor(vQ0, vQ0, vQ0);
+//        } else {
+//            kxnorw(kAuxMask, kAuxMask, kAuxMask);
+//        }
+//        uni_vpgatherdd(vQ0, ptr[rSrcTmp + shift00], kAuxMask); // v00 -> vQ0
+//        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//            uni_vcvtdq2ps(vQ0, vQ0);
+//        }
+//        uni_vfmsub213ps(vQ0, vDX, vQ0); // q0 = -(v00 - dx * v00)
+//
+//        // (y; x + 1)
+//        if (jcp.paddingMode == PaddingMode::ZEROS) {
+//            kmovw(kAuxMask, kMask01);
+//            uni_vpxor(vAux3, vAux3, vAux3);
+//        } else {
+//            kxnorw(kAuxMask, kAuxMask, kAuxMask);
+//        }
+//        uni_vpgatherdd(vAux3, ptr[rSrcTmp + shift01], kAuxMask);
+//        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//            uni_vcvtdq2ps(vAux3, vAux3);
+//        }
+//        uni_vfmsub231ps(vQ0, vAux3, vDX); // q0 = -q0 + dx * v01
+//
+//        // (y + 1; x + 1)
+//        if (jcp.paddingMode == PaddingMode::ZEROS) {
+//            kmovw(kAuxMask, kMask11);
+//            uni_vpxor(vAux3, vAux3, vAux3);
+//        } else {
+//            kxnorw(kAuxMask, kAuxMask, kAuxMask);
+//        }
+//        uni_vpgatherdd(vAux3, ptr[rSrcTmp + (Vmm)shift11], kAuxMask);
+//        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//            uni_vcvtdq2ps(vAux3, vAux3);
+//        }
+//
+//        // (y + 1; x)
+//        if (jcp.paddingMode == PaddingMode::ZEROS) {
+//            kmovw(kAuxMask, kMask10);
+//            uni_vpxor(vQ1, vQ1, vQ1);
+//        } else {
+//            kxnorw(kAuxMask, kAuxMask, kAuxMask);
+//        }
+//        uni_vpgatherdd(vQ1, ptr[rSrcTmp + (Vmm)shift10], kAuxMask);
+//        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//            uni_vcvtdq2ps(vQ1, vQ1);
+//        }
+//
+//        uni_vfmsub213ps(vQ1, vDX, vQ1); // q1 = -(v10 - dx * v10)
+//        uni_vfmsub231ps(vQ1, vAux3, vDX); // q1 = -q1 + dx * v11
+//        // Res = q0 + dy * (q1 - q0)
+//        uni_vsubps(vQ1, vQ1, vQ0);
+//        uni_vfmadd132ps(vQ1, vQ0, vDY);
+//
+//        if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+//            uni_vcvtps2dq(vQ1, vQ1);
+//        }
+//
+//        if (tail) {
+//            uni_vmovups(ptr[rDstTmp] | kTailMask, vQ1);
+//        } else {
+//            uni_vmovups(ptr[rDstTmp], vQ1);
+//        }
+//        add(rSrcTmp, regSrcChannelStepB);
+//        add(rDstTmp, regDstChannelStepB);
+//        add(rChannel, 1);
+//
+//        jmp(lChannelLoopBegin, T_NEAR);
+//        L(lChannelLoopEnd);
+//    }
 }
 
 template <x64::cpu_isa_t isa>

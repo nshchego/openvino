@@ -24,10 +24,6 @@ struct jGridSampleConfParams {
     InferenceEngine::Precision gridPrc;
     uint64_t batchNum = 0lu;
     uint64_t srcBatchStepB = 0lu;
-    uint64_t gridBatchStepB = 0lu;
-    uint64_t dstBatchStepB = 0lu;
-    float wDenormCoef = 1.f;
-    float hDenormCoef = 1.f;
 };
 
 struct jGridSamplesExecArgs {
@@ -127,7 +123,6 @@ private:
 
     // 32b registers
     Xbyak::Reg32 reg32Aux1 = Xbyak::Reg32(regAux1.getIdx());
-    Xbyak::Reg32 reg32Aux4 = Xbyak::Reg32(regAux4.getIdx());
 
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
