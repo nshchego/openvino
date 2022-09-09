@@ -135,91 +135,67 @@ private:
 
     // Vectors pool
     static const size_t vecNum = isa == dnnl::impl::cpu::x64::avx512_core ? 32 : isa == dnnl::impl::cpu::x64::sse41 ? 8 : 16;
-    static const Vmm vPool[vecNum];
+    std::vector<Vmm> vPool;
     std::set<int> vecSet;
 
-    int srcHeightFIdx = -1;
-    int srcWidthFIdx = -1;
-    int zerosIdx = -1;
-    int onesFIdx = -1;
-    int wDenormCoefFIdx = -1;
-    int hDenormCoefFIdx = -1;
-    int halfFIdx = -1;
-    int gridPermMaskIdx = -1;
+    int srcHeightFIdx         = -1;
+    int srcWidthFIdx          = -1;
+    int zerosIdx              = -1;
+    int halfFIdx              = -1;
+    int onesFIdx              = -1;
+    int wDenormCoefFIdx       = -1;
+    int hDenormCoefFIdx       = -1;
+    int gridPermMaskIdx       = -1;
+    int dataTypeSizeIdx       = -1; // for ZEROS padding
+    int srcWidthBIdx          = -1; // for ZEROS padding
 
-    // Auxiliary pool
-    const Vmm vAuxContainer[14] =
-            { /*SSE*/  Vmm(0),  Vmm(1),  Vmm(2),  Vmm(3),
-              /*AVX*/  Vmm(8),  Vmm(9),  Vmm(10), Vmm(11),
-              /*AVX5*/ Vmm(16), Vmm(17), Vmm(18), Vmm(19), Vmm(20), Vmm(21) };
-    // Common.
-    Vmm vZeros        = Vmm(4);
-    Vmm vOnesF        = Vmm(5);
-    Vmm vSrcWidthF    = Vmm(6);
-    Vmm vSrcHeightF   = Vmm(7);
-    // >= AVX
-    Vmm vWDenormCoefF = Vmm(12); // for ALIGN CORNERS
-    Vmm vHDenormCoefF = Vmm(13); // for ALIGN CORNERS
-    Vmm vPermGridMask = Vmm(14);
-    Vmm& vHalfF = vWDenormCoefF;
+    int srcHeightSub1FIdx     = -1; // for BORDER padding
+    int srcWidthSub1FIdx      = -1; // for BORDER padding
 
-    // AVX512
-    Vmm vSrcWidthSub1F       = Vmm(22);          // for BORDER padding
-    Vmm vSrcHeightSub1F      = Vmm(23);          // for BORDER padding
+    int srcHeightMul2FIdx     = -1; // for REFLECTION padding
+    int srcWidthMul2FIdx      = -1; // for REFLECTION padding
+    int srcHeightMul2Sub1FIdx = -1; // for REFLECTION padding
+    int srcWidthMul2Sub1FIdx  = -1; // for REFLECTION padding
+    int absMaskIdx            = -1; // for REFLECTION padding
 
-    Vmm& vSrcWidthMul2F      = vSrcWidthSub1F;   // for REFLECTION padding
-    Vmm& vSrcHeightMul2F     = vSrcHeightSub1F;  // for REFLECTION padding
-    Vmm vSrcWidthMul2Sub1F   = Vmm(24);          // for REFLECTION padding
-    Vmm vSrcHeightMul2Sub1F  = Vmm(25);          // for REFLECTION padding
-    Vmm vAbsMask             = Vmm(26);          // for REFLECTION padding
-
-    Vmm& vDataTypeSize       = vSrcWidthSub1F;   // for ZEROS padding
-    Vmm& vSrcWidthB          = vSrcHeightSub1F;  // for ZEROS padding
-
-    Vmm vBicubConst          = Vmm(27);          // for BICUBIC interpolation
-    Vmm vBicub2Const         = Vmm(28);          // for BICUBIC interpolation
-    Vmm vBicub3Const         = Vmm(29);          // for BICUBIC interpolation
-    Vmm v2val                = Vmm(30);          // for BICUBIC interpolation
-    Vmm v2Bicub3Const        = Vmm(31);          // for BICUBIC interpolation
+    int const_0_75_idx        = -1; // for BICUBIC interpolation
+    int const_1_25_idx        = -1; // for BICUBIC interpolation
+    int const_1_50_idx        = -1; // for BICUBIC interpolation
+    int const_2_00_idx        = -1; // for BICUBIC interpolation
+    int const_2_25_idx        = -1; // for BICUBIC interpolation
 
     void process();
-    void spatialLoop(const Vmm* vAuxPool);
-    void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vAux0);
-    void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord, const Vmm* vAuxPool);
-    void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord, const Vmm& vAux);
-    void interpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
-    void bilinearInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
-    void bicubicInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
-    void nearestInterpolation(const Vmm* vAuxPool, const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
-    void zerosPadding(const Vmm& vWCoord, const Vmm& vHCoord, const Vmask& kDst, const Vmask& kAux);
-    void zerosPadding0(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
-    void zerosPadding1(const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kDst, const Vmask& kAux);
-    void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmask& kAux, const coord dim);
+    void spatialLoop();
+    void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
+    void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
+    void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
+    void interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
+    void bilinearInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
+    void bicubicInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
+    void nearestInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
+    void zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord);
+    void zerosPadding0(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
+    void zerosPadding1(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
+    void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
     void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const coord dim);
-    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const Vmm* vAuxPool, const uint8_t idx);
-    void tail(const Vmm* vAuxPool);
+    void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
+    void tail();
 
     // Aux
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth, const Xbyak::Reg64& rAux);
+
     int getVecIdx() {
-        if (vecSet.empty())
-            return -1;
-        return *vecSet.erase(vecSet.end());
-    };
-    int getVecIdx(int& idx) {
-        if (vecSet.empty()) {
-            idx = -1;
-        } else {
-            idx = *vecSet.erase(vecSet.begin());
+        int idx = -1;
+        if (!vecSet.empty()) {
+            idx = *vecSet.begin();
+            vecSet.erase(vecSet.begin());
         }
         return idx;
     };
-//    void releaseVecIdx(int& idx) {
-//        if (idx >= 0 && idx < vecNum) {
-//            vecSet.insert(idx);
-//            idx = -1;
-//        }
-//    };
+    int getVecIdx(int& idx) {
+        idx = getVecIdx();
+        return idx;
+    };
     void releaseVecIdx(int idx) {
         if (idx >= 0 && idx < vecNum)
             vecSet.insert(idx);
