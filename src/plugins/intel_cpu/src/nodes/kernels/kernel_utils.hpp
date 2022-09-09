@@ -571,7 +571,7 @@ public:
     }
 
 protected:
-    size_t vecNum = 8;
+    size_t vecNum = 8; // Set in derived class.
     std::set<int> vecSet;
 };
 
