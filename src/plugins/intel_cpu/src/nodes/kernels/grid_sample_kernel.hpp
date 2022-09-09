@@ -185,11 +185,11 @@ private:
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth, const Xbyak::Reg64& rAux);
 
     int getVecIdx() {
-        int idx = -1;
-        if (!vecSet.empty()) {
-            idx = *vecSet.begin();
-            vecSet.erase(vecSet.begin());
+        if (vecSet.empty()) {
+            IE_THROW() << "There is no available vector register.";
         }
+        int idx = *vecSet.begin();
+        vecSet.erase(vecSet.begin());
         return idx;
     };
     int getVecIdx(int& idx) {
@@ -197,9 +197,35 @@ private:
         return idx;
     };
     void releaseVecIdx(int idx) {
-        if (idx >= 0 && idx < vecNum)
-            vecSet.insert(idx);
+        if (idx < 0 && idx >= vecNum) {
+            IE_THROW() << "Invalid vector register index: " << idx << ".";
+        }
+        if (vecSet.count(idx)) {
+            IE_THROW() << "Vector with index " << idx << " was already released.";
+        }
+        vecSet.insert(idx);
     };
+    class vRef {
+        jitGridSampleKernel* ker;
+        Vmm& ref;
+    public:
+        vRef(jitGridSampleKernel* ker, Vmm& ref) : ker(ker), ref(ref) {}
+        ~vRef() {
+            ker->releaseVecIdx(ref.getIdx());
+        }
+        operator Vmm() {
+            return ref;
+        }
+        int getIdx() {
+            return ref.getIdx();
+        }
+    };
+    vRef vmmRef(int idx) {
+        return vRef(this, vPool[idx]);
+    }
+    vRef vmmRef() {
+        return vRef(this, vPool[getVecIdx()]);
+    }
 };
 
 }   // namespace intel_cpu
