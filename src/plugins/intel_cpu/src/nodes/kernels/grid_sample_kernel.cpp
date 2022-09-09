@@ -3,7 +3,6 @@
 //
 
 #include "grid_sample_kernel.hpp"
-#include <ie_common.h>
 #include "utils/general_utils.h"
 
 using namespace dnnl::impl::cpu;
@@ -12,6 +11,8 @@ namespace ov {
 namespace intel_cpu {
 
 #define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
+#define vmmRef(idx) vRefWrap<Vmm>(this, vPool[idx])
+#define vmmRef() vRefWrap<Vmm>(this, vPool[getVecIdx()])
 
 template <x64::cpu_isa_t isa>
 jitGridSampleKernel<isa>::jitGridSampleKernel(const jGridSampleConfParams& jcp) :
@@ -26,6 +27,7 @@ jitGridSampleKernel<isa>::jitGridSampleKernel(const jGridSampleConfParams& jcp) 
     else if (dataTypeSize == 4)
         dataTypeShift = 2;
     vPool.reserve(vecNum);
+    vecNum = isa == dnnl::impl::cpu::x64::avx512_core ? 32 : isa == dnnl::impl::cpu::x64::sse41 ? 8 : 16;
     for (int i = 0; i < vecNum; i++) {
         vPool.push_back(Vmm(i));
         vecSet.insert(i);
