@@ -11,7 +11,6 @@ namespace ov {
 namespace intel_cpu {
 
 #define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
-#define vmmRef(idx) vRefWrap<Vmm>(this, vPool[idx])
 #define vmmRef() vRefWrap<Vmm>(this, vPool[getVecIdx()])
 
 template <x64::cpu_isa_t isa>
@@ -26,8 +25,8 @@ jitGridSampleKernel<isa>::jitGridSampleKernel(const jGridSampleConfParams& jcp) 
         dataTypeShift = 1;
     else if (dataTypeSize == 4)
         dataTypeShift = 2;
-    vPool.reserve(vecNum);
     vecNum = isa == dnnl::impl::cpu::x64::avx512_core ? 32 : isa == dnnl::impl::cpu::x64::sse41 ? 8 : 16;
+    vPool.reserve(vecNum);
     for (int i = 0; i < vecNum; i++) {
         vPool.push_back(Vmm(i));
         vecSet.insert(i);
@@ -228,6 +227,7 @@ void jitGridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, c
 template <>
 void jitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     auto vAux = vmmRef();
+
     uni_vpermd(vWCoord, vPool[gridPermMaskIdx], ptr[regGrid]); // Permute to XXXX.YYYY
     Xbyak::Xmm xmmH = Xbyak::Xmm(vHCoord.getIdx());
     vextracti128(xmmH, vWCoord, 1);
@@ -591,7 +591,7 @@ void jitGridSampleKernel<x64::sse41>::borderPadding(const Vmm& vCoordDst, const 
     } else if (dim == coord::h) {
         mov(regAux4, ptr[regParams + GET_OFF(srcHeightSub1F)]);
     }
-    auto vAux = vmmRef(getVecIdx());
+    auto vAux = vmmRef();
 
     uni_vmovups(vAux, vCoordOrigin);
     uni_vcmpps(vAux, vAux, ptr[regAux4], 0x2); // vCoord < vUpperBound
@@ -1284,10 +1284,6 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
     auto& vYDotProd  = vDX;
     auto vSrcShift0  = vmmRef();
     auto vSrcShift   = vmmRef();
-    auto vCX0        = vmmRef();
-    auto vCX1        = vmmRef();
-    auto vCX2        = vmmRef();
-    auto vCX3        = vmmRef();
     auto vAux        = vmmRef();
     const auto& kMask0   = masksContainer[1];
     const auto& kMask1   = masksContainer[2];
@@ -1303,8 +1299,9 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
     uni_vsubps(vHTop, vHTop, vPool[onesFIdx]);
     uni_vsubps(vWLeft, vWLeft, vPool[onesFIdx]);
 
+    vRefWrap<Vmm> vCX[4] = { vmmRef(), vmmRef(), vmmRef(), vmmRef() };
     for (int i = 0; i < 4; i++) {
-        bicubicCoefficients((&vCX0)[i], vDX, i);
+        bicubicCoefficients(vCX[i], vDX, i);
     }
 
     if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -1363,7 +1360,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
             if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                 uni_vcvtdq2ps(vAux, vAux);
             }
-            uni_vmulps(vXDotProd, vAux, vCX0);
+            uni_vmulps(vXDotProd, vAux, vCX[0]);
 
             // (y - 1 + h; x)
             // (y - 1 + h; x + 1)
@@ -1390,7 +1387,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
                 if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                     uni_vcvtdq2ps(vAux, vAux);
                 }
-                uni_vfmadd231ps(vXDotProd, vAux, (&vCX0)[w]);
+                uni_vfmadd231ps(vXDotProd, vAux, vCX[w]);
             }
 
             if (h != 3) {
