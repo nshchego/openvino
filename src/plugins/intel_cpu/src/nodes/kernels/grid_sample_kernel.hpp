@@ -134,9 +134,7 @@ private:
     const Xbyak::Opmask& kTailMask = k7;
 
     // Vectors pool
-    static const size_t vecNum = isa == dnnl::impl::cpu::x64::avx512_core ? 32 : isa == dnnl::impl::cpu::x64::sse41 ? 8 : 16;
     std::vector<Vmm> vPool;
-    std::set<int> vecSet;
 
     int srcHeightFIdx         = -1;
     int srcWidthFIdx          = -1;
@@ -183,49 +181,6 @@ private:
 
     // Aux
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth, const Xbyak::Reg64& rAux);
-
-    int getVecIdx() {
-        if (vecSet.empty()) {
-            IE_THROW() << "There is no available vector register.";
-        }
-        int idx = *vecSet.begin();
-        vecSet.erase(vecSet.begin());
-        return idx;
-    };
-    int getVecIdx(int& idx) {
-        idx = getVecIdx();
-        return idx;
-    };
-    void releaseVecIdx(int idx) {
-        if (idx < 0 && idx >= vecNum) {
-            IE_THROW() << "Invalid vector register index: " << idx << ".";
-        }
-        if (vecSet.count(idx)) {
-            IE_THROW() << "Vector with index " << idx << " was already released.";
-        }
-        vecSet.insert(idx);
-    };
-    class vRef {
-        jitGridSampleKernel* ker;
-        Vmm& ref;
-    public:
-        vRef(jitGridSampleKernel* ker, Vmm& ref) : ker(ker), ref(ref) {}
-        ~vRef() {
-            ker->releaseVecIdx(ref.getIdx());
-        }
-        operator Vmm() {
-            return ref;
-        }
-        int getIdx() {
-            return ref.getIdx();
-        }
-    };
-    vRef vmmRef(int idx) {
-        return vRef(this, vPool[idx]);
-    }
-    vRef vmmRef() {
-        return vRef(this, vPool[getVecIdx()]);
-    }
 };
 
 }   // namespace intel_cpu
