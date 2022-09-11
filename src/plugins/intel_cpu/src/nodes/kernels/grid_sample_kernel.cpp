@@ -1068,22 +1068,12 @@ void jitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
         reflectionPadding(shift11, shift11, kAuxMask, coord::h);
     }
     if (jcp.paddingMode == PaddingMode::BORDER || jcp.paddingMode == PaddingMode::REFLECTION) {
-        uni_vmovups(vAux3, shift11);
         // W * y + x
-        uni_vfmadd132ps(vAux3, vWCoord, vPool[srcWidthFIdx]);   // (y + 1; x)
-        uni_vfmadd231ps(vWCoord, vHCoord, vPool[srcWidthFIdx]); // (y; x)
-        uni_vfmadd132ps(vHCoord, shift10, vPool[srcWidthFIdx]); // (y; x + 1)
-        uni_vfmadd132ps(shift11, shift10, vPool[srcWidthFIdx]); // (y + 1; x + 1)
-        uni_vcvtps2dq(shift00, vWCoord);
-        uni_vcvtps2dq(shift01, vHCoord);
-        uni_vcvtps2dq(shift10, vAux3);
-        uni_vcvtps2dq(shift11, shift11);
-        if (dataTypeSize > 1) {
-            uni_vpslld(shift00, shift00, dataTypeShift);
-            uni_vpslld(shift01, shift01, dataTypeShift);
-            uni_vpslld(shift10, shift10, dataTypeShift);
-            uni_vpslld(shift11, shift11, dataTypeShift);
-        }
+        hwShiftPs2dq(vAux3, shift11, vWCoord, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(vWCoord, vHCoord, vWCoord, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(vHCoord, vHCoord, shift10, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(shift11, shift11, shift10, vPool[srcWidthFIdx]);
+        uni_vmovups(shift10, vAux3);
     }
 
     auto vQ0 = vmmRef();
@@ -1816,7 +1806,7 @@ void jitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
         }
         uni_vcvtps2dq(vDst, vDst);
     } else {
-        uni_vcvtps2dq(vDst, vWCoord);
+        uni_vcvtps2dq(vDst, vDst);
         if (dataTypeSize > 1)
             uni_vpslld(vDst, vDst, dataTypeShift); // multiply by source data type size.
     }
