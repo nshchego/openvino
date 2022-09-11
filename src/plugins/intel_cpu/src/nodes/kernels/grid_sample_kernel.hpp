@@ -104,24 +104,29 @@ private:
 
     // Suffix "B" means "In Bytes", "F" - float.
     // 64b registers
-    const Xbyak::Reg64& regSrc             = r8;
-    const Xbyak::Reg64& regDst             = r9;
-    const Xbyak::Reg64& regGrid            = r10;
-    const Xbyak::Reg64& regBatch           = r11;
-    const Xbyak::Reg64& regChannelsNum     = r12;
-    const Xbyak::Reg64& regWorkAmount      = r13;
-    const Xbyak::Reg64& regSrcChannelStepB = r14;
-    const Xbyak::Reg64& regDstChannelStepB = r15;
-    const Xbyak::Reg64& regAux1            = rsi;
-    const Xbyak::Reg64& regAux2            = rbx;
-    const Xbyak::Reg64& regAux3            = rdx;
-    const Xbyak::Reg64& regAux4 = regChannelsNum;
-    const Xbyak::Reg64& regAux5            = rbp;
+//    const Xbyak::Reg64& regSrc             = r8;
+//    const Xbyak::Reg64& regDst             = r9;
+//    const Xbyak::Reg64& regGrid            = r10;
+//    const Xbyak::Reg64& regBatch           = r11;
+//    const Xbyak::Reg64& regChannelsNum     = r12;
+//    const Xbyak::Reg64& regWorkAmount      = r13;
+//    const Xbyak::Reg64& regSrcChannelStepB = r14;
+//    const Xbyak::Reg64& regDstChannelStepB = r15;
+//    const Xbyak::Reg64& regAux1            = rsi;
+//    const Xbyak::Reg64& regAux2            = rbx;
+//    const Xbyak::Reg64& regAux3            = rdx;
+//    const Xbyak::Reg64& regAux4 = regChannelsNum;
+//    const Xbyak::Reg64& regAux5            = rbp;
+    int rSrcIdx             = -1;
+    int rGridIdx            = -1;
+    int rDstIdx             = -1;
+    int rBatchIdx           = -1;
+    int rChannelNumIdx      = -1;
+    int rWorkAmountIdx      = -1;
+    int rSrcChannelStepBIdx = -1;
+    int rDstChannelStepBIdx = -1;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
-
-    // 32b registers
-    Xbyak::Reg32 reg32Aux1 = Xbyak::Reg32(regAux1.getIdx());
 
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
@@ -172,7 +177,7 @@ private:
     void tail();
 
     // Aux
-    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth, const Xbyak::Reg64& rAux);
+    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
 };
 
 }   // namespace intel_cpu
