@@ -15,6 +15,8 @@ namespace intel_cpu {
 template <typename Vmm>
 class vRefWrap;
 
+#define r64Ref() rRefWrap<Xbyak::Reg64>(this, r64Pool[getRegIdx()])
+
 class jitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 protected:
 
@@ -120,7 +122,6 @@ protected:
                         const Xbyak::Reg64& rSrcPtr,
                         const Xbyak::Xmm&   vSrcShift,
                         const Xbyak::Xmm&   vReadMask,
-                        const Xbyak::Reg64& rAux,
                         const bool useMask  = true,
                         const bool zeroFill = false) {
         if (vDst.getIdx()== vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
@@ -133,6 +134,7 @@ protected:
                 uni_vpxor(vDst, vDst, vDst);
             vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
         } else {
+            auto rAux = r64Ref();
             Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
             const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / sizeof(int);
 
@@ -152,7 +154,7 @@ protected:
                     }
                 }
                 uni_vpextrd(r32Aux, vSrcShift, i);
-                pinsrd(vDst, ptr[rSrcPtr + rAux], i);
+                pinsrd(vDst, ptr[rSrcPtr + (Xbyak::Reg64)rAux], i);
 
                 if (useMask)
                     L(lLoopNext);
@@ -164,7 +166,6 @@ protected:
                         const Xbyak::Reg64& rSrcPtr,
                         const Xbyak::Ymm&   vSrcShift,
                         const Xbyak::Ymm&   vReadMask,
-                        const Xbyak::Reg64& rAux,
                         const bool useMask  = true,
                         const bool zeroFill = false) {
         if (vDst.getIdx()== vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
@@ -181,7 +182,7 @@ protected:
                        xmmSrcShft  = Xbyak::Xmm(vSrcShift.getIdx()),
                        xmmReadMask = Xbyak::Xmm(vReadMask.getIdx());
             for (uint8_t i = 0; i < 2; i++) {
-                uni_vpgatherdd(xmmDst, rSrcPtr, xmmSrcShft, xmmReadMask, rAux, useMask, zeroFill);
+                uni_vpgatherdd(xmmDst, rSrcPtr, xmmSrcShft, xmmReadMask, useMask, zeroFill);
 
                 vperm2f128(vDst, vDst, vDst, 0x1);
                 vperm2f128(vSrcShift, vSrcShift, vSrcShift, 0x1);
@@ -261,9 +262,9 @@ protected:
 
     void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
                           const Xbyak::Zmm& zAux,
-                          const Xbyak::Reg64& rWorkRest,
-                          const Xbyak::Reg64& rAux0,
-                          const Xbyak::Reg64& rAux1) {
+                          const Xbyak::Reg64& rWorkRest) {
+        auto rAux0 = r64Ref();
+        auto rAux1 = r64Ref();
         Xbyak::Label lKmov;
         Xbyak::Reg32 rOnes(rAux1.getIdx());
         const uint32_t typeSize = 4;
@@ -284,10 +285,9 @@ protected:
 
     void loadEl2vec32(const Xbyak::Xmm&   xmmDst,
                       const Xbyak::Reg64& rSrc,
-    //                   const Xbyak::Xmm& vAux,
                       const Xbyak::Reg64& rLoadNum,
-                      const Xbyak::Reg64& rAux,
                       const bool zeroFilling = false) {
+        auto rAux = r64Ref();
         const int typeSize = 4;
         const int elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
         Xbyak::Label lLoopEnd;
@@ -310,8 +310,8 @@ protected:
     void loadEl2vec32(const Xbyak::Ymm&   vDst,
                       const Xbyak::Reg64& rSrc,
                       const Xbyak::Ymm&   vAux,
-                      const Xbyak::Reg64& rLoadNum,
-                      const Xbyak::Reg64& rAux) {
+                      const Xbyak::Reg64& rLoadNum) {
+        auto rAux = r64Ref();
         const uint8_t typeSize = 4;
         const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
         Xbyak::Label lLoopEnd0, lLoopEnd1;
@@ -400,10 +400,10 @@ protected:
                    const Xbyak::Xmm&     xmmReadMask,
                    const Xbyak::Xmm&     xmmSrcShift,
                    const Xbyak::Reg64&   rToStoreCounter,
-                   const Xbyak::Reg64&   rAux,
                    const bool useMask  = false,
                    const bool zeroMask = false) {
         Xbyak::Label lEnd;
+        auto rAux = r64Ref();
         Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
         const uint8_t typeSize = 4;
 
@@ -420,9 +420,9 @@ protected:
             uni_vpextrd(r32Aux, xmmSrcShift, i);
             if (opDst.isXMM()) {
                 Xbyak::Xmm xmmDst = Xbyak::Xmm(opDst.getIdx());
-                pinsrd(xmmDst, ptr[opSrc.getReg() + rAux], i << 4);
+                pinsrd(xmmDst, ptr[opSrc.getReg() + (Xbyak::Reg64)rAux], i << 4);
             } else if (opDst.isREG()) {
-                mov(r32Aux, ptr[opSrc.getReg() + rAux]);
+                mov(r32Aux, ptr[opSrc.getReg() + (Xbyak::Reg64)rAux]);
                 mov(ptr[opDst.getReg() + i * typeSize], r32Aux);
             }
             jmp(lLoopNext, T_NEAR);
@@ -449,7 +449,6 @@ protected:
                    const Xbyak::Ymm&     vReadMask,
                    const Xbyak::Ymm&     vSrcShift,
                    const Xbyak::Reg64&   rToStoreCounter,
-                   const Xbyak::Reg64&   rAux,
                    const bool useMask  = false,
                    const bool zeroMask = false) {
         Xbyak::Label lEnd;
@@ -472,7 +471,7 @@ protected:
             Xbyak::Xmm xmmReadMask  = Xbyak::Xmm(vReadMask.getIdx()),
                        xmmSrcShft   = Xbyak::Xmm(vSrcShift.getIdx());
             for (uint8_t i = 0; i < 2; i++) {
-                maskMov32(opDst, opSrc, xmmReadMask, xmmSrcShft, rToStoreCounter, rAux, useMask, zeroMask);
+                maskMov32(opDst, opSrc, xmmReadMask, xmmSrcShft, rToStoreCounter, useMask, zeroMask);
 
                 if (i == 0) {
                     cmp(rToStoreCounter, 0);
@@ -622,13 +621,13 @@ protected:
         if (regSet.empty()) {
             IE_THROW() << "There is no available x64 register.";
         }
-        int idx = *(regSet.end()--);
-        regSet.erase(regSet.end()--);
+        int idx = *regSet.rbegin();
+        regSet.erase(*regSet.rbegin());
         return idx;
     }
 
     int getRegIdx(int& idx) {
-        idx = getVecIdx();
+        idx = getRegIdx();
         return idx;
     }
 
@@ -651,14 +650,31 @@ protected:
                                                       {r12.getIdx(), r12}, {r13.getIdx(), r13}, {r14.getIdx(), r14}, {r15.getIdx(), r15} };
     std::set<int> regSet;
 
-    template <typename RegType>
+    template <typename Vmm>
     class vRefWrap {
+        jitKernelBase* ker;
+        Vmm& ref;
+    public:
+        vRefWrap(jitKernelBase* ker, Vmm& ref) : ker(ker), ref(ref) {}
+        ~vRefWrap() {
+            ker->releaseVecIdx(ref.getIdx());
+        }
+        operator Vmm() {
+            return ref;
+        }
+        int getIdx() {
+            return ref.getIdx();
+        }
+    };
+
+    template <typename RegType>
+    class rRefWrap {
         jitKernelBase* ker;
         RegType& ref;
     public:
-        vRefWrap(jitKernelBase* ker, RegType& ref) : ker(ker), ref(ref) {}
-        ~vRefWrap() {
-            ker->releaseVecIdx(ref.getIdx());
+        rRefWrap(jitKernelBase* ker, RegType& ref) : ker(ker), ref(ref) {}
+        ~rRefWrap() {
+            ker->releaseRegIdx(ref.getIdx());
         }
         operator RegType() {
             return ref;
@@ -668,8 +684,6 @@ protected:
         }
     };
 };
-
-#define r64Ref() vRefWrap<Xbyak::Reg64>(this, r64Pool[getRegIdx()])
 
 }
 }
