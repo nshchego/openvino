@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-
 #pragma once
 
 #include "kernel_utils.hpp"
@@ -127,8 +126,6 @@ private:
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
     const Xbyak::Opmask& kTailMask = k7;
-
-    // Vectors pool
     std::vector<Vmm> vPool;
 
     int srcHeightFIdx         = -1;
@@ -170,7 +167,7 @@ private:
     void zerosPadding0(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
     void zerosPadding1(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
     void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
-    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmm& vAux, const Vmask& kAux, const coord dim);
+    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmask& kAux, const coord dim);
     void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
     void tail();
 

@@ -18,6 +18,15 @@ class vRefWrap;
 class jitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 protected:
 
+    jitKernelBase() {
+        for (int i = 0; i < vecNum; i++) {
+            vecSet.insert(i);
+        }
+        for (auto el : r64Pool) {
+            regSet.insert(el.first);
+        }
+    }
+
     inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {
         return is_subset(isa, dnnl::impl::cpu::x64::isa_all) && dnnl::impl::cpu::x64::mayiuse(isa);
     }
@@ -101,43 +110,86 @@ protected:
     }
 
     void uni_vpgatherdd(const Xbyak::Zmm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Opmask& kMask) {
+        if (kMask.getIdx() == 0) {
+            IE_THROW() << "The vpgatherdd instruction cannot use the register k0 as mask.";
+        }
         vpgatherdd(vDst | kMask, srcAddr);
     }
 
-    //void uni_vpgatherdd(const Xbyak::Ymm&   vDst,
-    //                    const Xbyak::Reg64& rSrc,
-    //                    const Xbyak::Ymm&   vShift,
-    //                    const Xbyak::Reg64& rAux) {
-    //    const uint8_t typeSize = 4;
-    //    const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
-    //    Xbyak::Label lLoopEnd0, lLoopEnd1;
-    ////    mov(rAux, rLoadNum);
-    //    Xbyak::Xmm xmmDst(vDst.getIdx());
-    ////    uni_vpxor(vDst, vDst, vDst);
-    //    for (uint8_t i = 0; i < elPerVec / 2; i++) {
-    ////        cmp(rAux, 0);
-    ////        je(lLoopEnd0, T_NEAR);
-    //
-    //        uni_vpinsrd(xmmDst, xmmDst, ptr[rSrc + i * typeSize], i);
-    //
-    ////        dec(rAux);
-    //    }
-    //    // vperm2f128(01);
-    //    xmmDst = Xbyak::Xmm(vAux.getIdx());
-    //    uni_vpxor(xmmDst, xmmDst, xmmDst);
-    //    for (uint8_t i = 0; i < elPerVec / 2; i++) {
-    //        cmp(rAux, 0);
-    //        je(lLoopEnd1, T_NEAR);
-    //
-    //        uni_vpinsrd(xmmDst, xmmDst, ptr[rSrc + i * typeSize], i);
-    //
-    //        dec(rAux);
-    //    }
-    //    L(lLoopEnd1);
-    //    vinsertf128(vDst, vDst, xmmDst, 1);
-    //    L(lLoopEnd0);
-    //    // vperm2f128(10);
-    //}
+    void uni_vpgatherdd(const Xbyak::Xmm&   vDst,
+                        const Xbyak::Reg64& rSrcPtr,
+                        const Xbyak::Xmm&   vSrcShift,
+                        const Xbyak::Xmm&   vReadMask,
+                        const Xbyak::Reg64& rAux,
+                        const bool useMask  = true,
+                        const bool zeroFill = false) {
+        if (vDst.getIdx()== vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
+            IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
+        }
+        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            if (!useMask)
+                uni_vcmpps(vReadMask, vReadMask, vReadMask, 0x0);
+            if (zeroFill)
+                uni_vpxor(vDst, vDst, vDst);
+            vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
+        } else {
+            Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
+            const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / sizeof(int);
+
+            for (uint8_t i = 0; i < elPerVec; i++) {
+                Xbyak::Label lLoopNext;
+                if (useMask) {
+                    uni_vpextrd(r32Aux, vReadMask, i);
+                    cmp(r32Aux, 0);
+                    if (zeroFill) {
+                        Xbyak::Label lNonZero;
+                        jne(lNonZero, T_NEAR);
+                        pinsrd(vDst, r32Aux, i); // Don't use vpinsrd. It zeros the rest of the YMM, ZMM registers.
+                        jmp(lLoopNext, T_NEAR);
+                        L(lNonZero);
+                    } else {
+                        je(lLoopNext, T_NEAR);
+                    }
+                }
+                uni_vpextrd(r32Aux, vSrcShift, i);
+                pinsrd(vDst, ptr[rSrcPtr + rAux], i);
+
+                if (useMask)
+                    L(lLoopNext);
+            }
+        }
+    }
+
+    void uni_vpgatherdd(const Xbyak::Ymm&   vDst,
+                        const Xbyak::Reg64& rSrcPtr,
+                        const Xbyak::Ymm&   vSrcShift,
+                        const Xbyak::Ymm&   vReadMask,
+                        const Xbyak::Reg64& rAux,
+                        const bool useMask  = true,
+                        const bool zeroFill = false) {
+        if (vDst.getIdx()== vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
+            IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
+        }
+        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            if (!useMask)
+                uni_vcmpps(vReadMask, vReadMask, vReadMask, 0x0);
+            if (zeroFill)
+                uni_vpxor(vDst, vDst, vDst);
+            vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
+        } else {
+            Xbyak::Xmm xmmDst      = Xbyak::Xmm(vDst.getIdx()),
+                       xmmSrcShft  = Xbyak::Xmm(vSrcShift.getIdx()),
+                       xmmReadMask = Xbyak::Xmm(vReadMask.getIdx());
+            for (uint8_t i = 0; i < 2; i++) {
+                uni_vpgatherdd(xmmDst, rSrcPtr, xmmSrcShft, xmmReadMask, rAux, useMask, zeroFill);
+
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                vperm2f128(vSrcShift, vSrcShift, vSrcShift, 0x1);
+                if (useMask)
+                    vperm2f128(vReadMask, vReadMask, vReadMask, 0x1);
+            }
+        }
+    }
 
     void uni_vpermd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vMask, const Xbyak::Operand& src) {
         if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
@@ -347,7 +399,6 @@ protected:
                    const Xbyak::Operand& opSrc,
                    const Xbyak::Xmm&     xmmReadMask,
                    const Xbyak::Xmm&     xmmSrcShift,
-                   const Xbyak::Xmm&     xmmAux,
                    const Xbyak::Reg64&   rToStoreCounter,
                    const Xbyak::Reg64&   rAux,
                    const bool useMask  = false,
@@ -397,7 +448,6 @@ protected:
                    const Xbyak::Operand& opSrc,
                    const Xbyak::Ymm&     vReadMask,
                    const Xbyak::Ymm&     vSrcShift,
-                   const Xbyak::Ymm&     vAux,
                    const Xbyak::Reg64&   rToStoreCounter,
                    const Xbyak::Reg64&   rAux,
                    const bool useMask  = false,
@@ -420,10 +470,9 @@ protected:
     //        }
         } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
             Xbyak::Xmm xmmReadMask  = Xbyak::Xmm(vReadMask.getIdx()),
-                       xmmSrcShft   = Xbyak::Xmm(vSrcShift.getIdx()),
-                       xmmAux       = Xbyak::Xmm(vAux.getIdx());
+                       xmmSrcShft   = Xbyak::Xmm(vSrcShift.getIdx());
             for (uint8_t i = 0; i < 2; i++) {
-                maskMov32(opDst, opSrc, xmmReadMask, xmmSrcShft, xmmAux, rToStoreCounter, rAux, useMask, zeroMask);
+                maskMov32(opDst, opSrc, xmmReadMask, xmmSrcShft, rToStoreCounter, rAux, useMask, zeroMask);
 
                 if (i == 0) {
                     cmp(rToStoreCounter, 0);
@@ -545,7 +594,6 @@ protected:
         }
     }
 
-public:
     int getVecIdx() {
         if (vecSet.empty()) {
             IE_THROW() << "There is no available vector register.";
@@ -570,27 +618,58 @@ public:
         vecSet.insert(idx);
     }
 
-protected:
-    size_t vecNum = 8; // Set in derived class.
+    int getRegIdx() {
+        if (regSet.empty()) {
+            IE_THROW() << "There is no available x64 register.";
+        }
+        int idx = *(regSet.end()--);
+        regSet.erase(regSet.end()--);
+        return idx;
+    }
+
+    int getRegIdx(int& idx) {
+        idx = getVecIdx();
+        return idx;
+    }
+
+    void releaseRegIdx(int idx) {
+        if (r64Pool.find(idx) == r64Pool.end()) {
+            IE_THROW() << "Invalid x64 register index: " << idx << ".";
+        }
+        if (regSet.count(idx)) {
+            IE_THROW() << "Register with index " << idx << " was already released.";
+        }
+        regSet.insert(idx);
+    }
+
+    const size_t vecNum = isValidIsa(dnnl::impl::cpu::x64::avx512_core) ? 32 :
+                          isValidIsa(dnnl::impl::cpu::x64::avx2) || isValidIsa(dnnl::impl::cpu::x64::avx) ? 16 : 8;
     std::set<int> vecSet;
+
+    std::unordered_map<int, Xbyak::Reg64> r64Pool = { {rdx.getIdx(), rdx}, {rbx.getIdx(), rbx}, {rbp.getIdx(), rbp}, {rsi.getIdx(), rsi},
+                                                      {r8.getIdx(), r8},   {r9.getIdx(), r9},   {r10.getIdx(), r10}, {r11.getIdx(), r11},
+                                                      {r12.getIdx(), r12}, {r13.getIdx(), r13}, {r14.getIdx(), r14}, {r15.getIdx(), r15} };
+    std::set<int> regSet;
+
+    template <typename RegType>
+    class vRefWrap {
+        jitKernelBase* ker;
+        RegType& ref;
+    public:
+        vRefWrap(jitKernelBase* ker, RegType& ref) : ker(ker), ref(ref) {}
+        ~vRefWrap() {
+            ker->releaseVecIdx(ref.getIdx());
+        }
+        operator RegType() {
+            return ref;
+        }
+        int getIdx() {
+            return ref.getIdx();
+        }
+    };
 };
 
-template <typename Vmm>
-class vRefWrap {
-    jitKernelBase* ker;
-    Vmm& ref;
-public:
-    vRefWrap(jitKernelBase* ker, Vmm& ref) : ker(ker), ref(ref) {}
-    ~vRefWrap() {
-        ker->releaseVecIdx(ref.getIdx());
-    }
-    operator Vmm() {
-        return ref;
-    }
-    int getIdx() {
-        return ref.getIdx();
-    }
-};
+#define r64Ref() vRefWrap<Xbyak::Reg64>(this, r64Pool[getRegIdx()])
 
 }
 }
