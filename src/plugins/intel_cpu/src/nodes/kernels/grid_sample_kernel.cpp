@@ -344,7 +344,6 @@ void jitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     Xbyak::Label lRest, lGridShift, lEnd;
 
     auto vAux  = vmmRef();
-    auto vAux1 = vmmRef();
     auto rAux  = r64Ref();
     Xbyak::Xmm xmmH(vHCoord.getIdx());
 
@@ -361,7 +360,7 @@ void jitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
         cmp(rAux, 0);
         jle(lEnd, T_NEAR);
 
-        loadEl2vec32(vAux, r64Pool[rGridIdx], vAux1, rAux);
+        loadEl2vec32(vAux, r64Pool[rGridIdx], rAux);
         vpermilps(vAux, vAux, 0xD8);
         Xbyak::Xmm xmmAux(vAux.getIdx());
         vinsertf128(vWCoord, vWCoord, xmmAux, 1); // Extract X component
@@ -372,7 +371,7 @@ void jitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     }
     L(lRest);
     {
-        loadEl2vec32(vWCoord, r64Pool[rGridIdx], vAux1, rAux);
+        loadEl2vec32(vWCoord, r64Pool[rGridIdx], rAux);
         uni_vpermd(vWCoord, vPool[gridPermMaskIdx], vWCoord); // Permute to XXXX.YYYY
         vextractf128(xmmH, vWCoord, 1); // Extract Y component
     }
