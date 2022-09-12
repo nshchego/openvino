@@ -267,24 +267,24 @@ protected:
         kmovw(kDstMask, rOnes);
     }
 
-    void loadEl2vec32(const Xbyak::Xmm&   xmmDst,
+    void loadEl2vec32(const Xbyak::Xmm&   vDst,
                       const Xbyak::Reg64& rSrc,
                       const Xbyak::Reg64& rLoadNum,
                       const bool zeroFilling = false) {
         auto rAux = r64Ref();
-        const int typeSize = 4;
+        const int typeSize = sizeof(int);
         const int elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
         Xbyak::Label lLoopEnd;
         if (rLoadNum.getIdx() != rAux.getIdx())
             mov(rAux, rLoadNum);
         if (zeroFilling)
-            uni_vpxor(xmmDst, xmmDst, xmmDst);
+            uni_vpxor(vDst, vDst, vDst);
 
         for (int i = 0; i < elPerVec; i++) {
             cmp(rAux, 0);
             jle(lLoopEnd, T_NEAR);
 
-            uni_vpinsrd(xmmDst, xmmDst, ptr[rSrc + i * typeSize], i);
+            pinsrd(vDst, ptr[rSrc + i * typeSize], i);
 
             dec(rAux);
         }
@@ -293,38 +293,40 @@ protected:
 
     void loadEl2vec32(const Xbyak::Ymm&   vDst,
                       const Xbyak::Reg64& rSrc,
-                      const Xbyak::Ymm&   vAux,
-                      const Xbyak::Reg64& rLoadNum) {
+                      const Xbyak::Reg64& rLoadNum,
+                      const bool zeroFilling = false) {
         auto rAux = r64Ref();
-        const uint8_t typeSize = 4;
+        const uint8_t typeSize = sizeof(int);
         const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
         Xbyak::Label lLoopEnd0, lLoopEnd1;
-        mov(rAux, rLoadNum);
-        Xbyak::Xmm xmmAux(vDst.getIdx());
-    //    uni_vpxor(vDst, vDst, vDst);
+        if (rLoadNum.getIdx() != rAux.getIdx())
+            mov(rAux, rLoadNum);
+        if (zeroFilling)
+            uni_vpxor(vDst, vDst, vDst);
+        Xbyak::Xmm xmmDst(vDst.getIdx());
+
         for (uint8_t i = 0; i < elPerVec / 2; i++) {
             cmp(rAux, 0);
             je(lLoopEnd0, T_NEAR);
 
-            uni_vpinsrd(xmmAux, xmmAux, ptr[rSrc + i * typeSize], i);
+            pinsrd(xmmDst, ptr[rSrc + i * typeSize], i);
 
             dec(rAux);
         }
-        // vperm2f128(01);
-        xmmAux = Xbyak::Xmm(vAux.getIdx());
-        uni_vpxor(xmmAux, xmmAux, xmmAux);
+
+        vperm2f128(vDst, vDst, vDst, 0x1);
         for (uint8_t i = 0; i < elPerVec / 2; i++) {
             cmp(rAux, 0);
             je(lLoopEnd1, T_NEAR);
 
-            uni_vpinsrd(xmmAux, xmmAux, ptr[rSrc + i * typeSize], i);
+            pinsrd(xmmDst, ptr[rSrc + i * typeSize], i);
 
             dec(rAux);
         }
+
         L(lLoopEnd1);
-        vinsertf128(vDst, vDst, xmmAux, 1);
+        vperm2f128(vDst, vDst, vDst, 0x1);
         L(lLoopEnd0);
-        // vperm2f128(10);
     }
 
     void storeVectorPart(const Xbyak::Reg64& rDst,
