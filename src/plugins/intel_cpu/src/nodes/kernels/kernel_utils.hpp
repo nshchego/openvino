@@ -86,7 +86,7 @@ protected:
     }
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
-        kmovq(kDst, kSrc);
+        kmovd(kDst, kSrc);
     }
 
     void uni_kmovd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc) {

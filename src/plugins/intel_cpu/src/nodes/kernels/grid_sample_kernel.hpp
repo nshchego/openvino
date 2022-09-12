@@ -16,12 +16,12 @@ enum class PaddingMode { ZEROS, BORDER, REFLECTION };
 
 struct jGridSampleConfParams {
     bool dynamicShapes = false;
-    bool alignCorners = false;
+    bool alignCorners  = false;
     InterpolationMode interpolationMode = InterpolationMode::BILINEAR;
     PaddingMode paddingMode = PaddingMode::ZEROS;
     InferenceEngine::Precision inDataPrc;
     InferenceEngine::Precision gridPrc;
-    uint64_t batchNum = 0lu;
+    uint64_t batchNum      = 0lu;
     uint64_t srcBatchStepB = 0lu;
 };
 
@@ -29,7 +29,7 @@ struct jGridSamplesExecArgs {
     const void* src;
     const void* grid;
     void* dst;
-    uint64_t batchNum = 1lu;
+    uint64_t batchNum    = 1lu;
     uint64_t channelsNum = 1lu;
     const float* srcWidthF;
     const float* srcHeightF;
@@ -76,11 +76,11 @@ public:
 
 protected:
     jGridSampleConfParams jcp;
+    uint64_t vlen         = 16lu;
     uint64_t dataTypeSize = 1lu;
     uint64_t gridTypeSize = 1lu;
-    uint64_t vlen = 0lu;
-    uint64_t dataElPerVec = 0lu;
-    uint64_t gridElPerVec = 0lu;
+    uint64_t dataElPerVec = 1lu;
+    uint64_t gridElPerVec = 1lu;
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
@@ -93,9 +93,9 @@ public:
     void create_ker() override;
     void generate() override;
 
-    using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Zmm,
-                                                         isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
-                                                                                                   Xbyak::Ymm>::type;
+    using Vmm   = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Zmm,
+                                                           isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
+                                                                                                     Xbyak::Ymm>::type;
     using Vmask = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Opmask,
                                                            isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
                                                                                                      Xbyak::Ymm>::type;
@@ -103,20 +103,7 @@ private:
     uint8_t dataTypeShift = 0;
 
     // Suffix "B" means "In Bytes", "F" - float.
-    // 64b registers
-//    const Xbyak::Reg64& regSrc             = r8;
-//    const Xbyak::Reg64& regDst             = r9;
-//    const Xbyak::Reg64& regGrid            = r10;
-//    const Xbyak::Reg64& regBatch           = r11;
-//    const Xbyak::Reg64& regChannelsNum     = r12;
-//    const Xbyak::Reg64& regWorkAmount      = r13;
-//    const Xbyak::Reg64& regSrcChannelStepB = r14;
-//    const Xbyak::Reg64& regDstChannelStepB = r15;
-//    const Xbyak::Reg64& regAux1            = rsi;
-//    const Xbyak::Reg64& regAux2            = rbx;
-//    const Xbyak::Reg64& regAux3            = rdx;
-//    const Xbyak::Reg64& regAux4 = regChannelsNum;
-//    const Xbyak::Reg64& regAux5            = rbp;
+    // 64b register indices.
     int rSrcIdx             = -1;
     int rGridIdx            = -1;
     int rDstIdx             = -1;
@@ -133,6 +120,7 @@ private:
     const Xbyak::Opmask& kTailMask = k7;
     std::vector<Vmm> vPool;
 
+    // Vector register indices.
     int srcHeightFIdx         = -1;
     int srcWidthFIdx          = -1;
     int zerosIdx              = -1;
