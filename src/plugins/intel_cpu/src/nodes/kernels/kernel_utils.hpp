@@ -107,15 +107,21 @@ protected:
         }
     }
 
-    void uni_vpgatherdd(const Xbyak::Xmm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Xmm& vMask) {
-        vpgatherdd(vDst, srcAddr, vMask);
-    }
-
-    void uni_vpgatherdd(const Xbyak::Zmm& vDst, const Xbyak::Address& srcAddr, const Xbyak::Opmask& kMask) {
-        if (kMask.getIdx() == 0) {
+    void uni_vpgatherdd(const Xbyak::Xmm&    vDst,
+                        const Xbyak::Reg64&  rSrcPtr,
+                        const Xbyak::Xmm&    vSrcShift,
+                        const Xbyak::Opmask& kReadMask,
+                        const bool useMask   = true,
+                        const bool zeroFill  = false) {
+        if (kReadMask.getIdx() == 0) {
             IE_THROW() << "The vpgatherdd instruction cannot use the register k0 as mask.";
         }
-        vpgatherdd(vDst | kMask, srcAddr);
+        if (!useMask)
+            kxnorw(kReadMask, kReadMask, kReadMask);
+        if (zeroFill)
+            uni_vpxor(vDst, vDst, vDst);
+
+        vpgatherdd(vDst | kReadMask, ptr[rSrcPtr + vSrcShift]);
     }
 
     void uni_vpgatherdd(const Xbyak::Xmm&   vDst,
@@ -132,6 +138,7 @@ protected:
                 uni_vcmpps(vReadMask, vReadMask, vReadMask, 0x0);
             if (zeroFill)
                 uni_vpxor(vDst, vDst, vDst);
+
             vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
         } else {
             auto rAux = r64Ref();
@@ -204,16 +211,6 @@ protected:
         vpermd(vDst, vMask, src);
     }
 
-    //void uni_vpinsrd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Operand& vSrc2, const int imm) {
-    //    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
-    //        vpinsrd(vDst, vSrc1, vSrc2, imm);
-    //    } else {
-    //        if (vSrc1.getIdx() != vSrc2.getIdx()) movdqa(vSrc1, vSrc2);
-    //        pinsrd(vDst, vSrc2, imm);
-    //    }
-    //}
-
-
     void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
         if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
             vpbroadcastd(x, op);
@@ -246,19 +243,6 @@ protected:
             }
         }
     }
-
-    //void uni_vpsrld(
-    //        const Xbyak::Ymm &vDst, const Xbyak::Operand &opSrc, const int imm) {
-    //    if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
-    //        Xbyak::Xmm xmmSrcShift = Xbyak::Xmm(vDst.getIdx());
-    //        uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
-    //        vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
-    //        uni_vpslld(xmmSrcShift, xmmSrcShift, dataTypeShift);
-    //        vperm2f128(ymmSrcShift, ymmSrcShift, ymmSrcShift, 0x1);
-    //    } else {
-    //        vpsrld(vDst, opSrc, imm);
-    //    }
-    //}
 
     void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
                           const Xbyak::Zmm& zAux,
@@ -550,15 +534,16 @@ protected:
                    const bool useMask  = false,
                    const bool zeroMask = false) {
         if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            Xbyak::Reg64 rSrc(opSrc.getIdx());
             if (opDst.isYMM()) {
                 Xbyak::Ymm vDst = Xbyak::Ymm(opDst.getIdx());
                 if (zeroMask)
                     uni_vpxor(vDst, vDst, vDst);
-                uni_vpgatherdd(vDst, ptr[vSrcShift + vSrcShift], vReadMask);
+                uni_vpgatherdd(vDst, rSrc, vSrcShift, vReadMask);
             } else if (opDst.isREG()) {
                 if (zeroMask)
                     uni_vpxor(vAux, vAux, vAux);
-                uni_vpgatherdd(vAux, ptr[vSrcShift + vSrcShift], vReadMask);
+                uni_vpgatherdd(vAux, rSrc, vSrcShift, vReadMask);
                 if (zeroMask)
                     uni_vmovups(ptr[opDst.getReg()], vAux);
                 else
