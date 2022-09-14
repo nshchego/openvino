@@ -781,7 +781,7 @@ void jitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef
     } else if (idx == 2) {
         uni_vmulps(vCoef, vDDim, vDDim);
         uni_vfmadd132ps(vCoef, vPool[const_0_75_idx], vPool[const_1_25_idx]);
-        vfmsub231ps(vCoef, vDDim, vPool[const_1_50_idx]);
+        uni_vfmsub231ps(vCoef, vDDim, vPool[const_1_50_idx]);
         uni_vmulps(vCoef, vCoef, vDDim);
     } else if (idx == 3) {
         uni_vmulps(vCoef, vPool[const_0_75_idx], vDDim);
@@ -858,7 +858,7 @@ void jitGridSampleKernel<isa>::bicubicCoefficients(const Vmm& vCoef, const Vmm& 
     } else if (idx == 2) {
         uni_vmulps(vCoef, vDDim, vDDim);
         vfmadd132ps(vCoef, vPool[const_0_75_idx], vPool[const_1_25_idx]);
-        vfmsub231ps(vCoef, vDDim, vPool[const_1_50_idx]);
+        uni_vfmsub231ps(vCoef, vDDim, vPool[const_1_50_idx]);
         uni_vmulps(vCoef, vCoef, vDDim);
     } else if (idx == 3) {
         uni_vmulps(vCoef, vPool[const_0_75_idx], vDDim);
@@ -1151,7 +1151,7 @@ void jitGridSampleKernel<x64::sse41>::bilinearInterpolation(const Vmm& vWCoord, 
                 uni_vcvtdq2ps(vQ1, vQ1);
             }
 
-            uni_vfmsub213ps(vQ1, vDX, vQ1); // q1 = -(v10 - dx * v10)
+            uni_vfmsub213ps(vQ1, vDX, vQ1);  // q1 = -(v10 - dx * v10)
             uni_vfmsub231ps(vQ1, vAux, vDX); // q1 = -q1 + dx * v11
             // Res = q0 + dy * (q1 - q0)
             uni_vsubps(vQ1, vQ1, vQ0);
@@ -1264,12 +1264,7 @@ void jitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
         if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
             uni_vcvtdq2ps(vAux, vAux);
         }
-        if (isa == x64::avx2) {
-            uni_vfmsub231ps(vQ0, vAux, vDX); // q0 = -q0 + dx * v01
-        } else {
-            uni_vmulps(vAux, vAux, vDX);
-            uni_vsubps(vQ0, vAux, vQ0);
-        }
+        uni_vfmsub231ps(vQ0, vAux, vDX); // q0 = -q0 + dx * v01
 
         // (y + 1; x + 1)
         if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -1292,11 +1287,11 @@ void jitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
         }
 
         // q1 = -(v10 - dx * v10)
-        if (isa == x64::avx) {
+        if (isa == x64::avx2) {
+            uni_vfmsub213ps(vQ1, vDX, vQ1);
+        } else {
             uni_vmulps(kGatherMask, vQ1, vDX);
             uni_vsubps(vQ1, kGatherMask, vQ1);
-        } else {
-            uni_vfmsub213ps(vQ1, vDX, vQ1);
         }
         uni_vfmsub231ps(vQ1, vAux, vDX); // q1 = -q1 + dx * v11
         // Res = q0 + dy * (q1 - q0)
@@ -1683,8 +1678,13 @@ void jitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
     } else if (vDst.getIdx() == vWidth.getIdx()) {
         uni_vfmadd132ps(vDst, vWCoord, vHCoord);
     } else {
-        uni_vmovups(vDst, vWCoord);
-        uni_vfmadd231ps(vDst, vHCoord, vWidth);
+        if (one_of(isa, x64::avx2, x64::avx512_core)) {
+            uni_vmovups(vDst, vWCoord);
+            uni_vfmadd231ps(vDst, vHCoord, vWidth);
+        } else {
+            uni_vmulps(vDst, vHCoord, vWidth);
+            uni_vaddps(vDst, vDst, vWCoord);
+        }
     }
 
     if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vmulps for YMM
