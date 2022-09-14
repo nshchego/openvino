@@ -76,7 +76,7 @@ protected:
             vfmsub231ps(x1, x2, op);
         } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
             assert(!x1.isEqualIfNotInherited(op));
-            vmulps(x1, x1, x2);
+            vmulps(x1, x2, op);
             vsubps(x1, x1, op);
         } else {
             assert(!x1.isEqualIfNotInherited(op));
