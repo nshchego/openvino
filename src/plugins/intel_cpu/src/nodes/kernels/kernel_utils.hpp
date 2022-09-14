@@ -65,23 +65,27 @@ protected:
         } else {
             assert(x1.getIdx() != x2.getIdx());
             mulps(x1, op);
-            subps(x1, x2);
+            subps(x2, x1);
+            vmovups(x1, x2);
         }
     }
 
-    void uni_vfmsub231ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+    void uni_vfmsub231ps(const Xbyak::Xmm &x1,
+                         const Xbyak::Xmm &x2,
+                         const Xbyak::Operand &op) {
         // Note: x1 gets overriden by x1*x2
         // This is incorrect if x1 == op
         if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
             vfmsub231ps(x1, x2, op);
         } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
             assert(!x1.isEqualIfNotInherited(op));
-            vmulps(x1, x2, op);
-            vsubps(x1, x1, op);
+            vmulps(x2, x2, op);
+            vsubps(x1, x2, x1);
         } else {
             assert(!x1.isEqualIfNotInherited(op));
-            mulps(x1, x2);
-            subps(x1, op);
+            mulps(x2, op);
+            subps(x2, x1);
+            vmovups(x1, x2);
         }
     }
 
