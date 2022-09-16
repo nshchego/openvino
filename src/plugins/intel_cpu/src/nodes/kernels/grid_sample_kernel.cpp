@@ -1670,8 +1670,8 @@ void jitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
             uni_vfmadd231ps(vDst, vHCoord, vWidth);
         } else {
             auto vTmp = vmmRef();
-            uni_vmulps(vTmp, vHCoord, vWCoord);
-            uni_vaddps(vDst, vDst, vWCoord);
+            uni_vmulps(vTmp, vHCoord, vWidth);
+            uni_vaddps(vDst, vTmp, vWCoord);
         }
     } else if (vDst.getIdx() == vHCoord.getIdx()) {
         uni_vfmadd132ps(vDst, vWCoord, vWidth);
