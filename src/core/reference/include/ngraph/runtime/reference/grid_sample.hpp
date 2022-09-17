@@ -127,8 +127,11 @@ DATA_ET bilinear(const DATA_ET* data,
                  const GRID_ET x_n,
                  const get_padded_fn_t<DATA_ET>& get_padded,
                  const denormalize_fn_t<GRID_ET>& denormalize) {
+std::string outX = "X:" + std::to_string(x_n), outY = std::string("Y:") + std::to_string(y_n);
     const auto y_d = denormalize(y_n, data_shape[2]);
     const auto x_d = denormalize(x_n, data_shape[3]);
+outX += ";" + std::to_string(x_d); outY += ";" + std::to_string(y_d);
+std::cout << outX << ";" << outY << std::endl;
     const auto y_topleft = std::floor(y_d);
     const auto x_topleft = std::floor(x_d);
     const auto dy = y_d - y_topleft;
@@ -137,6 +140,7 @@ DATA_ET bilinear(const DATA_ET* data,
     const auto v01 = get_padded(data, data_shape, n, c, y_topleft, x_topleft + 1);
     const auto v10 = get_padded(data, data_shape, n, c, y_topleft + 1, x_topleft);
     const auto v11 = get_padded(data, data_shape, n, c, y_topleft + 1, x_topleft + 1);
+std::cout << "{"<< v00 << ";" << v01 << ";" << v10 << ";" << v11 << "};" << std::endl;
 
     const auto q0 = (1 - dx) * v00 + dx * v01;
     const auto q1 = (1 - dx) * v10 + dx * v11;
