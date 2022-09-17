@@ -334,43 +334,46 @@ protected:
     }
 
     void storeVectorPart(const Xbyak::Reg64& rDst,
-                         const Xbyak::Reg64& rToStoreCounter,
+                         const Xbyak::Reg64& rToStoreNum,
                          const Xbyak::Xmm&   xmmSrc,
                          const uint64_t      typeSize) {
         Xbyak::Label lEnd;
         const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
+        auto rRestCounter = r64Ref();
+        mov(rRestCounter, rToStoreNum);
 
         for (int k = 0; k < elPerVec; k++) {
-            cmp(rToStoreCounter, 0);
+            cmp(rRestCounter, 0);
             jle(lEnd, T_NEAR);
 
             if (typeSize == 8) {
-                uni_vpextrq(ptr[rDst], xmmSrc, k);
+                uni_vpextrq(ptr[rDst + k * typeSize], xmmSrc, k);
             } else if (typeSize == 4) {
-                uni_vpextrd(ptr[rDst], xmmSrc, k);
+                uni_vpextrd(ptr[rDst + k * typeSize], xmmSrc, k);
             } else if (typeSize == 2) {
-                uni_vpextrw(ptr[rDst], xmmSrc, k);
+                uni_vpextrw(ptr[rDst + k * typeSize], xmmSrc, k);
             } else if (typeSize == 1) {
-                uni_vpextrb(ptr[rDst], xmmSrc, k);
+                uni_vpextrb(ptr[rDst + k * typeSize], xmmSrc, k);
             }
 
-            add(rDst, typeSize);
-            dec(rToStoreCounter);
+            dec(rRestCounter);
         }
         L(lEnd);
     }
 
     void storeVectorPart(const Xbyak::Reg64& rDst,
-                         const Xbyak::Reg64& rToStoreCounter,
+                         const Xbyak::Reg64& rToStoreNum,
                          const Xbyak::Ymm&   ymmSrc,
                          const uint64_t      typeSize) {
         Xbyak::Label lEnd;
         Xbyak::Xmm xmmSrc(ymmSrc.getIdx());
+        const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
+
         for (int i = 0; i < 2; i++) {
-            storeVectorPart(rDst, rToStoreCounter, xmmSrc, typeSize);
+            storeVectorPart(rDst, rToStoreNum, xmmSrc, typeSize);
 
             if (i == 0) {
-                cmp(rToStoreCounter, 0);
+                cmp(rToStoreNum, elPerVec / 2);
                 jle(lEnd, T_NEAR);
             }
 

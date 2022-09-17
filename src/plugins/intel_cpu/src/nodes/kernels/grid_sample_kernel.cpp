@@ -236,16 +236,13 @@ void jitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vm
     auto vAux = vmmRef();
 
     uni_vpermd(vWCoord, vPool[gridPermMaskIdx], ptr[r64Pool[rGridIdx]]); // Permute to XXXX.YYYY
-    Xbyak::Xmm xmmH(vHCoord.getIdx());
-    vextracti128(xmmH, vWCoord, 1);
+    vperm2i128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
 
     add(r64Pool[rGridIdx], vlen);
 
     uni_vpermd(vAux, vPool[gridPermMaskIdx], ptr[r64Pool[rGridIdx]]); // Permute to XXXX.YYYY
-    Xbyak::Xmm xmmAux(vAux.getIdx());
-    vinserti128(vWCoord, vWCoord, xmmAux, 1); // Extract X component
-    vextracti128(xmmAux, vAux, 1);               // Extract Y component
-    vinserti128(vHCoord, vHCoord, xmmAux, 1);
+    vperm2i128(vWCoord, vWCoord, vAux, 0B00100000);    // Extract X component
+    vperm2i128(vHCoord, vHCoord, vAux, 0B00110000);    // Extract Y component
 
     add(r64Pool[rGridIdx], vlen);
 }
@@ -1305,8 +1302,9 @@ void jitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
         if (!tail) {
             uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp], vQ1);
         } else {
-//            uni_vmovups(ptr[rDstTmp] | kTailMask, vQ1);
+            storeVectorPart(rDstTmp, r64Pool[rWorkAmountIdx], vQ1, dataTypeSize);
         }
+
         add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
         add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
         dec(rChannel);
