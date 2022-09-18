@@ -160,7 +160,7 @@ private:
     void zerosPadding0(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
     void zerosPadding1(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
     void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
-    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const Vmask& kAux, const coord dim);
+    void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
     void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
     void tail();
 

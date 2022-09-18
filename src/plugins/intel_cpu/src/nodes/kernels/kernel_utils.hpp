@@ -336,24 +336,26 @@ protected:
     void storeVectorPart(const Xbyak::Reg64& rDst,
                          const Xbyak::Reg64& rToStoreNum,
                          const Xbyak::Xmm&   xmmSrc,
-                         const uint64_t      typeSize) {
+                         const size_t        typeSize,
+                         const size_t        dstOffset = 0) {
         Xbyak::Label lEnd;
         const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
         auto rRestCounter = r64Ref();
         mov(rRestCounter, rToStoreNum);
 
-        for (int k = 0; k < elPerVec; k++) {
+        for (size_t k = 0; k < elPerVec; k++) {
             cmp(rRestCounter, 0);
             jle(lEnd, T_NEAR);
 
+            const size_t offset = dstOffset + k * typeSize;
             if (typeSize == 8) {
-                uni_vpextrq(ptr[rDst + k * typeSize], xmmSrc, k);
+                uni_vpextrq(ptr[rDst + offset], xmmSrc, k);
             } else if (typeSize == 4) {
-                uni_vpextrd(ptr[rDst + k * typeSize], xmmSrc, k);
+                uni_vpextrd(ptr[rDst + offset], xmmSrc, k);
             } else if (typeSize == 2) {
-                uni_vpextrw(ptr[rDst + k * typeSize], xmmSrc, k);
+                uni_vpextrw(ptr[rDst + offset], xmmSrc, k);
             } else if (typeSize == 1) {
-                uni_vpextrb(ptr[rDst + k * typeSize], xmmSrc, k);
+                uni_vpextrb(ptr[rDst + offset], xmmSrc, k);
             }
 
             dec(rRestCounter);
@@ -364,17 +366,20 @@ protected:
     void storeVectorPart(const Xbyak::Reg64& rDst,
                          const Xbyak::Reg64& rToStoreNum,
                          const Xbyak::Ymm&   ymmSrc,
-                         const uint64_t      typeSize) {
+                         const size_t        typeSize) {
         Xbyak::Label lEnd;
         Xbyak::Xmm xmmSrc(ymmSrc.getIdx());
-        const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
+        const size_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
 
         for (int i = 0; i < 2; i++) {
-            storeVectorPart(rDst, rToStoreNum, xmmSrc, typeSize);
+            storeVectorPart(rDst, rToStoreNum, xmmSrc, typeSize, i == 0 ? 0 : typeSize * elPerVec / 2);
 
             if (i == 0) {
                 cmp(rToStoreNum, elPerVec / 2);
                 jle(lEnd, T_NEAR);
+                sub(rToStoreNum, elPerVec / 2);
+            } else {
+                add(rToStoreNum, elPerVec / 2);
             }
 
             if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
