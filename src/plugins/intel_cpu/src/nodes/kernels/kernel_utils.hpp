@@ -89,6 +89,68 @@ protected:
         }
     }
 
+    void uni_vpaddd(const Xbyak::Ymm& vDst,
+                    const Xbyak::Ymm& vSrc,
+                    const Xbyak::Operand& op) {
+        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            vpaddd(vDst, vSrc, op);
+        } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+            Xbyak::Xmm xmmDst(vDst.getIdx());
+            vmovups(vDst, vSrc);
+            if (op.isYMM()) {
+                Xbyak::Ymm ymmOp(op.getIdx());
+                Xbyak::Xmm xmmOp(op.getIdx());
+                paddd(xmmDst, xmmOp);
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
+                paddd(xmmDst, xmmOp);
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
+            } else if (op.isMEM()) {
+                const int vlen = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen;
+                paddd(xmmDst, op.getAddress());
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                paddd(xmmDst, ptr[op.getAddress().getRegExp() + vlen]);
+                vperm2f128(vDst, vDst, vDst, 0x1);
+            } else {
+                IE_THROW() << "Not supported operand type.";
+            }
+        } else {
+            IE_THROW() << "Not defined behavior for instruction 'vpaddd' in current instructions set.";
+        }
+    }
+
+    void uni_vpsubd(const Xbyak::Ymm& vDst,
+                    const Xbyak::Ymm& vSrc,
+                    const Xbyak::Operand &op) {
+        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            vpsubd(vDst, vSrc, op);
+        } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+            Xbyak::Xmm xmmDst(vDst.getIdx());
+            vmovups(vDst, vSrc);
+            if (op.isYMM()) {
+                Xbyak::Ymm ymmOp(op.getIdx());
+                Xbyak::Xmm xmmOp(op.getIdx());
+                psubd(xmmDst, xmmOp);
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
+                psubd(xmmDst, xmmOp);
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
+            } else if (op.isMEM()) {
+                const int vlen = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen;
+                psubd(xmmDst, op.getAddress());
+                vperm2f128(vDst, vDst, vDst, 0x1);
+                psubd(xmmDst, ptr[op.getAddress().getRegExp() + vlen]);
+                vperm2f128(vDst, vDst, vDst, 0x1);
+            } else {
+                IE_THROW() << "Not supported operand type.";
+            }
+        } else {
+            IE_THROW() << "Not defined behavior for instruction 'vpsubd' in current instructions set.";
+        }
+    }
+
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
         kmovd(kDst, kSrc);
     }

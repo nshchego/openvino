@@ -141,13 +141,18 @@ void GridSample::createPrimitive() {
     } else if (x64::mayiuse(x64::sse41)) {
         jitKernel.reset(new jitGridSampleKernel<x64::sse41>(jcp));
     }
-    if (jitKernel) {
-        jitKernel->create_ker();
-    } else {
+    if (!jitKernel) {
         THROW_ERROR << " could not create JIT kernel.";
     }
+    jitKernel->create_ker();
 
     execParamsPerThread.resize(parallel_get_max_threads());
+    if (!x64::mayiuse(x64::avx512_core)) {
+        for (auto& p : execParamsPerThread) {
+            p.srcWidthB.resize(jitKernel->getDataElPerVec());
+            p.dataTypeSize.resize(jitKernel->getDataElPerVec());
+        }
+    }
 
     Node::createPrimitive();
 }
@@ -192,19 +197,19 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
         p.gridBatchStepB = (dstShape[2] * dstShape[3] - p.workAmount) * 2 * gridTypeSize;
         p.dstBatchStepB  = (dstShape[1] * dstShape[2] * dstShape[3] - p.workAmount) * dataTypeSize;
 
-        if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
-            p.srcWidthB = (srcDataShape[3] - 3) * dataTypeSize;
-        } else {
-            p.srcWidthB = srcDataShape[3] * dataTypeSize;
-        }
         if (x64::mayiuse(x64::avx512_core)) {
             p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
             p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
             p.srcHeightMul2F[0] = p.srcHeightF * 2.f;
             p.srcWidthMul2F[0]  = p.srcWidthF  * 2.f;
+            if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
+                p.srcWidthB[0] = (srcDataShape[3] - 3) * dataTypeSize;
+            } else {
+                p.srcWidthB[0] = srcDataShape[3] * dataTypeSize;
+            }
             if (alignCorners) {
                 p.srcHeightMul2Sub1F[0] = p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f;
-                p.srcWidthMul2Sub1F[0]  = p.srcWidthF == 1.f ? 1.f : p.srcWidthSub1F[0] * 2.f;
+                p.srcWidthMul2Sub1F[0]  = p.srcWidthF == 1.f  ? 1.f : p.srcWidthSub1F[0] * 2.f;
                 p.wDenormCoefF[0] = (p.srcWidthF  - 1.f) / 2.f;
                 p.hDenormCoefF[0] = (p.srcHeightF - 1.f) / 2.f;
             } else {
@@ -216,6 +221,11 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
             p.srcWidthSub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  - 1.f);
             p.srcHeightMul2F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF * 2.f);
             p.srcWidthMul2F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  * 2.f);
+            if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
+                std::fill(p.srcWidthB.begin(), p.srcWidthB.end(), (srcDataShape[3] - 3) * dataTypeSize);
+            } else {
+                std::fill(p.srcWidthB.begin(), p.srcWidthB.end(), srcDataShape[3] * dataTypeSize);
+            }
             if (alignCorners) {
                 p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f);
                 p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF == 1.f ? 1.f : p.srcWidthSub1F[0]  * 2.f);
@@ -228,6 +238,7 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
         }
         p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
         p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
+        std::fill(p.dataTypeSize.begin(), p.dataTypeSize.end(), dataTypeSize);
     });
 }
 
@@ -267,7 +278,7 @@ std::cout << std::endl;
         arg.channelsNum        = p.channelsNum;
         arg.srcHeightF         = &p.srcHeightF;
         arg.srcWidthF          = &p.srcWidthF;
-        arg.srcWidthB          = &p.srcWidthB;
+        arg.srcWidthB          = p.srcWidthB.data();
         arg.srcChannelStepB    = p.srcChannelStepB;
         arg.dstChannelStepB    = p.dstChannelStepB;
         arg.srcBatchStepB      = p.srcBatchStepB;
@@ -282,6 +293,7 @@ std::cout << std::endl;
         arg.wDenormCoefF       = p.wDenormCoefF.data();
         arg.hDenormCoefF       = p.hDenormCoefF.data();
         arg.workAmount         = p.workAmount;
+        arg.dataTypeSize       = p.dataTypeSize.data();
 
         (*jitKernel)(&arg);
     };
@@ -290,8 +302,8 @@ std::cout << std::endl;
 
 // DEBUG
 std::cout << "OUTPUT: " << std::endl;
-float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i % jitKernel->getDataElPerVec() == 0)
         std::cout << "| ";

@@ -33,11 +33,11 @@ struct jGridSamplesExecArgs {
     uint64_t channelsNum = 1lu;
     const float* srcWidthF;
     const float* srcHeightF;
-    uint64_t srcChannelStepB = 0lu;
-    uint64_t dstChannelStepB = 0lu;
     uint64_t srcBatchStepB   = 0lu;
     uint64_t gridBatchStepB  = 0lu;
     uint64_t dstBatchStepB   = 0lu;
+    uint64_t srcChannelStepB = 0lu;
+    uint64_t dstChannelStepB = 0lu;
     const void* wDenormCoefF;
     const void* hDenormCoefF;
     const void* srcWidthB;
@@ -47,6 +47,7 @@ struct jGridSamplesExecArgs {
     const void* srcWidthMul2Sub1F;
     const void* srcHeightSub1F;
     const void* srcWidthSub1F;
+    const void* dataTypeSize;
     uint64_t workAmount = 0lu;
 };
 
