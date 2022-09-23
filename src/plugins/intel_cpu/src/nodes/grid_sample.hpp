@@ -29,16 +29,17 @@ public:
     struct threadExecParams {
         uint64_t batchNum    = 1lu;
         uint64_t channelsNum = 1lu;
-        float srcWidthF  = 1.f;
-        float srcHeightF = 1.f;
-        uint64_t srcWidthB  = 1lu;
-        uint64_t gridStartB = 0lu;
-        uint64_t dstStartB  = 0lu;
+        float    srcWidthF   = 1.f;
+        float    srcHeightF  = 1.f;
+        uint64_t gridStartB  = 0lu;
+        uint64_t dstStartB   = 0lu;
         uint64_t srcChannelStepB = 0lu;
         uint64_t dstChannelStepB = 0lu;
         uint64_t srcBatchStepB   = 0lu;
         uint64_t gridBatchStepB  = 0lu;
         uint64_t dstBatchStepB   = 0lu;
+        std::vector<int>   srcWidthB{ 1lu };
+        std::vector<int>   dataTypeSize{ 1lu };
         std::vector<float> srcHeightMul2F{ 1.f };
         std::vector<float> srcWidthMul2F{ 1.f };
         std::vector<float> srcHeightMul2Sub1F{ 1.f };
