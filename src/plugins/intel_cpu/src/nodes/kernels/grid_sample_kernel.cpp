@@ -1193,28 +1193,28 @@ void jitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
         IE_THROW() << "This instance of the bilinearInterpolation supports only AVX2 and AVX instruction sets.";
     }
 
-    auto vDX  = vmmRef();
-    auto vDY  = vmmRef();
-    auto vAux = vmmRef();
+    auto vWRound = vmmRef();
+    auto vHRound = vmmRef();
+    auto& vDX    = vWCoord;
+    auto& vDY    = vHCoord;
+    auto vAux    = vmmRef();
     Vmm shift00, shift01, shift10, shift11;
     // For ZEROS padding only.
     Vmm vMask00, vMask01, vMask10, vMask11;
 
-    uni_vmovups(vDX, vWCoord);
-    uni_vmovups(vDY, vHCoord);
-    uni_vroundps(vWCoord, vWCoord, 0x1); // Round floor
-    uni_vroundps(vHCoord, vHCoord, 0x1); // Round floor
-    uni_vsubps(vDX, vDX, vWCoord);
-    uni_vsubps(vDY, vDY, vHCoord);
+    uni_vroundps(vWRound, vWCoord, 0x1); // Round floor
+    uni_vroundps(vHRound, vHCoord, 0x1); // Round floor
+    uni_vsubps(vDX, vDX, vWRound);
+    uni_vsubps(vDY, vDY, vHRound);
 
     if (jcp.paddingMode != PaddingMode::ZEROS) {
-        shift00 = vWCoord;
-        shift01 = vHCoord;
+        shift00 = vWRound;
+        shift01 = vHRound;
         shift10 = vPool[getVecIdx()];
         shift11 = vPool[getVecIdx()];
 
-        uni_vaddps(shift10, vWCoord, vPool[onesFIdx]);
-        uni_vaddps(shift11, vHCoord, vPool[onesFIdx]);
+        uni_vaddps(shift10, vWRound, vPool[onesFIdx]);
+        uni_vaddps(shift11, vHRound, vPool[onesFIdx]);
     }
 
     bool useMask = false, zeroFill = false;
@@ -1226,38 +1226,38 @@ void jitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
             mov(rAux, reinterpret_cast<uintptr_t>(&onesVal));
             uni_vpbroadcastd(vAux, ptr[(Xbyak::Reg64) rAux]);
         }
-        shift00 = vWCoord;
-        shift10 = vHCoord;
+        shift00 = vWRound;
+        shift10 = vHRound;
         vMask00 = vPool[getVecIdx()];
         vMask01 = vPool[getVecIdx()];
         vMask10 = vPool[getVecIdx()];
         vMask11 = vPool[getVecIdx()];
 
-        uni_vaddps(vMask00, vWCoord, vAux);
-        uni_vaddps(vAux, vHCoord, vAux);
+        uni_vaddps(vMask00, vWRound, vAux);
+        uni_vaddps(vAux, vHRound, vAux);
 
-        zerosPadding(vMask01, vHCoord, vMask00); // (y; x + 1)
-        zerosPadding(vMask10, vAux, vWCoord);    // (y + 1; x)
+        zerosPadding(vMask01, vHRound, vMask00); // (y; x + 1)
+        zerosPadding(vMask10, vAux, vWRound);    // (y + 1; x)
         zerosPadding(vMask11, vAux, vMask00);    // (y + 1; x + 1)
-        zerosPadding(vMask00, vHCoord, vWCoord); // (y; x)
+        zerosPadding(vMask00, vHRound, vWRound); // (y; x)
 
-        hwShiftPs2dq(shift00, vHCoord, vWCoord, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(shift00, vHRound, vWRound, vPool[srcWidthFIdx]);
     } else if (jcp.paddingMode == PaddingMode::BORDER) {
-        borderPadding(vWCoord, vWCoord, coord::w);
-        borderPadding(vHCoord, vHCoord, coord::h);
+        borderPadding(vWRound, vWRound, coord::w);
+        borderPadding(vHRound, vHRound, coord::h);
         borderPadding(shift10, shift10, coord::w);
         borderPadding(shift11, shift11, coord::h);
     } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
-        reflectionPadding(vWCoord, vWCoord, coord::w);
-        reflectionPadding(vHCoord, vHCoord, coord::h);
+        reflectionPadding(vWRound, vWRound, coord::w);
+        reflectionPadding(vHRound, vHRound, coord::h);
         reflectionPadding(shift10, shift10, coord::w);
         reflectionPadding(shift11, shift11, coord::h);
     }
     if (one_of(jcp.paddingMode, PaddingMode::BORDER, PaddingMode::REFLECTION)) {
         // W * y + x
-        hwShiftPs2dq(vAux, shift11, vWCoord, vPool[srcWidthFIdx]);
-        hwShiftPs2dq(vWCoord, vHCoord, vWCoord, vPool[srcWidthFIdx]);
-        hwShiftPs2dq(vHCoord, vHCoord, shift10, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(vAux, shift11, vWRound, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(vWRound, vHRound, vWRound, vPool[srcWidthFIdx]);
+        hwShiftPs2dq(vHRound, vHRound, shift10, vPool[srcWidthFIdx]);
         hwShiftPs2dq(shift11, shift11, shift10, vPool[srcWidthFIdx]);
         uni_vmovups(shift10, vAux);
     }
