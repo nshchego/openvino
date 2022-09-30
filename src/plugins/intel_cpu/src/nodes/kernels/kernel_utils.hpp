@@ -163,6 +163,27 @@ protected:
         kxnorw(kDst, kSrc1, kSrc2);
     }
 
+    void uni_kandd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc1, const Xbyak::Opmask& kSrc2) {
+        kandd(kDst, kSrc1, kSrc2);
+    }
+
+    void uni_kandd(const Xbyak::Xmm& kDst, const Xbyak::Xmm& kSrc1, const Xbyak::Xmm& kSrc2) {
+        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            vpand(kDst, kSrc1, kSrc2);
+        } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+// TODO
+        } else {
+            if (kDst.getIdx() == kSrc2.getIdx()) {
+                pand(kDst, kSrc1);
+            } else {
+                if (kDst.getIdx() != kSrc1.getIdx()) {
+                    mov(kDst, kSrc1);
+                }
+                pand(kDst, kSrc2);
+            }
+        }
+    }
+
     void uni_kxnorw(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Xmm& vSrc2) {
         uni_vpxor(vDst, vSrc1, vSrc2);
         if (dnnl::impl::cpu::x64::is_subset(dnnl::impl::cpu::x64::avx, dnnl::impl::cpu::x64::isa_all) &&
@@ -249,6 +270,7 @@ protected:
                 uni_vcmpps(vReadMask, vReadMask, vReadMask, 0x0);
             if (zeroFill)
                 uni_vpxor(vDst, vDst, vDst);
+
             vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
         } else {
             Xbyak::Xmm xmmDst      = Xbyak::Xmm(vDst.getIdx()),
@@ -399,7 +421,7 @@ protected:
                          const Xbyak::Reg64& rToStoreNum,
                          const Xbyak::Xmm&   xmmSrc,
                          const size_t        typeSize,
-                         const size_t        dstOffset = 0) {
+                         const size_t        dstOffset = 0lu) {
         Xbyak::Label lEnd;
         const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
         auto rRestCounter = r64Ref();
@@ -428,13 +450,14 @@ protected:
     void storeVectorPart(const Xbyak::Reg64& rDst,
                          const Xbyak::Reg64& rToStoreNum,
                          const Xbyak::Ymm&   ymmSrc,
-                         const size_t        typeSize) {
+                         const size_t        typeSize,
+                         const size_t        dstOffset = 0lu) {
         Xbyak::Label lEnd;
         Xbyak::Xmm xmmSrc(ymmSrc.getIdx());
         const size_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
 
         for (int i = 0; i < 2; i++) {
-            storeVectorPart(rDst, rToStoreNum, xmmSrc, typeSize, i == 0 ? 0 : typeSize * elPerVec / 2);
+            storeVectorPart(rDst, rToStoreNum, xmmSrc, typeSize, i == 0 ? dstOffset : (dstOffset + typeSize * elPerVec / 2));
 
             if (i == 0) {
                 cmp(rToStoreNum, elPerVec / 2);
@@ -513,20 +536,19 @@ protected:
                    const bool zeroMask = false) {
         Xbyak::Label lEnd;
         if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
-    //        if (opDst.isYMM()) {
-    //            Xbyak::Ymm vDst = Xbyak::Ymm(opDst.getIdx());
-    //            if (zeroMask)
-    //                uni_vpxor(vDst, vDst, vDst);
-    //            uni_vpgatherdd(vDst, ptr[vSrcShift + vSrcShift], vReadMask);
-    //        } else if (opDst.isREG()) {
-    //            if (zeroMask)
-    //                uni_vpxor(vAux, vAux, vAux);
-    //            uni_vpgatherdd(vAux, ptr[vSrcShift + vSrcShift], vReadMask);
-    //            if (zeroMask)
-    //                uni_vmovups(ptr[opDst.getReg()], vAux);
-    //            else
-    //                uni_vmovups_tail(ptr[opDst.getReg()], vWriteMask, vAux);
-    //        }
+//            Xbyak::Ymm ymmDst(opDst.getIdx());
+//            if (!useMask)
+//                uni_vcmpps(vReadMask, vReadMask, vReadMask, 0x0);
+//            if (zeroMask)
+//                uni_vpxor(ymmDst, ymmDst, ymmDst);
+//            vpgatherdd(ymmDst, ptr[Xbyak::Ymm(opSrc.getIdx()) + vSrcShift], vReadMask);
+//                if (zeroMask)
+//                    uni_vpxor(vAux, vAux, vAux);
+//                uni_vpgatherdd(vAux, ptr[vSrcShift + vSrcShift], vReadMask);
+//                if (zeroMask)
+//                    uni_vmovups(ptr[opDst.getReg()], vAux);
+//                else
+//                    uni_vmovups_tail(ptr[opDst.getReg()], vWriteMask, vAux);
         } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
             Xbyak::Xmm xmmReadMask  = Xbyak::Xmm(vReadMask.getIdx()),
                        xmmSrcShft   = Xbyak::Xmm(vSrcShift.getIdx());

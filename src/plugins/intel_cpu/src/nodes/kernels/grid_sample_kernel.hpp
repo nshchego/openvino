@@ -118,7 +118,7 @@ private:
 
     // Masks pool. Do not use k0 with gather instruction!
     Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
-    const Xbyak::Opmask& kTailMask = k7;
+    const Vmask kTailMask = Vmask(k7.getIdx());
     std::vector<Vmm> vPool;
 
     // Vector register indices.
