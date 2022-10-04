@@ -7,6 +7,8 @@
 #include "cpu/x64/jit_generator.hpp"
 #include <ie_common.h>
 #include <dnnl_types.h>
+#include "utils/general_utils.h"
+
 #include <set>
 
 namespace ov {
@@ -355,66 +357,93 @@ protected:
         kmovw(kDstMask, rOnes);
     }
 
-    void loadEl2vec32(const Xbyak::Xmm&   vDst,
-                      const Xbyak::Reg64& rSrc,
-                      const Xbyak::Reg64& rLoadNum,
-                      const bool zeroFilling = false) {
-        auto rAux = r64Ref();
-        const int typeSize = sizeof(int);
-        const int elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
+    void load(const Xbyak::Xmm&   vDst,
+              const Xbyak::Reg64& rSrc,
+              const Xbyak::Reg64& rLoadNum,
+              const uint8_t       typeSize,
+              const bool zeroFilling = false) {
+        if (!one_of(typeSize, 1, 2, 4, 8)) {
+            IE_THROW() << "Could not load data with type size " << typeSize;
+        }
+        const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
         Xbyak::Label lLoopEnd;
-        if (rLoadNum.getIdx() != rAux.getIdx())
-            mov(rAux, rLoadNum);
+        auto rAux = r64Ref();
+        mov(rAux, rLoadNum);
         if (zeroFilling)
             uni_vpxor(vDst, vDst, vDst);
 
-        for (int i = 0; i < elPerVec; i++) {
+        for (uint8_t i = 0; i < elPerVec; i++) {
             cmp(rAux, 0);
             jle(lLoopEnd, T_NEAR);
 
-            pinsrd(vDst, ptr[rSrc + i * typeSize], i);
+            if (typeSize == 1)
+                pinsrb(vDst, ptr[rSrc + i * typeSize], i);
+            else if (typeSize == 2)
+                pinsrw(vDst, ptr[rSrc + i * typeSize], i);
+            else if (typeSize == 4)
+                pinsrd(vDst, ptr[rSrc + i * typeSize], i);
+            else if (typeSize == 8)
+                pinsrq(vDst, ptr[rSrc + i * typeSize], i);
 
             dec(rAux);
         }
         L(lLoopEnd);
     }
 
-    void loadEl2vec32(const Xbyak::Ymm&   vDst,
-                      const Xbyak::Reg64& rSrc,
-                      const Xbyak::Reg64& rLoadNum,
-                      const bool zeroFilling = false) {
-        auto rAux = r64Ref();
-        const uint8_t typeSize = sizeof(int);
+    void load(const Xbyak::Ymm&   vDst,
+              const Xbyak::Reg64& rSrc,
+              const Xbyak::Reg64& rLoadNum,
+              const uint8_t       typeSize,
+              const bool zeroFilling = false) {
+        if (!one_of(typeSize, 1, 2, 4, 8)) {
+            IE_THROW() << "Could not load data with type size " << typeSize;
+        }
         const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
-        Xbyak::Label lLoopEnd0, lLoopEnd1;
-        if (rLoadNum.getIdx() != rAux.getIdx())
-            mov(rAux, rLoadNum);
+        Xbyak::Label lEnd, lLoop2End;
+        auto rAux = r64Ref();
+        mov(rAux, rLoadNum);
         if (zeroFilling)
             uni_vpxor(vDst, vDst, vDst);
         Xbyak::Xmm xmmDst(vDst.getIdx());
 
         for (uint8_t i = 0; i < elPerVec / 2; i++) {
             cmp(rAux, 0);
-            je(lLoopEnd0, T_NEAR);
+            jle(lEnd, T_NEAR);
 
-            pinsrd(xmmDst, ptr[rSrc + i * typeSize], i);
+            if (typeSize == 1)
+                pinsrb(xmmDst, ptr[rSrc + i * typeSize], i);
+            else if (typeSize == 2)
+                pinsrw(xmmDst, ptr[rSrc + i * typeSize], i);
+            else if (typeSize == 4)
+                pinsrd(xmmDst, ptr[rSrc + i * typeSize], i);
+            else if (typeSize == 8)
+                pinsrq(xmmDst, ptr[rSrc + i * typeSize], i);
 
             dec(rAux);
         }
 
         vperm2f128(vDst, vDst, vDst, 0x1);
+
         for (uint8_t i = 0; i < elPerVec / 2; i++) {
             cmp(rAux, 0);
-            je(lLoopEnd1, T_NEAR);
+            jle(lLoop2End, T_NEAR);
 
-            pinsrd(xmmDst, ptr[rSrc + i * typeSize], i);
+            const uint8_t offset = (i + elPerVec / 2) * typeSize;
+            if (typeSize == 1)
+                pinsrb(xmmDst, ptr[rSrc + offset], i);
+            else if (typeSize == 2)
+                pinsrw(xmmDst, ptr[rSrc + offset], i);
+            else if (typeSize == 4)
+                pinsrd(xmmDst, ptr[rSrc + offset], i);
+            else if (typeSize == 8)
+                pinsrq(xmmDst, ptr[rSrc + offset], i);
 
             dec(rAux);
         }
+        L(lLoop2End);
 
-        L(lLoopEnd1);
         vperm2f128(vDst, vDst, vDst, 0x1);
-        L(lLoopEnd0);
+        L(lEnd);
     }
 
     void storeVectorPart(const Xbyak::Reg64& rDst,
@@ -467,11 +496,7 @@ protected:
                 add(rToStoreNum, elPerVec / 2);
             }
 
-            if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
-                vperm2i128(ymmSrc, ymmSrc, ymmSrc, 0x1);
-            } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
-                vperm2f128(ymmSrc, ymmSrc, ymmSrc, 0x1);
-            }
+            vperm2f128(ymmSrc, ymmSrc, ymmSrc, 0x1);
         }
         L(lEnd);
     }
