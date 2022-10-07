@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "kernel_utils.hpp"
+#include "jit_kernel_base.hpp"
 #include "ie_precision.hpp"
 #include <set>
 
@@ -55,14 +55,14 @@ enum coord {
     w, h
 };
 
-class jitGridSampleKernelBase: public jitKernelBase {
+class JitGridSampleKernelBase: public JitKernelBase {
 public:
     void (*ker_)(const jGridSamplesExecArgs *);
     void operator()(const jGridSamplesExecArgs *args) {
         assert(ker_);
         ker_(args);
     }
-    explicit jitGridSampleKernelBase(const jGridSampleConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
+    explicit JitGridSampleKernelBase(const jGridSampleConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
 
     virtual void create_ker() = 0;
     uint64_t getVecLen() {
@@ -85,11 +85,11 @@ protected:
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-class jitGridSampleKernel : public jitGridSampleKernelBase {
+class JitGridSampleKernel : public JitGridSampleKernelBase {
 public:
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jitGridSampleKernel)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(JitGridSampleKernel)
 
-    explicit jitGridSampleKernel(const jGridSampleConfParams& jcp);
+    explicit JitGridSampleKernel(const jGridSampleConfParams& jcp);
 
     void create_ker() override;
     void generate() override;
