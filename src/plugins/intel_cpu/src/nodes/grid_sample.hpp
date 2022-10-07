@@ -66,12 +66,13 @@ private:
     InferenceEngine::Precision dataPrecision;
     InferenceEngine::Precision gridPrecision = InferenceEngine::Precision::FP32;
 
+    int nthr = 1;
     std::vector<threadExecParams> execParamsPerThread;
 
     static constexpr size_t IN_DATA = 0;
     static constexpr size_t IN_GRID = 1;
 
-    std::shared_ptr<jitGridSampleKernelBase> jitKernel;
+    std::shared_ptr<JitGridSampleKernelBase> jitKernel;
 };
 
 }   // namespace node

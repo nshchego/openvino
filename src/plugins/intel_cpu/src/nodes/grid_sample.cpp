@@ -133,25 +133,33 @@ void GridSample::createPrimitive() {
     }
 
     if (x64::mayiuse(x64::avx512_core)) {
-        jitKernel.reset(new jitGridSampleKernel<x64::avx512_core>(jcp));
+        jitKernel.reset(new JitGridSampleKernel<x64::avx512_core>(jcp));
     } else if (x64::mayiuse(x64::avx2)) {
-        jitKernel.reset(new jitGridSampleKernel<x64::avx2>(jcp));
+        jitKernel.reset(new JitGridSampleKernel<x64::avx2>(jcp));
     } else if (x64::mayiuse(x64::avx)) {
-        jitKernel.reset(new jitGridSampleKernel<x64::avx>(jcp));
+        jitKernel.reset(new JitGridSampleKernel<x64::avx>(jcp));
     } else if (x64::mayiuse(x64::sse41)) {
-        jitKernel.reset(new jitGridSampleKernel<x64::sse41>(jcp));
+        jitKernel.reset(new JitGridSampleKernel<x64::sse41>(jcp));
     }
     if (!jitKernel) {
         THROW_ERROR << " could not create JIT kernel.";
     }
     jitKernel->create_ker();
 
-    execParamsPerThread.resize(parallel_get_max_threads());
+    nthr = parallel_get_max_threads();
+    execParamsPerThread.resize(nthr);
     if (!x64::mayiuse(x64::avx512_core)) {
-        for (auto& p : execParamsPerThread) {
-            p.srcWidthB.resize(jitKernel->getDataElPerVec());
-            p.dataTypeSize.resize(jitKernel->getDataElPerVec());
-        }
+        const auto dataElPerVec = jitKernel->getDataElPerVec();
+        parallel_nt(nthr, [&](const int ithr, const int nthr) {
+            auto& p = execParamsPerThread[ithr];
+
+            p.srcWidthB.resize(dataElPerVec);
+            p.dataTypeSize.resize(dataElPerVec);
+            p.srcHeightSub1F.resize(dataElPerVec);
+            p.srcWidthSub1F.resize(dataElPerVec);
+            p.srcHeightMul2F.resize(dataElPerVec);
+            p.srcWidthMul2F.resize(dataElPerVec);
+        });
     }
 
     Node::createPrimitive();
@@ -174,7 +182,6 @@ void GridSample::prepareParams() {
     const auto& srcDataShape = dataMemPtr->getStaticDims();
     const auto& dstShape     = dstMemPtr->getStaticDims();
     const uint64_t totalWork = dstShape[2] * dstShape[3];
-    const uint64_t nthr = parallel_get_max_threads();
     const uint64_t wpt = ((totalWork / dataElPerVec) / nthr + 1) * dataElPerVec;
 
     parallel_nt(nthr, [&](const int ithr, const int nthr) {
@@ -197,6 +204,10 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
         p.gridBatchStepB = (dstShape[2] * dstShape[3] - p.workAmount) * 2 * gridTypeSize;
         p.dstBatchStepB  = (dstShape[1] * dstShape[2] * dstShape[3] - p.workAmount) * dataTypeSize;
 
+        p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
+        p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
+        std::fill(p.dataTypeSize.begin(), p.dataTypeSize.end(), dataTypeSize);
+
         if (x64::mayiuse(x64::avx512_core)) {
             p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
             p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
@@ -217,10 +228,10 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
                 p.srcWidthMul2Sub1F[0]  = p.srcWidthMul2F[0]  - 1.f;
             }
         } else {
-            p.srcHeightSub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF - 1.f);
-            p.srcWidthSub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  - 1.f);
-            p.srcHeightMul2F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF * 2.f);
-            p.srcWidthMul2F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF  * 2.f);
+            std::fill(p.srcHeightSub1F.begin(), p.srcHeightSub1F.end(), p.srcHeightF - 1.f);
+            std::fill(p.srcWidthSub1F.begin(),  p.srcWidthSub1F.end(),  p.srcWidthF  - 1.f);
+            std::fill(p.srcHeightMul2F.begin(), p.srcHeightMul2F.end(), p.srcHeightF * 2.f);
+            std::fill(p.srcWidthMul2F.begin(),  p.srcWidthMul2F.end(),  p.srcWidthF  * 2.f);
             if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
                 std::fill(p.srcWidthB.begin(), p.srcWidthB.end(), (srcDataShape[3] - 3) * dataTypeSize);
             } else {
@@ -236,9 +247,6 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
                 p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthMul2F[0]  - 1.f);
             }
         }
-        p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
-        p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
-        std::fill(p.dataTypeSize.begin(), p.dataTypeSize.end(), dataTypeSize);
     });
 }
 
@@ -265,6 +273,7 @@ for (int i = 0; i < getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetSize() / gridTy
     std::cout << gridDataF[i] << "; ";
 }
 std::cout << std::endl;
+std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
 // DEBUG
 
     auto threadBody = [&](const int ithr, const int nthr) {
@@ -304,6 +313,7 @@ std::cout << std::endl;
 std::cout << "OUTPUT: " << std::endl;
 float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i % jitKernel->getDataElPerVec() == 0)
         std::cout << "| ";
