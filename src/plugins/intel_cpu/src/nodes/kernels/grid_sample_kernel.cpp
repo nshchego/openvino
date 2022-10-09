@@ -52,7 +52,7 @@ void JitGridSampleKernel<isa>::generate() {
     mov(r64Pool[getRegIdx(rGridIdx)], ptr[regParams + GET_OFF(grid)]);
     mov(r64Pool[getRegIdx(rDstIdx)],  ptr[regParams + GET_OFF(dst)]);
 
-    const auto& rAux = r64Pool[getVecIdx()];
+    const auto& rAux = r64Pool[getRegIdx()];
 
     if (isa == x64::avx512_core || jcp.interpolationMode != InterpolationMode::BICUBIC) {
         mov(rAux, ptr[regParams + GET_OFF(srcWidthF)]);
@@ -1036,7 +1036,7 @@ void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vm
         cmp(rChannel, 0);
         jle(lChannelLoopEnd, T_NEAR);
 
-        if (jcp.paddingMode == PaddingMode::ZEROS && one_of(isa, x64::avx512_core, x64::avx2)) {
+        if (jcp.paddingMode == PaddingMode::ZEROS) {
             if (isa == x64::avx512_core && tail)
                 uni_kandd(kAuxMask, kTailMask, kGatherMask);
             else

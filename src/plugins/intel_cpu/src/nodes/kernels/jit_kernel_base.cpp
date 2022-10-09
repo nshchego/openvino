@@ -184,7 +184,7 @@ void JitKernelBase::gatherdd(const Xbyak::Xmm&   vDst,
         IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
     }
     if (zeroFill)
-        uni_vpxor(vDst, vDst, vDst);
+        pxor(vDst, vDst); // Don't use vpxor. It zeros the rest of the YMM register.
 
     if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
         if (!useMask)
