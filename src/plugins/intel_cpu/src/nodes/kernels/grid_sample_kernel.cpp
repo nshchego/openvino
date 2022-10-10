@@ -47,12 +47,19 @@ void JitGridSampleKernel<isa>::create_ker() {
 template <x64::cpu_isa_t isa>
 void JitGridSampleKernel<isa>::generate() {
     this->preamble();
+    registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi});
 
-    mov(r64Pool[getRegIdx(rSrcIdx)],  ptr[regParams + GET_OFF(src)]);
-    mov(r64Pool[getRegIdx(rGridIdx)], ptr[regParams + GET_OFF(grid)]);
-    mov(r64Pool[getRegIdx(rDstIdx)],  ptr[regParams + GET_OFF(dst)]);
+    regSrc  = r64Ref();
+    regGrid = r64Ref();
+    regDst  = r64Ref();
+    regSrcChannelStepB = r64Ref();
+    regDstChannelStepB = r64Ref();
 
-    const auto& rAux = r64Pool[getRegIdx()];
+    mov(regSrc,  ptr[regParams + GET_OFF(src)]);
+    mov(regGrid, ptr[regParams + GET_OFF(grid)]);
+    mov(regDst,  ptr[regParams + GET_OFF(dst)]);
+
+    auto rAux = r64Ref();
 
     if (isa == x64::avx512_core || jcp.interpolationMode != InterpolationMode::BICUBIC) {
         mov(rAux, ptr[regParams + GET_OFF(srcWidthF)]);
@@ -61,8 +68,8 @@ void JitGridSampleKernel<isa>::generate() {
         uni_vpbroadcastd(vPool[getVecIdx(srcHeightFIdx)], ptr[(Xbyak::Reg64) rAux]);
     }
 
-    mov(r64Pool[getRegIdx(rSrcChannelStepBIdx)], ptr[regParams + GET_OFF(srcChannelStepB)]);
-    mov(r64Pool[getRegIdx(rDstChannelStepBIdx)], ptr[regParams + GET_OFF(dstChannelStepB)]);
+    mov(regSrcChannelStepB, ptr[regParams + GET_OFF(srcChannelStepB)]);
+    mov(regDstChannelStepB, ptr[regParams + GET_OFF(dstChannelStepB)]);
 
     if (one_of(jcp.paddingMode, PaddingMode::ZEROS, PaddingMode::BORDER) &&
             (isa == x64::avx512_core ||
@@ -108,7 +115,8 @@ void JitGridSampleKernel<isa>::generate() {
 
         Xbyak::Reg32 r32Aux(rAux.getIdx());
         if (isa == x64::avx512_core) {
-            mov(r64Pool[getRegIdx(rChannelNumIdx)], ptr[regParams + GET_OFF(channelsNum)]);
+            regChannelNum = r64Ref();
+            mov(regChannelNum, ptr[regParams + GET_OFF(channelsNum)]);
 
             if (jcp.paddingMode == PaddingMode::ZEROS) {
                 mov(rAux, dataTypeSize);
@@ -156,47 +164,47 @@ void JitGridSampleKernel<isa>::generate() {
         }
     }
 
-    releaseRegIdx(rAux.getIdx());
+    rAux.release();
 
     process();
 
+    registersPool.reset();
     this->postamble();
 }
 
 template <x64::cpu_isa_t isa>
 void JitGridSampleKernel<isa>::process() {
-    auto rWorkAmount = r64Ref();
-    rWorkAmountIdx = rWorkAmount.getIdx();
+    regWorkAmount = r64Ref();
 
     // Batch loop
     if (jcp.dynamicShapes) {
         Xbyak::Label lBatchLoop, lEnd;
-        auto rBatch = r64Ref();
-        mov(rBatch, ptr[regParams + GET_OFF(batchNum)]);
+        auto regBatch = r64Ref();
+        mov(regBatch, ptr[regParams + GET_OFF(batchNum)]);
         L(lBatchLoop);
         {
-            cmp(rBatch, 0);
+            cmp(regBatch, 0);
             jle(lEnd, T_NEAR);
 
-            mov(rWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+            mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
             spatialLoop();
 
-            add(r64Pool[rSrcIdx],  ptr[regParams + GET_OFF(srcBatchStepB)]);
-            add(r64Pool[rGridIdx], ptr[regParams + GET_OFF(gridBatchStepB)]);
-            add(r64Pool[rDstIdx],  ptr[regParams + GET_OFF(dstBatchStepB)]);
+            add(regSrc,  ptr[regParams + GET_OFF(srcBatchStepB)]);
+            add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
+            add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
 
-            dec(rBatch);
+            dec(regBatch);
             jmp(lBatchLoop, T_NEAR);
         }
         L(lEnd);
     } else {
         for (uint64_t i = 0lu; i < jcp.batchNum; i++) {
-            mov(rWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+            mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
             spatialLoop();
 
-            add(r64Pool[rSrcIdx],  jcp.srcBatchStepB);
-            add(r64Pool[rGridIdx], ptr[regParams + GET_OFF(gridBatchStepB)]);
-            add(r64Pool[rDstIdx],  ptr[regParams + GET_OFF(dstBatchStepB)]);
+            add(regSrc,  jcp.srcBatchStepB);
+            add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
+            add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
         }
     }
 }
@@ -209,15 +217,15 @@ void JitGridSampleKernel<isa>::spatialLoop() {
     Xbyak::Label lSpacialLoop, lTail;
     L(lSpacialLoop);
     {
-        cmp(r64Pool[rWorkAmountIdx], dataElPerVec);
+        cmp(regWorkAmount, dataElPerVec);
         jl(lTail, T_NEAR);
 
         getCoordinates(vHCoord, vWCoord);
         denormalizeRawCoordinates(vWCoord, vHCoord);
         interpolation(vWCoord, vHCoord);
 
-        sub(r64Pool[rWorkAmountIdx], dataElPerVec);
-        add(r64Pool[rDstIdx], vlen);
+        sub(regWorkAmount, dataElPerVec);
+        add(regDst, vlen);
 
         jmp(lSpacialLoop, T_NEAR);
     }
@@ -228,23 +236,46 @@ void JitGridSampleKernel<isa>::spatialLoop() {
     tail();
 }
 
+template <x64::cpu_isa_t isa>
+void JitGridSampleKernel<isa>::tail() {
+    Xbyak::Label lEnd;
+    cmp(regWorkAmount, 0);
+    jle(lEnd, T_NEAR);
+
+    const Vmm& vHCoord = vPool[getVecIdx()];
+    const Vmm& vWCoord = vPool[getVecIdx()];
+
+    getTailCoordinates(vHCoord, vWCoord);
+    denormalizeRawCoordinates(vWCoord, vHCoord);
+    interpolation(vWCoord, vHCoord, true);
+
+    releaseVecIdx(vHCoord.getIdx());
+    releaseVecIdx(vWCoord.getIdx());
+
+    if (dataTypeSize > 1)
+        sal(regWorkAmount, dataTypeShift); // multiply by source data type size.
+    add(regDst, regWorkAmount);
+
+    L(lEnd);
+}
+
 template <>
 void JitGridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     auto vAux = vmmRef();
 
-    uni_vpermd(vWCoord, vPool[gridPermMaskIdx], ptr[r64Pool[rGridIdx]]); // Permute to XXXX.XXXX.YYYY.YYYY
+    uni_vpermd(vWCoord, vPool[gridPermMaskIdx], ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
     Xbyak::Ymm ymmH(vHCoord.getIdx());
     vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
 
-    add(r64Pool[rGridIdx], vlen);
+    add(regGrid, vlen);
 
-    uni_vpermd(vAux, vPool[gridPermMaskIdx], ptr[r64Pool[rGridIdx]]); // Permute to XXXX.XXXX.YYYY.YYYY
+    uni_vpermd(vAux, vPool[gridPermMaskIdx], ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
     Xbyak::Ymm ymmAux(vAux.getIdx());
     vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
     vextractf64x4(ymmAux, vAux, 1);            // Extract Y component
     vinsertf64x4(vHCoord, vHCoord, ymmAux, 1);
 
-    add(r64Pool[rGridIdx], vlen);
+    add(regGrid, vlen);
 }
 
 template <>
@@ -262,16 +293,16 @@ void JitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vm
         uni_vmovups(vPermMask, ptr[(Xbyak::Reg64)rAux]);
     }
 
-    uni_vpermd(vWCoord, vPermMask, ptr[r64Pool[rGridIdx]]); // Permute to XXXX.YYYY
+    uni_vpermd(vWCoord, vPermMask, ptr[regGrid]); // Permute to XXXX.YYYY
     vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011);      // Extract Y component
 
-    add(r64Pool[rGridIdx], vlen);
+    add(regGrid, vlen);
 
-    uni_vpermd(vAux, vPermMask, ptr[r64Pool[rGridIdx]]);    // Permute to XXXX.YYYY
+    uni_vpermd(vAux, vPermMask, ptr[regGrid]);    // Permute to XXXX.YYYY
     vperm2f128(vWCoord, vWCoord, vAux, 0B00100000);         // Extract X component
     vperm2f128(vHCoord, vHCoord, vAux, 0B00110000);         // Extract Y component
 
-    add(r64Pool[rGridIdx], vlen);
+    add(regGrid, vlen);
 
     if (gridPermMaskIdx < 0) {
         releaseVecIdx(vPermMask.getIdx());
@@ -286,16 +317,16 @@ void JitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
     Xbyak::Xmm xmmAux(vAux.getIdx());
     const uint64_t xmmVlen = x64::cpu_isa_traits<x64::sse41>::vlen;
 
-    uni_vpshufd(xmmWCoord, ptr[r64Pool[rGridIdx]], 0xD8);
+    uni_vpshufd(xmmWCoord, ptr[regGrid], 0xD8);
     shufpd(xmmHCoord, xmmWCoord, 0x2);
 
-    add(r64Pool[rGridIdx], xmmVlen);
+    add(regGrid, xmmVlen);
 
-    uni_vpshufd(xmmAux, ptr[r64Pool[rGridIdx]], 0xD8);
+    uni_vpshufd(xmmAux, ptr[regGrid], 0xD8);
     shufpd(xmmWCoord, xmmAux, 0x0);
     shufpd(xmmHCoord, xmmAux, 0x3);
 
-    add(r64Pool[rGridIdx], xmmVlen);
+    add(regGrid, xmmVlen);
 
     if (isa == x64::avx) {
         Xbyak::Ymm ymmWCoord(vWCoord.getIdx());
@@ -307,17 +338,17 @@ void JitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
         // Here is movups + pshufd instead of vpshufd for two reasons:
         // 1. vpshufd zeroes the rest ov YMM.
         // 2. pshufd does not work with not aligned to YMM Address.
-        movups(xmmWCoord, ptr[r64Pool[rGridIdx]]);
+        movups(xmmWCoord, ptr[regGrid]);
         pshufd(xmmWCoord, xmmWCoord, 0xD8);
         shufpd(xmmHCoord, xmmWCoord, 0x2);
 
-        add(r64Pool[rGridIdx], xmmVlen);
+        add(regGrid, xmmVlen);
 
-        uni_vpshufd(xmmAux, ptr[r64Pool[rGridIdx]], 0xD8);
+        uni_vpshufd(xmmAux, ptr[regGrid], 0xD8);
         shufpd(xmmWCoord, xmmAux, 0x0);
         shufpd(xmmHCoord, xmmAux, 0x3);
 
-        add(r64Pool[rGridIdx], xmmVlen);
+        add(regGrid, xmmVlen);
 
         vperm2f128(ymmWCoord, ymmWCoord, ymmWCoord, 0x1);
         vperm2f128(ymmHCoord, ymmHCoord, ymmHCoord, 0x1);
@@ -332,21 +363,21 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
     auto rAux = r64Ref();
     Xbyak::Ymm ymmH(vHCoord.getIdx());
 
-    mov(rAux, r64Pool[rWorkAmountIdx]);
+    mov(rAux, regWorkAmount);
     sal(rAux, 0x1); // multiply by gridShape[3]
-    cmp(r64Pool[rWorkAmountIdx], dataElPerVec / 2);
+    cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        uni_vpermd(vWCoord, vPool[gridPermMaskIdx], ptr[r64Pool[rGridIdx]]);
+        uni_vpermd(vWCoord, vPool[gridPermMaskIdx], ptr[regGrid]);
         vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
 
-        add(r64Pool[rGridIdx], vlen);
+        add(regGrid, vlen);
         sub(rAux, dataElPerVec);
         cmp(rAux, 0);
         jle(lEnd, T_NEAR);
 
         fillRestWorkMask(kTailMask, vAux, rAux);
-        uni_vmovups((Vmm)vAux | kTailMask, ptr[r64Pool[rGridIdx]]);
+        uni_vmovups((Vmm)vAux | kTailMask, ptr[regGrid]);
         uni_vpermd(vAux, vPool[gridPermMaskIdx], vAux);
         Xbyak::Ymm ymmAux(vAux.getIdx());
         vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
@@ -358,7 +389,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
     L(lRest);
     {
         fillRestWorkMask(kTailMask, vAux, rAux);
-        uni_vmovups(vWCoord | kTailMask, ptr[r64Pool[rGridIdx]]);
+        uni_vmovups(vWCoord | kTailMask, ptr[regGrid]);
         uni_vpermd(vWCoord, vPool[gridPermMaskIdx], vWCoord);
         vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
     }
@@ -366,11 +397,11 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
     L(lGridShift);
     if (dataTypeSize > 1)
         sal(rAux, dataTypeShift); // multiply by source data type size.
-    add(r64Pool[rGridIdx], rAux);
+    add(regGrid, rAux);
 
     L(lEnd);
 
-    fillRestWorkMask(kTailMask, vAux, r64Pool[rWorkAmountIdx]);
+    fillRestWorkMask(kTailMask, vAux, regWorkAmount);
 }
 
 template <>
@@ -389,21 +420,21 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
         uni_vmovups(vPermMask, ptr[(Xbyak::Reg64)rAux]);
     }
 
-    mov(rAux, r64Pool[rWorkAmountIdx]);
+    mov(rAux, regWorkAmount);
     sal(rAux, 0x1); // multiply by gridShape[3] == 2
-    cmp(r64Pool[rWorkAmountIdx], dataElPerVec / 2);
+    cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        uni_vpermd(vWCoord, vPermMask, ptr[r64Pool[rGridIdx]]); // Permute to XXXX.YYYY
+        uni_vpermd(vWCoord, vPermMask, ptr[regGrid]); // Permute to XXXX.YYYY
         vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011);      // Extract Y component
 
-        add(r64Pool[rGridIdx], vlen);
+        add(regGrid, vlen);
         sub(rAux, dataElPerVec);
         cmp(rAux, 0);
         jle(lEnd, T_NEAR);
 
         auto vAux  = vmmRef();
-        load(vAux, r64Pool[rGridIdx], rAux, dataTypeSize);
+        load(vAux, regGrid, rAux, dataTypeSize);
         uni_vpermd(vAux, vPermMask, vAux);
         vperm2f128(vWCoord, vWCoord, vAux, 0B00100000); // Extract X component
         vperm2f128(vHCoord, vHCoord, vAux, 0B00110000); // Extract Y component
@@ -412,7 +443,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     }
     L(lRest);
     {
-        load(vWCoord, r64Pool[rGridIdx], rAux, dataTypeSize);
+        load(vWCoord, regGrid, rAux, dataTypeSize);
         uni_vpermd(vWCoord, vPermMask, vWCoord);           // Permute to XXXX.YYYY
         vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
     }
@@ -424,7 +455,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     L(lGridShift);
     if (dataTypeSize > 1)
         sal(rAux, dataTypeShift); // Multiply by source data type size.
-    add(r64Pool[rGridIdx], rAux);
+    add(regGrid, rAux);
 
     L(lEnd);
 }
@@ -437,7 +468,7 @@ void JitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
     Xbyak::Xmm xmmHCoord(vHCoord.getIdx());
 
     auto rGridRest = r64Ref();
-    mov(rGridRest, r64Pool[rWorkAmountIdx]);
+    mov(rGridRest, regWorkAmount);
     sal(rGridRest, 0x1); // multiply by gridShape[3] == 2
 
     for (int i = 0; i < dataElPerVec; i++) {
@@ -445,11 +476,11 @@ void JitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
         jle(lEnd, T_NEAR);
 
         if (gridTypeSize == 4)
-            pinsrd(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[r64Pool[rGridIdx]], i / 2);
+            pinsrd(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[regGrid], i / 2);
         else if (gridTypeSize == 2)
-            pinsrw(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[r64Pool[rGridIdx]], i / 2);
+            pinsrw(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[regGrid], i / 2);
 
-        add(r64Pool[rGridIdx], gridTypeSize);
+        add(regGrid, gridTypeSize);
         dec(rGridRest);
     }
 
@@ -464,11 +495,11 @@ void JitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
         jle(lLoop2End, T_NEAR);
 
         if (gridTypeSize == 4)
-            pinsrd(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[r64Pool[rGridIdx]], i / 2);
+            pinsrd(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[regGrid], i / 2);
         else if (gridTypeSize == 2)
-            pinsrw(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[r64Pool[rGridIdx]], i / 2);
+            pinsrw(i % 2 == 0 ? xmmWCoord : xmmHCoord, ptr[regGrid], i / 2);
 
-        add(r64Pool[rGridIdx], gridTypeSize);
+        add(regGrid, gridTypeSize);
         dec(rGridRest);
     }
 
@@ -484,21 +515,21 @@ void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, con
     Xbyak::Label lRest, lHShuf, lGridShift, lEnd;
     auto rAux = r64Ref();
 
-    mov(rAux, r64Pool[rWorkAmountIdx]);
+    mov(rAux, regWorkAmount);
     sal(rAux, 0x1); // multiply by gridShape[3] == 2
-    cmp(r64Pool[rWorkAmountIdx], gridElPerVec / 2);
+    cmp(regWorkAmount, gridElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        pshufd(vWCoord, ptr[r64Pool[rGridIdx]], 0B11011000);
+        pshufd(vWCoord, ptr[regGrid], 0B11011000);
         shufpd(vHCoord, vWCoord, 0B00000010);
 
-        add(r64Pool[rGridIdx], vlen);
+        add(regGrid, vlen);
         sub(rAux, gridElPerVec);
         cmp(rAux, 0);
         jle(lHShuf, T_NEAR);
 
         auto vAux = vmmRef();
-        load(vAux, r64Pool[rGridIdx], rAux, dataTypeSize);
+        load(vAux, regGrid, rAux, dataTypeSize);
         pshufd(vAux, vAux, 0B11011000);
         shufpd(vWCoord, vAux, 0);          // Extract X component
         shufpd(vHCoord, vAux, 0B00000011); // Extract Y component
@@ -510,7 +541,7 @@ void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, con
     }
     L(lRest);
     {
-        load(vWCoord, r64Pool[rGridIdx], rAux, dataTypeSize);
+        load(vWCoord, regGrid, rAux, dataTypeSize);
         pshufd(vWCoord, vWCoord, 0B11011000); // Extract X component
         shufpd(vHCoord, vWCoord, 0B00000010); // Extract Y component
     }
@@ -518,7 +549,7 @@ void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, con
     L(lGridShift);
     if (dataTypeSize > 1)
         sal(rAux, dataTypeShift); // multiply by source data type size.
-    add(r64Pool[rGridIdx], rAux);
+    add(regGrid, rAux);
 
     L(lEnd);
 }
@@ -1034,8 +1065,8 @@ void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vm
     auto rSrcTmp  = r64Ref();
     auto rDstTmp  = r64Ref();
     mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
-    mov(rSrcTmp, r64Pool[rSrcIdx]);
-    mov(rDstTmp, r64Pool[rDstIdx]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
     L(lChannelLoopBegin);
     {
         cmp(rChannel, 0);
@@ -1061,16 +1092,16 @@ void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vm
             } else if (isa == x64::avx2) {
                 gatherdd(vAux, rSrcTmp, vSrcShift, kAuxMask, useMask, zeroFill);
                 // TODO: The instruction vmaskmovps could be used here, but it has big latency on the AVX2. Need to compare performance.
-                store(rDstTmp, r64Pool[rWorkAmountIdx], vAux, dataTypeSize);
+                store(rDstTmp, regWorkAmount, vAux, dataTypeSize);
             } else {
                 auto rWrkTmp = r64Ref();
-                mov(rWrkTmp, r64Pool[rWorkAmountIdx]);
+                mov(rWrkTmp, regWorkAmount);
                 maskMov32(rDstTmp, rSrcTmp, vPool[kGatherMask.getIdx()], vSrcShift, rWrkTmp, useMask, zeroFill);
             }
         }
 
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         dec(rChannel);
 
         jmp(lChannelLoopBegin, T_NEAR);
@@ -1148,11 +1179,11 @@ void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
     auto rSrcTmp  = r64Ref();
     auto rDstTmp  = r64Ref();
     mov(rChannel, 0);
-    mov(rSrcTmp, r64Pool[rSrcIdx]);
-    mov(rDstTmp, r64Pool[rDstIdx]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
     L(lChannelLoopBegin);
     {
-        cmp(rChannel, r64Pool[rChannelNumIdx]);
+        cmp(rChannel, regChannelNum);
         jge(lChannelLoopEnd, T_NEAR);
 
         // (y; x)
@@ -1208,8 +1239,8 @@ void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
         } else {
             uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp] | kTailMask, vQ1);
         }
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         add(rChannel, 1);
 
         jmp(lChannelLoopBegin, T_NEAR);
@@ -1245,11 +1276,11 @@ void JitGridSampleKernel<x64::sse41>::bilinearInterpolation(const Vmm& vWCoord, 
     auto rSrcTmp  = r64Ref();
     auto rDstTmp  = r64Ref();
     mov(rChannel, 0);
-    mov(rSrcTmp, r64Pool[rSrcIdx]);
-    mov(rDstTmp, r64Pool[rDstIdx]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
     L(lChannelLoopBegin);
     {
-        cmp(rChannel, r64Pool[rChannelNumIdx]);
+        cmp(rChannel, regChannelNum);
         jge(lChannelLoopEnd, T_NEAR);
 
         if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -1310,8 +1341,8 @@ void JitGridSampleKernel<x64::sse41>::bilinearInterpolation(const Vmm& vWCoord, 
         }
 
         uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp], vQ1);
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         add(rChannel, 1);
 
         jmp(lChannelLoopBegin, T_NEAR);
@@ -1405,8 +1436,8 @@ void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
     auto rDstTmp   = r64Ref();
     auto rTypeSize = r64Ref();
     mov(rChannel,  ptr[regParams + GET_OFF(channelsNum)]);
-    mov(rSrcTmp,   r64Pool[rSrcIdx]);
-    mov(rDstTmp,   r64Pool[rDstIdx]);
+    mov(rSrcTmp,   regSrc);
+    mov(rDstTmp,   regDst);
     mov(rTypeSize, ptr[regParams + GET_OFF(dataTypeSize)]);
 
     L(lChannelLoopBegin);
@@ -1486,11 +1517,11 @@ void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
         if (!tail) {
             uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp], vQ1);
         } else {
-            store(rDstTmp, r64Pool[rWorkAmountIdx], vQ1, dataTypeSize);
+            store(rDstTmp, regWorkAmount, vQ1, dataTypeSize);
         }
 
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         dec(rChannel);
 
         jmp(lChannelLoopBegin, T_NEAR);
@@ -1556,11 +1587,11 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
     auto rSrcTmp  = r64Ref();
     auto rDstTmp  = r64Ref();
     mov(rChannel, 0);
-    mov(rSrcTmp, r64Pool[rSrcIdx]);
-    mov(rDstTmp, r64Pool[rDstIdx]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
     L(lChannelLoopBegin);
     {
-        cmp(rChannel, r64Pool[rChannelNumIdx]);
+        cmp(rChannel, regChannelNum);
         jge(lChannelLoopEnd, T_NEAR);
 
         uni_vmovups(vHCoord, vHTop);
@@ -1637,8 +1668,8 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
         } else {
             uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp] | kTailMask, vYDotProd);
         }
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         add(rChannel, 1);
 
         jmp(lChannelLoopBegin, T_NEAR);
@@ -1690,11 +1721,11 @@ void JitGridSampleKernel<x64::sse41>::bicubicInterpolation(const Vmm& vWCoord, c
     auto rSrcTmp = r64Ref();
     auto rDstTmp = r64Ref();
     mov(rChannel, 0);
-    mov(rSrcTmp, r64Pool[rSrcIdx]);
-    mov(rDstTmp, r64Pool[rDstIdx]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
     L(lChannelLoopBegin);
     {
-        cmp(rChannel, r64Pool[rChannelNumIdx]);
+        cmp(rChannel, regChannelNum);
         jge(lChannelLoopEnd, T_NEAR);
 
         if (jcp.paddingMode == PaddingMode::ZEROS) {
@@ -1819,8 +1850,8 @@ void JitGridSampleKernel<x64::sse41>::bicubicInterpolation(const Vmm& vWCoord, c
         }
 
         uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp], vYDotProd);
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         add(rChannel, 1);
 
         jmp(lChannelLoopBegin, T_NEAR);
@@ -1874,8 +1905,8 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
     auto rSrcTmp  = r64Ref();
     auto rDstTmp  = r64Ref();
     mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
-    mov(rSrcTmp, r64Pool[rSrcIdx]);
-    mov(rDstTmp, r64Pool[rDstIdx]);
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst);
     L(lChannelLoopBegin);
     {
         cmp(rChannel, 0);
@@ -1961,36 +1992,13 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
         } else {
             uni_vmovups(ptr[(Xbyak::Reg64)rDstTmp], vYDotProd);
         }
-        add(rSrcTmp, r64Pool[rSrcChannelStepBIdx]);
-        add(rDstTmp, r64Pool[rDstChannelStepBIdx]);
+        add(rSrcTmp, regSrcChannelStepB);
+        add(rDstTmp, regDstChannelStepB);
         dec(rChannel);
 
         jmp(lChannelLoopBegin, T_NEAR);
         L(lChannelLoopEnd);
     }
-}
-
-template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::tail() {
-    Xbyak::Label lEnd;
-    cmp(r64Pool[rWorkAmountIdx], 0);
-    jle(lEnd, T_NEAR);
-
-    const Vmm& vHCoord = vPool[getVecIdx()];
-    const Vmm& vWCoord = vPool[getVecIdx()];
-
-    getTailCoordinates(vHCoord, vWCoord);
-    denormalizeRawCoordinates(vWCoord, vHCoord);
-    interpolation(vWCoord, vHCoord, true);
-
-    releaseVecIdx(vHCoord.getIdx());
-    releaseVecIdx(vWCoord.getIdx());
-
-    if (dataTypeSize > 1)
-        sal(r64Pool[rWorkAmountIdx], dataTypeShift); // multiply by source data type size.
-    add(r64Pool[rDstIdx], r64Pool[rWorkAmountIdx]);
-
-    L(lEnd);
 }
 
 template <x64::cpu_isa_t isa>
