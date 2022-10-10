@@ -159,6 +159,12 @@ void GridSample::createPrimitive() {
             p.srcWidthSub1F.resize(dataElPerVec);
             p.srcHeightMul2F.resize(dataElPerVec);
             p.srcWidthMul2F.resize(dataElPerVec);
+            p.srcHeightMul2Sub1F.resize(dataElPerVec);
+            p.srcWidthMul2Sub1F.resize(dataElPerVec);
+            if (alignCorners) {
+                p.wDenormCoefF.resize(dataElPerVec);
+                p.hDenormCoefF.resize(dataElPerVec);
+            }
         });
     }
 
@@ -208,43 +214,35 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
         p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
         std::fill(p.dataTypeSize.begin(), p.dataTypeSize.end(), dataTypeSize);
 
-        if (x64::mayiuse(x64::avx512_core)) {
-            p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
-            p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
-            p.srcHeightMul2F[0] = p.srcHeightF * 2.f;
-            p.srcWidthMul2F[0]  = p.srcWidthF  * 2.f;
-            if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
-                p.srcWidthB[0] = (srcDataShape[3] - 3) * dataTypeSize;
-            } else {
-                p.srcWidthB[0] = srcDataShape[3] * dataTypeSize;
-            }
-            if (alignCorners) {
-                p.srcHeightMul2Sub1F[0] = p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f;
-                p.srcWidthMul2Sub1F[0]  = p.srcWidthF == 1.f  ? 1.f : p.srcWidthSub1F[0] * 2.f;
-                p.wDenormCoefF[0] = (p.srcWidthF  - 1.f) / 2.f;
-                p.hDenormCoefF[0] = (p.srcHeightF - 1.f) / 2.f;
-            } else {
-                p.srcHeightMul2Sub1F[0] = p.srcHeightMul2F[0] - 1.f;
-                p.srcWidthMul2Sub1F[0]  = p.srcWidthMul2F[0]  - 1.f;
-            }
+        p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
+        p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
+        p.srcHeightMul2F[0] = p.srcHeightF * 2.f;
+        p.srcWidthMul2F[0]  = p.srcWidthF  * 2.f;
+        if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
+            p.srcWidthB[0] = (srcDataShape[3] - 3) * dataTypeSize;
         } else {
-            std::fill(p.srcHeightSub1F.begin(), p.srcHeightSub1F.end(), p.srcHeightF - 1.f);
-            std::fill(p.srcWidthSub1F.begin(),  p.srcWidthSub1F.end(),  p.srcWidthF  - 1.f);
-            std::fill(p.srcHeightMul2F.begin(), p.srcHeightMul2F.end(), p.srcHeightF * 2.f);
-            std::fill(p.srcWidthMul2F.begin(),  p.srcWidthMul2F.end(),  p.srcWidthF  * 2.f);
-            if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
-                std::fill(p.srcWidthB.begin(), p.srcWidthB.end(), (srcDataShape[3] - 3) * dataTypeSize);
-            } else {
-                std::fill(p.srcWidthB.begin(), p.srcWidthB.end(), srcDataShape[3] * dataTypeSize);
-            }
+            p.srcWidthB[0] = srcDataShape[3] * dataTypeSize;
+        }
+        if (alignCorners) {
+            p.srcHeightMul2Sub1F[0] = p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f;
+            p.srcWidthMul2Sub1F[0]  = p.srcWidthF == 1.f  ? 1.f : p.srcWidthSub1F[0]  * 2.f;
+            p.wDenormCoefF[0] = (p.srcWidthF  - 1.f) / 2.f;
+            p.hDenormCoefF[0] = (p.srcHeightF - 1.f) / 2.f;
+        } else {
+            p.srcHeightMul2Sub1F[0] = p.srcHeightMul2F[0] - 1.f;
+            p.srcWidthMul2Sub1F[0]  = p.srcWidthMul2F[0]  - 1.f;
+        }
+        if (!x64::mayiuse(x64::avx512_core)) {
+            std::fill(p.srcHeightSub1F.begin(), p.srcHeightSub1F.end(), p.srcHeightSub1F[0]);
+            std::fill(p.srcWidthSub1F.begin(),  p.srcWidthSub1F.end(),  p.srcWidthSub1F[0]);
+            std::fill(p.srcHeightMul2F.begin(), p.srcHeightMul2F.end(), p.srcHeightMul2F[0]);
+            std::fill(p.srcWidthMul2F.begin(),  p.srcWidthMul2F.end(),  p.srcWidthMul2F[0]);
+            std::fill(p.srcWidthB.begin(),      p.srcWidthB.end(),      p.srcWidthB[0]);
+            std::fill(p.srcHeightMul2Sub1F.begin(), p.srcHeightMul2Sub1F.end(), p.srcHeightMul2Sub1F[0]);
+            std::fill(p.srcWidthMul2Sub1F.begin(),  p.srcWidthMul2Sub1F.end(),  p.srcWidthMul2Sub1F[0]);
             if (alignCorners) {
-                p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f);
-                p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthF == 1.f ? 1.f : p.srcWidthSub1F[0]  * 2.f);
-                p.wDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcWidthF  - 1.f) / 2.f);
-                p.hDenormCoefF = std::vector<float>(jitKernel->getDataElPerVec(), (p.srcHeightF - 1.f) / 2.f);
-            } else {
-                p.srcHeightMul2Sub1F = std::vector<float>(jitKernel->getDataElPerVec(), p.srcHeightMul2F[0] - 1.f);
-                p.srcWidthMul2Sub1F  = std::vector<float>(jitKernel->getDataElPerVec(), p.srcWidthMul2F[0]  - 1.f);
+                std::fill(p.wDenormCoefF.begin(), p.wDenormCoefF.end(), p.wDenormCoefF[0]);
+                std::fill(p.hDenormCoefF.begin(), p.hDenormCoefF.end(), p.hDenormCoefF[0]);
             }
         }
     });

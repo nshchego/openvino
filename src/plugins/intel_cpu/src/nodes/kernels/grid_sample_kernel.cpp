@@ -481,8 +481,7 @@ void JitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
 
 template <>
 void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
-    Xbyak::Label lRest, lGridShift, lEnd;
-    auto vAux = vmmRef();
+    Xbyak::Label lRest, lHShuf, lGridShift, lEnd;
     auto rAux = r64Ref();
 
     mov(rAux, r64Pool[rWorkAmountIdx]);
@@ -490,26 +489,30 @@ void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, con
     cmp(r64Pool[rWorkAmountIdx], gridElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        pshufd(vWCoord, ptr[r64Pool[rGridIdx]], 0xD8);
-        shufpd(vHCoord, vWCoord, 0x2);
+        pshufd(vWCoord, ptr[r64Pool[rGridIdx]], 0B11011000);
+        shufpd(vHCoord, vWCoord, 0B00000010);
 
         add(r64Pool[rGridIdx], vlen);
         sub(rAux, gridElPerVec);
         cmp(rAux, 0);
-        jle(lEnd, T_NEAR);
+        jle(lHShuf, T_NEAR);
 
+        auto vAux = vmmRef();
         load(vAux, r64Pool[rGridIdx], rAux, dataTypeSize);
-        pshufd(vAux, vAux, 0xD8);
-        shufpd(vWCoord, vAux, 0x0); // Extract X component
-        shufpd(vHCoord, vAux, 0x3); // Extract Y component
+        pshufd(vAux, vAux, 0B11011000);
+        shufpd(vWCoord, vAux, 0);          // Extract X component
+        shufpd(vHCoord, vAux, 0B00000011); // Extract Y component
 
         jmp(lGridShift, T_NEAR);
+        L(lHShuf);
+        shufpd(vHCoord, vHCoord, 0B00000001); // Extract Y component
+        jmp(lEnd, T_NEAR);
     }
     L(lRest);
     {
         load(vWCoord, r64Pool[rGridIdx], rAux, dataTypeSize);
-        pshufd(vWCoord, vWCoord, 0xD8);  // Extract X component
-        shufpd(vHCoord, vWCoord, 0x2);   // Extract Y component
+        pshufd(vWCoord, vWCoord, 0B11011000); // Extract X component
+        shufpd(vHCoord, vWCoord, 0B00000010); // Extract Y component
     }
 
     L(lGridShift);
@@ -828,7 +831,7 @@ void JitGridSampleKernel<x64::sse41>::reflectionPadding(const Vmm& vCoordDst, co
 
     auto vAux1 = vmmRef();
     uni_vmovups(vAux1, vPool[dim == coord::w ? srcWidthFIdx : srcHeightFIdx]);
-    vcmpps(vAux1, vAux1, vCoordDst, 0x2); // vCoordDst >= vSrcDimF
+    uni_vcmpps(vAux1, vAux1, vCoordDst, 0x2); // vCoordDst >= vSrcDimF
     uni_vpand(vCoordDst, vCoordDst, vAux1);
     uni_vpand(vAux1, vAux1, vAux);
     uni_vaddps(vCoordDst, vCoordDst, vAux1);
@@ -844,7 +847,7 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
         static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-        mov(rAux, reinterpret_cast<uintptr_t>(absMask)); // TODO: use PSIGND or vpabsd
+        mov(rAux, reinterpret_cast<uintptr_t>(absMask)); // TODO: use PSIGND or vpabsd, slld
         uni_vandps(vCoordDst, vCoordDst, ptr[(Xbyak::Reg64)rAux]); // abs(x)
         if (dim == coord::w) {
             mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
@@ -901,9 +904,9 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef
         uni_vmulps(vCoef, vCoef, vDDim);
         uni_vfmadd132ps(vCoef, vPool[onesFIdx], vDDim);
     } else if (idx == 2) {
-        uni_vmulps(vCoef, vDDim, vDDim);
-        uni_vfmadd132ps(vCoef, vPool[const_0_75_idx], vPool[const_1_25_idx]);
-        uni_vfmsub231ps(vCoef, vDDim, vPool[const_1_50_idx]);
+        uni_vmovups(vCoef, vDDim);
+        vfnmadd132ps(vCoef, vPool[const_1_50_idx], vPool[const_1_25_idx]);
+        uni_vfmsub132ps(vCoef, vPool[const_0_75_idx], vDDim);
         uni_vmulps(vCoef, vCoef, vDDim);
     } else if (idx == 3) {
         uni_vmulps(vCoef, vPool[const_0_75_idx], vDDim);
@@ -1991,12 +1994,12 @@ void JitGridSampleKernel<isa>::tail() {
 template <x64::cpu_isa_t isa>
 void JitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth) {
     if (vDst.getIdx() == vWCoord.getIdx()) {
-        if (one_of(isa, x64::avx2, x64::avx512_core)) {
+        if (one_of(isa, x64::avx512_core, x64::avx2)) {
             uni_vfmadd231ps(vDst, vHCoord, vWidth);
         } else {
             auto vTmp = vmmRef();
             uni_vmulps(vTmp, vHCoord, vWidth);
-            uni_vaddps(vDst, vTmp, vWCoord);
+            uni_vaddps(vDst, vWCoord, vTmp);
         }
     } else if (vDst.getIdx() == vHCoord.getIdx()) {
         uni_vfmadd132ps(vDst, vWCoord, vWidth);
