@@ -283,7 +283,7 @@ void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
     auto rAux1 = r64Ref();
     Xbyak::Label lKmov;
     Xbyak::Reg32 rOnes(rAux1.getIdx());
-    const uint32_t typeSize = 4;
+    const uint64_t typeSize = 4;
     const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx512_core>::vlen / typeSize;
 
     mov(rOnes, 0x0000FFFF);
