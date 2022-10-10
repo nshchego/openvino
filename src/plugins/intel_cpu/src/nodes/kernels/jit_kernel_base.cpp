@@ -17,9 +17,6 @@ JitKernelBase::JitKernelBase() {
     for (int i = 0; i < vecNum; i++) {
         vecSet.insert(i);
     }
-    for (auto el : r64Pool) {
-        regSet.insert(el.first);
-    }
 }
 
 void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm&     x1,

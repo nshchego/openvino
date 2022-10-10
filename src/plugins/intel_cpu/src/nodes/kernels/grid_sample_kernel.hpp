@@ -104,15 +104,14 @@ private:
     uint8_t dataTypeShift = 0;
 
     // Suffix "B" means "In Bytes", "F" - float.
-    // 64b register indices.
-    int rSrcIdx             = -1;
-    int rGridIdx            = -1;
-    int rDstIdx             = -1;
-    int rBatchIdx           = -1;
-    int rChannelNumIdx      = -1;
-    int rWorkAmountIdx      = -1;
-    int rSrcChannelStepBIdx = -1;
-    int rDstChannelStepBIdx = -1;
+    // 64b registers.
+    RegistersPool::Reg<Xbyak::Reg64> regSrc;
+    RegistersPool::Reg<Xbyak::Reg64> regGrid;
+    RegistersPool::Reg<Xbyak::Reg64> regDst;
+    RegistersPool::Reg<Xbyak::Reg64> regChannelNum;
+    RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
+    RegistersPool::Reg<Xbyak::Reg64> regSrcChannelStepB;
+    RegistersPool::Reg<Xbyak::Reg64> regDstChannelStepB;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 

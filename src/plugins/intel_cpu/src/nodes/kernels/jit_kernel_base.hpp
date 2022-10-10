@@ -8,6 +8,7 @@
 #include <ie_common.h>
 #include <dnnl_types.h>
 #include "utils/general_utils.h"
+#include "registers_pool.hpp"
 
 #include <set>
 
@@ -17,7 +18,7 @@ namespace intel_cpu {
 template <typename Vmm>
 class vRefWrap;
 
-#define r64Ref() rRefWrap<Xbyak::Reg64>(this, r64Pool[getRegIdx()])
+#define r64Ref() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 protected:
@@ -199,38 +200,9 @@ protected:
         vecSet.insert(idx);
     }
 
-    int getRegIdx() {
-        if (regSet.empty()) {
-            IE_THROW() << "There is no available x64 register.";
-        }
-        int idx = *regSet.rbegin();
-        regSet.erase(*regSet.rbegin());
-        return idx;
-    }
-
-    int getRegIdx(int& idx) {
-        idx = getRegIdx();
-        return idx;
-    }
-
-    void releaseRegIdx(int idx) {
-        if (r64Pool.find(idx) == r64Pool.end()) {
-            IE_THROW() << "Invalid x64 register index: " << idx << ".";
-        }
-        if (regSet.count(idx)) {
-            IE_THROW() << "Register with index " << idx << " was already released.";
-        }
-        regSet.insert(idx);
-    }
-
     const size_t vecNum = isValidIsa(dnnl::impl::cpu::x64::avx512_core) ? 32 :
                           isValidIsa(dnnl::impl::cpu::x64::avx2) || isValidIsa(dnnl::impl::cpu::x64::avx) ? 16 : 8;
     std::set<int> vecSet;
-
-    std::unordered_map<int, Xbyak::Reg64> r64Pool = { {rdx.getIdx(), rdx}, {rbx.getIdx(), rbx}, {rbp.getIdx(), rbp}, {rsi.getIdx(), rsi},
-                                                      {r8.getIdx(), r8},   {r9.getIdx(), r9},   {r10.getIdx(), r10}, {r11.getIdx(), r11},
-                                                      {r12.getIdx(), r12}, {r13.getIdx(), r13}, {r14.getIdx(), r14}, {r15.getIdx(), r15} };
-    std::set<int> regSet;
 
     template <typename Vmm>
     class vRefWrap {
@@ -249,22 +221,7 @@ protected:
         }
     };
 
-    template <typename RegType>
-    class rRefWrap {
-         JitKernelBase* ker;
-        RegType& ref;
-    public:
-        rRefWrap(JitKernelBase* ker, RegType& ref) : ker(ker), ref(ref) {}
-        ~rRefWrap() {
-            ker->releaseRegIdx(ref.getIdx());
-        }
-        operator RegType() {
-            return ref;
-        }
-        int getIdx() {
-            return ref.getIdx();
-        }
-    };
+    RegistersPool::Ptr registersPool;
 };
 
 }
