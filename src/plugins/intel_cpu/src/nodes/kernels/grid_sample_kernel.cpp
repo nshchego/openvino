@@ -789,9 +789,7 @@ void JitGridSampleKernel<x64::sse41>::reflectionPadding(const Vmm& vCoordDst, co
         // abs(x) % D21
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
-        static const unsigned absMask[4] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-        mov(rAux, reinterpret_cast<uintptr_t>(absMask)); // TODO: use PSIGND
-        uni_vandps(vCoordDst, vCoordDst, ptr[(Xbyak::Reg64)rAux]); // abs(x)
+        uni_vpsignd(vCoordDst, vCoordDst, vCoordDst); // abs(x)
         if (dim == coord::w) {
             mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
         } else if (coord::h) {
@@ -846,9 +844,13 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
         // abs(x) % D21
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
-        static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-        mov(rAux, reinterpret_cast<uintptr_t>(absMask)); // TODO: use PSIGND or vpabsd, slld
-        uni_vandps(vCoordDst, vCoordDst, ptr[(Xbyak::Reg64)rAux]); // abs(x)
+        if (isa == x64::avx2) { // abs(x)
+            uni_vpsignd(vCoordDst, vCoordDst, vCoordDst);
+        } else {
+            static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
+            mov(rAux, reinterpret_cast<uintptr_t>(absMask));
+            uni_vandps(vCoordDst, vCoordDst, ptr[(Xbyak::Reg64)rAux]);
+        }
         if (dim == coord::w) {
             mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
         } else if (coord::h) {
