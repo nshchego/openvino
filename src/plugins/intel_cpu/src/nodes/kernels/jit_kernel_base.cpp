@@ -309,13 +309,13 @@ void JitKernelBase::load(const Xbyak::Xmm&   vDst,
     }
     const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
     Xbyak::Label lLoopEnd;
-    auto rAux = r64Ref();
-    mov(rAux, rLoadNum);
+    auto rRestCounter = r64Ref();
+    mov(rRestCounter, rLoadNum);
     if (zeroFilling)
         uni_vpxor(vDst, vDst, vDst);
 
     for (uint8_t i = 0; i < elPerVec; i++) {
-        cmp(rAux, 0);
+        cmp(rRestCounter, 0);
         jle(lLoopEnd, T_NEAR);
 
         if (typeSize == 1)
@@ -327,7 +327,7 @@ void JitKernelBase::load(const Xbyak::Xmm&   vDst,
         else if (typeSize == 8)
             pinsrq(vDst, ptr[rSrc + i * typeSize], i);
 
-        dec(rAux);
+        dec(rRestCounter);
     }
     L(lLoopEnd);
 }
