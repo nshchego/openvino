@@ -115,37 +115,35 @@ private:
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
-    // Masks pool. Do not use k0 with gather instruction!
-    Vmask masksContainer[7] = {Vmask(0), Vmask(1), Vmask(2), Vmask(3), Vmask(4), Vmask(5), Vmask(6)};
-    const Vmask kTailMask = Vmask(k7.getIdx());
-    std::vector<Vmm> vPool;
+    // Tail mask.
+    RegistersPool::Reg<Vmask> kTailMask;
 
-    // Vector register indices.
-    int srcHeightFIdx         = -1;
-    int srcWidthFIdx          = -1;
-    int zerosIdx              = -1;
-    int halfFIdx              = -1;
-    int onesFIdx              = -1;
-    int wDenormCoefFIdx       = -1;
-    int hDenormCoefFIdx       = -1;
-    int gridPermMaskIdx       = -1;
-    int dataTypeSizeIdx       = -1; // for ZEROS padding
-    int srcWidthBIdx          = -1; // for ZEROS padding
+    // Vector registers.
+    RegistersPool::Reg<Vmm> vSrcHeightF; 
+    RegistersPool::Reg<Vmm> vSrcWidthF; 
+    RegistersPool::Reg<Vmm> vZeros;
+    RegistersPool::Reg<Vmm> vHalfF;
+    RegistersPool::Reg<Vmm> vOnesF;
+    RegistersPool::Reg<Vmm> vWDenormCoefF;
+    RegistersPool::Reg<Vmm> vHDenormCoefF;
+    RegistersPool::Reg<Vmm> vGridPermMask;
+    RegistersPool::Reg<Vmm> vDataTypeSize;       // for ZEROS padding
+    RegistersPool::Reg<Vmm> vSrcWidthB;          // for ZEROS padding
 
-    int srcHeightSub1FIdx     = -1; // for BORDER padding
-    int srcWidthSub1FIdx      = -1; // for BORDER padding
+    RegistersPool::Reg<Vmm> vSrcHeightSub1F;     // for BORDER padding
+    RegistersPool::Reg<Vmm> vSrcWidthSub1F;      // for BORDER padding
 
-    int srcHeightMul2FIdx     = -1; // for REFLECTION padding
-    int srcWidthMul2FIdx      = -1; // for REFLECTION padding
-    int srcHeightMul2Sub1FIdx = -1; // for REFLECTION padding
-    int srcWidthMul2Sub1FIdx  = -1; // for REFLECTION padding
-    int absMaskIdx            = -1; // for REFLECTION padding
+    RegistersPool::Reg<Vmm> vSrcHeightMul2F;     // for REFLECTION padding
+    RegistersPool::Reg<Vmm> vSrcWidthMul2F;      // for REFLECTION padding
+    RegistersPool::Reg<Vmm> vSrcHeightMul2Sub1F; // for REFLECTION padding
+    RegistersPool::Reg<Vmm> vSrcWidthMul2Sub1F;  // for REFLECTION padding
+    RegistersPool::Reg<Vmm> vAbsMask;            // for REFLECTION padding
 
-    int const_0_75_idx        = -1; // for BICUBIC interpolation
-    int const_1_25_idx        = -1; // for BICUBIC interpolation
-    int const_1_50_idx        = -1; // for BICUBIC interpolation
-    int const_2_00_idx        = -1; // for BICUBIC interpolation
-    int const_2_25_idx        = -1; // for BICUBIC interpolation
+    RegistersPool::Reg<Vmm> vConst_0_75;         // for BICUBIC interpolation
+    RegistersPool::Reg<Vmm> vConst_1_25;         // for BICUBIC interpolation
+    RegistersPool::Reg<Vmm> vConst_1_50;         // for BICUBIC interpolation
+    RegistersPool::Reg<Vmm> vConst_2_00;         // for BICUBIC interpolation
+    RegistersPool::Reg<Vmm> vConst_2_25;         // for BICUBIC interpolation
 
     void process();
     void spatialLoop();

@@ -10,14 +10,6 @@ using namespace ov;
 using namespace intel_cpu;
 using namespace dnnl::impl::cpu;
 
-template <typename Vmm>
-class vRefWrap;
-
-JitKernelBase::JitKernelBase() {
-    for (int i = 0; i < vecNum; i++) {
-        vecSet.insert(i);
-    }
-}
 
 void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm&     x1,
                                     const Xbyak::Xmm&     x2,
@@ -189,7 +181,7 @@ void JitKernelBase::gatherdd(const Xbyak::Xmm&   vDst,
 
         vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
     } else {
-        auto rAux = r64Ref();
+        auto rAux = getReg64();
         Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
         const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / sizeof(int);
 
@@ -276,8 +268,8 @@ void JitKernelBase::uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &
 void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
                                      const Xbyak::Zmm&    zAux,
                                      const Xbyak::Reg64&  rWorkRest) {
-    auto rAux0 = r64Ref();
-    auto rAux1 = r64Ref();
+    auto rAux0 = getReg64();
+    auto rAux1 = getReg64();
     Xbyak::Label lKmov;
     Xbyak::Reg32 rOnes(rAux1.getIdx());
     const uint64_t typeSize = 4;
@@ -306,7 +298,7 @@ void JitKernelBase::load(const Xbyak::Xmm&   vDst,
     }
     const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
     Xbyak::Label lLoopEnd;
-    auto rRestCounter = r64Ref();
+    auto rRestCounter = getReg64();
     mov(rRestCounter, rLoadNum);
     if (zeroFilling)
         uni_vpxor(vDst, vDst, vDst);
@@ -339,7 +331,7 @@ void JitKernelBase::load(const Xbyak::Ymm&   vDst,
     }
     const uint8_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::avx>::vlen / typeSize;
     Xbyak::Label lEnd, lLoop2End;
-    auto rAux = r64Ref();
+    auto rAux = getReg64();
     mov(rAux, rLoadNum);
     if (zeroFilling)
         uni_vpxor(vDst, vDst, vDst);
@@ -392,7 +384,7 @@ void JitKernelBase::store(const Xbyak::Reg64& rDst,
                           const size_t        dstOffset) {
     Xbyak::Label lEnd;
     const uint64_t elPerVec = dnnl::impl::cpu::x64::cpu_isa_traits<dnnl::impl::cpu::x64::sse41>::vlen / typeSize;
-    auto rRestCounter = r64Ref();
+    auto rRestCounter = getReg64();
     mov(rRestCounter, rToStoreNum);
 
     for (size_t k = 0; k < elPerVec; k++) {
@@ -450,7 +442,7 @@ void JitKernelBase::maskMov32(const Xbyak::Operand& opDst,
                               const bool            useMask,
                               const bool            zeroMask) {
     Xbyak::Label lEnd;
-    auto rAux = r64Ref();
+    auto rAux = getReg64();
     Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
     const uint8_t typeSize = 4;
 
