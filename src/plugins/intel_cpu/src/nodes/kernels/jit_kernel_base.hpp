@@ -66,6 +66,22 @@ protected:
         }
     }
 
+    void uni_vpermd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vMask, const Xbyak::Operand& src) {
+        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
+            vpermd(vDst, vMask, src);
+        } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
+
+        }
+    }
+
+    void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Operand& src) {
+        vpermd(vDst, vMask, src);
+    }
+
+    void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op);
+
+    void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op);
+
     void gatherdd(const Xbyak::Xmm&    vDst,
                   const Xbyak::Reg64&  rSrcPtr,
                   const Xbyak::Xmm&    vSrcShift,
@@ -87,22 +103,6 @@ protected:
                   const bool useMask  = true,
                   const bool zeroFill = false);
 
-    void uni_vpermd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vMask, const Xbyak::Operand& src) {
-        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
-            vpermd(vDst, vMask, src);
-        } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
-
-        }
-    }
-
-    void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Operand& src) {
-        vpermd(vDst, vMask, src);
-    }
-
-    void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op);
-
-    void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op);
-
     void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
                           const Xbyak::Zmm& zAux,
                           const Xbyak::Reg64& rWorkRest);
@@ -111,13 +111,13 @@ protected:
               const Xbyak::Reg64& rSrc,
               const Xbyak::Reg64& rLoadNum,
               const uint8_t       typeSize,
-              const bool zeroFilling = false);
+              const bool zeroFill = false);
 
     void load(const Xbyak::Ymm&   vDst,
               const Xbyak::Reg64& rSrc,
               const Xbyak::Reg64& rLoadNum,
               const uint8_t       typeSize,
-              const bool zeroFilling = false);
+              const bool zeroFill = false);
 
     void store(const Xbyak::Reg64& rDst,
                const Xbyak::Reg64& rToStoreNum,
@@ -131,49 +131,23 @@ protected:
                const size_t        typeSize,
                const size_t        dstOffset = 0lu);
 
-    // Makes gather from memory under the vReadMask and writes to the XMM/m128.
-    // It can fill in values not read from the source with zero.
-    void maskMov32(const Xbyak::Operand& opDst,
-                   const Xbyak::Operand& opSrc,
-                   const Xbyak::Xmm&     xmmReadMask,
-                   const Xbyak::Xmm&     xmmSrcShift,
-                   const Xbyak::Reg64&   rToStoreCounter,
-                   const bool useMask  = false,
-                   const bool zeroMask = false);
+    // Makes gather from memory under the vReadMask and writes to the memory m128.
+    void memMovDD(const Xbyak::Reg64& rDst,
+                  const Xbyak::Reg64& rSrc,
+                  const Xbyak::Xmm&   vReadMask,
+                  const Xbyak::Xmm&   vSrcShift,
+                  const Xbyak::Reg64& rToStoreCounter,
+                  const bool useMask  = true,
+                  const bool zeroFill = false);
 
-    // Makes gather from memory under the vReadMask and writes to the YMM/m256.
-    // It can fill in values not read from the source with zero.
-    void maskMov32(const Xbyak::Operand& opDst,
-                   const Xbyak::Operand& opSrc,
-                   const Xbyak::Ymm&     vReadMask,
-                   const Xbyak::Ymm&     vSrcShift,
-                   const Xbyak::Reg64&   rToStoreCounter,
-                   const bool useMask  = false,
-                   const bool zeroMask = false);
-
-    // Makes gather from memory under the vReadMask and writes to the XMM/m128 under the vWriteMask
-    // It can fill in values not read from the source with zero.
-    void maskMov32(const Xbyak::Operand& opDst,
-                   const Xbyak::Operand& opSrc,
-                   const Xbyak::Xmm&     vReadMask,
-                   const Xbyak::Xmm&     vWriteMask,
-                   const Xbyak::Xmm&     vSrcShift,
-                   const Xbyak::Xmm&     vAux,
-                   const Xbyak::Reg64&   rAux,
-                   const bool useMask  = false,
-                   const bool zeroMask = false);
-
-    // Gathers data from memory under the vReadMask and writes to the YMM/m256 under the vWriteMask
-    // It can fill in values not read from the source with zero.
-    void maskMov32(const Xbyak::Operand& opDst,
-                   const Xbyak::Operand& opSrc,
-                   const Xbyak::Ymm&     vReadMask,
-                   const Xbyak::Ymm&     vWriteMask,
-                   const Xbyak::Ymm&     vSrcShift,
-                   const Xbyak::Ymm&     vAux,
-                   const Xbyak::Reg64&   rAux,
-                   const bool useMask  = false,
-                   const bool zeroMask = false);
+    // Makes gather from the memory under the vReadMask and writes to the memory m256.
+    void memMovDD(const Xbyak::Reg64& rDst,
+                  const Xbyak::Reg64& rSrc,
+                  const Xbyak::Ymm&   vReadMask,
+                  const Xbyak::Ymm&   vSrcShift,
+                  const Xbyak::Reg64& rToStoreCounter,
+                  const bool useMask  = true,
+                  const bool zeroFill = false);
 
     RegistersPool::Ptr registersPool;
 };
