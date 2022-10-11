@@ -15,15 +15,14 @@
 namespace ov {
 namespace intel_cpu {
 
-template <typename Vmm>
-class vRefWrap;
-
-#define r64Ref() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
+#define getReg64() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
+#define getVmm()   RegistersPool::Reg<Vmm>(registersPool)
+#define getMask()  RegistersPool::Reg<Vmask>(registersPool)
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 protected:
 
-    JitKernelBase();
+    JitKernelBase() {};
 
     inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {
         return is_subset(isa, dnnl::impl::cpu::x64::isa_all) && dnnl::impl::cpu::x64::mayiuse(isa);
@@ -175,51 +174,6 @@ protected:
                    const Xbyak::Reg64&   rAux,
                    const bool useMask  = false,
                    const bool zeroMask = false);
-
-    int getVecIdx() {
-        if (vecSet.empty()) {
-            IE_THROW() << "There is no available vector register.";
-        }
-        int idx = *vecSet.begin();
-        vecSet.erase(vecSet.begin());
-        return idx;
-    }
-
-    int getVecIdx(int& idx) {
-        idx = getVecIdx();
-        return idx;
-    }
-
-    void releaseVecIdx(int idx) {
-        if (idx < 0 && idx >= vecNum) {
-            IE_THROW() << "Invalid vector register index: " << idx << ".";
-        }
-        if (vecSet.count(idx)) {
-            IE_THROW() << "Vector with index " << idx << " was already released.";
-        }
-        vecSet.insert(idx);
-    }
-
-    const size_t vecNum = isValidIsa(dnnl::impl::cpu::x64::avx512_core) ? 32 :
-                          isValidIsa(dnnl::impl::cpu::x64::avx2) || isValidIsa(dnnl::impl::cpu::x64::avx) ? 16 : 8;
-    std::set<int> vecSet;
-
-    template <typename Vmm>
-    class vRefWrap {
-        JitKernelBase* ker;
-        Vmm& ref;
-    public:
-        vRefWrap(JitKernelBase* ker, Vmm& ref) : ker(ker), ref(ref) {}
-        ~vRefWrap() {
-            ker->releaseVecIdx(ref.getIdx());
-        }
-        operator Vmm() {
-            return ref;
-        }
-        int getIdx() {
-            return ref.getIdx();
-        }
-    };
 
     RegistersPool::Ptr registersPool;
 };
