@@ -48,6 +48,7 @@ struct jGridSamplesExecArgs {
     const void* srcHeightSub1F;
     const void* srcWidthSub1F;
     const void* dataTypeSize;
+    const void* buffer;
     uint64_t workAmount = 0lu;
 };
 
@@ -163,6 +164,7 @@ private:
     void tail();
 
     // Aux
+    void typeShiftPs();
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
 };
 

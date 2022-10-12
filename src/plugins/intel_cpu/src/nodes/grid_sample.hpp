@@ -49,6 +49,7 @@ public:
         std::vector<float> wDenormCoefF{ 1.f };
         std::vector<float> hDenormCoefF{ 1.f };
         uint64_t workAmount = 0lu;
+        std::vector<int> buffer;
     };
 
 protected:

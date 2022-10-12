@@ -11,8 +11,8 @@ using namespace intel_cpu;
 using namespace dnnl::impl::cpu;
 
 
-void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm&     x1,
-                                    const Xbyak::Xmm&     x2,
+void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& x1,
+                                    const Xbyak::Xmm& x2,
                                     const Xbyak::Operand& op) {
     // Note: x1 gets overriden by x1*op
     // This is incorrect if x1 == x2
@@ -29,8 +29,8 @@ void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm&     x1,
     }
 }
 
-void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm&     x1,
-                                     const Xbyak::Xmm&     x2,
+void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& x1, // TODO: not needed?
+                                     const Xbyak::Xmm& x2,
                                      const Xbyak::Operand& op) {
     // Note: x1 gets overriden by x1*op
     // This is incorrect if x1 == x2
@@ -67,8 +67,8 @@ void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm &x1,
     }
 }
 
-void JitKernelBase::uni_vpaddd(const Xbyak::Ymm&     vDst,
-                               const Xbyak::Ymm&     vSrc,
+void JitKernelBase::uni_vpaddd(const Xbyak::Ymm& vDst,
+                               const Xbyak::Ymm& vSrc,
                                const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vpaddd(vDst, vSrc, op);
