@@ -257,24 +257,24 @@ void GridSample::execute(dnnl::stream strm) {
     uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
 // DEBUG
-std::cout << "\nINPUT DATA: " << std::endl;
-float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i % jitKernel->getDataElPerVec() == 0)
-        std::cout << "| ";
-    std::cout << srcDataF[i] << "; ";
-}
-std::cout << std::endl;
-
-std::cout << "GRID DATA: " << std::endl;
-float* gridDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetSize() / gridTypeSize; i++) {
-    if (i % jitKernel->getGridElPerVec() == 0)
-        std::cout << "| ";
-    std::cout << gridDataF[i] << "; ";
-}
-std::cout << std::endl;
-std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
+//std::cout << "\nINPUT DATA: " << std::endl;
+//float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//    if (i % jitKernel->getDataElPerVec() == 0)
+//        std::cout << "| ";
+//    std::cout << srcDataF[i] << "; ";
+//}
+//std::cout << std::endl;
+//
+//std::cout << "GRID DATA: " << std::endl;
+//float* gridDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetSize() / gridTypeSize; i++) {
+//    if (i % jitKernel->getGridElPerVec() == 0)
+//        std::cout << "| ";
+//    std::cout << gridDataF[i] << "; ";
+//}
+//std::cout << std::endl;
+//std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
 // DEBUG
 
     auto threadBody = [&](const int ithr, const int nthr) {
@@ -312,16 +312,16 @@ std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
     parallel_nt(0, threadBody);
 
 // DEBUG
-std::cout << "OUTPUT: " << std::endl;
-float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i % jitKernel->getDataElPerVec() == 0)
-        std::cout << "| ";
-    std::cout << dstDataF[i] << "; ";
-}
-std::cout << std::endl << std::endl;
+//std::cout << "OUTPUT: " << std::endl;
+//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+////char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//    if (i % jitKernel->getDataElPerVec() == 0)
+//        std::cout << "| ";
+//    std::cout << dstDataF[i] << "; ";
+//}
+//std::cout << std::endl << std::endl;
 // DEBUG
 }
 
