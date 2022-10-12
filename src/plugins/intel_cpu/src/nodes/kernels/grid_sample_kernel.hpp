@@ -164,7 +164,7 @@ private:
     void tail();
 
     // Aux
-    void typeShiftPs();
+    void dataTypeShiftPs(const Vmm& vDst);
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
 };
 

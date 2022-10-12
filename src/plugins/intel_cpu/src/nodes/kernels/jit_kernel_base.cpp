@@ -11,59 +11,53 @@ using namespace intel_cpu;
 using namespace dnnl::impl::cpu;
 
 
-void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& x1,
-                                    const Xbyak::Xmm& x2,
+void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& dst,
+                                    const Xbyak::Xmm& src,
                                     const Xbyak::Operand& op) {
-    // Note: x1 gets overriden by x1*op
-    // This is incorrect if x1 == x2
     if (isValidIsa(x64::avx2)) {
-        vfmsub132ps(x1, x2, op);
+        vfmsub132ps(dst, src, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(x1.getIdx() != x2.getIdx());
-        vmulps(x1, x1, op);
-        vsubps(x1, x1, x2);
+        assert(dst.getIdx() != src.getIdx());
+        vmulps(dst, dst, op);
+        vsubps(dst, dst, src);
     } else {
-        assert(x1.getIdx() != x2.getIdx());
-        mulps(x1, op);
-        subps(x1, x2);
+        assert(dst.getIdx() != src.getIdx());
+        mulps(dst, op);
+        subps(dst, src);
     }
 }
 
-void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& x1, // TODO: not needed?
-                                     const Xbyak::Xmm& x2,
+void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& dst,
+                                     const Xbyak::Xmm& src,
                                      const Xbyak::Operand& op) {
-    // Note: x1 gets overriden by x1*op
-    // This is incorrect if x1 == x2
     if (isValidIsa(x64::avx2)) {
-        vfnmadd132ps(x1, x2, op);
+        vfnmadd132ps(dst, src, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(x1.getIdx() != x2.getIdx());
-        vmulps(x1, x1, op);
-        vsubps(x1, x2, x1);
+        assert(dst.getIdx() != src.getIdx());
+        vmulps(dst, dst, op);
+        vsubps(dst, src, dst);
     } else {
-        assert(x1.getIdx() != x2.getIdx());
-        mulps(x1, op);
-        subps(x2, x1);
-        vmovups(x1, x2);
+        assert(dst.getIdx() != src.getIdx());
+        mulps(dst, op);
+        subps(src, dst);
+        vmovups(dst, src);
     }
 }
 
-void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm &x1,
-                                    const Xbyak::Xmm &x2,
-                                    const Xbyak::Operand &op) {
-    // Note: x1 gets overriden by x1*x2
-    // This is incorrect if x1 == op
+void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm& dst,
+                                    const Xbyak::Xmm& src,
+                                    const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub231ps(x1, x2, op);
+        vfmsub231ps(dst, src, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(!x1.isEqualIfNotInherited(op));
-        vmulps(x2, x2, op);
-        vsubps(x1, x2, x1);
+        assert(!dst.isEqualIfNotInherited(op));
+        vmulps(src, src, op);
+        vsubps(dst, src, dst);
     } else {
-        assert(!x1.isEqualIfNotInherited(op));
-        mulps(x2, op);
-        subps(x2, x1);
-        vmovups(x1, x2);
+        assert(!dst.isEqualIfNotInherited(op));
+        mulps(src, op);
+        subps(src, dst);
+        vmovups(dst, src);
     }
 }
 
@@ -93,14 +87,17 @@ void JitKernelBase::uni_vpaddd(const Xbyak::Ymm& vDst,
         } else {
             IE_THROW() << "Not supported operand type.";
         }
+    } else if (isValidIsa(x64::sse41)) {
+        assert(vDst.getIdx() != vSrc.getIdx());
+        paddd(vDst, op);
     } else {
         IE_THROW() << "Not defined behavior for instruction 'vpaddd' in current instructions set.";
     }
 }
 
-void JitKernelBase::uni_vpsubd(const Xbyak::Ymm&    vDst,
-                               const Xbyak::Ymm&    vSrc,
-                               const Xbyak::Operand &op) {
+void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
+                               const Xbyak::Ymm& vSrc,
+                               const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vpsubd(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
@@ -124,25 +121,11 @@ void JitKernelBase::uni_vpsubd(const Xbyak::Ymm&    vDst,
         } else {
             IE_THROW() << "Not supported operand type.";
         }
+    } else if (isValidIsa(x64::sse41)) {
+        assert(vDst.getIdx() != vSrc.getIdx());
+        psubd(vDst, op);
     } else {
         IE_THROW() << "Not defined behavior for instruction 'vpsubd' in current instructions set.";
-    }
-}
-
-void JitKernelBase::uni_kandd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Xmm& vSrc2) {
-    if (isValidIsa(x64::avx2)) {
-        vpand(vDst, vSrc1, vSrc2);
-    } else if (isValidIsa(x64::avx)) {
-// TODO
-    } else {
-        if (vDst.getIdx() == vSrc2.getIdx()) {
-            pand(vDst, vSrc1);
-        } else {
-            if (vDst.getIdx() != vSrc1.getIdx()) {
-                mov(vDst, vSrc1);
-            }
-            pand(vDst, vSrc2);
-        }
     }
 }
 

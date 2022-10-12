@@ -5,12 +5,7 @@
 #pragma once
 
 #include "cpu/x64/jit_generator.hpp"
-#include <ie_common.h>
-#include <dnnl_types.h>
-#include "utils/general_utils.h"
 #include "registers_pool.hpp"
-
-#include <set>
 
 namespace ov {
 namespace intel_cpu {
@@ -28,15 +23,15 @@ protected:
         return is_subset(isa, dnnl::impl::cpu::x64::isa_all) && dnnl::impl::cpu::x64::mayiuse(isa);
     }
 
-    void uni_vfmsub132ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op);
+    void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
-    void uni_vfnmadd132ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op);
+    void uni_vfnmadd132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
-    void uni_vfmsub231ps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op);
+    void uni_vfmsub231ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
     void uni_vpaddd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
-    void uni_vpsubd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand &op);
+    void uni_vpsubd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
         kmovd(kDst, kSrc);
@@ -46,36 +41,12 @@ protected:
         uni_vmovups(vDst, vSrc);
     }
 
-    void uni_kxnorw(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc1, const Xbyak::Opmask& kSrc2) {
-        kxnorw(kDst, kSrc1, kSrc2);
-    }
-
     void uni_kandd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc1, const Xbyak::Opmask& kSrc2) {
         kandd(kDst, kSrc1, kSrc2);
     }
 
-    void uni_kandd(const Xbyak::Xmm& kDst, const Xbyak::Xmm& kSrc1, const Xbyak::Xmm& kSrc2);
-
-    void uni_kxnorw(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc1, const Xbyak::Xmm& vSrc2) {
-        uni_vpxor(vDst, vSrc1, vSrc2);
-        if (dnnl::impl::cpu::x64::is_subset(dnnl::impl::cpu::x64::avx, dnnl::impl::cpu::x64::isa_all) &&
-                  dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx)) {
-            vandnps(vDst, vSrc1, vSrc2);
-        } else {
-            andnps(vDst, vSrc1);
-        }
-    }
-
-    void uni_vpermd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vMask, const Xbyak::Operand& src) {
-        if (isValidIsa(dnnl::impl::cpu::x64::avx2)) {
-            vpermd(vDst, vMask, src);
-        } else if (isValidIsa(dnnl::impl::cpu::x64::avx)) {
-
-        }
-    }
-
-    void uni_vpermd(const Xbyak::Zmm& vDst, const Xbyak::Zmm& vMask, const Xbyak::Operand& src) {
-        vpermd(vDst, vMask, src);
+    void uni_kandd(const Xbyak::Xmm& kDst, const Xbyak::Xmm& kSrc1, const Xbyak::Xmm& kSrc2) {
+        uni_vandps(kDst, kSrc1, kSrc2);
     }
 
     void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op);

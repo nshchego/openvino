@@ -275,13 +275,13 @@ template <>
 void JitGridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     auto vAux = getVmm();
 
-    uni_vpermd(vWCoord, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
+    vpermd(vWCoord, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
     Xbyak::Ymm ymmH(vHCoord.getIdx());
     vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
 
     add(regGrid, vlen);
 
-    uni_vpermd(vAux, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
+    vpermd(vAux, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
     Xbyak::Ymm ymmAux(vAux.getIdx());
     vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
     vextractf64x4(ymmAux, vAux, 1);            // Extract Y component
@@ -307,12 +307,12 @@ void JitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vm
         uni_vmovups(vPermMask, ptr[rAux]);
     }
 
-    uni_vpermd(vWCoord, vPermMask, ptr[regGrid]); // Permute to XXXX.YYYY
+    vpermd(vWCoord, vPermMask, ptr[regGrid]); // Permute to XXXX.YYYY
     vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011);      // Extract Y component
 
     add(regGrid, vlen);
 
-    uni_vpermd(vAux, vPermMask, ptr[regGrid]);    // Permute to XXXX.YYYY
+    vpermd(vAux, vPermMask, ptr[regGrid]);    // Permute to XXXX.YYYY
     vperm2f128(vWCoord, vWCoord, vAux, 0B00100000);         // Extract X component
     vperm2f128(vHCoord, vHCoord, vAux, 0B00110000);         // Extract Y component
 
@@ -378,7 +378,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
     cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        uni_vpermd(vWCoord, vGridPermMask, ptr[regGrid]);
+        vpermd(vWCoord, vGridPermMask, ptr[regGrid]);
         vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
 
         add(regGrid, vlen);
@@ -388,7 +388,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
 
         fillRestWorkMask(kTailMask, vAux, rAux);
         uni_vmovups((Vmm)vAux | kTailMask, ptr[regGrid]);
-        uni_vpermd(vAux, vGridPermMask, vAux);
+        vpermd(vAux, vGridPermMask, vAux);
         Xbyak::Ymm ymmAux(vAux.getIdx());
         vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
         vextractf64x4(ymmAux, vAux, 1); // Extract Y component
@@ -400,7 +400,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
     {
         fillRestWorkMask(kTailMask, vAux, rAux);
         uni_vmovups(vWCoord | kTailMask, ptr[regGrid]);
-        uni_vpermd(vWCoord, vGridPermMask, vWCoord);
+        vpermd(vWCoord, vGridPermMask, vWCoord);
         vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
     }
 
@@ -437,7 +437,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        uni_vpermd(vWCoord, vPermMask, ptr[regGrid]);      // Permute to XXXX.YYYY
+        vpermd(vWCoord, vPermMask, ptr[regGrid]);      // Permute to XXXX.YYYY
         vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
 
         add(regGrid, vlen);
@@ -447,7 +447,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
 
         auto vAux  = getVmm();
         load(vAux, regGrid, rAux, dataTypeSize);
-        uni_vpermd(vAux, vPermMask, vAux);
+        vpermd(vAux, vPermMask, vAux);
         vperm2f128(vWCoord, vWCoord, vAux, 0B00100000); // Extract X component
         vperm2f128(vHCoord, vHCoord, vAux, 0B00110000); // Extract Y component
 
@@ -456,7 +456,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     L(lRest);
     {
         load(vWCoord, regGrid, rAux, dataTypeSize);
-        uni_vpermd(vWCoord, vPermMask, vWCoord);           // Permute to XXXX.YYYY
+        vpermd(vWCoord, vPermMask, vWCoord);           // Permute to XXXX.YYYY
         vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
     }
 
@@ -942,13 +942,13 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef
         uni_vfmadd132ps(vCoef, vOnesF, vDDim);
     } else if (idx == 2) {
         uni_vmovups(vCoef, vDDim);
-        vfnmadd132ps(vCoef, vConst_1_50, vConst_1_25);
+        uni_vfnmadd132ps(vCoef, vConst_1_50, vConst_1_25);
         uni_vfmsub132ps(vCoef, vConst_0_75, vDDim);
         uni_vmulps(vCoef, vCoef, vDDim);
     } else if (idx == 3) {
         uni_vmulps(vCoef, vConst_0_75, vDDim);
         uni_vmulps(vCoef, vCoef, vDDim);
-        vfnmadd132ps(vCoef, vCoef, vDDim);
+        uni_vfnmadd132ps(vCoef, vCoef, vDDim);
     }
 }
 
@@ -962,7 +962,6 @@ void JitGridSampleKernel<x64::avx2>::bicubicCoefficients(const Vmm& vCoef, const
     static const float const_2_25[elPerVec] = { 2.25f };
 
     auto rAux = getReg64();
-//    auto vAux = getVmm();
 
     if (idx == 0) {
         uni_vmovups(vCoef, vDDim);
@@ -991,7 +990,7 @@ void JitGridSampleKernel<x64::avx2>::bicubicCoefficients(const Vmm& vCoef, const
         mov(rAux, reinterpret_cast<uintptr_t>(const_0_75));
         uni_vmulps(vCoef, vDDim, ptr[rAux]);
         uni_vmulps(vCoef, vCoef, vDDim);
-        vfnmadd132ps(vCoef, vCoef, vDDim);
+        uni_vfnmadd132ps(vCoef, vCoef, vDDim);
     }
 }
 
@@ -2000,8 +1999,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
                 uni_vaddps(vSrcShift, vSrcShift0, vSrcShift);
             }
             uni_vcvtps2dq(vSrcShift, vSrcShift);
-            if (dataTypeSize > 1)
-                uni_vpslld(vSrcShift, vSrcShift, dataTypeShift);
+            dataTypeShiftPs(vSrcShift);
             gatherdd(vAux, rSrcTmp, vSrcShift, kAuxMask, useMask, zeroFill);
             if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                 uni_vcvtdq2ps(vAux, vAux);
@@ -2024,8 +2022,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
                     uni_vaddps(vSrcShift, vSrcShift0, vSrcShift);
                 }
                 uni_vcvtps2dq(vSrcShift, vSrcShift);
-                if (dataTypeSize > 1)
-                    uni_vpslld(vSrcShift, vSrcShift, dataTypeShift);
+                dataTypeShiftPs(vSrcShift);
                 gatherdd(vAux, rSrcTmp, vSrcShift, kAuxMask, useMask, zeroFill);
                 if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
                     uni_vcvtdq2ps(vAux, vAux);
@@ -2059,8 +2056,20 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
     }
 }
 
-void typeShiftPs() {
+template <x64::cpu_isa_t isa>
+void JitGridSampleKernel<isa>::dataTypeShiftPs(const Vmm& vDst) {
+    if (dataTypeSize == 1)
+        return;
 
+    if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vmulps for YMM
+        auto rAux = getReg64();
+        const float val = dataTypeSize;
+        static const float dataTypeSizeArr[8] = {val, val, val, val, val, val, val, val};
+        mov(rAux, reinterpret_cast<uintptr_t>(dataTypeSizeArr));
+        uni_vmulps(vDst, vDst, ptr[rAux]);
+    } else {
+        uni_vpslld(vDst, vDst, dataTypeShift); // multiply by source data type size.
+    }
 }
 
 template <x64::cpu_isa_t isa>
@@ -2103,10 +2112,10 @@ void JitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
     }
 }
 
-template struct JitGridSampleKernel<x64::avx512_core>;
-template struct JitGridSampleKernel<x64::avx2>;
-template struct JitGridSampleKernel<x64::avx>;
-template struct JitGridSampleKernel<x64::sse41>;
+template class JitGridSampleKernel<x64::avx512_core>;
+template class JitGridSampleKernel<x64::avx2>;
+template class JitGridSampleKernel<x64::avx>;
+template class JitGridSampleKernel<x64::sse41>;
 
 }   // namespace intel_cpu
 }   // namespace ov
