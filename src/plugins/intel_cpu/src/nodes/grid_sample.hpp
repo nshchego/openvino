@@ -29,15 +29,8 @@ public:
     struct threadExecParams {
         uint64_t batchNum    = 1lu;
         uint64_t channelsNum = 1lu;
-        float    srcWidthF   = 1.f;
-        float    srcHeightF  = 1.f;
-        uint64_t gridStartB  = 0lu;
-        uint64_t dstStartB   = 0lu;
-        uint64_t srcChannelStepB = 0lu;
-        uint64_t dstChannelStepB = 0lu;
-        uint64_t srcBatchStepB   = 0lu;
-        uint64_t gridBatchStepB  = 0lu;
-        uint64_t dstBatchStepB   = 0lu;
+        std::vector<float> srcHeightF{ 1.f };
+        std::vector<float> srcWidthF{ 1.f };
         std::vector<int>   srcWidthB{ 1lu };
         std::vector<int>   dataTypeSize{ 1lu };
         std::vector<float> srcHeightMul2F{ 1.f };
@@ -48,7 +41,14 @@ public:
         std::vector<float> srcWidthSub1F{ 1.f };
         std::vector<float> wDenormCoefF{ 1.f };
         std::vector<float> hDenormCoefF{ 1.f };
-        uint64_t workAmount = 0lu;
+        uint64_t gridStartB      = 0lu;
+        uint64_t dstStartB       = 0lu;
+        uint64_t srcChannelStepB = 0lu;
+        uint64_t dstChannelStepB = 0lu;
+        uint64_t srcBatchStepB   = 0lu;
+        uint64_t gridBatchStepB  = 0lu;
+        uint64_t dstBatchStepB   = 0lu;
+        uint64_t workAmount      = 0lu;
         std::vector<int> buffer;
     };
 

@@ -271,11 +271,11 @@ void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
     kmovw(dstMask, rOnes);
 }
 
-void JitKernelBase::load(const Xbyak::Xmm&   vDst,
-                         const Xbyak::Reg64& rSrc,
-                         const Xbyak::Reg64& rLoadNum,
-                         const uint8_t       typeSize,
-                         const bool          zeroFilling) {
+void JitKernelBase::load(const Xbyak::Xmm&     vDst,
+                         const Xbyak::Address& srcAddr,
+                         const Xbyak::Reg64&   rLoadNum,
+                         const size_t          typeSize,
+                         const bool            zeroFilling) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not load data with type size " << typeSize;
     }
@@ -288,23 +288,24 @@ void JitKernelBase::load(const Xbyak::Xmm&   vDst,
         cmp(rLoadNum, i);
         jle(lEnd, T_NEAR);
 
+        const size_t offset = i * typeSize;
         if (typeSize == 1)
-            pinsrb(vDst, ptr[rSrc + i * typeSize], i);
+            pinsrb(vDst, ptr[srcAddr.getRegExp() + offset], i);
         else if (typeSize == 2)
-            pinsrw(vDst, ptr[rSrc + i * typeSize], i);
+            pinsrw(vDst, ptr[srcAddr.getRegExp() + offset], i);
         else if (typeSize == 4)
-            pinsrd(vDst, ptr[rSrc + i * typeSize], i);
+            pinsrd(vDst, ptr[srcAddr.getRegExp() + offset], i);
         else if (typeSize == 8)
-            pinsrq(vDst, ptr[rSrc + i * typeSize], i);
+            pinsrq(vDst, ptr[srcAddr.getRegExp() + offset], i);
     }
     L(lEnd);
 }
 
-void JitKernelBase::load(const Xbyak::Ymm&   vDst,
-                         const Xbyak::Reg64& rSrc,
-                         const Xbyak::Reg64& rLoadNum,
-                         const uint8_t       typeSize,
-                         const bool          zeroFilling) {
+void JitKernelBase::load(const Xbyak::Ymm&     vDst,
+                         const Xbyak::Address& srcAddr,
+                         const Xbyak::Reg64&   rLoadNum,
+                         const size_t          typeSize,
+                         const bool            zeroFilling) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not load data with type size " << typeSize;
     }
@@ -323,15 +324,15 @@ void JitKernelBase::load(const Xbyak::Ymm&   vDst,
             cmp(rLoadNum, j + idx);
             jle(i == 0 ? lEnd : lPerm, T_NEAR);
 
-            const uint8_t offset = offset0 + j * typeSize;
+            const size_t offset = offset0 + j * typeSize;
             if (typeSize == 1)
-                pinsrb(xmmDst, ptr[rSrc + offset], j);
+                pinsrb(xmmDst, ptr[srcAddr.getRegExp() + offset], j);
             else if (typeSize == 2)
-                pinsrw(xmmDst, ptr[rSrc + offset], j);
+                pinsrw(xmmDst, ptr[srcAddr.getRegExp() + offset], j);
             else if (typeSize == 4)
-                pinsrd(xmmDst, ptr[rSrc + offset], j);
+                pinsrd(xmmDst, ptr[srcAddr.getRegExp() + offset], j);
             else if (typeSize == 8)
-                pinsrq(xmmDst, ptr[rSrc + offset], j);
+                pinsrq(xmmDst, ptr[srcAddr.getRegExp() + offset], j);
         }
 
         L(lPerm);
@@ -340,11 +341,10 @@ void JitKernelBase::load(const Xbyak::Ymm&   vDst,
     L(lEnd);
 }
 
-void JitKernelBase::store(const Xbyak::Reg64& rDst,
-                          const Xbyak::Reg64& rToStoreNum,
-                          const Xbyak::Xmm&   vSrc,
-                          const size_t        typeSize,
-                          const size_t        dstOffset) {
+void JitKernelBase::store(const Xbyak::Address& dstAddr,
+                          const Xbyak::Xmm&     vSrc,
+                          const Xbyak::Reg64&   rToStoreNum,
+                          const size_t          typeSize) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not store data with type size " << typeSize;
     }
@@ -355,25 +355,24 @@ void JitKernelBase::store(const Xbyak::Reg64& rDst,
         cmp(rToStoreNum, i);
         jle(lEnd, T_NEAR);
 
-        const size_t offset = dstOffset + i * typeSize;
+        const size_t offset = i * typeSize;
         if (typeSize == 1) {
-            uni_vpextrb(ptr[rDst + offset], vSrc, i);
+            uni_vpextrb(ptr[dstAddr.getRegExp() + offset], vSrc, i);
         } else if (typeSize == 2) {
-            uni_vpextrw(ptr[rDst + offset], vSrc, i);
+            uni_vpextrw(ptr[dstAddr.getRegExp() + offset], vSrc, i);
         } else if (typeSize == 4) {
-            uni_vpextrd(ptr[rDst + offset], vSrc, i);
+            uni_vpextrd(ptr[dstAddr.getRegExp() + offset], vSrc, i);
         } else if (typeSize == 8) {
-            uni_vpextrq(ptr[rDst + offset], vSrc, i);
+            uni_vpextrq(ptr[dstAddr.getRegExp() + offset], vSrc, i);
         }
     }
     L(lEnd);
 }
 
-void JitKernelBase::store(const Xbyak::Reg64& rDst,
-                          const Xbyak::Reg64& rToStoreNum,
-                          const Xbyak::Ymm&   vSrc,
-                          const size_t        typeSize,
-                          const size_t        dstOffset) {
+void JitKernelBase::store(const Xbyak::Address& dstAddr,
+                          const Xbyak::Ymm&     vSrc,
+                          const Xbyak::Reg64&   rToStoreNum,
+                          const size_t          typeSize) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not store data with type size " << typeSize;
     }
@@ -384,7 +383,7 @@ void JitKernelBase::store(const Xbyak::Reg64& rDst,
     for (int i = 0; i < 2; i++) {
         Xbyak::Label lPerm;
         const size_t idx = i * elPerXmm;
-        const size_t offset0 = dstOffset + idx * typeSize;
+        const size_t offset0 = idx * typeSize;
 
         for (size_t j = 0; j < elPerXmm; j++) {
             cmp(rToStoreNum, j + idx);
@@ -392,13 +391,13 @@ void JitKernelBase::store(const Xbyak::Reg64& rDst,
 
             const size_t offset = offset0 + j * typeSize;
             if (typeSize == 8) {
-                uni_vpextrq(ptr[rDst + offset], xmmSrc, j);
+                uni_vpextrq(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
             } else if (typeSize == 4) {
-                uni_vpextrd(ptr[rDst + offset], xmmSrc, j);
+                uni_vpextrd(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
             } else if (typeSize == 2) {
-                uni_vpextrw(ptr[rDst + offset], xmmSrc, j);
+                uni_vpextrw(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
             } else if (typeSize == 1) {
-                uni_vpextrb(ptr[rDst + offset], xmmSrc, j);
+                uni_vpextrb(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
             }
         }
 
@@ -459,7 +458,7 @@ void JitKernelBase::memMovDD(const Xbyak::Reg64& rDst,
     if (isValidIsa(x64::avx2)) {
         auto vAux = RegistersPool::Reg<Xbyak::Ymm>(registersPool);
         gatherdd(vAux, rSrc, vSrcShift, vReadMask, useMask, zeroFill);
-        store(rDst, rToStoreNum, vAux, sizeof(int));
+        store(ptr[rDst], vAux, rToStoreNum, sizeof(int));
     } else if (isValidIsa(x64::avx)) {
         const uint8_t typeSize = sizeof(int);
         const uint8_t elPerXmm = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;

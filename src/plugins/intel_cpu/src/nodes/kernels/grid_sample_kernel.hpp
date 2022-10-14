@@ -21,7 +21,8 @@ struct jGridSampleConfParams {
     PaddingMode paddingMode = PaddingMode::ZEROS;
     InferenceEngine::Precision inDataPrc;
     InferenceEngine::Precision gridPrc;
-    uint64_t batchNum      = 0lu;
+    uint64_t batchNum      = 1lu;
+    uint64_t cannelNum     = 1lu;
     uint64_t srcBatchStepB = 0lu;
 };
 
