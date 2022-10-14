@@ -8,6 +8,7 @@
 
 #include "openvino/op/op.hpp"
 #include "openvino/opsets/opset1.hpp"
+#include "openvino/opsets/opset10.hpp"
 #include "openvino/opsets/opset2.hpp"
 #include "openvino/opsets/opset3.hpp"
 #include "openvino/opsets/opset4.hpp"
@@ -154,6 +155,22 @@ TEST(opset, opset9) {
 TEST(opset, opset9_dump) {
     const auto& opset = ov::get_opset9();
     std::cout << "All opset9 operations: ";
+    for (const auto& t : opset.get_types_info()) {
+        std::cout << t.name << " ";
+    }
+    std::cout << std::endl;
+    ASSERT_EQ(173, opset.get_types_info().size());
+}
+
+TEST(opset, opset10) {
+    auto op = std::make_shared<ov::opset10::Parameter>();
+    ASSERT_NE(nullptr, op);
+    EXPECT_TRUE(ov::op::util::is_parameter(op));
+}
+
+TEST(opset, opset10_dump) {
+    const auto& opset = ov::get_opset9();
+    std::cout << "All opset10 operations: ";
     for (const auto& t : opset.get_types_info()) {
         std::cout << t.name << " ";
     }
