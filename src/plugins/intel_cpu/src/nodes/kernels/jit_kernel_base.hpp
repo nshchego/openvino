@@ -78,29 +78,27 @@ protected:
                           const Xbyak::Zmm& zAux,
                           const Xbyak::Reg64& rWorkRest);
 
-    void load(const Xbyak::Xmm&   vDst,
-              const Xbyak::Reg64& rSrc,
-              const Xbyak::Reg64& rLoadNum,
-              const uint8_t       typeSize,
+    void load(const Xbyak::Xmm&     vDst,
+              const Xbyak::Address& srcAddr,
+              const Xbyak::Reg64&   rLoadNum,
+              const size_t          typeSize,
               const bool zeroFill = false);
 
-    void load(const Xbyak::Ymm&   vDst,
-              const Xbyak::Reg64& rSrc,
-              const Xbyak::Reg64& rLoadNum,
-              const uint8_t       typeSize,
+    void load(const Xbyak::Ymm&     vDst,
+              const Xbyak::Address& srcAddr,
+              const Xbyak::Reg64&   rLoadNum,
+              const size_t          typeSize,
               const bool zeroFill = false);
 
-    void store(const Xbyak::Reg64& rDst,
-               const Xbyak::Reg64& rToStoreNum,
-               const Xbyak::Xmm&   xmmSrc,
-               const size_t        typeSize,
-               const size_t        dstOffset = 0lu);
+    void store(const Xbyak::Address& dstAddr,
+               const Xbyak::Xmm&     vSrc,
+               const Xbyak::Reg64&   rToStoreNum,
+               const size_t          typeSize);
 
-    void store(const Xbyak::Reg64& rDst,
-               const Xbyak::Reg64& rToStoreNum,
-               const Xbyak::Ymm&   vSrc,
-               const size_t        typeSize,
-               const size_t        dstOffset = 0lu);
+    void store(const Xbyak::Address& dstAddr,
+               const Xbyak::Ymm&     vSrc,
+               const Xbyak::Reg64&   rToStoreNum,
+               const size_t          typeSize);
 
     // Makes gather from memory under the vReadMask and writes to the memory m128.
     void memMovDD(const Xbyak::Reg64& rDst,

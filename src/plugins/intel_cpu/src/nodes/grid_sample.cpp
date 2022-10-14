@@ -125,11 +125,15 @@ void GridSample::createPrimitive() {
     jcp.interpolationMode = interpolationMode;
     jcp.paddingMode   = paddingMode;
 
+    const auto& srcDataDims = getInputShapeAtPort(IN_DATA).getDims();
     if (!jcp.dynamicShapes) {
-        const auto& srcDataShape = getInputShapeAtPort(IN_DATA).getDims();
         const auto& dstShape     = getOutputShapeAtPort(0).getDims();
-        jcp.batchNum      = srcDataShape[0];
-        jcp.srcBatchStepB = std::accumulate(srcDataShape.begin() + 1, srcDataShape.end(), dataTypeSize, std::multiplies<Dim>());
+        jcp.batchNum      = srcDataDims[0];
+        jcp.cannelNum     = srcDataDims[1];
+        jcp.srcBatchStepB = std::accumulate(srcDataDims.begin() + 1, srcDataDims.end(), dataTypeSize, std::multiplies<Dim>());
+    } else {
+        jcp.batchNum  = srcDataDims[0] == Shape::UNDEFINED_DIM ? 1lu : srcDataDims[0];
+        jcp.cannelNum = srcDataDims[1] == Shape::UNDEFINED_DIM ? 1lu : srcDataDims[1];
     }
 
     if (x64::mayiuse(x64::avx512_core)) {
@@ -153,6 +157,8 @@ void GridSample::createPrimitive() {
         parallel_nt(nthr, [&](const int ithr, const int nthr) {
             auto& p = execParamsPerThread[ithr];
 
+            p.srcHeightF.resize(dataElPerVec);
+            p.srcWidthF.resize(dataElPerVec);
             p.srcWidthB.resize(dataElPerVec);
             p.dataTypeSize.resize(dataElPerVec);
             p.srcHeightSub1F.resize(dataElPerVec);
@@ -166,7 +172,7 @@ void GridSample::createPrimitive() {
                 p.hDenormCoefF.resize(dataElPerVec);
             }
             if (interpolationMode == InterpolationMode::BICUBIC) {
-                p.buffer.resize(dataElPerVec * dataTypeSize * 4);
+                p.buffer.resize(dataElPerVec * dataTypeSize * 20); // TODO: reduce
             }
         });
     }
@@ -200,10 +206,10 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
 
         auto& p = execParamsPerThread[ithr];
 
-        p.batchNum    = srcDataShape[0];
-        p.channelsNum = srcDataShape[1];
-        p.srcHeightF  = srcDataShape[2];
-        p.srcWidthF   = srcDataShape[3];
+        p.batchNum      = srcDataShape[0];
+        p.channelsNum   = srcDataShape[1];
+        p.srcHeightF[0] = srcDataShape[2];
+        p.srcWidthF[0]  = srcDataShape[3];
 
         p.workAmount = dstEnd - dstStart;
         p.gridStartB = dstStart * 2 * gridTypeSize;
@@ -215,32 +221,35 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
 
         p.srcChannelStepB = srcDataShape[2] * srcDataShape[3] * dataTypeSize;
         p.dstChannelStepB = dstShape[2] * dstShape[3] * dataTypeSize;
-        std::fill(p.dataTypeSize.begin(), p.dataTypeSize.end(), dataTypeSize);
+        p.dataTypeSize[0] = dataTypeSize;
 
-        p.srcHeightSub1F[0] = p.srcHeightF - 1.f;
-        p.srcWidthSub1F[0]  = p.srcWidthF  - 1.f;
-        p.srcHeightMul2F[0] = p.srcHeightF * 2.f;
-        p.srcWidthMul2F[0]  = p.srcWidthF  * 2.f;
+        p.srcHeightSub1F[0] = p.srcHeightF[0] - 1.f;
+        p.srcWidthSub1F[0]  = p.srcWidthF[0]  - 1.f;
+        p.srcHeightMul2F[0] = p.srcHeightF[0] * 2.f;
+        p.srcWidthMul2F[0]  = p.srcWidthF[0]  * 2.f;
         if (interpolationMode == InterpolationMode::BICUBIC && srcDataShape[3] >= 4) {
             p.srcWidthB[0] = (srcDataShape[3] - 3) * dataTypeSize;
         } else {
             p.srcWidthB[0] = srcDataShape[3] * dataTypeSize;
         }
         if (alignCorners) {
-            p.srcHeightMul2Sub1F[0] = p.srcHeightF == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f;
-            p.srcWidthMul2Sub1F[0]  = p.srcWidthF == 1.f  ? 1.f : p.srcWidthSub1F[0]  * 2.f;
-            p.wDenormCoefF[0] = (p.srcWidthF  - 1.f) / 2.f;
-            p.hDenormCoefF[0] = (p.srcHeightF - 1.f) / 2.f;
+            p.srcHeightMul2Sub1F[0] = p.srcHeightF[0] == 1.f ? 1.f : p.srcHeightSub1F[0] * 2.f;
+            p.srcWidthMul2Sub1F[0]  = p.srcWidthF[0]  == 1.f ? 1.f : p.srcWidthSub1F[0]  * 2.f;
+            p.wDenormCoefF[0] = (p.srcWidthF[0]  - 1.f) / 2.f;
+            p.hDenormCoefF[0] = (p.srcHeightF[0] - 1.f) / 2.f;
         } else {
             p.srcHeightMul2Sub1F[0] = p.srcHeightMul2F[0] - 1.f;
             p.srcWidthMul2Sub1F[0]  = p.srcWidthMul2F[0]  - 1.f;
         }
         if (!x64::mayiuse(x64::avx512_core)) {
-            std::fill(p.srcHeightSub1F.begin(), p.srcHeightSub1F.end(), p.srcHeightSub1F[0]);
-            std::fill(p.srcWidthSub1F.begin(),  p.srcWidthSub1F.end(),  p.srcWidthSub1F[0]);
-            std::fill(p.srcHeightMul2F.begin(), p.srcHeightMul2F.end(), p.srcHeightMul2F[0]);
-            std::fill(p.srcWidthMul2F.begin(),  p.srcWidthMul2F.end(),  p.srcWidthMul2F[0]);
-            std::fill(p.srcWidthB.begin(),      p.srcWidthB.end(),      p.srcWidthB[0]);
+            std::fill(p.srcHeightF.begin(),         p.srcHeightF.end(),         p.srcHeightF[0]);
+            std::fill(p.srcWidthF.begin(),          p.srcWidthF.end(),          p.srcWidthF[0]);
+            std::fill(p.dataTypeSize.begin(),       p.dataTypeSize.end(),       p.dataTypeSize[0]);
+            std::fill(p.srcHeightSub1F.begin(),     p.srcHeightSub1F.end(),     p.srcHeightSub1F[0]);
+            std::fill(p.srcWidthSub1F.begin(),      p.srcWidthSub1F.end(),      p.srcWidthSub1F[0]);
+            std::fill(p.srcHeightMul2F.begin(),     p.srcHeightMul2F.end(),     p.srcHeightMul2F[0]);
+            std::fill(p.srcWidthMul2F.begin(),      p.srcWidthMul2F.end(),      p.srcWidthMul2F[0]);
+            std::fill(p.srcWidthB.begin(),          p.srcWidthB.end(),          p.srcWidthB[0]);
             std::fill(p.srcHeightMul2Sub1F.begin(), p.srcHeightMul2Sub1F.end(), p.srcHeightMul2Sub1F[0]);
             std::fill(p.srcWidthMul2Sub1F.begin(),  p.srcWidthMul2Sub1F.end(),  p.srcWidthMul2Sub1F[0]);
             if (alignCorners) {
@@ -252,9 +261,9 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
 }
 
 void GridSample::execute(dnnl::stream strm) {
-    const void* srcData = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
+    const void*    srcData = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
     const uint8_t* gridData = reinterpret_cast<uint8_t*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
-    uint8_t* dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+    uint8_t*       dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
 // DEBUG
 //std::cout << "\nINPUT DATA: " << std::endl;
@@ -280,14 +289,17 @@ void GridSample::execute(dnnl::stream strm) {
     auto threadBody = [&](const int ithr, const int nthr) {
         const auto& p = execParamsPerThread[ithr];
         auto arg = jGridSamplesExecArgs();
+        if (p.workAmount == 0lu) {
+            return;
+        }
 
         arg.src                = srcData;
         arg.grid               = gridData + p.gridStartB;
         arg.dst                = dstData  + p.dstStartB;
         arg.batchNum           = p.batchNum;
         arg.channelsNum        = p.channelsNum;
-        arg.srcHeightF         = &p.srcHeightF;
-        arg.srcWidthF          = &p.srcWidthF;
+        arg.srcHeightF         = p.srcHeightF.data();
+        arg.srcWidthF          = p.srcWidthF.data();
         arg.srcWidthB          = p.srcWidthB.data();
         arg.srcChannelStepB    = p.srcChannelStepB;
         arg.dstChannelStepB    = p.dstChannelStepB;
@@ -309,19 +321,19 @@ void GridSample::execute(dnnl::stream strm) {
         (*jitKernel)(&arg);
     };
 
-    parallel_nt(0, threadBody);
+    parallel_nt(nthr, threadBody);
 
 // DEBUG
-//std::cout << "OUTPUT: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-////char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//    if (i % jitKernel->getDataElPerVec() == 0)
-//        std::cout << "| ";
-//    std::cout << dstDataF[i] << "; ";
-//}
-//std::cout << std::endl << std::endl;
+std::cout << "OUTPUT: " << std::endl;
+float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+    if (i % jitKernel->getDataElPerVec() == 0)
+        std::cout << "| ";
+    std::cout << dstDataF[i] << "; ";
+}
+std::cout << std::endl << std::endl;
 // DEBUG
 }
 
