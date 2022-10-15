@@ -147,8 +147,10 @@ private:
     RegistersPool::Reg<Vmm> vConst_2_00;         // for BICUBIC interpolation
     RegistersPool::Reg<Vmm> vConst_2_25;         // for BICUBIC interpolation
 
+    void initVectors();
     void process();
     void spatialLoop();
+    void spatialVectors();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
@@ -167,6 +169,37 @@ private:
     // Aux
     void dataTypeShiftPs(const Vmm& vDst);
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
+    enum class VectorName;
+//    RegistersPool::Reg<Vmm> getOrLoad(const VectorName& name);
+    auto getOrLoad(const VectorName& name);
+    
+    enum class VectorName {
+        srcHeightF,
+        srcWidthF,
+        zeros,
+        halfF,
+        onesF,
+        wDenormCoefF,
+        hDenormCoefF,
+        gridPermMask,
+        dataTypeSize,       // for ZEROS padding
+        srcWidthB,          // for ZEROS padding
+
+        srcHeightSub1F,     // for BORDER padding
+        srcWidthSub1F,      // for BORDER padding
+
+        srcHeightMul2F,     // for REFLECTION padding
+        srcWidthMul2F,      // for REFLECTION padding
+        srcHeightMul2Sub1F, // for REFLECTION padding
+        srcWidthMul2Sub1F,  // for REFLECTION padding
+        absMask,            // for REFLECTION padding
+
+        const_0_75,         // for BICUBIC interpolation
+        const_1_25,         // for BICUBIC interpolation
+        const_1_50,         // for BICUBIC interpolation
+        const_2_00,         // for BICUBIC interpolation
+        const_2_25          // for BICUBIC interpolation
+    };
 };
 
 }   // namespace intel_cpu
