@@ -139,11 +139,11 @@ void JitKernelBase::gatherdd(const Xbyak::Xmm&    vDst,
         IE_THROW() << "The vpgatherdd instruction cannot use the register k0 as mask.";
     }
     if (!useMask)
-        kxnorw(kReadMask, kReadMask, kReadMask);
+        kxnord(kReadMask, kReadMask, kReadMask);
     if (zeroFill)
         uni_vpxor(vDst, vDst, vDst);
 
-    vpgatherdd(vDst | kReadMask, ptr[rSrcPtr + vSrcShift]); // TODO: Try do not use a mask.
+    vpgatherdd(vDst | kReadMask, ptr[rSrcPtr + vSrcShift]);
 }
 
 void JitKernelBase::gatherdd(const Xbyak::Xmm&   vDst,
