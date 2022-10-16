@@ -223,51 +223,6 @@ void JitGridSampleKernel<isa>::initVectors() {
     }
 }
 
-template <>
-void JitGridSampleKernel<x64::avx512_core>::spatialVectors() {}
-
-template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::spatialVectors() {
-    if (jcp.interpolationMode == InterpolationMode::BICUBIC && jcp.paddingMode == PaddingMode::REFLECTION) {
-        auto rAux = getReg64();
-
-//        if (!vSrcWidthF.isInitialized()) {
-//            vSrcWidthF = getVmm();
-//            mov(rAux, ptr[regParams + GET_OFF(srcWidthF)]);
-//            uni_vmovups(vSrcWidthF, ptr[rAux]);
-//        }
-//
-//        if (!vSrcHeightF.isInitialized()) {
-//            vSrcHeightF = getVmm();
-//            mov(rAux, ptr[regParams + GET_OFF(srcHeightF)]);
-//            uni_vmovups(vSrcHeightF, ptr[rAux]);
-//        }
-
-//        vSrcHeightMul2Sub1F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcHeightMul2Sub1F)]);
-//        uni_vmovups(vSrcHeightMul2Sub1F, ptr[rAux]);
-//
-//        vSrcWidthMul2Sub1F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
-//        uni_vmovups(vSrcWidthMul2Sub1F, ptr[rAux]);
-
-//        if (jcp.alignCorners) {
-//            static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-//            mov(rAux, reinterpret_cast<uintptr_t>(absMask));
-//            vAbsMask = getVmm();
-//            uni_vmovups(vAbsMask, ptr[rAux]);
-//        } else {
-//            vSrcHeightMul2F = getVmm();
-//            mov(rAux, ptr[regParams + GET_OFF(srcHeightMul2F)]);
-//            uni_vmovups(vSrcHeightMul2F, ptr[rAux]);
-
-//            vSrcWidthMul2F = getVmm();
-//            mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2F)]);
-//            uni_vmovups(vSrcWidthMul2F, ptr[rAux]);
-//        }
-    }
-}
-
 template <x64::cpu_isa_t isa>
 void JitGridSampleKernel<isa>::process() {
     regWorkAmount = getReg64();
@@ -316,7 +271,6 @@ void JitGridSampleKernel<isa>::spatialLoop() {
         cmp(regWorkAmount, dataElPerVec);
         jl(lTail, T_NEAR);
 
-        spatialVectors();
         getCoordinates(vHCoord, vWCoord);
         denormalizeRawCoordinates(vWCoord, vHCoord);
         interpolation(vWCoord, vHCoord);
@@ -353,7 +307,6 @@ void JitGridSampleKernel<isa>::tail() {
     auto vHCoord = getVmm();
     auto vWCoord = getVmm();
 
-    spatialVectors();
     getTailCoordinates(vHCoord, vWCoord);
     denormalizeRawCoordinates(vWCoord, vHCoord);
     interpolation(vWCoord, vHCoord, true);
@@ -658,32 +611,6 @@ void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, con
 
     L(lEnd);
 }
-
-//template <>
-//void JitGridSampleKernel<x64::sse41>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
-//    auto vAux = getVmm();
-//    auto rAux = getReg64();
-//
-//    if (jcp.alignCorners) {
-//        mov(rAux, ptr[regParams + GET_OFF(wDenormCoefF)]);
-//        uni_vmovups(vAux, ptr[rAux]);
-//        uni_vfmadd132ps(vWCoord, vAux, vAux);
-//
-//        mov(rAux, ptr[regParams + GET_OFF(hDenormCoefF)]);
-//        uni_vmovups(vAux, ptr[rAux]);
-//        uni_vfmadd132ps(vHCoord, vAux, vAux);
-//    } else {
-//        static const float halfValues[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-//        mov(rAux, reinterpret_cast<uintptr_t>(halfValues));
-//        uni_vmovups(vAux, ptr[rAux]);
-//
-//        uni_vfmadd132ps(vWCoord, vSrcWidthF, vSrcWidthF);
-//        uni_vfmsub132ps(vWCoord, vAux, vAux);
-//
-//        uni_vfmadd132ps(vHCoord, vSrcHeightF, vSrcHeightF);
-//        uni_vfmsub132ps(vHCoord, vAux, vAux);
-//    }
-//}
 
 template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
 void JitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
