@@ -129,7 +129,7 @@ private:
     RegistersPool::Reg<Vmm> vWDenormCoefF;
     RegistersPool::Reg<Vmm> vHDenormCoefF;
     RegistersPool::Reg<Vmm> vGridPermMask;
-    RegistersPool::Reg<Vmm> vDataTypeSize;       // for ZEROS padding
+    RegistersPool::Reg<Vmm> vDataTypeSizeB;      // for ZEROS padding
     RegistersPool::Reg<Vmm> vSrcWidthB;          // for ZEROS padding
 
     RegistersPool::Reg<Vmm> vSrcHeightSub1F;     // for BORDER padding
@@ -159,15 +159,15 @@ private:
     void bicubicInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void nearestInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord);
-    void zerosPadding0(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
-    void zerosPadding1(const Vmask& kDst, const Vmm& vCoord, const Vmm& vUpperBound, const Vmask& kAux);
+    void zerosPaddingW(const Vmask& kDst, const Vmm& vCoord);
+    void zerosPaddingH(const Vmask& kDst, const Vmm& vCoord, const Vmask& kMaskW);
     void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
     void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
     void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
     void tail();
 
     // Aux
-    void dataTypeShiftPs(const Vmm& vDst);
+    void dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vSrc);
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
     enum class VectorName;
 //    RegistersPool::Reg<Vmm> getOrLoad(const VectorName& name);
