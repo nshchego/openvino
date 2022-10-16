@@ -172,7 +172,7 @@ void GridSample::createPrimitive() {
                 p.hDenormCoefF.resize(dataElPerVec);
             }
             if (interpolationMode == InterpolationMode::BICUBIC) {
-                p.buffer.resize(dataElPerVec * dataTypeSize * 20); // TODO: reduce
+                p.buffer.resize(dataElPerVec * dataTypeSize * 32); // TODO: reduce
             }
         });
     }
@@ -324,16 +324,16 @@ void GridSample::execute(dnnl::stream strm) {
     parallel_nt(nthr, threadBody);
 
 // DEBUG
-//std::cout << "OUTPUT: " << std::endl;
+std::cout << "OUTPUT: " << std::endl;
 //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-////char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//    if (i % jitKernel->getDataElPerVec() == 0)
-//        std::cout << "| ";
-//    std::cout << dstDataF[i] << "; ";
-//}
-//std::cout << std::endl << std::endl;
+int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+    if (i % jitKernel->getDataElPerVec() == 0)
+        std::cout << "| ";
+    std::cout << dstDataF[i] << "; ";
+}
+std::cout << std::endl << std::endl;
 // DEBUG
 }
 
