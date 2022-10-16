@@ -277,7 +277,7 @@ void JitGridSampleKernel<isa>::process() {
     RegistersPool::Reg<Xbyak::Reg64> regBatch;
 
     for (uint64_t i = 0lu; i < jcp.batchNum; i++) {
-        if (jcp.dynamicShapes && jcp.batchNum == 1) {
+        if (jcp.dynamicBatch) {
             regBatch = getReg64();
             mov(regBatch, ptr[regParams + GET_OFF(batchNum)]);
 
@@ -297,7 +297,7 @@ void JitGridSampleKernel<isa>::process() {
         add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
         add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
 
-        if (jcp.dynamicShapes && jcp.batchNum == 1) {
+        if (jcp.dynamicBatch) {
             dec(regBatch);
             jmp(lBatchLoop, T_NEAR);
             L(lEnd);
@@ -1014,15 +1014,12 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
 
     if (jcp.alignCorners) {
         // abs(x) % D21
-        if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
-            uni_vmovups(vCoordDst, vCoordOrigin);
-        if (isa == x64::avx2) { // abs(x)
-            uni_vpsignd(vCoordDst, vCoordDst, vCoordDst);
-        } else {
-            static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-            mov(rAux, reinterpret_cast<uintptr_t>(absMask));
-            uni_vandps(vCoordDst, vCoordDst, ptr[rAux]);
-        }
+//        if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
+//            uni_vmovups(vCoordDst, vCoordOrigin);
+        static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
+        mov(rAux, reinterpret_cast<uintptr_t>(absMask));
+        uni_vandps(vCoordDst, vCoordOrigin, ptr[rAux]); // abs(x)
+
         Vmm vMul2Sub1;
         if (dim == coord::w) {
             if (vSrcWidthMul2Sub1F.isInitialized()) {
@@ -1314,7 +1311,7 @@ void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vm
     mov(rDstTmp, regDst);
 
     for (int ch = 0; ch < jcp.cannelNum; ch++) {
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             rChannel = getReg64();
             mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
 
@@ -1348,7 +1345,7 @@ void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vm
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
 
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             dec(rChannel);
             jmp(lChannelLoopBegin, T_NEAR);
             L(lChannelLoopEnd);
@@ -1426,7 +1423,7 @@ void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
     mov(rDstTmp, regDst);
 
     for (int ch = 0; ch < jcp.cannelNum; ch++) {
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             rChannel = getReg64();
             mov(rChannel, 0);
 
@@ -1491,7 +1488,7 @@ void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
 
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             inc(rChannel);
             jmp(lChannelLoopBegin, T_NEAR);
             L(lChannelLoopEnd);
@@ -1685,19 +1682,23 @@ void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
 
     // PER CHANNEL LOOP
     Xbyak::Label lChannelLoopBegin, lChannelLoopEnd;
-    auto rChannel  = getReg64();
+    RegistersPool::Reg<Xbyak::Reg64> rChannel;
     auto rSrcTmp   = getReg64();
     auto rDstTmp   = getReg64();
     auto rTypeSize = getReg64();
-    mov(rChannel,  ptr[regParams + GET_OFF(channelsNum)]);
     mov(rSrcTmp,   regSrc);
     mov(rDstTmp,   regDst);
     mov(rTypeSize, ptr[regParams + GET_OFF(dataTypeSize)]);
 
-    L(lChannelLoopBegin);
-    {
-        cmp(rChannel, 0);
-        jle(lChannelLoopEnd, T_NEAR);
+    for (int ch = 0; ch < jcp.cannelNum; ch++) {
+        if (jcp.dynamicChannel) {
+            rChannel = getReg64();
+            mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
+
+            L(lChannelLoopBegin);
+            cmp(rChannel, 0);
+            jle(lChannelLoopEnd, T_NEAR);
+        }
 
         // (y; x)
         if (jcp.paddingMode == PaddingMode::ZEROS && isa == x64::avx2) {
@@ -1778,10 +1779,12 @@ void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
 
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
-        dec(rChannel);
 
-        jmp(lChannelLoopBegin, T_NEAR);
-        L(lChannelLoopEnd);
+        if (jcp.dynamicChannel) {
+            dec(rChannel);
+            jmp(lChannelLoopBegin, T_NEAR);
+            L(lChannelLoopEnd);
+        }
     }
 }
 
@@ -1838,7 +1841,7 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
     mov(rDstTmp, regDst);
 
     for (int ch = 0; ch < jcp.cannelNum; ch++) {
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             rChannel = getReg64();
             mov(rChannel, 0);
 
@@ -1926,7 +1929,7 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
 
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             inc(rChannel);
             jmp(lChannelLoopBegin, T_NEAR);
             L(lChannelLoopEnd);
@@ -2130,8 +2133,6 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
     uni_vsubps(vHTop, vHTop, vOnesF);
     uni_vsubps(vWLeft, vWLeft, vOnesF);
 
-    const size_t zeroMaskShift = 0lu;
-
     auto rBuff = getReg64();
     mov(rBuff, ptr[regParams + GET_OFF(buffer)]);
 
@@ -2163,7 +2164,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
         }
         auto vH  = getVmm();
 
-        size_t bufShift = zeroMaskShift;
+        size_t bufShift = 0lu;
         for (int h = 0; h < 4; h++) {
             borderPadding(vH, vHTop, coord::h);
             uni_vmulps(vH, vH, vSrcWidthF);
@@ -2217,7 +2218,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
         }
         auto vH  = getVmm();
 
-        size_t bufShift = zeroMaskShift;
+        size_t bufShift = 0lu;
         for (int h = 0; h < 4; h++) {
             reflectionPadding(vH, vHTop, coord::h);
             uni_vmulps(vH, vH, vSrcWidthF);
@@ -2251,7 +2252,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
             }
         }
 
-        size_t bufShift = zeroMaskShift;
+        size_t bufShift = 0lu;
         auto vShift = vWCoord, vMaskH = vHCoord;
         if (!vDataTypeSizeB.isInitialized()) {
             auto rAux = getReg64();
@@ -2313,7 +2314,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
     mov(rDstTmp, regDst);
 
     for (int ch = 0; ch < jcp.cannelNum; ch++) {
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             rChannel = getReg64();
             mov(rChannel, ptr[regParams + GET_OFF(channelsNum)]);
 
@@ -2324,7 +2325,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
 
         uni_vpxor(vYDotProd, vYDotProd, vYDotProd);
         for (int h = 0; h < 4; h++) {
-            size_t bufShift = zeroMaskShift + h * 4 * vlen;
+            size_t bufShift = h * 4 * vlen;
             // (y - 1 + h; x - 1)
             if (jcp.paddingMode == PaddingMode::ZEROS) {
                 uni_vmovups(kGatherMask, ptr[rBuff + bufShift + 16 * vlen]);
@@ -2369,7 +2370,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
         add(rSrcTmp, regSrcChannelStepB);
         add(rDstTmp, regDstChannelStepB);
 
-        if (jcp.dynamicShapes && jcp.cannelNum == 1) {
+        if (jcp.dynamicChannel) {
             dec(rChannel);
             jmp(lChannelLoopBegin, T_NEAR);
             L(lChannelLoopEnd);
@@ -2384,7 +2385,7 @@ void JitGridSampleKernel<isa>::dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vS
 
     if (isa == x64::avx) { // vpslld works just with XMM for AVX, so use vmulps for YMM
         auto rAux = getReg64();
-        const float val = dataTypeSize;
+        static const float val = dataTypeSize;
         static const float dataTypeSizeArr[8] = {val, val, val, val, val, val, val, val};
         mov(rAux, reinterpret_cast<uintptr_t>(dataTypeSizeArr));
         uni_vmulps(vDst, vSrc, ptr[rAux]);
