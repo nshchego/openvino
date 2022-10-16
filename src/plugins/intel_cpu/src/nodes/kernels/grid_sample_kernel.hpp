@@ -15,7 +15,9 @@ enum class InterpolationMode { BILINEAR, BICUBIC, NEAREST };
 enum class PaddingMode { ZEROS, BORDER, REFLECTION };
 
 struct jGridSampleConfParams {
-    bool dynamicShapes = false;
+    bool dynamicShapes  = false;
+    bool dynamicBatch   = false;
+    bool dynamicChannel = false;
     bool alignCorners  = false;
     InterpolationMode interpolationMode = InterpolationMode::BILINEAR;
     PaddingMode paddingMode = PaddingMode::ZEROS;

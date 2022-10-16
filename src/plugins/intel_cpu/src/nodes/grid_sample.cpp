@@ -128,12 +128,16 @@ void GridSample::createPrimitive() {
     const auto& srcDataDims = getInputShapeAtPort(IN_DATA).getDims();
     if (!jcp.dynamicShapes) {
         const auto& dstShape     = getOutputShapeAtPort(0).getDims();
-        jcp.batchNum      = srcDataDims[0];
-        jcp.cannelNum     = srcDataDims[1];
-        jcp.srcBatchStepB = std::accumulate(srcDataDims.begin() + 1, srcDataDims.end(), dataTypeSize, std::multiplies<Dim>());
+        jcp.batchNum       = srcDataDims[0];
+        jcp.cannelNum      = srcDataDims[1];
+        jcp.dynamicBatch   = false;
+        jcp.dynamicChannel = false;
+        jcp.srcBatchStepB  = std::accumulate(srcDataDims.begin() + 1, srcDataDims.end(), dataTypeSize, std::multiplies<Dim>());
     } else {
-        jcp.batchNum  = srcDataDims[0] == Shape::UNDEFINED_DIM ? 1lu : srcDataDims[0];
-        jcp.cannelNum = srcDataDims[1] == Shape::UNDEFINED_DIM ? 1lu : srcDataDims[1];
+        jcp.dynamicBatch   = srcDataDims[0] == Shape::UNDEFINED_DIM;
+        jcp.batchNum       = jcp.dynamicBatch ? 1lu : srcDataDims[0];
+        jcp.dynamicChannel = srcDataDims[1] == Shape::UNDEFINED_DIM;
+        jcp.cannelNum      = jcp.dynamicChannel ? 1lu : srcDataDims[1];
     }
 
     if (x64::mayiuse(x64::avx512_core)) {
@@ -172,7 +176,8 @@ void GridSample::createPrimitive() {
                 p.hDenormCoefF.resize(dataElPerVec);
             }
             if (interpolationMode == InterpolationMode::BICUBIC) {
-                p.buffer.resize(dataElPerVec * dataTypeSize * 32); // TODO: reduce
+                const size_t vecNum = paddingMode == PaddingMode::ZEROS ? 32 : 16;
+                p.buffer.resize(dataElPerVec * dataTypeSize * vecNum);
             }
         });
     }
@@ -325,8 +330,8 @@ void GridSample::execute(dnnl::stream strm) {
 
 // DEBUG
 std::cout << "OUTPUT: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 //char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i % jitKernel->getDataElPerVec() == 0)
