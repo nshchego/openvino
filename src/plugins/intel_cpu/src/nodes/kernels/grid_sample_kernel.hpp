@@ -152,7 +152,6 @@ private:
     void initVectors();
     void process();
     void spatialLoop();
-    void spatialVectors();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
