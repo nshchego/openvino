@@ -15,19 +15,18 @@ namespace intel_cpu {
 #define getMask()  RegistersPool::Reg<Vmask>(registersPool)
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
-protected:
-
-    JitKernelBase() {};
-
-    inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {
-        return is_subset(isa, dnnl::impl::cpu::x64::isa_all) && dnnl::impl::cpu::x64::mayiuse(isa);
-    }
+public:
+    JitKernelBase() {}
 
     void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
     void uni_vfnmadd132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
     void uni_vfmsub231ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
+
+    void uni_vpaddd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op) {
+        jit_generator::uni_vpaddd(vDst, vSrc, op);
+    }
 
     void uni_vpaddd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
@@ -118,8 +117,13 @@ protected:
                   const bool useMask  = true,
                   const bool zeroFill = false);
 
+protected:
+    inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {
+        return is_subset(isa, dnnl::impl::cpu::x64::isa_all) && dnnl::impl::cpu::x64::mayiuse(isa);
+    }
+
     RegistersPool::Ptr registersPool;
 };
 
-}
-}
+} // namespace intel_cpu
+} // namespace ov

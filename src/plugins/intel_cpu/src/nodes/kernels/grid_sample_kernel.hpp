@@ -123,8 +123,8 @@ private:
     RegistersPool::Reg<Vmask> kTailMask;
 
     // Vector registers.
-    RegistersPool::Reg<Vmm> vSrcHeightF; 
-    RegistersPool::Reg<Vmm> vSrcWidthF; 
+    RegistersPool::Reg<Vmm> vSrcHeightF;
+    RegistersPool::Reg<Vmm> vSrcWidthF;
     RegistersPool::Reg<Vmm> vZeros;
     RegistersPool::Reg<Vmm> vHalfF;
     RegistersPool::Reg<Vmm> vOnesF;
@@ -169,7 +169,7 @@ private:
 
     // Aux
     void dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vSrc);
-    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,const Vmm& vWCoord, const Vmm& vWidth);
+    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vWidth);
     enum class VectorName;
 //    RegistersPool::Reg<Vmm> getOrLoad(const VectorName& name);
     auto getOrLoad(const VectorName& name);
