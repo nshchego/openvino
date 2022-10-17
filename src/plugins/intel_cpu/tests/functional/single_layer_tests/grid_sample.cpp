@@ -138,15 +138,15 @@ namespace {
 
 const std::vector<ElementType> dataPrecision = {
         ElementType::f32,
-        ElementType::bf16,
-        ElementType::i32,
-        ElementType::i8
+        // TODO: Check reference
+//        ElementType::bf16,
+//        ElementType::i32,
+//        ElementType::i8
 };
 
 const std::vector<ElementType> gridPrecision = {
         ElementType::f32,
-        ElementType::bf16,
-        ElementType::f16
+        ElementType::bf16
 };
 
 std::vector<std::map<std::string, std::string>> additionalConfig

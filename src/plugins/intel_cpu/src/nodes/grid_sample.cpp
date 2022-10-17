@@ -90,12 +90,12 @@ void GridSample::initSupportedPrimitiveDescriptors() {
 
     const auto& dataDims = getInputShapeAtPort(IN_DATA).getDims();
 
-    dataPrecision = getOriginalInputPrecisionAtPort(IN_DATA);
-    if (dataPrecision.is_float()) {
+//    dataPrecision = getOriginalInputPrecisionAtPort(IN_DATA);
+//    if (dataPrecision.is_float()) {
         dataPrecision = Precision::FP32;
-    } else {
-        dataPrecision = Precision::I32;
-    }
+//    } else {
+//        dataPrecision = Precision::I32; TODO: Check reference.
+//    }
     dataTypeSize = dataPrecision.size();
     gridTypeSize = gridPrecision.size();
 
@@ -330,8 +330,8 @@ void GridSample::execute(dnnl::stream strm) {
 
 // DEBUG
 std::cout << "OUTPUT: " << std::endl;
-float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 //char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i % jitKernel->getDataElPerVec() == 0)

@@ -115,6 +115,8 @@ bool evaluate_grid_sample(const HostTensorPtr& output,
     auto rc = true;
     switch (output->get_element_type()) {
         NGRAPH_TYPE_CASE(evaluate_grid_sample, f32, output, data, grid, attributes);
+        NGRAPH_TYPE_CASE(evaluate_grid_sample, i32, output, data, grid, attributes);
+        NGRAPH_TYPE_CASE(evaluate_grid_sample, i8, output, data, grid, attributes);
     default:
         rc = false;
         break;
