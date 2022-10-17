@@ -129,6 +129,45 @@ void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
     }
 }
 
+void JitKernelBase::uni_vdivps(const Xbyak::Xmm& vDst,
+                               const Xbyak::Operand& op1,
+                               const Xbyak::Operand& op2) {
+    if (isValidIsa(x64::avx)) {
+        vdivps(vDst, op1, op2);
+    } else {
+        if (!vDst.isEqualIfNotInherited(op1)) {
+            movups(vDst, op1);
+        }
+        divps(vDst, op2);
+    }
+}
+
+void JitKernelBase::uni_vandps(const Xbyak::Xmm& vDst,
+                               const Xbyak::Xmm& vSrs,
+                               const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx))
+        vandps(vDst, vSrs, op);
+    else {
+        if (!vDst.isEqualIfNotInherited(vSrs)) {
+            movups(vDst, vSrs);
+        }
+        andps(vDst, op);
+    }
+}
+
+void JitKernelBase::uni_vandnps(const Xbyak::Xmm& vDst,
+                                const Xbyak::Xmm& vSrs,
+                                const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx))
+        vandnps(vDst, vSrs, op);
+    else {
+        if (!vDst.isEqualIfNotInherited(vSrs)) {
+            movups(vDst, vSrs);
+        }
+        andnps(vDst, op);
+    }
+}
+
 void JitKernelBase::gatherdd(const Xbyak::Xmm&    vDst,
                              const Xbyak::Reg64&  rSrcPtr,
                              const Xbyak::Xmm&    vSrcShift,
