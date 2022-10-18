@@ -91,7 +91,9 @@ protected:
         if (additionalConfig[InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16] == InferenceEngine::PluginConfigParams::YES) {
             selectedType = makeSelectedTypeStr(selectedType, ElementType::bf16);
         } else {
-            selectedType = makeSelectedTypeStr(selectedType, dataPrecision);
+            auto execType = ov::element::Type(dataPrecision).is_integral() ? ov::element::i32 : ov::element::f32;
+            selectedType = makeSelectedTypeStr(selectedType, execType);
+//            selectedType = makeSelectedTypeStr(selectedType, ov::element::f32);
         }
 
         auto params = ngraph::builder::makeDynamicParams({dataPrecision, gridPrecision}, inputDynamicShapes);
@@ -138,10 +140,9 @@ namespace {
 
 const std::vector<ElementType> dataPrecision = {
         ElementType::f32,
-        // TODO: Check reference
-//        ElementType::bf16,
-//        ElementType::i32,
-//        ElementType::i8
+        ElementType::bf16,
+        ElementType::i32,
+        ElementType::i8
 };
 
 const std::vector<ElementType> gridPrecision = {

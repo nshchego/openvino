@@ -374,12 +374,14 @@ void JitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
     Xbyak::Xmm xmmAux(vAux.getIdx());
     const uint64_t xmmVlen = x64::cpu_isa_traits<x64::sse41>::vlen;
 
-    uni_vpshufd(xmmWCoord, ptr[regGrid], 0xD8);
+    uni_vmovups(xmmWCoord, ptr[regGrid]);
+    uni_vpshufd(xmmWCoord, xmmWCoord, 0xD8);
     shufpd(xmmHCoord, xmmWCoord, 0x2);
 
     add(regGrid, xmmVlen);
 
-    uni_vpshufd(xmmAux, ptr[regGrid], 0xD8);
+    uni_vmovups(xmmAux, ptr[regGrid]);
+    uni_vpshufd(xmmAux, xmmAux, 0xD8);
     shufpd(xmmWCoord, xmmAux, 0x0);
     shufpd(xmmHCoord, xmmAux, 0x3);
 
@@ -1350,6 +1352,7 @@ void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
         uni_vfmadd132ps(vQ1, vQ0, vDY);
 
         if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+            uni_vroundps(vQ1, vQ1, 0x3); // Truncation
             uni_vcvtps2dq(vQ1, vQ1);
         }
 
@@ -1535,6 +1538,7 @@ void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
         uni_vfmadd132ps(vQ1, vQ0, vDY);
 
         if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+            uni_vroundps(vQ1, vQ1, 0x3); // Truncation
             uni_vcvtps2dq(vQ1, vQ1);
         }
 

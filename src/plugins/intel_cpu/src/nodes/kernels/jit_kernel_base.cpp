@@ -40,7 +40,7 @@ void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& dst,
         assert(dst.getIdx() != src.getIdx());
         mulps(dst, op);
         subps(src, dst);
-        vmovups(dst, src);
+        movups(dst, src);
     }
 }
 
@@ -57,7 +57,7 @@ void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm& dst,
         assert(!dst.isEqualIfNotInherited(op));
         mulps(src, op);
         subps(src, dst);
-        vmovups(dst, src);
+        movups(dst, src);
     }
 }
 
