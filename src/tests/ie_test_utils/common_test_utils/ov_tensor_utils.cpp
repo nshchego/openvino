@@ -192,6 +192,23 @@ void compare(const ov::Tensor& expected,
 
     auto expected_data = expected.data<ExpectedT>();
     auto actual_data = actual.data<ActualT>();
+
+// DEBUG
+std::cout << "\nEXPECTED: " << std::endl;
+for (int i = 0; i < expected.get_size(); i++) {
+    if (i % 16 == 0)
+        std::cout << "| ";
+    std::cout << expected_data[i] << "; ";
+}
+std::cout << "\nACTUAL: " << std::endl;
+for (int i = 0; i < actual.get_size(); i++) {
+    if (i % 16 == 0)
+        std::cout << "| ";
+    std::cout << actual_data[i] << "; ";
+}
+std::cout << std::endl;
+// DEBUG
+
     double abs_threshold = abs_threshold_;
     double rel_threshold = rel_threshold_;
     if (abs_threshold == std::numeric_limits<double>::max() && rel_threshold == std::numeric_limits<double>::max()) {
