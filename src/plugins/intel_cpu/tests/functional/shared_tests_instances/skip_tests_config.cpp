@@ -164,7 +164,10 @@ std::vector<std::string> disabledTestPatterns() {
         // is shared across plugins
         // passed local test and cpu has specific test cases with nms9 to cover
         R"(smoke_NmsLayerTest.*)",
-        // Issue 90107. Division by zero in the reference implementation.
+        // Conversion issue in the reference implementation. There can be some garbage in the rest of float values like 0.333333745.
+        // Value 0.000000745 is taken into account and affects further type conversion.
+        R"(smoke.*GridSampleLayerTestCPU.*(i32|i8|bf16).*)",
+        R"(smoke.*GridSampleLayerTestCPU.*ENFORCE_BF16=YES.*)"
     };
 
 #define FIX_62820 0

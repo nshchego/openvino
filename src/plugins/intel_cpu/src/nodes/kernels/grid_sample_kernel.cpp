@@ -1689,6 +1689,7 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
         }
 
         if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+            uni_vroundps(vYDotProd, vYDotProd, 0x3); // Truncation
             uni_vcvtps2dq(vYDotProd, vYDotProd);
         }
 
@@ -1943,6 +1944,7 @@ void JitGridSampleKernel<x64::sse41>::bicubicInterpolation(const Vmm& vWCoord, c
         }
 
         if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+            uni_vroundps(vYDotProd, vYDotProd, 0x3); // Truncation
             uni_vcvtps2dq(vYDotProd, vYDotProd);
         }
 
@@ -2202,6 +2204,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
         }
 
         if (jcp.inDataPrc == InferenceEngine::Precision::I32) {
+            uni_vroundps(vYDotProd, vYDotProd, 0x3); // Truncation
             uni_vcvtps2dq(vYDotProd, vYDotProd);
         }
 
@@ -2278,33 +2281,6 @@ void JitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
         if (dataTypeSize > 1)
             uni_vpslld(vDst, vDst, dataTypeShift); // multiply by source data type size.
     }
-}
-
-//template <>
-//RegistersPool::Reg<Xbyak::Zmm> JitGridSampleKernel<x64::avx512_core>::getOrLoad(const VectorName& name) {
-//    return getVmm();
-//}
-
-template <x64::cpu_isa_t isa>
-auto JitGridSampleKernel<isa>::getOrLoad(const VectorName& name) {
-    auto rAux   = getReg64();
-    RegistersPool::Reg<Vmm> vResult;
-
-    switch (name) {
-        case VectorName::srcHeightF:
-            if (vSrcHeightF.isInitialized()) {
-//                vResult = vSrcHeightF;
-            } else {
-                vSrcHeightF = getVmm();
-                mov(rAux, ptr[regParams + GET_OFF(srcHeightF)]);
-                uni_vpbroadcastd(vSrcHeightF, ptr[rAux]);
-            }
-            break;
-        default:
-            IE_THROW() << "Unknown vector name.";
-    }
-
-    return vResult;
 }
 
 template class JitGridSampleKernel<x64::avx512_core>;
