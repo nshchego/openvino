@@ -505,7 +505,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
     L(lRest);
     {
         load(vWCoord, ptr[regGrid], rAux, dataTypeSize);
-        vpermd(vWCoord, vPermMask, vWCoord);           // Permute to XXXX.YYYY
+        vpermd(vWCoord, vPermMask, vWCoord);               // Permute to XXXX.YYYY
         vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
     }
 
@@ -725,7 +725,7 @@ void JitGridSampleKernel<x64::sse41>::zerosPaddingH(const Vmask& kDst, const Vmm
 
     uni_vpand(kDst, kDst, vAux); // vHCoord < vSrcHeightF && vZeros <= vWCoord < vSrcWidthF
     uni_vpxor(vAux, vAux, vAux);
-    uni_vcmpps(vAux, vAux, vHCoord, 0x2);            // vHCoord >= vZeros
+    uni_vcmpps(vAux, vAux, vHCoord, 0x2); // vHCoord >= vZeros
     uni_vpand(kDst, kDst, vAux); // vZeros <= vHCoord < vSrcHeightF && vZeros <= vWCoord < vSrcWidthF
 }
 
@@ -859,7 +859,7 @@ void JitGridSampleKernel<x64::avx512_core>::reflectionPadding(const Vmm& vCoordD
         // abs(x) % D21
         uni_vandps(vCoordDst, vCoordOrigin, vAbsMask); // abs(x)
         uni_vdivps(vAux, vCoordDst, vSrcDimMul2Sub1F);
-        uni_vroundps(vAux, vAux, 0x3);                          // Round floor
+        uni_vroundps(vAux, vAux, 0x3);                          // Truncation
         uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2Sub1F);    // abs(x) % D21
     } else {
         const auto& vSrcDimMul2F = dim == coord::w ? vSrcWidthMul2F : vSrcHeightMul2F;
@@ -867,11 +867,11 @@ void JitGridSampleKernel<x64::avx512_core>::reflectionPadding(const Vmm& vCoordD
         if (vCoordDst.getIdx() != vCoordOrigin.getIdx())
             uni_vmovups(vCoordDst, vCoordOrigin);
         uni_vdivps(vAux, vCoordDst, vSrcDimMul2F);
-        uni_vroundps(vAux, vAux, 0x3);                   // Round floor
+        uni_vroundps(vAux, vAux, 0x3);                   // Truncation
         uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2F); // x % D2
         uni_vaddps(vCoordDst, vCoordDst, vSrcDimMul2F);  // x % D2 + D2
         uni_vdivps(vAux, vCoordDst, vSrcDimMul2F);
-        uni_vroundps(vAux, vAux, 0x3);                   // Round floor
+        uni_vroundps(vAux, vAux, 0x3);                   // Truncation
         uni_vfnmadd231ps(vCoordDst, vAux, vSrcDimMul2F); // (x % D2 + D2) % D2
     }
 
@@ -914,7 +914,7 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
             }
         }
         uni_vdivps(vAux0, vCoordDst, vMul2Sub1);
-        uni_vroundps(vAux0, vAux0, 0x3);               // Round floor
+        uni_vroundps(vAux0, vAux0, 0x3);               // Truncation
         uni_vfnmadd231ps(vCoordDst, vAux0, vMul2Sub1); // abs(x) % D21
         uni_vsubps(vAux0, vCoordDst, vMul2Sub1);       // abs(x) % D21 - D21
     } else {
@@ -940,11 +940,11 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
             }
         }
         uni_vdivps(vAux0, vCoordOrigin, vMul2);
-        uni_vroundps(vAux0, vAux0, 0x3);           // Round floor
+        uni_vroundps(vAux0, vAux0, 0x3);           // Truncation
         uni_vfnmadd231ps(vCoordDst, vAux0, vMul2); // x % D2
         uni_vaddps(vCoordDst, vCoordDst, vMul2);   // x % D2 + D2
         uni_vdivps(vAux0, vCoordDst, vMul2);
-        uni_vroundps(vAux0, vAux0, 0x3);           // Round floor
+        uni_vroundps(vAux0, vAux0, 0x3);           // Truncation
         uni_vfnmadd231ps(vCoordDst, vAux0, vMul2); // (x % D2 + D2) % D2
 
         if (dim == coord::w) {
