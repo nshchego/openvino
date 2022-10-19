@@ -144,6 +144,8 @@ std::cout << "{"<< v00 << ";" << v01 << ";" << v10 << ";" << v11 << "};" << std:
 
     const auto q0 = (1 - dx) * v00 + dx * v01;
     const auto q1 = (1 - dx) * v10 + dx * v11;
+const auto res0 = dy * q1 + (1 - dy) * q0;
+std::cout << "q0: " << q0 << " q1: " << q1 << " res: " << res0 << " rest_casted: " << static_cast<DATA_ET>(res0) << std::endl;
     return dy * q1 + (1 - dy) * q0;
 }
 
