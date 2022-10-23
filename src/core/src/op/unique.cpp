@@ -211,7 +211,7 @@ void op::v10::Unique::validate_and_infer_types() {
     set_output_type(0, get_input_element_type(0), output_shapes[0]);
     set_output_type(1, m_index_element_type, output_shapes[1]);
     set_output_type(2, m_index_element_type, output_shapes[2]);
-    set_output_type(3, element::i64, output_shapes[3]);
+    set_output_type(3, element::i32, output_shapes[3]);
 }
 
 std::shared_ptr<Node> op::v10::Unique::clone_with_new_inputs(const OutputVector& new_args) const {
