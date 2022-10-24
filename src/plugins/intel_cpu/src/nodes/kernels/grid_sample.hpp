@@ -14,7 +14,7 @@ namespace intel_cpu {
 enum class InterpolationMode { BILINEAR, BICUBIC, NEAREST };
 enum class PaddingMode { ZEROS, BORDER, REFLECTION };
 
-struct jGridSampleConfParams {
+struct GridSampleKernelConfParams {
     bool dynamicShapes  = false;
     bool dynamicBatch   = false;
     bool dynamicChannel = false;
@@ -28,7 +28,7 @@ struct jGridSampleConfParams {
     uint64_t srcBatchStepB = 0lu;
 };
 
-struct jGridSamplesExecArgs {
+struct GridSamplesKernelExecArgs {
     const void* src;
     const void* grid;
     void* dst;
@@ -59,14 +59,14 @@ enum coord {
     w, h
 };
 
-class JitGridSampleKernelBase: public JitKernelBase {
+class GridSampleKernelBase: public JitKernelBase {
 public:
-    void (*ker_)(const jGridSamplesExecArgs *);
-    void operator()(const jGridSamplesExecArgs *args) {
+    void (*ker_)(const GridSamplesKernelExecArgs *);
+    void operator()(const GridSamplesKernelExecArgs *args) {
         assert(ker_);
         ker_(args);
     }
-    explicit JitGridSampleKernelBase(const jGridSampleConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
+    explicit GridSampleKernelBase(const GridSampleKernelConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
 
     virtual void create_ker() = 0;
     uint64_t getVecLen() {
@@ -80,7 +80,7 @@ public:
     }
 
 protected:
-    jGridSampleConfParams jcp;
+    GridSampleKernelConfParams jcp;
     uint64_t vlen         = 16lu;
     uint64_t dataTypeSize = 1lu;
     uint64_t gridTypeSize = 1lu;
@@ -89,11 +89,11 @@ protected:
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-class JitGridSampleKernel : public JitGridSampleKernelBase {
+class GridSampleKernel : public GridSampleKernelBase {
 public:
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(JitGridSampleKernel)
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(GridSampleKernel)
 
-    explicit JitGridSampleKernel(const jGridSampleConfParams& jcp);
+    explicit GridSampleKernel(const GridSampleKernelConfParams& jcp);
 
     void create_ker() override;
     void generate() override;

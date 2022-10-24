@@ -5,7 +5,7 @@
 #pragma once
 
 #include <node.h>
-#include "kernels/grid_sample_kernel.hpp"
+#include "kernels/grid_sample.hpp"
 
 #include <memory>
 #include <string>
@@ -73,7 +73,7 @@ private:
     static constexpr size_t IN_DATA = 0;
     static constexpr size_t IN_GRID = 1;
 
-    std::shared_ptr<JitGridSampleKernelBase> jitKernel;
+    std::shared_ptr<GridSampleKernelBase> jitKernel;
 };
 
 }   // namespace node

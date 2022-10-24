@@ -93,7 +93,6 @@ protected:
         } else {
             auto execType = ov::element::Type(dataPrecision).is_integral() ? ov::element::i32 : ov::element::f32;
             selectedType = makeSelectedTypeStr(selectedType, execType);
-//            selectedType = makeSelectedTypeStr(selectedType, ov::element::f32);
         }
 
         auto params = ngraph::builder::makeDynamicParams({dataPrecision, gridPrecision}, inputDynamicShapes);
@@ -290,8 +289,20 @@ INSTANTIATE_TEST_SUITE_P(smoke_static, GridSampleLayerTestCPU,
                     ::testing::ValuesIn(dataPrecision),
                     ::testing::ValuesIn(gridPrecision),
                     ::testing::ValuesIn(getCPUInfo()),
-                    ::testing::ValuesIn(additionalConfig)),
+                    ::testing::Values(additionalConfig[0])),
                 GridSampleLayerTestCPU::getTestCaseName);
+
+INSTANTIATE_TEST_SUITE_P(nightly_static, GridSampleLayerTestCPU,
+                 ::testing::Combine(
+                         ::testing::ValuesIn(getStaticShapes()),
+                         ::testing::ValuesIn(interpolateMode),
+                         ::testing::ValuesIn(paddingMode),
+                         ::testing::ValuesIn(alignCorners),
+                         ::testing::ValuesIn({ElementType::f32, ElementType::i32, ElementType::i8}),
+                         ::testing::ValuesIn({ElementType::f32}),
+                         ::testing::ValuesIn(getCPUInfo()),
+                         ::testing::Values(additionalConfig[1])),
+                 GridSampleLayerTestCPU::getTestCaseName);
 
 
 const std::vector<std::vector<InputShape>> dynamicInSapes = {
@@ -338,7 +349,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_dynamic, GridSampleLayerTestCPU,
                              ::testing::ValuesIn(dataPrecision),
                              ::testing::ValuesIn(gridPrecision),
                              ::testing::ValuesIn(getCPUInfo()),
-                             ::testing::ValuesIn(additionalConfig)),
+                             ::testing::Values(additionalConfig[0])),
                      GridSampleLayerTestCPU::getTestCaseName);
 } // namespace
 } // namespace CPULayerTestsDefinitions

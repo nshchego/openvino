@@ -11,53 +11,53 @@ using namespace intel_cpu;
 using namespace dnnl::impl::cpu;
 
 
-void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& dst,
-                                    const Xbyak::Xmm& src,
+void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& vDst,
+                                    const Xbyak::Xmm& vSrc,
                                     const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub132ps(dst, src, op);
+        vfmsub132ps(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(dst.getIdx() != src.getIdx());
-        vmulps(dst, dst, op);
-        vsubps(dst, dst, src);
+        assert(vDst.getIdx() != vSrc.getIdx());
+        vmulps(vDst, vDst, op);
+        vsubps(vDst, vDst, vSrc);
     } else {
-        assert(dst.getIdx() != src.getIdx());
-        mulps(dst, op);
-        subps(dst, src);
+        assert(vDst.getIdx() != vSrc.getIdx());
+        mulps(vDst, op);
+        subps(vDst, vSrc);
     }
 }
 
-void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& dst,
-                                     const Xbyak::Xmm& src,
+void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& vDst,
+                                     const Xbyak::Xmm& vSrc,
                                      const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfnmadd132ps(dst, src, op);
+        vfnmadd132ps(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(dst.getIdx() != src.getIdx());
-        vmulps(dst, dst, op);
-        vsubps(dst, src, dst);
+        assert(vDst.getIdx() != vSrc.getIdx());
+        vmulps(vDst, vDst, op);
+        vsubps(vDst, vSrc, vDst);
     } else {
-        assert(dst.getIdx() != src.getIdx());
-        mulps(dst, op);
-        subps(src, dst);
-        movups(dst, src);
+        assert(vDst.getIdx() != vSrc.getIdx());
+        mulps(vDst, op);
+        subps(vSrc, vDst);
+        movups(vDst, vSrc);
     }
 }
 
-void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm& dst,
-                                    const Xbyak::Xmm& src,
+void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm& vDst,
+                                    const Xbyak::Xmm& vSrc,
                                     const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub231ps(dst, src, op);
+        vfmsub231ps(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(!dst.isEqualIfNotInherited(op));
-        vmulps(src, src, op);
-        vsubps(dst, src, dst);
+        assert(!vDst.isEqualIfNotInherited(op));
+        vmulps(vSrc, vSrc, op);
+        vsubps(vDst, vSrc, vDst);
     } else {
-        assert(!dst.isEqualIfNotInherited(op));
-        mulps(src, op);
-        subps(src, dst);
-        movups(dst, src);
+        assert(!vDst.isEqualIfNotInherited(op));
+        mulps(vSrc, op);
+        subps(vSrc, vDst);
+        movups(vDst, vSrc);
     }
 }
 

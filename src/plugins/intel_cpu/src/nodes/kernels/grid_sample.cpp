@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "grid_sample_kernel.hpp"
+#include "grid_sample.hpp"
 
 using namespace dnnl::impl::cpu;
 
 namespace ov {
 namespace intel_cpu {
 
-#define GET_OFF(field) offsetof(jGridSamplesExecArgs, field)
+#define GET_OFF(field) offsetof(GridSamplesKernelExecArgs, field)
 
 template <x64::cpu_isa_t isa>
-JitGridSampleKernel<isa>::JitGridSampleKernel(const jGridSampleConfParams& jcp) :
-        JitGridSampleKernelBase(jcp) {
+GridSampleKernel<isa>::GridSampleKernel(const GridSampleKernelConfParams& jcp) :
+        GridSampleKernelBase(jcp) {
     vlen = x64::cpu_isa_traits<isa>::vlen;
     dataTypeSize = jcp.inDataPrc.size();
     gridTypeSize = jcp.gridPrc.size();
@@ -26,7 +26,7 @@ JitGridSampleKernel<isa>::JitGridSampleKernel(const jGridSampleConfParams& jcp) 
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::create_ker() {
+void GridSampleKernel<isa>::create_ker() {
     auto code = x64::jit_generator::create_kernel();
     if (code != dnnl::impl::status::success)
         IE_THROW() << "Could not create GridSample kernel. Error code: " << std::to_string(code);
@@ -34,7 +34,7 @@ void JitGridSampleKernel<isa>::create_ker() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::generate() {
+void GridSampleKernel<isa>::generate() {
     this->preamble();
     registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
@@ -58,7 +58,7 @@ void JitGridSampleKernel<isa>::generate() {
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::initVectors() {
+void GridSampleKernel<x64::avx512_core>::initVectors() {
     auto rAux = getReg64();
     Xbyak::Reg32 r32Aux(rAux.getIdx());
 
@@ -160,7 +160,7 @@ void JitGridSampleKernel<x64::avx512_core>::initVectors() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::initVectors() {
+void GridSampleKernel<isa>::initVectors() {
     auto rAux = getReg64();
 
     vSrcWidthF = getVmm();
@@ -224,7 +224,7 @@ void JitGridSampleKernel<isa>::initVectors() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::process() {
+void GridSampleKernel<isa>::process() {
     regWorkAmount = getReg64();
 
     // Batch loop
@@ -261,7 +261,7 @@ void JitGridSampleKernel<isa>::process() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::spatialLoop() {
+void GridSampleKernel<isa>::spatialLoop() {
     auto vHCoord = getVmm();
     auto vWCoord = getVmm();
 
@@ -288,7 +288,7 @@ void JitGridSampleKernel<isa>::spatialLoop() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+void GridSampleKernel<isa>::interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
         bilinearInterpolation(vWCoord, vHCoord, tail);
     } else if (jcp.interpolationMode == InterpolationMode::BICUBIC) {
@@ -299,7 +299,7 @@ void JitGridSampleKernel<isa>::interpolation(const Vmm& vWCoord, const Vmm& vHCo
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::tail() {
+void GridSampleKernel<isa>::tail() {
     Xbyak::Label lEnd;
     cmp(regWorkAmount, 0);
     jle(lEnd, T_NEAR);
@@ -319,7 +319,7 @@ void JitGridSampleKernel<isa>::tail() {
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     auto vAux = getVmm();
 
     vpermd(vWCoord, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
@@ -338,7 +338,7 @@ void JitGridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, c
 }
 
 template <>
-void JitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     auto vAux = getVmm();
     Vmm vPermMask;
     RegistersPool::Reg<Vmm> permMaskHolder;
@@ -367,7 +367,7 @@ void JitGridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vm
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX, SSE41
-void JitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     auto vAux = getVmm();
     Xbyak::Xmm xmmWCoord(vWCoord.getIdx());
     Xbyak::Xmm xmmHCoord(vHCoord.getIdx());
@@ -415,7 +415,7 @@ void JitGridSampleKernel<isa>::getCoordinates(const Vmm& vHCoord, const Vmm& vWC
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     Xbyak::Label lEnd, lGridShift, lRest;
 
     auto vAux = getVmm();
@@ -464,7 +464,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
 }
 
 template <>
-void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     Xbyak::Label lRest, lGridShift, lEnd;
 
     auto rAux = getReg64();
@@ -518,7 +518,7 @@ void JitGridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, cons
 }
 
 template <>
-void JitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     Xbyak::Label lLoop2End, lEnd;
 
     Xbyak::Xmm xmmWCoord(vWCoord.getIdx());
@@ -568,7 +568,7 @@ void JitGridSampleKernel<x64::avx>::getTailCoordinates(const Vmm& vHCoord, const
 }
 
 template <>
-void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
     Xbyak::Label lRest, lHShuf, lGridShift, lEnd;
     auto rAux = getReg64();
 
@@ -616,7 +616,7 @@ void JitGridSampleKernel<x64::sse41>::getTailCoordinates(const Vmm& vHCoord, con
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
-void JitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
+void GridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord) {
     if (jcp.alignCorners) {
         if (vWDenormCoefF.isInitialized()) {
             uni_vfmadd132ps(vWCoord, vWDenormCoefF, vWDenormCoefF);
@@ -677,25 +677,25 @@ void JitGridSampleKernel<isa>::denormalizeRawCoordinates(const Vmm& vWCoord, con
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::zerosPaddingW(const Vmask& kDst, const Vmm& vCoord) {
+void GridSampleKernel<x64::avx512_core>::zerosPaddingW(const Vmask& kDst, const Vmm& vCoord) {
     vcmpps(kDst, vCoord, vSrcWidthF, 0x1);    // vCoord < vUpperBound
     vcmpps(kDst | kDst, vZeros, vCoord, 0x2); // vCoord >= vZeros
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::zerosPaddingH(const Vmask& kDst, const Vmm& vCoord, const Vmask& kMaskW) {
+void GridSampleKernel<x64::avx512_core>::zerosPaddingH(const Vmask& kDst, const Vmm& vCoord, const Vmask& kMaskW) {
     vcmpps(kDst | kMaskW, vCoord, vSrcHeightF, 0x1); // vCoord < vUpperBound
     vcmpps(kDst | kDst, vZeros, vCoord, 0x2);        // vCoord >= vZeros
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::avx512_core>::zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord) {
     zerosPaddingW(kDst, vWCoord);
     zerosPaddingH(kDst, vHCoord, kDst);
 }
 
 template <>
-void JitGridSampleKernel<x64::sse41>::zerosPaddingW(const Vmask& kDst, const Vmm& vWCoord) {
+void GridSampleKernel<x64::sse41>::zerosPaddingW(const Vmask& kDst, const Vmm& vWCoord) {
     auto vAux = getVmm();
 
     if (vSrcWidthF.isInitialized()) {
@@ -712,7 +712,7 @@ void JitGridSampleKernel<x64::sse41>::zerosPaddingW(const Vmask& kDst, const Vmm
 }
 
 template <>
-void JitGridSampleKernel<x64::sse41>::zerosPaddingH(const Vmask& kDst, const Vmm& vHCoord, const Vmask& kMaskW) {
+void GridSampleKernel<x64::sse41>::zerosPaddingH(const Vmask& kDst, const Vmm& vHCoord, const Vmask& kMaskW) {
     auto vAux = getVmm();
 
     if (vSrcHeightF.isInitialized()) {
@@ -731,13 +731,13 @@ void JitGridSampleKernel<x64::sse41>::zerosPaddingH(const Vmask& kDst, const Vmm
 }
 
 template <>
-void JitGridSampleKernel<x64::sse41>::zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<x64::sse41>::zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord) {
     zerosPaddingW(kDst, vWCoord);
     zerosPaddingH(kDst, vHCoord, kDst);
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX
-void JitGridSampleKernel<isa>::zerosPaddingW(const Vmask& kDst, const Vmm& vCoord) {
+void GridSampleKernel<isa>::zerosPaddingW(const Vmask& kDst, const Vmm& vCoord) {
     auto vAux = getVmm();
     Vmm vZerosTmp;
     RegistersPool::Reg<Vmm> zerosHolder;
@@ -762,7 +762,7 @@ void JitGridSampleKernel<isa>::zerosPaddingW(const Vmask& kDst, const Vmm& vCoor
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX
-void JitGridSampleKernel<isa>::zerosPaddingH(const Vmask& kDst, const Vmm& vCoord, const Vmask& kMaskW) {
+void GridSampleKernel<isa>::zerosPaddingH(const Vmask& kDst, const Vmm& vCoord, const Vmask& kMaskW) {
     auto vAux = getVmm();
     Vmm vZerosTmp;
     RegistersPool::Reg<Vmm> zerosHolder;
@@ -788,7 +788,7 @@ void JitGridSampleKernel<isa>::zerosPaddingH(const Vmask& kDst, const Vmm& vCoor
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX
-void JitGridSampleKernel<isa>::zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord) {
+void GridSampleKernel<isa>::zerosPadding(const Vmask& kDst, const Vmm& vHCoord, const Vmm& vWCoord) {
     bool releaseZeroVec = false;
     if (!vZeros.isInitialized()) {
         releaseZeroVec = true;
@@ -805,13 +805,13 @@ void JitGridSampleKernel<isa>::zerosPadding(const Vmask& kDst, const Vmm& vHCoor
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
+void GridSampleKernel<x64::avx512_core>::borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
     vrangeps(vCoordDst, vCoordOrigin, dim == coord::w ? vSrcWidthSub1F : vSrcHeightSub1F, 0x0); // vWCoord >= vSrcWidthF
     vrangeps(vCoordDst, vCoordDst, vZeros, 0x1); // vWCoord < vZeros
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX, SSE41
-void JitGridSampleKernel<isa>::borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
+void GridSampleKernel<isa>::borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
     auto rAux = getReg64();
     auto vAux = getVmm();
     RegistersPool::Reg<Vmm> vAux1;
@@ -861,7 +861,7 @@ void JitGridSampleKernel<isa>::borderPadding(const Vmm& vCoordDst, const Vmm& vC
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
+void GridSampleKernel<x64::avx512_core>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
     auto vAux = getVmm();
     const auto& vSrcDimMul2Sub1F = dim == coord::w ? vSrcWidthMul2Sub1F : vSrcHeightMul2Sub1F;
 
@@ -892,7 +892,7 @@ void JitGridSampleKernel<x64::avx512_core>::reflectionPadding(const Vmm& vCoordD
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX, SSE41
-void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
+void GridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim) {
     auto rAux  = getReg64();
     auto vAux0 = getVmm();
     auto vAux1 = getVmm();
@@ -1001,7 +1001,7 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
+void GridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
     if (idx == 0) {
         uni_vmovups(vCoef, vDDim);
         uni_vfnmadd132ps(vCoef, vOnesF, vConst_2_00);
@@ -1026,7 +1026,7 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicCoefficients(const Vmm& vCoef
 }
 
 template <>
-void JitGridSampleKernel<x64::avx2>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
+void GridSampleKernel<x64::avx2>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
     static const size_t elPerVec = x64::cpu_isa_traits<x64::avx2>::vlen / sizeof(float);;
     static const float const_0_75[elPerVec] = { -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f };
     static const float const_1_25[elPerVec] = { 1.25f, 1.25f, 1.25f, 1.25f, 1.25f, 1.25f, 1.25f, 1.25f };
@@ -1068,7 +1068,7 @@ void JitGridSampleKernel<x64::avx2>::bicubicCoefficients(const Vmm& vCoef, const
 }
 
 template <>
-void JitGridSampleKernel<x64::avx>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
+void GridSampleKernel<x64::avx>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
     static const size_t elPerVec = x64::cpu_isa_traits<x64::avx>::vlen / sizeof(float);
     static const float const_0_75[elPerVec] = { -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f };
     static const float const_1_25[elPerVec] = { 1.25f, 1.25f, 1.25f, 1.25f, 1.25f, 1.25f, 1.25f, 1.25f };
@@ -1115,7 +1115,7 @@ void JitGridSampleKernel<x64::avx>::bicubicCoefficients(const Vmm& vCoef, const 
 }
 
 template <>
-void JitGridSampleKernel<x64::sse41>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
+void GridSampleKernel<x64::sse41>::bicubicCoefficients(const Vmm& vCoef, const Vmm& vDDim, const uint8_t idx) {
     static const size_t elToAllocate = 2 * x64::cpu_isa_traits<x64::sse41>::vlen / sizeof(float);
     // Allocation with a margin for address alignment.
     static const float c_0_75[elToAllocate] = { -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f, -0.75f };
@@ -1176,7 +1176,7 @@ void JitGridSampleKernel<x64::sse41>::bicubicCoefficients(const Vmm& vCoef, cons
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
-void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+void GridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     const auto& vSrcShift = vWCoord;
     const auto& vAux      = vHCoord;
     auto kGatherMask      = getMask();
@@ -1251,7 +1251,7 @@ void JitGridSampleKernel<isa>::nearestInterpolation(const Vmm& vWCoord, const Vm
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+void GridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     auto vDX     = getVmm();
     auto vDY     = getVmm();
     const auto& shift00 = vWCoord;
@@ -1395,7 +1395,7 @@ void JitGridSampleKernel<x64::avx512_core>::bilinearInterpolation(const Vmm& vWC
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX, SSE41
-void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+void GridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     auto vWRound = getVmm();
     auto vHRound = getVmm();
     auto& vDX    = vWCoord;
@@ -1597,7 +1597,7 @@ void JitGridSampleKernel<isa>::bilinearInterpolation(const Vmm& vWCoord, const V
 }
 
 template <>
-void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+void GridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     auto vHTop      = getVmm();
     auto vWLeft     = getVmm();
     auto vDX        = getVmm();
@@ -1747,7 +1747,7 @@ void JitGridSampleKernel<x64::avx512_core>::bicubicInterpolation(const Vmm& vWCo
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, AVX, SSE41
-void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
+void GridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     auto vHTop  = getVmm();
     auto vWLeft = getVmm();
     auto vDX    = getVmm();
@@ -2008,7 +2008,7 @@ void JitGridSampleKernel<isa>::bicubicInterpolation(const Vmm& vWCoord, const Vm
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vSrc) {
+void GridSampleKernel<isa>::dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vSrc) {
     if (dataTypeSize == 1)
         return;
 
@@ -2027,7 +2027,7 @@ void JitGridSampleKernel<isa>::dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vS
 }
 
 template <x64::cpu_isa_t isa>
-void JitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vWidth) {
+void GridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vWidth) {
     if (vDst.getIdx() == vWCoord.getIdx()) {
         if (one_of(isa, x64::avx512_core, x64::avx2)) {
             uni_vfmadd231ps(vDst, vHCoord, vWidth);
@@ -2066,10 +2066,10 @@ void JitGridSampleKernel<isa>::hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord,
     }
 }
 
-template class JitGridSampleKernel<x64::avx512_core>;
-template class JitGridSampleKernel<x64::avx2>;
-template class JitGridSampleKernel<x64::avx>;
-template class JitGridSampleKernel<x64::sse41>;
+template class GridSampleKernel<x64::avx512_core>;
+template class GridSampleKernel<x64::avx2>;
+template class GridSampleKernel<x64::avx>;
+template class GridSampleKernel<x64::sse41>;
 
 }   // namespace intel_cpu
 }   // namespace ov

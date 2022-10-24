@@ -27,6 +27,15 @@ bool GridSample::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
             errorMessage = "Not supported CPU instructions set.";
             return false;
         }
+
+        // 94982. FP32->I32 conversion issue in the reference implementation. There can be some garbage in the rest of float values like 0.333333745.
+        // The kernel does not have such garbage. The diff 0.000000745 is taken into account in calculations and affects further type conversion.
+        // Reorder->GridSample->Reorder also does not work here. Potential fix is to use nearest conversion instead of truncation.
+        // 94989. BF16 Reference produces different results.
+        if (op->inputs()[0].get_element_type() != element::f32 || op->inputs()[1].get_element_type() != element::f32) {
+            errorMessage = "Only f32 input type is supported.";
+            return false;
+        }
     } catch (...) {
         return false;
     }
@@ -116,7 +125,7 @@ void GridSample::initSupportedPrimitiveDescriptors() {
 }
 
 void GridSample::createPrimitive() {
-    jGridSampleConfParams jcp;
+    GridSampleKernelConfParams jcp;
 
     jcp.inDataPrc     = dataPrecision;
     jcp.gridPrc       = gridPrecision;
@@ -141,13 +150,13 @@ void GridSample::createPrimitive() {
     }
 
     if (x64::mayiuse(x64::avx512_core)) {
-        jitKernel.reset(new JitGridSampleKernel<x64::avx512_core>(jcp));
+        jitKernel.reset(new GridSampleKernel<x64::avx512_core>(jcp));
     } else if (x64::mayiuse(x64::avx2)) {
-        jitKernel.reset(new JitGridSampleKernel<x64::avx2>(jcp));
+        jitKernel.reset(new GridSampleKernel<x64::avx2>(jcp));
     } else if (x64::mayiuse(x64::avx)) {
-        jitKernel.reset(new JitGridSampleKernel<x64::avx>(jcp));
+        jitKernel.reset(new GridSampleKernel<x64::avx>(jcp));
     } else if (x64::mayiuse(x64::sse41)) {
-        jitKernel.reset(new JitGridSampleKernel<x64::sse41>(jcp));
+        jitKernel.reset(new GridSampleKernel<x64::sse41>(jcp));
     }
     if (!jitKernel) {
         THROW_ERROR << " could not create JIT kernel.";
@@ -271,30 +280,31 @@ void GridSample::execute(dnnl::stream strm) {
     uint8_t*       dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 
 // DEBUG
-std::cout << "\nINPUT DATA: " << std::endl;
+//std::cout << "\nINPUT DATA: " << std::endl;
 //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i % jitKernel->getDataElPerVec() == 0)
-        std::cout << "| ";
-    std::cout << srcDataF[i] << "; ";
-}
-std::cout << std::endl;
-
-std::cout << "GRID DATA: " << std::endl;
-float* gridDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetSize() / gridTypeSize; i++) {
-    if (i % jitKernel->getGridElPerVec() == 0)
-        std::cout << "| ";
-    std::cout << gridDataF[i] << "; ";
-}
-std::cout << std::endl;
-std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
+////int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//    if (i % jitKernel->getDataElPerVec() == 0)
+//        std::cout << "| ";
+//    std::cout << srcDataF[i] << "; ";
+//}
+//std::cout << std::endl;
+//
+//std::cout << "GRID DATA: " << std::endl;
+////float* gridDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
+//short* gridDataF = reinterpret_cast<short*>(getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_GRID)->getMemoryPtr()->GetSize() / gridTypeSize; i++) {
+//    if (i % jitKernel->getGridElPerVec() == 0)
+//        std::cout << "| ";
+//    std::cout << gridDataF[i] << "; ";
+//}
+//std::cout << std::endl;
+//std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
 // DEBUG
 
     auto threadBody = [&](const int ithr, const int nthr) {
         const auto& p = execParamsPerThread[ithr];
-        auto arg = jGridSamplesExecArgs();
+        auto arg = GridSamplesKernelExecArgs();
         if (p.workAmount == 0lu) {
             return;
         }
@@ -330,16 +340,16 @@ std::cout << "batchNum: " << execParamsPerThread[0].batchNum << std::endl;
     parallel_nt(nthr, threadBody);
 
 // DEBUG
-std::cout << "OUTPUT: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i % jitKernel->getDataElPerVec() == 0)
-        std::cout << "| ";
-    std::cout << dstDataF[i] << "; ";
-}
-std::cout << std::endl << std::endl;
+//std::cout << "OUTPUT: " << std::endl;
+////float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+////char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//    if (i % jitKernel->getDataElPerVec() == 0)
+//        std::cout << "| ";
+//    std::cout << dstDataF[i] << "; ";
+//}
+//std::cout << std::endl << std::endl;
 // DEBUG
 }
 
