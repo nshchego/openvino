@@ -902,7 +902,12 @@ void JitGridSampleKernel<isa>::reflectionPadding(const Vmm& vCoordDst, const Vmm
     if (jcp.alignCorners) {
         // x' = abs(x) % D21 - D21
         static const unsigned absMask[8] = { 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff };
-        mov(rAux, reinterpret_cast<uintptr_t>(absMask));
+        if (isa ==x64::sse41) {
+            static const unsigned *absPtr = absMask + (reinterpret_cast<int64_t>(absMask) % 16) / sizeof(unsigned);
+            mov(rAux, reinterpret_cast<uintptr_t>(absPtr));
+        } else {
+            mov(rAux, reinterpret_cast<uintptr_t>(absMask));
+        }
         uni_vandps(vCoordDst, vCoordOrigin, ptr[rAux]); // abs(x)
 
         Vmm vMul2Sub1;
