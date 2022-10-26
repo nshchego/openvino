@@ -78,6 +78,8 @@ private:
     // 64b registers.
     RegistersPool::Reg<Xbyak::Reg64> regSrc;
     RegistersPool::Reg<Xbyak::Reg64> regDst;
+    RegistersPool::Reg<Xbyak::Reg64> regLeft;
+    RegistersPool::Reg<Xbyak::Reg64> regRight;
     RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
 
     // Tail mask.
@@ -87,15 +89,16 @@ private:
     RegistersPool::Reg<Vmm> vZeros;
     RegistersPool::Reg<Vmm> vHalfF;
     RegistersPool::Reg<Vmm> vOnesF;
+    RegistersPool::Reg<Vmm> vInc;
+    RegistersPool::Reg<Vmm> vSteps;
 
     void initVectors();
     void quickSort();
     void partition();
     void process();
-    void spatialLoop();
+//    void spatialLoop();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
-    void denormalizeRawCoordinates(const Vmm& vWCoord, const Vmm& vHCoord);
     void interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void tail();
 
