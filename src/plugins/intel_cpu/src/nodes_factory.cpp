@@ -91,7 +91,7 @@
 #include "nodes/eye.h"
 #include "nodes/interaction.h"
 #include "nodes/mha.h"
-#include "nodes/unique.h"
+#include "nodes/unique.hpp"
 
 namespace ov {
 namespace intel_cpu {
