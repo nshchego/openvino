@@ -51,7 +51,7 @@ GridSample::GridSample(const std::shared_ptr<ov::Node>& op, const dnnl::engine& 
     }
 
     if (op->get_input_size() != 2 || op->get_output_size() != 1)
-        THROW_ERROR << "has incorrect number of input/output edges.";
+        THROW_ERROR << "has incorrect number of input/output ports.";
 
     const auto& dataShape = getInputShapeAtPort(IN_DATA);
     if (dataShape.getRank() != 4)
@@ -97,13 +97,9 @@ void GridSample::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    const auto& dataDims = getInputShapeAtPort(IN_DATA).getDims();
-
     dataPrecision = getOriginalInputPrecisionAtPort(IN_DATA);
-    if (dataPrecision.is_float()) {
+    if (dataPrecision != Precision::I32) {
         dataPrecision = Precision::FP32;
-    } else {
-        dataPrecision = Precision::I32;
     }
     dataTypeSize = dataPrecision.size();
     gridTypeSize = gridPrecision.size();
@@ -136,7 +132,6 @@ void GridSample::createPrimitive() {
 
     const auto& srcDataDims = getInputShapeAtPort(IN_DATA).getDims();
     if (!jcp.dynamicShapes) {
-        const auto& dstShape     = getOutputShapeAtPort(0).getDims();
         jcp.batchNum       = srcDataDims[0];
         jcp.cannelNum      = srcDataDims[1];
         jcp.dynamicBatch   = false;

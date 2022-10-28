@@ -13,7 +13,7 @@ namespace intel_cpu {
 
 template <x64::cpu_isa_t isa>
 GridSampleKernel<isa>::GridSampleKernel(const GridSampleKernelConfParams& jcp) :
-        GridSampleKernelBase(jcp) {
+        GridSampleKernelBase(jit_name(), jcp) {
     vlen = x64::cpu_isa_traits<isa>::vlen;
     dataTypeSize = jcp.inDataPrc.size();
     gridTypeSize = jcp.gridPrc.size();
@@ -159,7 +159,7 @@ void GridSampleKernel<x64::avx512_core>::initVectors() {
     }
 }
 
-template <x64::cpu_isa_t isa>
+template <x64::cpu_isa_t isa> // Works for AVX2, AVX, SSE41
 void GridSampleKernel<isa>::initVectors() {
     auto rAux = getReg64();
 
@@ -168,9 +168,9 @@ void GridSampleKernel<isa>::initVectors() {
     uni_vmovups(vSrcWidthF, ptr[rAux]);
 
     if (one_of(jcp.interpolationMode, InterpolationMode::BILINEAR, InterpolationMode::NEAREST) ||
-            jcp.interpolationMode == InterpolationMode::BICUBIC && (jcp.paddingMode == PaddingMode::REFLECTION ||
-                    jcp.paddingMode == PaddingMode::BORDER && !jcp.alignCorners ||
-                    jcp.paddingMode == PaddingMode::ZEROS)) {
+        jcp.interpolationMode == InterpolationMode::BICUBIC && (jcp.paddingMode == PaddingMode::REFLECTION ||
+                                                                jcp.paddingMode == PaddingMode::BORDER && !jcp.alignCorners ||
+                                                                jcp.paddingMode == PaddingMode::ZEROS)) {
         vSrcHeightF = getVmm();
         mov(rAux, ptr[regParams + GET_OFF(srcHeightF)]);
         uni_vmovups(vSrcHeightF, ptr[rAux]);
@@ -223,7 +223,7 @@ void GridSampleKernel<isa>::initVectors() {
     }
 }
 
-template <x64::cpu_isa_t isa>
+template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
 void GridSampleKernel<isa>::process() {
     regWorkAmount = getReg64();
 
@@ -260,7 +260,7 @@ void GridSampleKernel<isa>::process() {
     }
 }
 
-template <x64::cpu_isa_t isa>
+template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
 void GridSampleKernel<isa>::spatialLoop() {
     auto vHCoord = getVmm();
     auto vWCoord = getVmm();
@@ -287,7 +287,7 @@ void GridSampleKernel<isa>::spatialLoop() {
     tail();
 }
 
-template <x64::cpu_isa_t isa>
+template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
 void GridSampleKernel<isa>::interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail) {
     if (jcp.interpolationMode == InterpolationMode::BILINEAR) {
         bilinearInterpolation(vWCoord, vHCoord, tail);
@@ -298,7 +298,7 @@ void GridSampleKernel<isa>::interpolation(const Vmm& vWCoord, const Vmm& vHCoord
     }
 }
 
-template <x64::cpu_isa_t isa>
+template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
 void GridSampleKernel<isa>::tail() {
     Xbyak::Label lEnd;
     cmp(regWorkAmount, 0);
@@ -354,14 +354,14 @@ void GridSampleKernel<x64::avx2>::getCoordinates(const Vmm& vHCoord, const Vmm& 
         uni_vmovups(vPermMask, ptr[rAux]);
     }
 
-    vpermd(vWCoord, vPermMask, ptr[regGrid]); // Permute to XXXX.YYYY
-    vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011);      // Extract Y component
+    vpermd(vWCoord, vPermMask, ptr[regGrid]);          // Permute to XXXX.YYYY
+    vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
 
     add(regGrid, vlen);
 
-    vpermd(vAux, vPermMask, ptr[regGrid]);    // Permute to XXXX.YYYY
-    vperm2f128(vWCoord, vWCoord, vAux, 0B00100000);         // Extract X component
-    vperm2f128(vHCoord, vHCoord, vAux, 0B00110000);         // Extract Y component
+    vpermd(vAux, vPermMask, ptr[regGrid]);             // Permute to XXXX.YYYY
+    vperm2f128(vWCoord, vWCoord, vAux, 0B00100000);    // Extract X component
+    vperm2f128(vHCoord, vHCoord, vAux, 0B00110000);    // Extract Y component
 
     add(regGrid, vlen);
 }
@@ -440,7 +440,7 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
         vpermd(vAux, vGridPermMask, vAux);
         Xbyak::Ymm ymmAux(vAux.getIdx());
         vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
-        vextractf64x4(ymmAux, vAux, 1); // Extract Y component
+        vextractf64x4(ymmAux, vAux, 1);            // Extract Y component
         vinsertf64x4(vHCoord, vHCoord, ymmAux, 1);
 
         jmp(lGridShift, T_NEAR);
@@ -486,7 +486,7 @@ void GridSampleKernel<x64::avx2>::getTailCoordinates(const Vmm& vHCoord, const V
     cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
-        vpermd(vWCoord, vPermMask, ptr[regGrid]);      // Permute to XXXX.YYYY
+        vpermd(vWCoord, vPermMask, ptr[regGrid]);          // Permute to XXXX.YYYY
         vperm2f128(vHCoord, vHCoord, vWCoord, 0B00000011); // Extract Y component
 
         add(regGrid, vlen);

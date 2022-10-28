@@ -16,7 +16,7 @@ namespace intel_cpu {
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 public:
-    JitKernelBase() {}
+    JitKernelBase(const char* name) : dnnl::impl::cpu::x64::jit_generator(name) {}
 
     void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 

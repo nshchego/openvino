@@ -145,9 +145,9 @@ void JitKernelBase::uni_vdivps(const Xbyak::Xmm& vDst,
 void JitKernelBase::uni_vandps(const Xbyak::Xmm& vDst,
                                const Xbyak::Xmm& vSrs,
                                const Xbyak::Operand &op) {
-    if (isValidIsa(x64::avx))
+    if (isValidIsa(x64::avx)) {
         vandps(vDst, vSrs, op);
-    else {
+    } else {
         if (!vDst.isEqualIfNotInherited(vSrs)) {
             movups(vDst, vSrs);
         }
@@ -158,9 +158,9 @@ void JitKernelBase::uni_vandps(const Xbyak::Xmm& vDst,
 void JitKernelBase::uni_vandnps(const Xbyak::Xmm& vDst,
                                 const Xbyak::Xmm& vSrs,
                                 const Xbyak::Operand &op) {
-    if (isValidIsa(x64::avx))
+    if (isValidIsa(x64::avx)) {
         vandnps(vDst, vSrs, op);
-    else {
+    } else {
         if (!vDst.isEqualIfNotInherited(vSrs)) {
             movups(vDst, vSrs);
         }

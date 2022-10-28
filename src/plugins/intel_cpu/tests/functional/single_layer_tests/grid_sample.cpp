@@ -25,7 +25,7 @@ typedef std::tuple<
 > GridSampleLayerTestCPUParams;
 
 class GridSampleLayerTestCPU : public testing::WithParamInterface<GridSampleLayerTestCPUParams>,
-                           virtual public SubgraphBaseTest, public CPUTestsBase {
+                               virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
     static std::string getTestCaseName(testing::TestParamInfo<GridSampleLayerTestCPUParams> obj) {
         std::vector<InputShape> inputShapes;
@@ -53,9 +53,9 @@ public:
         }
 
         result << "interpMode=" << (interpolateMode == GridSample::InterpolationMode::BILINEAR ? "BILINEAR" :
-                interpolateMode == GridSample::InterpolationMode::BICUBIC ? "BICUBIC" : "NEAREST") << "_";
+                                    interpolateMode == GridSample::InterpolationMode::BICUBIC ? "BICUBIC" : "NEAREST") << "_";
         result << "padMode=" << (paddingMode == GridSample::PaddingMode::ZEROS ? "ZEROS" :
-                paddingMode == GridSample::PaddingMode::BORDER ? "BORDER" : "REFLECTION") << "_";
+                                 paddingMode == GridSample::PaddingMode::BORDER ? "BORDER" : "REFLECTION") << "_";
         result << "alignCorners=" << (alignCorners ? "True" : "False") << "_";
         result << "dataPrc=" << dataPrecision << "_";
         result << "gridPrc=" << gridPrecision << "_";
@@ -212,8 +212,8 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
         { { {}, { {2, 6, 9, 8} } },   // Static shapes
           { {}, { {2, 2, 5, 2} } }
         }
-    }; // SSE42
-
+    };
+    // AVX2, AVX
     if (InferenceEngine::with_cpu_x86_avx2() || InferenceEngine::with_cpu_x86_avx()) {
         std::vector<std::vector<InputShape>> tmp = {
             { { {}, { {1, 7, 5, 3} } },   // Static shapes
@@ -242,8 +242,8 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
             }
         };
         result.insert(result.end(), tmp.begin(), tmp.end());
-    } // AVX2
-
+    }
+    // AVX512
     if (InferenceEngine::with_cpu_x86_avx512f()) {
         std::vector<std::vector<InputShape>> tmp = {
             { { {}, { {1, 7, 2, 9} } },    // Static shapes
@@ -275,39 +275,39 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
             }
         };
         result.insert(result.end(), tmp.begin(), tmp.end());
-    } // AVX512
+    }
 
     return result;
 }
 
 INSTANTIATE_TEST_SUITE_P(smoke_static, GridSampleLayerTestCPU,
-                ::testing::Combine(
-                    ::testing::ValuesIn(getStaticShapes()),
-                    ::testing::ValuesIn(interpolateMode),
-                    ::testing::ValuesIn(paddingMode),
-                    ::testing::ValuesIn(alignCorners),
-                    ::testing::ValuesIn(dataPrecision),
-                    ::testing::ValuesIn(gridPrecision),
-                    ::testing::ValuesIn(getCPUInfo()),
-                    ::testing::Values(additionalConfig[0])),
-                GridSampleLayerTestCPU::getTestCaseName);
+        ::testing::Combine(
+                ::testing::ValuesIn(getStaticShapes()),
+                ::testing::ValuesIn(interpolateMode),
+                ::testing::ValuesIn(paddingMode),
+                ::testing::ValuesIn(alignCorners),
+                ::testing::ValuesIn(dataPrecision),
+                ::testing::ValuesIn(gridPrecision),
+                ::testing::ValuesIn(getCPUInfo()),
+                ::testing::Values(additionalConfig[0])),
+        GridSampleLayerTestCPU::getTestCaseName);
 
 INSTANTIATE_TEST_SUITE_P(nightly_static, GridSampleLayerTestCPU,
-                 ::testing::Combine(
-                         ::testing::ValuesIn(getStaticShapes()),
-                         ::testing::ValuesIn(interpolateMode),
-                         ::testing::ValuesIn(paddingMode),
-                         ::testing::ValuesIn(alignCorners),
-                         ::testing::ValuesIn({ElementType::f32, ElementType::i32, ElementType::i8}),
-                         ::testing::ValuesIn({ElementType::f32}),
-                         ::testing::ValuesIn(getCPUInfo()),
-                         ::testing::Values(additionalConfig[1])),
-                 GridSampleLayerTestCPU::getTestCaseName);
+        ::testing::Combine(
+                ::testing::ValuesIn(getStaticShapes()),
+                ::testing::ValuesIn(interpolateMode),
+                ::testing::ValuesIn(paddingMode),
+                ::testing::ValuesIn(alignCorners),
+                ::testing::ValuesIn({ElementType::f32, ElementType::i32, ElementType::i8}),
+                ::testing::ValuesIn({ElementType::f32}),
+                ::testing::ValuesIn(getCPUInfo()),
+                ::testing::Values(additionalConfig[1])),
+        GridSampleLayerTestCPU::getTestCaseName);
 
 
 const std::vector<std::vector<InputShape>> dynamicInSapes = {
     { { { ov::Dimension(1, 15), -1, -1, -1 },                               // Dynamic shape 0
-        { {1, 1, 1, 1}, {6, 3, 1, 2}, {4, 5, 3, 1}, {2, 7, 2, 2} } },        // Target shapes
+        { {1, 1, 1, 1}, {6, 3, 1, 2}, {4, 5, 3, 1}, {2, 7, 2, 2} } },       // Target shapes
       { { ov::Dimension(1, 16), -1, -1, -1 },                               // Dynamic shape 1
         { {1, 1, 1, 2}, {6, 2, 2, 2}, {4, 1, 3, 2}, {2, 1, 2, 2} } } },     // Target shapes
     { { { -1, -1, -1, -1 },                                                 // Dynamic shape 0
@@ -341,15 +341,15 @@ const std::vector<std::vector<InputShape>> dynamicInSapes = {
 };
 
 INSTANTIATE_TEST_SUITE_P(smoke_dynamic, GridSampleLayerTestCPU,
-                     ::testing::Combine(
-                             ::testing::ValuesIn(dynamicInSapes),
-                             ::testing::ValuesIn(interpolateMode),
-                             ::testing::ValuesIn(paddingMode),
-                             ::testing::ValuesIn(alignCorners),
-                             ::testing::ValuesIn(dataPrecision),
-                             ::testing::ValuesIn(gridPrecision),
-                             ::testing::ValuesIn(getCPUInfo()),
-                             ::testing::Values(additionalConfig[0])),
-                     GridSampleLayerTestCPU::getTestCaseName);
+        ::testing::Combine(
+                ::testing::ValuesIn(dynamicInSapes),
+                ::testing::ValuesIn(interpolateMode),
+                ::testing::ValuesIn(paddingMode),
+                ::testing::ValuesIn(alignCorners),
+                ::testing::ValuesIn(dataPrecision),
+                ::testing::ValuesIn(gridPrecision),
+                ::testing::ValuesIn(getCPUInfo()),
+                ::testing::Values(additionalConfig[0])),
+        GridSampleLayerTestCPU::getTestCaseName);
 } // namespace
 } // namespace CPULayerTestsDefinitions

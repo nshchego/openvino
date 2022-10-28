@@ -66,7 +66,7 @@ public:
         assert(ker_);
         ker_(args);
     }
-    explicit GridSampleKernelBase(const GridSampleKernelConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
+    explicit GridSampleKernelBase(const char* name, const GridSampleKernelConfParams& jcp) : JitKernelBase(name), ker_(nullptr), jcp(jcp) {}
 
     virtual void create_ker() = 0;
     uint64_t getVecLen() {
@@ -104,6 +104,7 @@ public:
     using Vmask = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Opmask,
                                                            isa == dnnl::impl::cpu::x64::sse41,       Xbyak::Xmm,
                                                                                                      Xbyak::Ymm>::type;
+
 private:
     uint8_t dataTypeShift = 0;
 
