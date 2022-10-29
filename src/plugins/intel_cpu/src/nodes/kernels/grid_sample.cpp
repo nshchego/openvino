@@ -320,19 +320,15 @@ void GridSampleKernel<isa>::tail() {
 
 template <>
 void GridSampleKernel<x64::avx512_core>::getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord) {
-    auto vAux = getVmm();
-
-    vpermd(vWCoord, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
-    Xbyak::Ymm ymmH(vHCoord.getIdx());
-    vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
+    vpermd(vWCoord, vGridPermMask, ptr[regGrid]);      // Permute to XXXX.XXXX.YYYY.YYYY
+    vshuff64x2(vHCoord, vWCoord, vHCoord, 0B11101110); // Extract Y component
 
     add(regGrid, vlen);
 
-    vpermd(vAux, vGridPermMask, ptr[regGrid]); // Permute to XXXX.XXXX.YYYY.YYYY
-    Xbyak::Ymm ymmAux(vAux.getIdx());
-    vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
-    vextractf64x4(ymmAux, vAux, 1);            // Extract Y component
-    vinsertf64x4(vHCoord, vHCoord, ymmAux, 1);
+    auto vAux = getVmm();
+    vpermd(vAux, vGridPermMask, ptr[regGrid]);         // Permute to XXXX.XXXX.YYYY.YYYY
+    vshuff64x2(vWCoord, vWCoord, vAux, 0B01000100);    // Extract X component
+    vshuff64x2(vHCoord, vHCoord, vAux, 0B11100100);    // Extract Y component
 
     add(regGrid, vlen);
 }
@@ -420,15 +416,14 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
 
     auto vAux = getVmm();
     auto rAux = getReg64();
-    Xbyak::Ymm ymmH(vHCoord.getIdx());
 
     mov(rAux, regWorkAmount);
-    sal(rAux, 0x1); // multiply by gridShape[3]
+    sal(rAux, 0x1); // Multiply by gridShape[3].
     cmp(regWorkAmount, dataElPerVec / 2);
     jl(lRest, T_NEAR);
     {
         vpermd(vWCoord, vGridPermMask, ptr[regGrid]);
-        vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
+        vshuff64x2(vHCoord, vWCoord, vHCoord, 0B11101110); // Extract Y component
 
         add(regGrid, vlen);
         sub(rAux, dataElPerVec);
@@ -439,9 +434,8 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
         uni_vmovups((Vmm)vAux | kTailMask, ptr[regGrid]);
         vpermd(vAux, vGridPermMask, vAux);
         Xbyak::Ymm ymmAux(vAux.getIdx());
-        vinsertf64x4(vWCoord, vWCoord, ymmAux, 1); // Extract X component
-        vextractf64x4(ymmAux, vAux, 1);            // Extract Y component
-        vinsertf64x4(vHCoord, vHCoord, ymmAux, 1);
+        vshuff64x2(vWCoord, vWCoord, vAux, 0B01000100);    // Extract X component
+        vshuff64x2(vHCoord, vHCoord, vAux, 0B11100100);    // Extract Y component
 
         jmp(lGridShift, T_NEAR);
     }
@@ -450,12 +444,12 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
         fillRestWorkMask(kTailMask, vAux, rAux);
         uni_vmovups(vWCoord | kTailMask, ptr[regGrid]);
         vpermd(vWCoord, vGridPermMask, vWCoord);
-        vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
+        vshuff64x2(vHCoord, vWCoord, vHCoord, 0B11101110); // Extract Y component
     }
 
     L(lGridShift);
     if (dataTypeSize > 1)
-        sal(rAux, dataTypeShift); // multiply by source data type size.
+        sal(rAux, dataTypeShift); // Multiply by source data type size.
     add(regGrid, rAux);
 
     L(lEnd);
