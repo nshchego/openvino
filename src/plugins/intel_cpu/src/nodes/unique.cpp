@@ -58,6 +58,9 @@ Unique::Unique(const std::shared_ptr<ov::Node>& op, const dnnl::engine& eng, Wei
         if (jcp.axis < 0) {
             jcp.axis += op->get_input_partial_shape(IN_DATA).rank().get_length();
         }
+        if (jcp.axis < 0) {
+            THROW_ERROR << "has invalid axis value " << ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXIS))->cast_vector<int>()[0];
+        }
     } else {
         jcp.flattened = true;
     }
@@ -69,7 +72,7 @@ void Unique::initSupportedPrimitiveDescriptors() {
     if (jcp.dataPrc != Precision::I32 && jcp.dataPrc != Precision::I8 && jcp.dataPrc != Precision::U8) {
         jcp.dataPrc = Precision::FP32;
     }
-    const auto axisPrecision = Precision::I32;
+    const InferenceEngine::Precision axisPrecision = Precision::I32;
 
     impl_desc_type implType = jit_sse42;
     if (x64::mayiuse(x64::avx512_core)) {
@@ -80,11 +83,18 @@ void Unique::initSupportedPrimitiveDescriptors() {
         implType = jit_avx;
     }
 
-    addSupportedPrimDesc({{LayoutType::ncsp, jcp.dataPrc},
-                          {LayoutType::ncsp, axisPrecision}},
-                         {{LayoutType::ncsp, jcp.dataPrc}},
-                         implType,
-                         isDynamicNode());
+    std::vector<PortConfigurator> inPortConfigs = { {LayoutType::ncsp, jcp.dataPrc} };
+    if (!jcp.flattened) {
+        inPortConfigs.push_back( {LayoutType::ncsp, axisPrecision} );
+    }
+    std::vector<PortConfigurator> outPortConfigs;
+    for (int i = 0; i < 4; i++) {
+        if (jcp.definedOutputs[i]) {
+            outPortConfigs.push_back({LayoutType::ncsp, i == 0 ? jcp.dataPrc : axisPrecision});
+        }
+    }
+
+    addSupportedPrimDesc(inPortConfigs, outPortConfigs, implType, isDynamicNode());
 }
 
 void Unique::createPrimitive() {
@@ -153,7 +163,7 @@ void Unique::prepareParams() {
 
     const uint64_t dataElPerVec = kernel->getDataElPerVec();
     const auto& srcDataShape = dataMemPtr->getStaticDims();
-    const uint64_t totalWork = jcp.axis >= 0 ? srcDataShape[jcp.axis] : std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>());
+    const uint64_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
     const uint64_t wpt = ((totalWork / dataElPerVec) / threadsNum + 1) * dataElPerVec;
 
     parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
@@ -161,24 +171,22 @@ void Unique::prepareParams() {
         const uint64_t dstEnd = std::min(wpt * (ithr + 1), totalWork);
 printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - dstStart);
 
-        auto& p = execArgsPerThread[ithr];
+        auto& arg = execArgsPerThread[ithr];
 
-        p.workAmount = dstEnd - dstStart;
-        if (p.workAmount == 0)
+        arg.workAmount = dstEnd - dstStart;
+        if (arg.workAmount == 0)
             return;
 
-        p.srcPtr = dataMemPtr->GetPtr();
         for (int i = 0; i < 4; i++) {
             if (jcp.definedOutputs[i]) {
-                p.dstPtr[i] = getChildEdgeAt(i)->getMemoryPtr()->GetPtr();
+                arg.dstPtr[i] = getChildEdgeAt(i)->getMemoryPtr()->GetPtr();
             }
         }
     });
 }
 
 void Unique::execute(dnnl::stream strm) {
-//    const void* srcData = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
-//    uint8_t*    dstData = reinterpret_cast<uint8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+    const void* srcDataPtr = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
 
 // DEBUG
 std::cout << "\nINPUT DATA: " << std::endl;
@@ -193,21 +201,26 @@ std::cout << std::endl;
 // DEBUG
 
     parallel_nt(threadsNum,  [&](const int ithr, const int nthr) {
-        const auto& arg = execArgsPerThread[ithr];
+        auto& arg = execArgsPerThread[ithr];
         if (arg.workAmount == 0lu) {
             return;
         }
+        arg.srcPtr = srcDataPtr;
 
         (*kernel)(&arg);
     });
+
+//    VectorDims newDims{validOutputs, 3};
+//    redefineOutputMemory( {newDims, newDims, {1}} );
 
 // DEBUG
 std::cout << "OUTPUT: " << std::endl;
 //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 //char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i % kernel->getDataElPerVec() == 0)
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+    if (i % 4 == 0)
         std::cout << "| ";
     std::cout << dstDataF[i] << "; ";
 }

@@ -16,7 +16,7 @@ template <x64::cpu_isa_t isa>
 UniqueKernel<isa>::UniqueKernel(const UniqueKernelConfParams& jcp) :
         UniqueKernelBase(jcp) {
     vlen = x64::cpu_isa_traits<isa>::vlen;
-//    dataTypeSize = jcp.dataPrc.size();
+    dataTypeSize = jcp.dataPrc.size();
     dataElPerVec = vlen / dataTypeSize;
     if (dataTypeSize == 2)
         dataTypeShift = 1;
@@ -69,11 +69,27 @@ void UniqueKernel<x64::avx512_core>::initVectors() {
 //    mov(rAux, reinterpret_cast<uintptr_t>(steps));
 //    uni_vmovups(vSteps, ptr[rAux]);
 
+    Xbyak::Reg32 rMask(rAux.getIdx());
+
     kMaxMask0 = getMask();
+    mov(rMask, 0B1010101010101010);
+    kmovw(kMaxMask0, rMask);
+
     kMaxMask1 = getMask();
+    mov(rMask, 0B1100110011001100);
+    kmovw(kMaxMask1, rMask);
+
     kMaxMask2 = getMask();
+    mov(rMask, 0B1101010011010100);
+    kmovw(kMaxMask2, rMask);
+
     kMaxMask3 = getMask();
+    mov(rMask, 0B1111000101110000);
+    kmovw(kMaxMask3, rMask);
+
     kMaxMask4 = getMask();
+    mov(rMask, 0B1010101010101010);
+    kmovw(kMaxMask4, rMask);
 
     static const unsigned permMask2[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
     mov(rAux, reinterpret_cast<uintptr_t>(permMask2));
@@ -446,12 +462,13 @@ void UniqueKernel<x64::avx512_core>::sortVector(const Vmm& vToSort) {
     cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask2);
 
     // 3 Step.
-    vpermd(vAux1, vPermMask3, vToSort);
+    vpermd(vAux1, vPermMask3, vSrcTmp);
     cmpPerm(vToSort, vSrcTmp, vAux1, kMaxMask3);
+//uni_vmovups(vToSort, vAux1);
 
-    // 4 Step.
-    vpermd(vAux1, vPermMask4, vToSort);
-    cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask4);
+//    // 4 Step.
+//    vpermd(vAux1, vPermMask4, vToSort);
+//    cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask4);
 }
 
 template <x64::cpu_isa_t isa>
