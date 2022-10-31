@@ -21,7 +21,7 @@ typedef std::tuple<
         std::map<std::string, std::string>   // Additional config
 > UniqueLayerTestCPUParams;
 
-class GridSampleLayerTestCPU : public testing::WithParamInterface<UniqueLayerTestCPUParams>,
+class UniqueLayerTestCPU : public testing::WithParamInterface<UniqueLayerTestCPUParams>,
                            virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
     static std::string getTestCaseName(testing::TestParamInfo<UniqueLayerTestCPUParams> obj) {
@@ -92,11 +92,11 @@ protected:
         auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         std::shared_ptr<ov::Node> uniqueNode;
         if (std::get<0>(flatOrAxis)) {
-            auto uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],
+            uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],
                         ov::op::v0::Constant::create(ov::element::i64, ov::Shape({1}), {std::get<1>(flatOrAxis)}),
                         sorted);
         } else {
-            auto uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],sorted);
+            uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],sorted);
         }
 
         function = makeNgraphFunction(dataPrecision, params, uniqueNode, "UniqueCPU");
@@ -120,7 +120,7 @@ protected:
     }
 };
 
-TEST_P(GridSampleLayerTestCPU, CompareWithRefs) {
+TEST_P(UniqueLayerTestCPU, CompareWithRefs) {
     SKIP_IF_CURRENT_TEST_IS_DISABLED()
 
     run();
@@ -212,7 +212,7 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
     return result;
 }
 
-INSTANTIATE_TEST_SUITE_P(smoke_static, GridSampleLayerTestCPU,
+INSTANTIATE_TEST_SUITE_P(smoke_static, UniqueLayerTestCPU,
                 ::testing::Combine(
                         ::testing::ValuesIn(getStaticShapes()),
                         ::testing::ValuesIn(flatOrAxis),
@@ -220,9 +220,9 @@ INSTANTIATE_TEST_SUITE_P(smoke_static, GridSampleLayerTestCPU,
                         ::testing::ValuesIn(dataPrecisionSmoke),
                         ::testing::ValuesIn(getCPUInfo()),
                         ::testing::Values(additionalConfig[0])),
-                GridSampleLayerTestCPU::getTestCaseName);
+                UniqueLayerTestCPU::getTestCaseName);
 
-INSTANTIATE_TEST_SUITE_P(nightly_static, GridSampleLayerTestCPU,
+INSTANTIATE_TEST_SUITE_P(nightly_static, UniqueLayerTestCPU,
                 ::testing::Combine(
                         ::testing::ValuesIn(getStaticShapes()),
                         ::testing::ValuesIn(flatOrAxis),
@@ -230,7 +230,7 @@ INSTANTIATE_TEST_SUITE_P(nightly_static, GridSampleLayerTestCPU,
                         ::testing::ValuesIn(dataPrecisionNightly),
                         ::testing::ValuesIn(getCPUInfo()),
                         ::testing::Values(additionalConfig[1])),
-                GridSampleLayerTestCPU::getTestCaseName);
+                UniqueLayerTestCPU::getTestCaseName);
 
 
 const std::vector<std::vector<InputShape>> dynamicInSapes = {
@@ -268,7 +268,7 @@ const std::vector<std::vector<InputShape>> dynamicInSapes = {
 //        { {8, 8, 8, 2}, {6, 8, 7, 2}, {4, 1, 33, 2}, {2, 4, 8, 2} } } }     // Target shapes
 };
 
-INSTANTIATE_TEST_SUITE_P(smoke_dynamic, GridSampleLayerTestCPU,
+INSTANTIATE_TEST_SUITE_P(smoke_dynamic, UniqueLayerTestCPU,
                      ::testing::Combine(
                              ::testing::ValuesIn(dynamicInSapes),
                              ::testing::ValuesIn(flatOrAxis),
@@ -276,9 +276,9 @@ INSTANTIATE_TEST_SUITE_P(smoke_dynamic, GridSampleLayerTestCPU,
                              ::testing::ValuesIn(dataPrecisionSmoke),
                              ::testing::ValuesIn(getCPUInfo()),
                              ::testing::Values(additionalConfig[0])),
-                     GridSampleLayerTestCPU::getTestCaseName);
+                     UniqueLayerTestCPU::getTestCaseName);
 
-INSTANTIATE_TEST_SUITE_P(nightly_dynamic, GridSampleLayerTestCPU,
+INSTANTIATE_TEST_SUITE_P(nightly_dynamic, UniqueLayerTestCPU,
                          ::testing::Combine(
                                  ::testing::ValuesIn(dynamicInSapes),
                                  ::testing::ValuesIn(flatOrAxis),
@@ -286,6 +286,6 @@ INSTANTIATE_TEST_SUITE_P(nightly_dynamic, GridSampleLayerTestCPU,
                                  ::testing::ValuesIn(dataPrecisionNightly),
                                  ::testing::ValuesIn(getCPUInfo()),
                                  ::testing::Values(additionalConfig[1])),
-                         GridSampleLayerTestCPU::getTestCaseName);
+                         UniqueLayerTestCPU::getTestCaseName);
 } // namespace
 } // namespace CPULayerTestsDefinitions

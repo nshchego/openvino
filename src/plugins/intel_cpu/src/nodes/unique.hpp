@@ -35,19 +35,21 @@ private:
     void flattenTensorExec();
     void slicedTensorExec();
 
-    bool sorted = false;
-    int axis = -1;
-    bool definedOutputs[4] = { false, false, false, false };
-    uint64_t dataTypeSize = 1lu;
-    InferenceEngine::Precision dataPrecision;
+    UniqueKernelConfParams jcp;
+    std::shared_ptr<UniqueKernelBase> kernel;
+
+//    bool sorted    = false;
+//    bool flattened = true;
+//    int axis = 0;
+//    bool definedOutputs[4] = { false, false, false, false };
+//    uint64_t dataTypeSize = 1lu;
+//    InferenceEngine::Precision dataPrecision;
 
     int threadsNum = 1;
-    std::vector<UniqueKernelExecArgs> execParamsPerThread;
+    std::vector<UniqueKernelExecArgs> execArgsPerThread;
 
     static constexpr size_t IN_DATA = 0;
     static constexpr size_t AXIS    = 1;
-
-    std::shared_ptr<UniqueKernelBase> kernel;
 };
 
 }   // namespace node
