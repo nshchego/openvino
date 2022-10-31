@@ -105,13 +105,8 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op, const dnnl::engine& eng, Wei
                 IE_THROW(Unexpected) << "CPU plug-in doesn't support " << getTypeStr() << " operation with dynamic rank. Operation name: " << getName();
             }
 
-            if (type == Type::Unique && i == 0) {
-                ov::PartialShape shape1({ -1 });
-                outputShapes.emplace_back(shape1);
-            } else {
-                bool isScalar = shape.rank().get_length() == 0;
-                outputShapes.emplace_back(isScalar ? ngraph::PartialShape{1} : shape);
-            }
+            bool isScalar = shape.rank().get_length() == 0;
+            outputShapes.emplace_back(isScalar ? ngraph::PartialShape{1} : shape);
             originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     }
