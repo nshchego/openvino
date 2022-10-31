@@ -50,6 +50,8 @@ public:
 
         if (!std::get<0>(flatOrAxis)) {
             result << "axis=" << std::get<1>(flatOrAxis) << "_";
+        } else {
+            result << "flattened" << "_";
         }
         result << "sorted=" << (sorted ? "True" : "False") << "_";
         result << "dataPrc=" << dataPrecision << "_";
@@ -70,7 +72,8 @@ protected:
     void SetUp() override {
         std::vector<InputShape> inputShapes;
         std::tuple<bool, int> flatOrAxis;
-        bool sorted;
+        bool sorted, flattened;
+        int axis;
         ElementType dataPrecision;
         CPUSpecificParams cpuParams;
         std::map<std::string, std::string> additionalConfig;
@@ -80,6 +83,7 @@ protected:
         targetDevice = CommonTestUtils::DEVICE_CPU;
         init_input_shapes(inputShapes);
         configuration.insert(additionalConfig.begin(), additionalConfig.end());
+        flattened = std::get<0>(flatOrAxis);
 
         if (additionalConfig[InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16] == InferenceEngine::PluginConfigParams::YES) {
             selectedType = makeSelectedTypeStr(selectedType, ElementType::bf16);
@@ -91,12 +95,13 @@ protected:
         params[0]->set_friendly_name("data");
         auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         std::shared_ptr<ov::Node> uniqueNode;
-        if (std::get<0>(flatOrAxis)) {
-            uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],
-                        ov::op::v0::Constant::create(ov::element::i64, ov::Shape({1}), {std::get<1>(flatOrAxis)}),
-                        sorted);
-        } else {
+        if (flattened) {
             uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],sorted);
+        } else {
+            axis = std::get<1>(flatOrAxis);
+            uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],
+                                                               ov::op::v0::Constant::create(ov::element::i64, ov::Shape({1}), {axis}),
+                                                               sorted);
         }
 
         function = makeNgraphFunction(dataPrecision, params, uniqueNode, "UniqueCPU");
