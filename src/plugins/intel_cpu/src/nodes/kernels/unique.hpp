@@ -11,21 +11,25 @@
 namespace ov {
 namespace intel_cpu {
 
+enum UniqueOutputIdx {
+    UNIQUE_DATA,
+    FIRST_UNIQUE_IDX,
+    ALL_IDX,
+    OCCURRENCES_NUM
+};
+
 struct UniqueKernelConfParams {
     bool sorted = false;
-    int axis = -1;
-    bool input0Defined = false;
-    bool input1Defined = false;
-    bool input2Defined = false;
-    bool input3Defined = false;
-    bool dynamicShapes  = false;
-    InferenceEngine::Precision inDataPrc;
+    bool flattened = true;
+    int axis = 0;
+    bool definedOutputs[4] = { true, false, false, false };
+    bool dynamicShapes = false;
+    InferenceEngine::Precision dataPrc;
 };
 
 struct UniqueKernelExecArgs {
-    const void* src;
-    void* dst;
-    const void* buffer;
+    const void* srcPtr;
+    void* dstPtr[4];
     uint64_t workAmount = 0lu;
 };
 
@@ -77,25 +81,37 @@ private:
     // Suffix "B" means "In Bytes", "F" - float.
     // 64b registers.
     RegistersPool::Reg<Xbyak::Reg64> regSrc;
-    RegistersPool::Reg<Xbyak::Reg64> regDst;
+    RegistersPool::Reg<Xbyak::Reg64> regDst[4];
+//    RegistersPool::Reg<Xbyak::Reg64> regDst1;
+//    RegistersPool::Reg<Xbyak::Reg64> regDst2;
+//    RegistersPool::Reg<Xbyak::Reg64> regDst3;
     RegistersPool::Reg<Xbyak::Reg64> regLeft;
     RegistersPool::Reg<Xbyak::Reg64> regRight;
     RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
 
-    // Tail mask.
-    RegistersPool::Reg<Vmask> kTailMask;
-
     // Vector registers.
-    RegistersPool::Reg<Vmm> vZeros;
-    RegistersPool::Reg<Vmm> vHalfF;
-    RegistersPool::Reg<Vmm> vOnesF;
+//    RegistersPool::Reg<Vmm> vZeros;
+//    RegistersPool::Reg<Vmm> vOnesF;
     RegistersPool::Reg<Vmm> vInc;
     RegistersPool::Reg<Vmm> vSteps;
+    RegistersPool::Reg<Vmm> vPermMask2;
+    RegistersPool::Reg<Vmm> vPermMask3;
+    RegistersPool::Reg<Vmm> vPermMask4;
+
+    // Tail mask.
+    RegistersPool::Reg<Vmask> kTailMask;
+    RegistersPool::Reg<Vmask> kMaxMask0;
+    RegistersPool::Reg<Vmask> kMaxMask1;
+    RegistersPool::Reg<Vmask> kMaxMask2;
+    RegistersPool::Reg<Vmask> kMaxMask3;
+    RegistersPool::Reg<Vmask> kMaxMask4;
 
     void initVectors();
-    void quickSort();
+    void quickSort(const Xbyak::Reg64& rSrc);
     void partition();
     void process();
+    void sortVector(const Vmm& vToSort);
+    void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMaxMask);
 //    void spatialLoop();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);

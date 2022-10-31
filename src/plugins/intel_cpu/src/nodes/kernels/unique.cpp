@@ -16,7 +16,7 @@ template <x64::cpu_isa_t isa>
 UniqueKernel<isa>::UniqueKernel(const UniqueKernelConfParams& jcp) :
         UniqueKernelBase(jcp) {
     vlen = x64::cpu_isa_traits<isa>::vlen;
-    dataTypeSize = jcp.inDataPrc.size();
+//    dataTypeSize = jcp.dataPrc.size();
     dataElPerVec = vlen / dataTypeSize;
     if (dataTypeSize == 2)
         dataTypeShift = 1;
@@ -37,14 +37,18 @@ void UniqueKernel<isa>::generate() {
     this->preamble();
     registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
-    regSrc  = getReg64();
-    regDst  = getReg64();
+    regSrc = getReg64();
+    mov(regSrc,  ptr[regParams + GET_OFF(srcPtr)]);
 
-    mov(regSrc,  ptr[regParams + GET_OFF(src)]);
-    mov(regDst,  ptr[regParams + GET_OFF(dst)]);
+    for (int i = 0; i < 4; i++) {
+        if (jcp.definedOutputs[i]) {
+            regDst[i] = getReg64();
+            mov(regDst[i],  ptr[regParams + GET_OFF(dstPtr[i])]);
+        }
+    }
 
     initVectors();
-    quickSort();
+    process();
 
     registersPool.reset();
     this->postamble();
@@ -54,16 +58,37 @@ template <>
 void UniqueKernel<x64::avx512_core>::initVectors() {
     auto rAux = getReg64();
 
-    vInc = getVmm();
-    mov(rAux, dataTypeSize);
-    vpbroadcastd(vInc, rAux);
+//    vInc = getVmm();
+//    mov(rAux, dataTypeSize);
+//    vpbroadcastd(vInc, rAux);
 
-    vSteps = getVmm();
-    static const unsigned val = dataTypeSize;
-    static const unsigned steps[16]  = { 0 * val, 1 * val, 2 * val,   3 * val,   4 * val,   5 * val,   6 * val,   7 * val,
-                                         8 * val, 9 * val, 10 * val, 11 * val, 12 * val, 13 * val, 14 * val, 14 * val };
-    mov(rAux, reinterpret_cast<uintptr_t>(steps));
-    uni_vmovups(vSteps, ptr[rAux]);
+//    vSteps = getVmm();
+//    static const unsigned val = dataTypeSize;
+//    static const unsigned steps[16]  = { 0 * val, 1 * val, 2 * val,   3 * val,   4 * val,   5 * val,   6 * val,   7 * val,
+//                                         8 * val, 9 * val, 10 * val, 11 * val, 12 * val, 13 * val, 14 * val, 14 * val };
+//    mov(rAux, reinterpret_cast<uintptr_t>(steps));
+//    uni_vmovups(vSteps, ptr[rAux]);
+
+    kMaxMask0 = getMask();
+    kMaxMask1 = getMask();
+    kMaxMask2 = getMask();
+    kMaxMask3 = getMask();
+    kMaxMask4 = getMask();
+
+    static const unsigned permMask2[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
+    mov(rAux, reinterpret_cast<uintptr_t>(permMask2));
+    vPermMask2 = getVmm();
+    uni_vmovups(vPermMask2, ptr[rAux]);
+
+    static const unsigned permMask3[16]  = { 8, 5, 6, 4, 3, 1, 2, 15, 0, 13, 14, 12, 11, 9, 10, 7 };
+    mov(rAux, reinterpret_cast<uintptr_t>(permMask3));
+    vPermMask3 = getVmm();
+    uni_vmovups(vPermMask3, ptr[rAux]);
+
+    static const unsigned permMask4[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
+    mov(rAux, reinterpret_cast<uintptr_t>(permMask4));
+    vPermMask4 = getVmm();
+    uni_vmovups(vPermMask4, ptr[rAux]);
 
 //    Xbyak::Reg32 r32Aux(rAux.getIdx());
 //
@@ -228,69 +253,84 @@ void UniqueKernel<isa>::initVectors() {
 //    }
 }
 
+template <>
+void UniqueKernel<x64::avx512_core>::quickSort(const Xbyak::Reg64& rSrc) {
+//    Xbyak::Label lEnd;
+//    cmp(regLeft, regRight);
+//    jge(lEnd, T_NEAR);
+
+//    auto vData = getVmm();
+//    auto vPivot = getVmm();
+//    auto vLeft = getVmm();
+//    auto vRight = getVmm();
+//    auto vAux   = getVmm();
+//    auto kAux   = getMask();
+//
+//    uni_vmovups(vData, ptr[regSrc]);
+//    Xbyak::Xmm xmmLow(vData.getIdx());
+//    for (int i = 0; i < dataElPerVec; i++) {
+//        vbroadcastss(vPivot, xmmLow);
+//        vminps(vLeft, vData, vPivot);
+//        vmaxps(vRight, vData, vPivot);
+//        vcmpps(kAux, vLeft, vPivot, 0x1);
+//        vcompressps(Vmm(vLeft.getIdx()) | kAux, vLeft);
+//        vcmpps(kAux, vRight, vPivot, 0x5);
+//        vcompressps(Vmm(vRight.getIdx()) | kAux, vRight);
+//    }
+
+//    L(lEnd);
+}
+
 template <x64::cpu_isa_t isa>
-void UniqueKernel<isa>::quickSort() {
-    Xbyak::Label lEnd;
-    cmp(regLeft, regRight);
-    jge(lEnd, T_NEAR);
+void UniqueKernel<isa>::quickSort(const Xbyak::Reg64& rSrc) {
 
-//    push(regLeft);
-//    push(regRight);
-
-    partition();
-    quickSort();
-    quickSort();
-
-//    pop(regRight);
-//    pop(regLeft);
-    L(lEnd);
 }
 
 template <>
 void UniqueKernel<x64::avx512_core>::partition() {
-    auto vData = getVmm();
-    auto vPivot = getVmm();
-    auto vLeft = getVmm();
-    auto vRight = getVmm();
-    auto vAux   = getVmm();
-    auto kAux   = getMask();
-
-    uni_vmovups(vData, ptr[regSrc]);
-    Xbyak::Xmm xmmLow(vData.getIdx());
-    for (int i = 0; i < dataElPerVec; i++) {
-        vbroadcastss(vPivot, xmmLow);
-        vminps(vLeft, vData, vPivot);
-        vmaxps(vRight, vData, vPivot);
-    }
-
-    vpbroadcastd(vRight, regRight);
-    uni_vpaddd(vRight, vRight, vSteps);
-    gatherdd(vPivot, regSrc, vRight, kAux, false);
-
-    Xbyak::Label lLoop, lEnd;
-    auto rIter = getReg64();
-    auto vIter = getVmm();
-    auto vCurr = getVmm();
-    mov(rIter, regLeft);
-    vpbroadcastd(vIter, rIter);
-    L(lLoop);
-    {
-        cmp(rIter, regRight);
-        jge(lEnd, T_NEAR);
-
-        gatherdd(vCurr, regSrc, vIter, kAux, false);
-//        if (jcp.inDataPrc == Precision::FP32) {
-//            vcmpps(kAux, vCurr, vPivot, 0x2); // vCurr <= vPivot
-//        } else if (jcp.inDataPrc == Precision::I32) {
-//            vpcmpd(kAux, vCurr, vPivot, 0x2); // vCurr <= vPivot
-//        }
-
-
-        add(rIter, dataTypeSize);
-        uni_vpaddd(vIter, vIter, vInc);
-        jmp(lLoop, T_NEAR);
-    }
-    L(lEnd);
+//    auto vData = getVmm();
+//    auto vPivot = getVmm();
+//    auto vLeft = getVmm();
+//    auto vRight = getVmm();
+//    auto vAux   = getVmm();
+//    auto kAux   = getMask();
+//
+//    uni_vmovups(vData, ptr[regSrc]);
+//    Xbyak::Xmm xmmLow(vData.getIdx());
+//    for (int i = 0; i < dataElPerVec; i++) {
+//        vbroadcastss(vPivot, xmmLow);
+//        vminps(vLeft, vData, vPivot);
+//        vmaxps(vRight, vData, vPivot);
+//    }
+//
+//    vpbroadcastd(vRight, regRight);
+//    uni_vpaddd(vRight, vRight, vSteps);
+//    gatherdd(vPivot, regSrc, vRight, kAux, false);
+//
+//    Xbyak::Label lLoop, lEnd;
+//    auto rIter = getReg64();
+//    auto vIter = getVmm();
+//    auto vCurr = getVmm();
+//    mov(rIter, regLeft);
+//    vpbroadcastd(vIter, rIter);
+//    L(lLoop);
+//    {
+//        cmp(rIter, regRight);
+//        jge(lEnd, T_NEAR);
+//
+//        gatherdd(vCurr, regSrc, vIter, kAux, false);
+////        if (jcp.inDataPrc == Precision::FP32) {
+////            vcmpps(kAux, vCurr, vPivot, 0x2); // vCurr <= vPivot
+////        } else if (jcp.inDataPrc == Precision::I32) {
+////            vpcmpd(kAux, vCurr, vPivot, 0x2); // vCurr <= vPivot
+////        }
+//
+//
+//        add(rIter, dataTypeSize);
+//        uni_vpaddd(vIter, vIter, vInc);
+//        jmp(lLoop, T_NEAR);
+//    }
+//    L(lEnd);
 }
 
 //template <>
@@ -337,39 +377,86 @@ void UniqueKernel<isa>::partition() {
 
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::process() {
-    regWorkAmount = getReg64();
+    Xbyak::Label lLoop, lEnd;
+    auto rSrcTmp = getReg64();
+    auto rDstTmp = getReg64();
+    mov(rSrcTmp, regSrc);
+    mov(rDstTmp, regDst[UNIQUE_DATA]);
+    auto vSrc = getVmm();
 
-    // Batch loop
-//    Xbyak::Label lBatchLoop, lEnd;
-//    RegistersPool::Reg<Xbyak::Reg64> regBatch;
-//
-//    for (uint64_t i = 0lu; i < jcp.batchNum; i++) {
-//        if (jcp.dynamicBatch) {
-//            regBatch = getReg64();
-//            mov(regBatch, ptr[regParams + GET_OFF(batchNum)]);
-//
-//            L(lBatchLoop);
-//            cmp(regBatch, 0);
-//            jle(lEnd, T_NEAR);
-//        }
-//
-//        mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
-//        spatialLoop();
-//
-//        if (jcp.dynamicShapes) {
-//            add(regSrc,  ptr[regParams + GET_OFF(srcBatchStepB)]);
-//        } else {
-//            add(regSrc, jcp.srcBatchStepB);
-//        }
-//        add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
-//        add(regDst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
-//
-//        if (jcp.dynamicBatch) {
-//            dec(regBatch);
-//            jmp(lBatchLoop, T_NEAR);
-//            L(lEnd);
-//        }
-//    }
+    // Per vector sort
+    regWorkAmount = getReg64();
+    mov(regWorkAmount, ptr[regParams + GET_OFF(workAmount)]);
+
+    L(lLoop);
+    cmp(regWorkAmount, dataElPerVec);
+    jl(lEnd, T_NEAR);
+
+    uni_vmovups(vSrc, ptr[rSrcTmp]);
+    sortVector(vSrc);
+    uni_vmovups(ptr[rDstTmp], vSrc);
+
+    add(rSrcTmp, vlen);
+    add(rSrcTmp, vlen);
+
+    sub(regWorkAmount, dataElPerVec);
+    jmp(lLoop, T_NEAR);
+    L(lEnd);
+
+    tail();
+}
+
+template <>
+void UniqueKernel<x64::avx512_core>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMaxMask) {
+    if (jcp.dataPrc == Precision::FP32) {
+        vminps(vDst, vSrc1, vSrc2);
+        vmaxps(vDst | kMaxMask, vSrc1, vSrc2);
+    } else if (jcp.dataPrc == Precision::I32) {
+        vpminsd(vDst, vSrc1, vSrc2);
+        vpmaxsd(vDst | kMaxMask, vSrc1, vSrc2);
+    }  else if (jcp.dataPrc == Precision::U8) {
+        vpminub(vDst, vSrc1, vSrc2);
+        vpmaxub(vDst | kMaxMask, vSrc1, vSrc2);
+    } else if (jcp.dataPrc == Precision::I8) {
+        vpminsb(vDst, vSrc1, vSrc2);
+        vpmaxsb(vDst | kMaxMask, vSrc1, vSrc2);
+    }
+}
+
+template <x64::cpu_isa_t isa>
+void UniqueKernel<isa>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMaxMask) {
+
+}
+
+template <>
+void UniqueKernel<x64::avx512_core>::sortVector(const Vmm& vToSort) {
+    auto vAux1   = getVmm();
+    auto vSrcTmp = getVmm();
+
+    // 0 Step.
+    vpshufd(vAux1, vToSort, 0B10110001);
+    cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask0);
+
+    // 1 Step.
+    vpshufd(vAux1, vSrcTmp, 0B01001110);
+    cmpPerm(vToSort, vSrcTmp, vAux1, kMaxMask1);
+
+    // 2 Step.
+    vpermd(vAux1, vPermMask2, vToSort);
+    cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask2);
+
+    // 3 Step.
+    vpermd(vAux1, vPermMask3, vToSort);
+    cmpPerm(vToSort, vSrcTmp, vAux1, kMaxMask3);
+
+    // 4 Step.
+    vpermd(vAux1, vPermMask4, vToSort);
+    cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask4);
+}
+
+template <x64::cpu_isa_t isa>
+void UniqueKernel<isa>::sortVector(const Vmm& vToSort) {
+
 }
 
 //template <x64::cpu_isa_t isa>
@@ -400,21 +487,20 @@ void UniqueKernel<isa>::process() {
 
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::tail() {
-    Xbyak::Label lEnd;
-    cmp(regWorkAmount, 0);
-    jle(lEnd, T_NEAR);
-
-    auto vHCoord = getVmm();
-    auto vWCoord = getVmm();
-
-    getTailCoordinates(vHCoord, vWCoord);
-//    interpolation(vWCoord, vHCoord, true);
-
-    if (dataTypeSize > 1)
-        sal(regWorkAmount, dataTypeShift); // Multiply by source data type size.
-    add(regDst, regWorkAmount);
-
-    L(lEnd);
+//    Xbyak::Label lEnd;
+//    cmp(regWorkAmount, 0);
+//    jle(lEnd, T_NEAR);
+//
+//    auto vHCoord = getVmm();
+//    auto vWCoord = getVmm();
+//
+////    getTailCoordinates(vHCoord, vWCoord);
+//
+//    if (dataTypeSize > 1)
+//        sal(regWorkAmount, dataTypeShift); // Multiply by source data type size.
+//    add(regDst, regWorkAmount);
+//
+//    L(lEnd);
 }
 
 template <>
