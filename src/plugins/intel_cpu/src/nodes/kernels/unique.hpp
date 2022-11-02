@@ -94,6 +94,7 @@ private:
 //    RegistersPool::Reg<Vmm> vOnesF;
     RegistersPool::Reg<Vmm> vInc;
     RegistersPool::Reg<Vmm> vSteps;
+    RegistersPool::Reg<Vmm> vPermMask;
     RegistersPool::Reg<Vmm> vPermMask2;
     RegistersPool::Reg<Vmm> vPermMask3;
     RegistersPool::Reg<Vmm> vPermMask4;
