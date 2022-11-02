@@ -131,7 +131,7 @@ void Unique::createPrimitive() {
     }
     kernel->create_ker();
 
-    threadsNum = parallel_get_max_threads();
+    threadsNum = 1;//parallel_get_max_threads();
     execArgsPerThread.resize(threadsNum);
 //    if (!x64::mayiuse(x64::avx512_core)) {
 //        const auto dataElPerVec = kernel->getDataElPerVec();
@@ -192,7 +192,8 @@ void Unique::execute(dnnl::stream strm) {
 std::cout << "\nINPUT DATA: " << std::endl;
 //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
     if (i % kernel->getDataElPerVec() == 0)
         std::cout << "| ";
     std::cout << srcDataF[i] << "; ";
@@ -210,6 +211,83 @@ std::cout << std::endl;
         (*kernel)(&arg);
     });
 
+int* dstDataI = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+const int n = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int);
+const int p = n / 16;
+std::vector<int> aux1;
+std::vector<int> aux1idx;
+
+for (int j = 0; j < p; j++) {
+    int k = j * (n / p);
+    for (int i = 0; i < p; i++) {
+        aux1idx.push_back(k + i * n / (p * p));
+        aux1.push_back(dstDataI[k + i * n / (p * p)]);
+    }
+}
+std::vector<int> aux1idxidx(p * p, 0);
+for (int i = 1; i < aux1idxidx.size(); i ++) {
+    aux1idxidx[i] = aux1idxidx[i - 1] + 1;
+}
+
+// sort
+for (int j = 1; j < aux1.size(); j++) {
+    int key = aux1[j];
+    int keyIdx = aux1idxidx[j];
+    int i = j - 1;
+    while (i >= 0 && aux1[i] > key) {
+        aux1[i + 1] = aux1[i];
+        aux1idxidx[i + 1] = aux1idxidx[i];
+        i = i - 1;
+    }
+    aux1[i + 1] = key;
+    aux1idxidx[i + 1] = keyIdx;
+}
+
+std::vector<int> aux2;
+std::vector<int> aux2idx;
+for (int i = 1; i < p; i++) {
+    int idx = i * p + p / 2 - 1;
+    if (idx >= aux1.size())
+        break;
+    aux2idx.push_back(aux1idxidx[i * p + p / 2 - 1]);
+    aux2.push_back(aux1[i * p + p / 2 - 1]);
+}
+
+std::vector<int> sorted(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int));
+int k = 0, l = 0, m = 0;
+for (int i = 0; i < aux1idxidx.size(); i++) {
+    auto start = aux1idx[aux1idxidx[i]];
+    auto end = aux1idxidx[i] + 1 < aux1idx.size() ? aux1idx[aux1idxidx[i] + 1] : sorted.size() - 1;
+    if (l < aux2idx.size() && aux1idxidx.size() < (i + 1) && aux2idx[l] == aux1idxidx[i + 1]) {
+        end++;
+        l++;
+    }
+    if (m < aux2idx.size() && aux1idxidx.size() < (i + 1) && aux2idx[m] == aux1idxidx[i]) {
+        start++;
+        m++;
+    }
+    for (int j = start; j < end; j++, k++) {
+        if (j >= sorted.size() || k >= sorted.size()) {
+            break;
+        }
+        sorted[k] = dstDataI[j];
+    }
+}
+
+//for (int i = 0; i < p; i++) {
+//    const int start = i * n / (p * p);
+//    const int end = (i + 1) * n / (p * p);
+//    for (int j = start + 1; j < end; j++) {
+//        int key = sorted[j];
+//        int i = j - 1;
+//        while (i >= start && sorted[i] > key) {
+//            sorted[i + 1] = sorted[i];
+//            i = i - 1;
+//        }
+//        sorted[i + 1] = key;
+//    }
+//}
+
 //    VectorDims newDims{validOutputs, 3};
 //    redefineOutputMemory( {newDims, newDims, {1}} );
 
@@ -217,12 +295,13 @@ std::cout << std::endl;
 std::cout << "OUTPUT: " << std::endl;
 //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//char* dstDataF = reinterpret_cast<char*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
 //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i % 4 == 0)
         std::cout << "| ";
-    std::cout << dstDataF[i] << "; ";
+//    std::cout << dstDataF[i] << "; ";
+    std::cout << sorted[i] << "; ";
 }
 std::cout << std::endl << std::endl;
 // DEBUG
