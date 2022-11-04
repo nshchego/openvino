@@ -212,81 +212,117 @@ std::cout << std::endl;
     });
 
 int* dstDataI = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-const int n = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int);
-const int p = n / 16;
-std::vector<int> aux1;
+const int N = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int);
+const int P = N / 16;
+std::vector<int> samples1;
 std::vector<int> aux1idx;
 
-for (int j = 0; j < p; j++) {
-    int k = j * (n / p);
-    for (int i = 0; i < p; i++) {
-        aux1idx.push_back(k + i * n / (p * p));
-        aux1.push_back(dstDataI[k + i * n / (p * p)]);
+for (int j = 0; j < P; j++) {
+    int k = j * (N / P);
+    for (int i = 0; i < P; i++) {
+        aux1idx.push_back(k + i * N / (P * P));
+        samples1.push_back(dstDataI[k + i * N / (P * P)]);
     }
 }
-std::vector<int> aux1idxidx(p * p, 0);
+std::vector<int> aux1idxidx(P * P, 0);
 for (int i = 1; i < aux1idxidx.size(); i ++) {
     aux1idxidx[i] = aux1idxidx[i - 1] + 1;
 }
 
 // sort
-for (int j = 1; j < aux1.size(); j++) {
-    int key = aux1[j];
+for (int j = 1; j < samples1.size(); j++) {
+    int key = samples1[j];
     int keyIdx = aux1idxidx[j];
     int i = j - 1;
-    while (i >= 0 && aux1[i] > key) {
-        aux1[i + 1] = aux1[i];
+    while (i >= 0 && samples1[i] > key) {
+        samples1[i + 1] = samples1[i];
         aux1idxidx[i + 1] = aux1idxidx[i];
         i = i - 1;
     }
-    aux1[i + 1] = key;
+    samples1[i + 1] = key;
     aux1idxidx[i + 1] = keyIdx;
 }
 
 std::vector<int> aux2;
 std::vector<int> aux2idx;
-for (int i = 1; i < p; i++) {
-    int idx = i * p + p / 2 - 1;
-    if (idx >= aux1.size())
+for (int i = 1; i < P; i++) {
+    int idx = i * P + P / 2 - 1;
+    if (idx >= samples1.size())
         break;
-    aux2idx.push_back(aux1idxidx[i * p + p / 2 - 1]);
-    aux2.push_back(aux1[i * p + p / 2 - 1]);
+    aux2idx.push_back(aux1idxidx[i * P + P / 2 - 1]);
+    aux2.push_back(samples1[i * P + P / 2 - 1]);
 }
 
 std::vector<int> sorted(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int));
-int k = 0, l = 0, m = 0;
-for (int i = 0; i < aux1idxidx.size(); i++) {
-    auto start = aux1idx[aux1idxidx[i]];
-    auto end = aux1idxidx[i] + 1 < aux1idx.size() ? aux1idx[aux1idxidx[i] + 1] : sorted.size() - 1;
-    if (l < aux2idx.size() && aux1idxidx.size() < (i + 1) && aux2idx[l] == aux1idxidx[i + 1]) {
-        end++;
-        l++;
-    }
-    if (m < aux2idx.size() && aux1idxidx.size() < (i + 1) && aux2idx[m] == aux1idxidx[i]) {
-        start++;
-        m++;
-    }
-    for (int j = start; j < end; j++, k++) {
-        if (j >= sorted.size() || k >= sorted.size()) {
-            break;
-        }
-        sorted[k] = dstDataI[j];
-    }
-}
-
-//for (int i = 0; i < p; i++) {
-//    const int start = i * n / (p * p);
-//    const int end = (i + 1) * n / (p * p);
-//    for (int j = start + 1; j < end; j++) {
-//        int key = sorted[j];
-//        int i = j - 1;
-//        while (i >= start && sorted[i] > key) {
-//            sorted[i + 1] = sorted[i];
-//            i = i - 1;
+//int k = 0, l = 0, m = 0;
+//for (int i = 0; i < aux1idxidx.size(); i++) {
+//    auto start = aux1idx[aux1idxidx[i]];
+//    auto end = aux1idxidx[i] + 1 < aux1idx.size() ? aux1idx[aux1idxidx[i] + 1] : sorted.size() - 1;
+//    if (l < aux2idx.size() && aux1idxidx.size() < (i + 1) && aux2idx[l] == aux1idxidx[i + 1]) {
+//        end++;
+//        l++;
+//    }
+//    if (m < aux2idx.size() && aux1idxidx.size() < (i + 1) && aux2idx[m] == aux1idxidx[i]) {
+//        start++;
+//        m++;
+//    }
+//    for (int j = start; j < end; j++, k++) {
+//        if (j >= sorted.size() || k >= sorted.size()) {
+//            break;
 //        }
-//        sorted[i + 1] = key;
+//        sorted[k] = dstDataI[j];
 //    }
 //}
+//for (int l = 0; l < aux2.size(); l++)
+std::vector<std::vector<int>> bounds(std::vector<std::vector<int>>(P, std::vector<int>(P, 0)));
+for (int ps = 0; ps < P; ps++) {
+    bounds[0][ps] = ps * N / P;
+}
+std::vector<std::vector<int>> finalBounds(std::vector<std::vector<int>>(P, std::vector<int>(2, 0)));
+
+int s = 0, k = 0, ps = 0;
+for (int pd = 0; pd < P; pd++) {
+//    int start = 0, end = aux2[l];
+//    int l = 0;
+    ps = 0;
+    s = bounds[pd][0];
+std::cout << "s[" << pd << "][" << 0 << "]=" << s << std::endl;
+    finalBounds[pd][0] = k;
+    for (int j = 0; j < N && s < sorted.size() && k < sorted.size(); j++) {
+        if (pd < aux2.size() && dstDataI[s] > aux2[pd]) {
+            ps++;
+            bounds[pd + 1][ps - 1] = s;
+std::cout << "bounds[" << pd + 1 << "][" << ps - 1 << "]=" <<  bounds[pd + 1][ps - 1] << std::endl;
+            if (ps == P) {
+//                sorted[k++] = dstDataI[s++];
+                break;
+            }
+            s = bounds[pd][ps];
+std::cout << "s[" << pd << "][" << ps << "]=" << s << std::endl;
+        }
+        if (pd == P - 1 && s == (ps + 1) * N / P) {
+            ps++;
+            s = bounds[pd][ps];
+std::cout << "s[" << pd << "][" << ps << "]=" << s << std::endl;
+        }
+        sorted[k++] = dstDataI[s++];
+    }
+    finalBounds[pd][1] = k;
+}
+
+for (int p = 0; p < P; p++) {
+//    const int start = i * N / (P * P);
+//    const int end = (i + 1) * N / (P * P);
+    for (int j = finalBounds[p][0] + 1; j < finalBounds[p][1]; j++) {
+        int key = sorted[j];
+        int i = j - 1;
+        while (i >= finalBounds[p][0] && sorted[i] > key) {
+            sorted[i + 1] = sorted[i];
+            i = i - 1;
+        }
+        sorted[i + 1] = key;
+    }
+}
 
 //    VectorDims newDims{validOutputs, 3};
 //    redefineOutputMemory( {newDims, newDims, {1}} );
