@@ -54,7 +54,7 @@ public:
             result << "flattened" << "_";
         }
         result << "sorted=" << (sorted ? "True" : "False") << "_";
-        result << "dataPrc=" << dataPrecision << "_";
+        result << "dataPrc=" << dataPrecision;
         result << CPUTestsBase::getTestCaseName(cpuParams);
 
         if (!additionalConfig.empty()) {

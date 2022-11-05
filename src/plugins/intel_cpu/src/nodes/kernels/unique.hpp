@@ -101,18 +101,18 @@ private:
 
     // Tail mask.
     RegistersPool::Reg<Vmask> kTailMask;
-    RegistersPool::Reg<Vmask> kMaxMask0;
-    RegistersPool::Reg<Vmask> kMaxMask1;
-    RegistersPool::Reg<Vmask> kMaxMask2;
-    RegistersPool::Reg<Vmask> kMaxMask3;
-    RegistersPool::Reg<Vmask> kMaxMask4;
+    RegistersPool::Reg<Vmask> kMask0;
+    RegistersPool::Reg<Vmask> kMask1;
+    RegistersPool::Reg<Vmask> kMaskFirst;
+    RegistersPool::Reg<Vmask> kMaskLast;
+//    RegistersPool::Reg<Vmask> kMaxMask4;
 
     void initVectors();
     void quickSort(const Xbyak::Reg64& rSrc);
     void partition();
     void process();
     void sortVector(const Vmm& vToSort);
-    void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMaxMask);
+    void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask);
 //    void spatialLoop();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
