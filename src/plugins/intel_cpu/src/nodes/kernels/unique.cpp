@@ -71,13 +71,21 @@ void UniqueKernel<x64::avx512_core>::initVectors() {
 
     Xbyak::Reg32 rMask(rAux.getIdx());
 
-    kMaxMask0 = getMask();
-    mov(rMask, 0B1010101010101010);
-    kmovw(kMaxMask0, rMask);
+    kMask0 = getMask();
+    mov(rMask, 0B0101010101010101);
+    kmovw(kMask0, rMask);
 
-    kMaxMask1 = getMask();
+    kMask1 = getMask();
+    mov(rMask, 0B1010101010101010);
+    kmovw(kMask1, rMask);
+
+    kMaskFirst = getMask();
+    mov(rMask, 0B0010101010101011);
+    kmovw(kMaskFirst, rMask);
+
+    kMaskLast = getMask();
     mov(rMask, 0B1101010101010100);
-    kmovw(kMaxMask1, rMask);
+    kmovw(kMaskLast, rMask);
 
 //    kMaxMask0 = getMask();
 //    mov(rMask, 0B1010101010101010);
@@ -87,37 +95,37 @@ void UniqueKernel<x64::avx512_core>::initVectors() {
 //    mov(rMask, 0B1100110011001100);
 //    kmovw(kMaxMask1, rMask);
 
-    kMaxMask2 = getMask();
-    mov(rMask, 0B1101010011010100);
-    kmovw(kMaxMask2, rMask);
-
-    kMaxMask3 = getMask();
-    mov(rMask, 0B1111000101110000);
-    kmovw(kMaxMask3, rMask);
-
-    kMaxMask4 = getMask();
-    mov(rMask, 0B1010101010101010);
-    kmovw(kMaxMask4, rMask);
+//    kMaxMask2 = getMask();
+//    mov(rMask, 0B1101010011010100);
+//    kmovw(kMaxMask2, rMask);
+//
+//    kMaxMask3 = getMask();
+//    mov(rMask, 0B1111000101110000);
+//    kmovw(kMaxMask3, rMask);
+//
+//    kMaxMask4 = getMask();
+//    mov(rMask, 0B1010101010101010);
+//    kmovw(kMaxMask4, rMask);
 
     static const unsigned permMask[16]  = { 15, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 0 };
     mov(rAux, reinterpret_cast<uintptr_t>(permMask));
     vPermMask = getVmm();
     uni_vmovups(vPermMask, ptr[rAux]);
 
-    static const unsigned permMask2[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
-    mov(rAux, reinterpret_cast<uintptr_t>(permMask2));
-    vPermMask2 = getVmm();
-    uni_vmovups(vPermMask2, ptr[rAux]);
-
-    static const unsigned permMask3[16]  = { 8, 5, 6, 4, 3, 1, 2, 15, 0, 13, 14, 12, 11, 9, 10, 7 };
-    mov(rAux, reinterpret_cast<uintptr_t>(permMask3));
-    vPermMask3 = getVmm();
-    uni_vmovups(vPermMask3, ptr[rAux]);
-
-    static const unsigned permMask4[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
-    mov(rAux, reinterpret_cast<uintptr_t>(permMask4));
-    vPermMask4 = getVmm();
-    uni_vmovups(vPermMask4, ptr[rAux]);
+//    static const unsigned permMask2[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
+//    mov(rAux, reinterpret_cast<uintptr_t>(permMask2));
+//    vPermMask2 = getVmm();
+//    uni_vmovups(vPermMask2, ptr[rAux]);
+//
+//    static const unsigned permMask3[16]  = { 8, 5, 6, 4, 3, 1, 2, 15, 0, 13, 14, 12, 11, 9, 10, 7 };
+//    mov(rAux, reinterpret_cast<uintptr_t>(permMask3));
+//    vPermMask3 = getVmm();
+//    uni_vmovups(vPermMask3, ptr[rAux]);
+//
+//    static const unsigned permMask4[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
+//    mov(rAux, reinterpret_cast<uintptr_t>(permMask4));
+//    vPermMask4 = getVmm();
+//    uni_vmovups(vPermMask4, ptr[rAux]);
 
 //    Xbyak::Reg32 r32Aux(rAux.getIdx());
 //
@@ -438,44 +446,41 @@ void UniqueKernel<isa>::process() {
 }
 
 template <>
-void UniqueKernel<x64::avx512_core>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMaxMask) {
+void UniqueKernel<x64::avx512_core>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask) {
     if (jcp.dataPrc == Precision::FP32) {
-        vminps(vDst, vSrc1, vSrc2);
+        vminps(vDst | kMinMask, vSrc1, vSrc2);
         vmaxps(vDst | kMaxMask, vSrc1, vSrc2);
     } else if (jcp.dataPrc == Precision::I32) {
-        vpminsd(vDst, vSrc1, vSrc2);
+        vpminsd(vDst | kMinMask, vSrc1, vSrc2);
         vpmaxsd(vDst | kMaxMask, vSrc1, vSrc2);
     }  else if (jcp.dataPrc == Precision::U8) {
-        vpminub(vDst, vSrc1, vSrc2);
+        vpminub(vDst | kMinMask, vSrc1, vSrc2);
         vpmaxub(vDst | kMaxMask, vSrc1, vSrc2);
     } else if (jcp.dataPrc == Precision::I8) {
-        vpminsb(vDst, vSrc1, vSrc2);
+        vpminsb(vDst | kMinMask, vSrc1, vSrc2);
         vpmaxsb(vDst | kMaxMask, vSrc1, vSrc2);
     }
 }
 
 template <x64::cpu_isa_t isa>
-void UniqueKernel<isa>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMaxMask) {
+void UniqueKernel<isa>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask) {
 
 }
 
 template <>
 void UniqueKernel<x64::avx512_core>::sortVector(const Vmm& vToSort) {
     auto vAux1   = getVmm();
-    auto vSrcTmp = getVmm();
 
     const int iterNum = dataElPerVec / 2 - 1;
     for (int i = 0; i < iterNum; i++) {
         vpshufd(vAux1, vToSort, 0B10110001);
-        cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask0);
+        cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
 
-        vpermd(vAux1, vPermMask, vSrcTmp);
-        cmpPerm(vToSort, vSrcTmp, vAux1, kMaxMask1);
+        vpermd(vAux1, vPermMask, vToSort);
+        cmpPerm(vToSort, vToSort, vAux1, kMaskFirst, kMaskLast);
     }
     vpshufd(vAux1, vToSort, 0B10110001);
-    cmpPerm(vSrcTmp, vToSort, vAux1, kMaxMask0);
-
-    uni_vmovups(vToSort, vSrcTmp);
+    cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
 }
 
 template <x64::cpu_isa_t isa>
