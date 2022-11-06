@@ -115,7 +115,7 @@ private:
     void process();
     void sortContiguousVec();
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask);
-    void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2);
+    void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
 //    void spatialLoop();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
