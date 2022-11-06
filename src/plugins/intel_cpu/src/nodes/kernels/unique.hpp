@@ -82,11 +82,11 @@ private:
     // 64b registers.
     RegistersPool::Reg<Xbyak::Reg64> regSrc;
     RegistersPool::Reg<Xbyak::Reg64> regDst[4];
-//    RegistersPool::Reg<Xbyak::Reg64> regDst1;
+    RegistersPool::Reg<Xbyak::Reg64> regVecCounter;
 //    RegistersPool::Reg<Xbyak::Reg64> regDst2;
 //    RegistersPool::Reg<Xbyak::Reg64> regDst3;
-    RegistersPool::Reg<Xbyak::Reg64> regLeft;
-    RegistersPool::Reg<Xbyak::Reg64> regRight;
+//    RegistersPool::Reg<Xbyak::Reg64> regLeft;
+//    RegistersPool::Reg<Xbyak::Reg64> regRight;
     RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
 
     // Vector registers.
@@ -94,25 +94,28 @@ private:
 //    RegistersPool::Reg<Vmm> vOnesF;
     RegistersPool::Reg<Vmm> vInc;
     RegistersPool::Reg<Vmm> vSteps;
-    RegistersPool::Reg<Vmm> vPermMask;
-    RegistersPool::Reg<Vmm> vPermMask2;
-    RegistersPool::Reg<Vmm> vPermMask3;
-    RegistersPool::Reg<Vmm> vPermMask4;
+    RegistersPool::Reg<Vmm> vPermElem;
+    RegistersPool::Reg<Vmm> vPermuted0;
+    RegistersPool::Reg<Vmm> vPermuted1;
+//    RegistersPool::Reg<Vmm> vPermMask4;
+    std::vector<RegistersPool::Reg<Vmm>> contiguousVec;
 
     // Tail mask.
     RegistersPool::Reg<Vmask> kTailMask;
     RegistersPool::Reg<Vmask> kMask0;
     RegistersPool::Reg<Vmask> kMask1;
-    RegistersPool::Reg<Vmask> kMaskFirst;
-    RegistersPool::Reg<Vmask> kMaskLast;
-//    RegistersPool::Reg<Vmask> kMaxMask4;
+    RegistersPool::Reg<Vmask> kMaskMinLast;
+    RegistersPool::Reg<Vmask> kMaskMaxFirst;
+    RegistersPool::Reg<Vmask> kFirstElMask;
+    RegistersPool::Reg<Vmask> kLastElMask;
 
     void initVectors();
     void quickSort(const Xbyak::Reg64& rSrc);
     void partition();
     void process();
-    void sortVector(const Vmm& vToSort);
+    void sortContiguousVec();
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask);
+    void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2);
 //    void spatialLoop();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);

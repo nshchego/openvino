@@ -69,7 +69,7 @@ void UniqueKernel<x64::avx512_core>::initVectors() {
 //    mov(rAux, reinterpret_cast<uintptr_t>(steps));
 //    uni_vmovups(vSteps, ptr[rAux]);
 
-    Xbyak::Reg32 rMask(rAux.getIdx());
+    Xbyak::Reg32 rMask(rAux.getIdx()); // TODO use r64
 
     kMask0 = getMask();
     mov(rMask, 0B0101010101010101);
@@ -79,53 +79,31 @@ void UniqueKernel<x64::avx512_core>::initVectors() {
     mov(rMask, 0B1010101010101010);
     kmovw(kMask1, rMask);
 
-    kMaskFirst = getMask();
-    mov(rMask, 0B0010101010101011);
-    kmovw(kMaskFirst, rMask);
+    kMaskMinLast = getMask();
+    mov(rMask, 0B0010101010101010);
+    kmovw(kMaskMinLast, rMask);
 
-    kMaskLast = getMask();
-    mov(rMask, 0B1101010101010100);
-    kmovw(kMaskLast, rMask);
+    kMaskMaxFirst = getMask();
+    mov(rMask, 0B0101010101010100);
+    kmovw(kMaskMaxFirst, rMask);
 
-//    kMaxMask0 = getMask();
-//    mov(rMask, 0B1010101010101010);
-//    kmovw(kMaxMask0, rMask);
+    kFirstElMask = getMask();
+    mov(rMask, 0B0000000000000001);
+    kmovw(kFirstElMask, rMask);
 
-//    kMaxMask1 = getMask();
-//    mov(rMask, 0B1100110011001100);
-//    kmovw(kMaxMask1, rMask);
+    kLastElMask = getMask();
+    mov(rMask, 0B1000000000000000);
+    kmovw(kLastElMask, rMask);
 
-//    kMaxMask2 = getMask();
-//    mov(rMask, 0B1101010011010100);
-//    kmovw(kMaxMask2, rMask);
-//
-//    kMaxMask3 = getMask();
-//    mov(rMask, 0B1111000101110000);
-//    kmovw(kMaxMask3, rMask);
-//
-//    kMaxMask4 = getMask();
-//    mov(rMask, 0B1010101010101010);
-//    kmovw(kMaxMask4, rMask);
+    static const unsigned permElem[16]  = { 15, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 0 };
+    mov(rAux, reinterpret_cast<uintptr_t>(permElem));
+    vPermElem = getVmm();
+    uni_vmovups(vPermElem, ptr[rAux]);
 
-    static const unsigned permMask[16]  = { 15, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 0 };
-    mov(rAux, reinterpret_cast<uintptr_t>(permMask));
-    vPermMask = getVmm();
-    uni_vmovups(vPermMask, ptr[rAux]);
-
-//    static const unsigned permMask2[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
-//    mov(rAux, reinterpret_cast<uintptr_t>(permMask2));
-//    vPermMask2 = getVmm();
-//    uni_vmovups(vPermMask2, ptr[rAux]);
-//
-//    static const unsigned permMask3[16]  = { 8, 5, 6, 4, 3, 1, 2, 15, 0, 13, 14, 12, 11, 9, 10, 7 };
-//    mov(rAux, reinterpret_cast<uintptr_t>(permMask3));
-//    vPermMask3 = getVmm();
-//    uni_vmovups(vPermMask3, ptr[rAux]);
-//
-//    static const unsigned permMask4[16]  = { 4, 2, 1, 7, 0, 6, 5, 3, 12, 10, 9, 15, 8, 14, 13, 11 };
-//    mov(rAux, reinterpret_cast<uintptr_t>(permMask4));
-//    vPermMask4 = getVmm();
-//    uni_vmovups(vPermMask4, ptr[rAux]);
+    const auto vecNum = registersPool->countFree<Vmm>() - 2;
+    for (int i = 0; i < vecNum; i++) {
+        contiguousVec.push_back(getVmm());
+    }
 
 //    Xbyak::Reg32 r32Aux(rAux.getIdx());
 //
@@ -414,12 +392,13 @@ void UniqueKernel<isa>::partition() {
 
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::process() {
-    Xbyak::Label lLoop, lEnd;
+    Xbyak::Label lLoop, lTail, lLoadEnd, lStoreEnd;
     auto rSrcTmp = getReg64();
     auto rDstTmp = getReg64();
+    regVecCounter = getReg64();
     mov(rSrcTmp, regSrc);
     mov(rDstTmp, regDst[UNIQUE_DATA]);
-    auto vSrc = getVmm();
+    mov(regVecCounter, 0);
 
     // Per vector sort
     regWorkAmount = getReg64();
@@ -428,20 +407,40 @@ void UniqueKernel<isa>::process() {
     L(lLoop);
     {
         cmp(regWorkAmount, dataElPerVec);
-        jl(lEnd, T_NEAR);
+        jl(lTail, T_NEAR);
 
-        uni_vmovups(vSrc, ptr[rSrcTmp]);
-        sortVector(vSrc);
-        uni_vmovups(ptr[rDstTmp], vSrc);
+        // LOAD
+        for (int v = 0; v < contiguousVec.size(); v++) {
+            cmp(regWorkAmount, dataElPerVec);
+            jl(lLoadEnd, T_NEAR);
 
-        add(rSrcTmp, vlen);
-        add(rDstTmp, vlen);
+            const auto& vec = contiguousVec[v];
+            uni_vmovups(vec, ptr[rSrcTmp]);
 
-        sub(regWorkAmount, dataElPerVec);
+            add(rSrcTmp, vlen);
+            inc(regVecCounter);
+            sub(regWorkAmount, dataElPerVec);
+        }
+        L(lLoadEnd);
+
+        sortContiguousVec();
+
+        // STORE
+        for (int v = 0; v < contiguousVec.size(); v++) {
+            cmp(regVecCounter, v);
+            jle(lStoreEnd, T_NEAR);
+
+            const auto& vec = contiguousVec[v];
+            uni_vmovups(ptr[rDstTmp], vec);
+
+            add(rDstTmp, vlen);
+        }
+        L(lStoreEnd);
+
         jmp(lLoop, T_NEAR);
     }
-    L(lEnd);
 
+    L(lTail);
     tail();
 }
 
@@ -468,23 +467,108 @@ void UniqueKernel<isa>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vS
 }
 
 template <>
-void UniqueKernel<x64::avx512_core>::sortVector(const Vmm& vToSort) {
-    auto vAux1   = getVmm();
-
-    const int iterNum = dataElPerVec / 2 - 1;
-    for (int i = 0; i < iterNum; i++) {
-        vpshufd(vAux1, vToSort, 0B10110001);
-        cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
-
-        vpermd(vAux1, vPermMask, vToSort);
-        cmpPerm(vToSort, vToSort, vAux1, kMaskFirst, kMaskLast);
+void UniqueKernel<x64::avx512_core>::permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2) {
+    if (jcp.dataPrc.size() == 4) {
+        uni_vmovups(vSrc1 | kLastElMask, vSrc2);
+        uni_vmovups(vSrc2 | kFirstElMask, vSrc1);
+    } else if (jcp.dataPrc.size() == 1) {
+        vmovdqu8(vSrc1 | kLastElMask, vSrc2);
+        vmovdqu8(vSrc2 | kFirstElMask, vSrc1);
     }
-    vpshufd(vAux1, vToSort, 0B10110001);
-    cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
 }
 
 template <x64::cpu_isa_t isa>
-void UniqueKernel<isa>::sortVector(const Vmm& vToSort) {
+void UniqueKernel<isa>::permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2) {
+
+}
+
+template <>
+void UniqueKernel<x64::avx512_core>::sortContiguousVec() {
+    Xbyak::Label lFew, lEnd;
+    auto vAux1 = getVmm();
+
+    cmp(regVecCounter, 1);
+    jg(lFew, T_NEAR);
+    {
+        const int iterNum = dataElPerVec / 2 - 1;
+        const auto &vToSort = contiguousVec[0];
+        for (int i = 0; i < iterNum; i++) {
+            vpshufd(vAux1, vToSort, 0B10110001);
+            cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
+
+            vpermd(vAux1, vPermElem, vToSort);
+            cmpPerm(vToSort, vToSort, vAux1, kMaskMinLast, kMaskMaxFirst);
+        }
+        vpshufd(vAux1, vToSort, 0B10110001);
+        cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
+
+        jmp(lEnd, T_NEAR);
+    }
+    L(lFew);
+    {
+        Xbyak::Label lLastCmp;
+        const int iterNum = (contiguousVec.size() * dataElPerVec) / 2 - 1;
+        auto vAux2 = getVmm();
+
+        for (int i = 0; i < iterNum; i++) {
+            cmp(regVecCounter, 2 * (i + 1) / dataElPerVec);
+            jle(lLastCmp, T_NEAR);
+            Xbyak::Label lSecond, lNext;
+
+            for (int v = 0; v < contiguousVec.size(); v++) {
+                cmp(regVecCounter, v);
+                jle(lSecond, T_NEAR);
+
+                const auto &vToSort = contiguousVec[v];
+                vpshufd(vAux1, vToSort, 0B10110001);
+                cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
+            }
+
+            L(lSecond);
+            const auto &vFirst = contiguousVec[0];
+            const auto &vSecond = contiguousVec[1];
+            vpermd(vAux1, vPermElem, vFirst);
+            vpermd(vAux2, vPermElem, vSecond);
+            permOnEdge(vAux1, vAux2);
+            cmpPerm(vFirst, vFirst, vAux1, kMask1, kMaskMaxFirst);
+            for (int v = 1; v < contiguousVec.size() - 1; v++) {
+                Xbyak::Label lLast, lNext2;
+                cmp(regVecCounter, v + 1);
+                jle(lLast, T_NEAR);
+
+                const auto &vCurr = contiguousVec[v];
+                const auto &vNext = contiguousVec[v + 1];
+                vpermd(v % 2 == 0 ? vAux2 : vAux1, vPermElem, vNext);
+                permOnEdge(v % 2 == 0 ? vAux1 : vAux2, v % 2 == 0 ? vAux2 : vAux1);
+                cmpPerm(vCurr, vCurr, v % 2 == 0 ? vAux1 : vAux2, kMask1, kMask0);
+                jmp(lNext2, T_NEAR);
+
+                L(lLast);
+                cmpPerm(vCurr, vCurr, v % 2 == 0 ? vAux1 : vAux2, kMaskMinLast, kMask0);
+                jmp(lNext, T_NEAR);
+
+                L(lNext2);
+            }
+
+            L(lNext);
+        }
+
+        L(lLastCmp);
+        for (int v = 0; v < contiguousVec.size(); v++) {
+            cmp(regVecCounter, v);
+            jle(lEnd, T_NEAR);
+
+            const auto &vToSort = contiguousVec[v];
+            vpshufd(vAux1, vToSort, 0B10110001);
+            cmpPerm(vToSort, vToSort, vAux1, kMask0, kMask1);
+        }
+    }
+
+    L(lEnd);
+}
+
+template <x64::cpu_isa_t isa>
+void UniqueKernel<isa>::sortContiguousVec() {
 
 }
 
