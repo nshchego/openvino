@@ -470,7 +470,6 @@ template <>
 void UniqueKernel<x64::avx512_core>::permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1) {
     if (jcp.dataPrc.size() == 4) {
         uni_vmovups(vSrc1 | kLastElMask, vSrc2);
-//        uni_vmovups(vSrc2 | kFirstElMask, vSrc1);
         vpermd(vSrc2 | kFirstElMask, vPermElem, vOrigin1);
     } else if (jcp.dataPrc.size() == 1) {
         vmovdqu8(vSrc1 | kLastElMask, vSrc2);
@@ -527,12 +526,8 @@ void UniqueKernel<x64::avx512_core>::sortContiguousVec() {
 
             L(lSecond);
             const auto& vFirst = contiguousVec[0];
-            const auto& vSecond = contiguousVec[1];
             vpermd(vAux1, vPermElem, vFirst);
-            vpermd(vAux2, vPermElem, vSecond);
-            permOnEdge(vAux1, vAux2, vFirst);
-            cmpPerm(vFirst, vFirst, vAux1, kMask1, kMaskMaxFirst);
-            for (int v = 1; v < contiguousVec.size() - 1; v++) {
+            for (int v = 0; v < contiguousVec.size() - 1; v++) {
                 Xbyak::Label lLast, lNext2;
                 cmp(regVecCounter, v + 1);
                 jle(lLast, T_NEAR);
@@ -544,7 +539,7 @@ void UniqueKernel<x64::avx512_core>::sortContiguousVec() {
 
                 vpermd(vNextAux, vPermElem, vNext);
                 permOnEdge(vCurrAux, vNextAux, vCurr);
-                cmpPerm(vCurr, vCurr, vCurrAux, kMask1, kMask0);
+                cmpPerm(vCurr, vCurr, vCurrAux, kMask1, v == 0 ? kMaskMaxFirst : kMask0);
                 jmp(lNext2, T_NEAR);
 
                 L(lLast);
