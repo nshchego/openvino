@@ -288,20 +288,17 @@ void JitKernelBase::uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &
 }
 
 void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
-                                     const Xbyak::Zmm&    zAux,
-                                     const Xbyak::Reg64&  rWorkRest) {
-    auto rAux0 = getReg64();
-    auto rAux1 = getReg64();
+                                     const Xbyak::Reg64& rWorkRest,
+                                     size_t typeSize) {
     Xbyak::Label lKmov;
-    Xbyak::Reg32 rOnes(rAux1.getIdx());
-    const uint64_t typeSize = 4;
     const uint64_t elPerVec = x64::cpu_isa_traits<x64::avx512_core>::vlen / typeSize;
-
+    auto rOnes = getReg32();
     mov(rOnes, 0x0000FFFF);
+
     cmp(rWorkRest, elPerVec);
     jge(lKmov);
     {
-        Xbyak::Reg32 rShift(rAux0.getIdx());
+        auto rShift = getReg32();
         mov(rShift, elPerVec);
         sub(rShift, rWorkRest);
         shrx(rOnes, rOnes, rShift);

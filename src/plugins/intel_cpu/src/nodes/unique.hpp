@@ -35,6 +35,9 @@ private:
     void flattenTensorExec();
     void slicedTensorExec();
 
+    std::vector<std::vector<int64_t>> blockLen;
+    std::vector<std::vector<int64_t>> vecNumInBlock;
+
     UniqueKernelConfParams jcp;
     std::shared_ptr<UniqueKernelBase> kernel;
 

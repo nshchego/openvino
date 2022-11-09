@@ -435,7 +435,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
         cmp(rAux, 0);
         jle(lEnd, T_NEAR);
 
-        fillRestWorkMask(kTailMask, vAux, rAux);
+        fillRestWorkMask(kTailMask, rAux, dataTypeSize);
         uni_vmovups((Vmm)vAux | kTailMask, ptr[regGrid]);
         vpermd(vAux, vGridPermMask, vAux);
         Xbyak::Ymm ymmAux(vAux.getIdx());
@@ -447,7 +447,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
     }
     L(lRest);
     {
-        fillRestWorkMask(kTailMask, vAux, rAux);
+        fillRestWorkMask(kTailMask, rAux, dataTypeSize);
         uni_vmovups(vWCoord | kTailMask, ptr[regGrid]);
         vpermd(vWCoord, vGridPermMask, vWCoord);
         vextractf64x4(ymmH, vWCoord, 1); // Extract Y component
@@ -460,7 +460,7 @@ void JitGridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoor
 
     L(lEnd);
 
-    fillRestWorkMask(kTailMask, vAux, regWorkAmount);
+    fillRestWorkMask(kTailMask, regWorkAmount, dataTypeSize);
 }
 
 template <>
