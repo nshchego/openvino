@@ -122,7 +122,7 @@ private:
     void partition();
     void process();
     void sortContiguousVec(const Xbyak::Reg64& regVecNum);
-    void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask);
+    void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask, bool tail = false);
     void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
 //    void spatialLoop();
     void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
@@ -131,8 +131,7 @@ private:
     void tail();
 
     // Aux
-    void dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vSrc);
-    void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vWidth);
+    void alignTailMask(const Vmask& kDst, const Vmask& kSrc, bool even);
 };
 
 }   // namespace intel_cpu
