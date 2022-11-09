@@ -430,7 +430,7 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
         cmp(rAux, 0);
         jle(lEnd, T_NEAR);
 
-        fillRestWorkMask(kTailMask, vAux, rAux);
+        fillRestWorkMask(kTailMask, rAux, dataTypeSize);
         uni_vmovups((Vmm)vAux | kTailMask, ptr[regGrid]);
         vpermd(vAux, vGridPermMask, vAux);
         Xbyak::Ymm ymmAux(vAux.getIdx());
@@ -441,7 +441,7 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
     }
     L(lRest);
     {
-        fillRestWorkMask(kTailMask, vAux, rAux);
+        fillRestWorkMask(kTailMask, rAux, dataTypeSize);
         uni_vmovups(vWCoord | kTailMask, ptr[regGrid]);
         vpermd(vWCoord, vGridPermMask, vWCoord);
         vshuff64x2(vHCoord, vWCoord, vHCoord, 0B11101110); // Extract Y component
@@ -454,7 +454,7 @@ void GridSampleKernel<x64::avx512_core>::getTailCoordinates(const Vmm& vHCoord, 
 
     L(lEnd);
 
-    fillRestWorkMask(kTailMask, vAux, regWorkAmount);
+    fillRestWorkMask(kTailMask, regWorkAmount, dataTypeSize);
 }
 
 template <>

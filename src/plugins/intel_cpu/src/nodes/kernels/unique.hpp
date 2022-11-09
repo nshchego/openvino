@@ -30,7 +30,10 @@ struct UniqueKernelConfParams {
 struct UniqueKernelExecArgs {
     const void* srcPtr;
     void* dstPtr[4];
-    uint64_t workAmount = 0lu;
+    int64_t workAmount = 0lu;
+    int64_t blocksNum  = 1lu;
+    int64_t* blockLen;
+    int64_t* vecNumInBlock;
 };
 
 class UniqueKernelBase: public JitKernelBase {
@@ -49,6 +52,7 @@ public:
     uint64_t getDataElPerVec() {
         return dataElPerVec;
     }
+    virtual uint64_t getDataElPerBlock() = 0;
 
 protected:
     UniqueKernelConfParams jcp;
@@ -64,6 +68,10 @@ public:
     DECLARE_CPU_JIT_AUX_FUNCTIONS(UniqueKernel)
 
     explicit UniqueKernel(const UniqueKernelConfParams& jcp);
+
+    uint64_t getDataElPerBlock() override {
+        return dataElPerVec * contiguousVec.size();
+    }
 
     void create_ker() override;
     void generate() override;
@@ -82,7 +90,7 @@ private:
     // 64b registers.
     RegistersPool::Reg<Xbyak::Reg64> regSrc;
     RegistersPool::Reg<Xbyak::Reg64> regDst[4];
-    RegistersPool::Reg<Xbyak::Reg64> regVecCounter;
+//    RegistersPool::Reg<Xbyak::Reg64> regVecCounter;
 //    RegistersPool::Reg<Xbyak::Reg64> regDst2;
 //    RegistersPool::Reg<Xbyak::Reg64> regDst3;
 //    RegistersPool::Reg<Xbyak::Reg64> regLeft;
@@ -100,20 +108,20 @@ private:
 //    RegistersPool::Reg<Vmm> vPermMask4;
     std::vector<RegistersPool::Reg<Vmm>> contiguousVec;
 
-    // Tail mask.
-    RegistersPool::Reg<Vmask> kTailMask;
+    // Masks
     RegistersPool::Reg<Vmask> kMask0;
     RegistersPool::Reg<Vmask> kMask1;
     RegistersPool::Reg<Vmask> kMaskMinLast;
     RegistersPool::Reg<Vmask> kMaskMaxFirst;
     RegistersPool::Reg<Vmask> kFirstElMask;
     RegistersPool::Reg<Vmask> kLastElMask;
+    RegistersPool::Reg<Vmask> kTailMask;
 
     void initVectors();
     void quickSort(const Xbyak::Reg64& rSrc);
     void partition();
     void process();
-    void sortContiguousVec();
+    void sortContiguousVec(const Xbyak::Reg64& regVecNum);
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask);
     void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
 //    void spatialLoop();
