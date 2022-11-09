@@ -133,6 +133,8 @@ void Unique::createPrimitive() {
 
     threadsNum = 1;//parallel_get_max_threads();
     execArgsPerThread.resize(threadsNum);
+    blockLen.resize(threadsNum);
+    vecNumInBlock.resize(threadsNum);
 //    if (!x64::mayiuse(x64::avx512_core)) {
 //        const auto dataElPerVec = kernel->getDataElPerVec();
 //        parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
@@ -163,8 +165,11 @@ void Unique::prepareParams() {
 
     const uint64_t dataElPerVec = kernel->getDataElPerVec();
     const auto& srcDataShape = dataMemPtr->getStaticDims();
-    const uint64_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
-    const uint64_t wpt = ((totalWork / dataElPerVec) / threadsNum + 1) * dataElPerVec;
+    const int64_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
+//    const int64_t wpt = ((totalWork / dataElPerVec) / threadsNum + 1) * dataElPerVec;
+//    const int64_t wpt = ((totalWork / kernel->getDataElPerBlock()) / threadsNum + 1) * kernel->getDataElPerBlock();
+    const int64_t blNum = (totalWork - 1) / kernel->getDataElPerBlock() + 1;
+    const int64_t wpt = blNum < threadsNum ? totalWork / blNum : totalWork / threadsNum;
 
     parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
         const uint64_t dstStart = std::min(wpt * ithr, totalWork);
@@ -182,6 +187,33 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
                 arg.dstPtr[i] = getChildEdgeAt(i)->getMemoryPtr()->GetPtr();
             }
         }
+
+std::string blockLenStr, vecNumInBlockStr;
+        if (arg.workAmount <= kernel->getDataElPerBlock()) {
+            arg.blocksNum = 1;
+            blockLen[ithr].resize(1, arg.workAmount);
+            vecNumInBlock[ithr].resize(1, blockLen[ithr][0] / kernel->getDataElPerVec() + (blockLen[ithr][0] % kernel->getDataElPerVec() != 0));
+blockLenStr += std::to_string(blockLen[ithr][0]) + "; ";
+vecNumInBlockStr += std::to_string(vecNumInBlock[ithr][0]) + "; ";
+        } else {
+            arg.blocksNum = arg.workAmount / kernel->getDataElPerBlock() + 1;
+            const auto minWork = arg.workAmount / arg.blocksNum;
+            auto restWork = arg.workAmount % arg.blocksNum;
+            blockLen[ithr].resize(arg.blocksNum, minWork);
+            vecNumInBlock[ithr].resize(arg.blocksNum);
+            for (int i = 0; restWork > 0; restWork--, i++) {
+                blockLen[ithr][i]++;
+            }
+            for (int i = 0; i < arg.blocksNum; i++) {
+                vecNumInBlock[ithr][i] = blockLen[ithr][i] / kernel->getDataElPerVec() + (blockLen[ithr][i] % kernel->getDataElPerVec() != 0);
+blockLenStr += std::to_string(blockLen[ithr][i]) + "; ";
+vecNumInBlockStr += std::to_string(vecNumInBlock[ithr][i]) + "; ";
+            }
+        }
+        arg.blockLen = blockLen[ithr].data();
+        arg.vecNumInBlock = vecNumInBlock[ithr].data();
+
+printf("[%d] blocksNum: %lu; blockLen {%s}; vecNumInBlock {%s}\n", ithr, arg.blocksNum, blockLenStr.c_str(), vecNumInBlockStr.c_str());
     });
 }
 
@@ -194,8 +226,10 @@ std::cout << "\nINPUT DATA: " << std::endl;
 int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 //int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-    if (i % kernel->getDataElPerVec() == 0)
+    if (i > 0 && i % 4 == 0)
         std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
     std::cout << srcDataF[i] << "; ";
 }
 std::cout << std::endl;
@@ -334,8 +368,10 @@ int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr
 //int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
 //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i % 4 == 0)
+    if (i > 0 && i % 4 == 0)
         std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
     std::cout << dstDataF[i] << "; ";
 //    std::cout << sorted[i] << "; ";
 }

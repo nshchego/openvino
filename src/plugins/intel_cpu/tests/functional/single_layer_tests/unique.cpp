@@ -212,7 +212,11 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
             { { {}, { {5, 5, 5} } } },     // Static shapes
 
 
-{ { {}, { {1, 3, 16} } } }     // Static shapes
+{ { {}, { {1, 3, 16} } } },     // Static shapes
+{ { {}, { {1, 3, 15} } } },     // Static shapes
+{ { {}, { {1, 16, 16} } } },     // Static shapes
+{ { {}, { {1, 16, 32} } } },     // Static shapes
+{ { {}, { {1, 20, 30} } } }     // Static shapes
         };
         result.insert(result.end(), tmp.begin(), tmp.end());
     }
