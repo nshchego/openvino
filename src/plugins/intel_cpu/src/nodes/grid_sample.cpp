@@ -19,6 +19,9 @@ using namespace ov::intel_cpu::node;
 
 bool GridSample::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
+        if (op->inputs()[1].get_element_type() == element::bf16) {
+            return false;
+        }
         if (!ov::is_type<op::v9::GridSample>(op)) {
             errorMessage = "Not supported GridSample operation version. CPU plug-in supports only 9th version.";
             return false;

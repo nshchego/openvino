@@ -172,7 +172,7 @@ std::vector<std::string> disabledTestPatterns() {
         // Reorder->GridSample->Reorder also does not work here. Potential fix is to use nearest conversion instead of truncation.
         R"(.*GridSampleLayerTestCPU.*(BILINEAR|BICUBIC).*(i32|i8).*)",
         // 94989. BF16 Reference produces different results.
-        R"(.*GridSampleLayerTestCPU.*(BILINEAR|BICUBIC).*gridPrc=bf16.*)"
+//        R"(.*GridSampleLayerTestCPU.*(BILINEAR|BICUBIC).*gridPrc=bf16.*)"
     };
 
 #define FIX_62820 0

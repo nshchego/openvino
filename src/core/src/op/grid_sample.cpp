@@ -101,6 +101,7 @@ bool evaluate(const HostTensorPtr& output,
     auto rc = true;
     switch (grid->get_element_type()) {
         GRID_SAMPLE_TYPE_CASE(f32, output, data, grid, attributes);
+        GRID_SAMPLE_TYPE_CASE(bf16, output, data, grid, attributes);
     default:
         rc = false;
         break;
@@ -132,6 +133,6 @@ bool op::v9::GridSample::evaluate(const HostTensorVector& outputs, const HostTen
 }
 
 bool op::v9::GridSample::has_evaluate() const {
-    return get_input_element_type(0) == element::f32 && get_input_element_type(1) == element::f32;
+    return get_input_element_type(0) == element::f32 && (get_input_element_type(1) == element::f32 || get_input_element_type(1) == element::bf16);
 }
 }  // namespace ov
