@@ -98,14 +98,11 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
 
     // Vector registers.
-//    RegistersPool::Reg<Vmm> vZeros;
-//    RegistersPool::Reg<Vmm> vOnesF;
     RegistersPool::Reg<Vmm> vInc;
     RegistersPool::Reg<Vmm> vSteps;
     RegistersPool::Reg<Vmm> vPermElem;
     RegistersPool::Reg<Vmm> vPermuted0;
     RegistersPool::Reg<Vmm> vPermuted1;
-//    RegistersPool::Reg<Vmm> vPermMask4;
     std::vector<RegistersPool::Reg<Vmm>> contiguousVec;
 
     // Masks
@@ -121,12 +118,9 @@ private:
     void quickSort(const Xbyak::Reg64& rSrc);
     void partition();
     void process();
-    void sortContiguousVec(const Xbyak::Reg64& regVecNum);
+    void sortContiguousVec(const Xbyak::Reg64& rBlockLen);
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask, bool tail = false);
     void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
-//    void spatialLoop();
-    void getCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
-    void getTailCoordinates(const Vmm& vHCoord, const Vmm& vWCoord);
     void interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
     void tail();
 
