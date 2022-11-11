@@ -14,7 +14,7 @@ namespace intel_cpu {
 
 template <x64::cpu_isa_t isa>
 UniqueKernel<isa>::UniqueKernel(const UniqueKernelConfParams& jcp) :
-        UniqueKernelBase(jcp) {
+        UniqueKernelBase(jit_name(), jcp) {
     vlen = x64::cpu_isa_traits<isa>::vlen;
     dataTypeSize = jcp.dataPrc.size();
     dataElPerVec = vlen / dataTypeSize;
@@ -97,51 +97,6 @@ void UniqueKernel<x64::avx512_core>::initVectors() {
     for (int i = 0; i < vecNum; i++) {
         contiguousVec.push_back(getVmm());
     }
-
-//    if (one_of(jcp.interpolationMode, InterpolationMode::BICUBIC, InterpolationMode::BILINEAR)) {
-//        vOnesF = getVmm();
-//        mov(r32Aux, 0x3f800000); // 1.f
-//        vpbroadcastd(vOnesF, r32Aux);
-//    }
-//
-//    static const unsigned gridPermMask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
-//    mov(rAux, reinterpret_cast<uintptr_t>(gridPermMask));
-//    vGridPermMask = getVmm();
-//    uni_vmovups(vGridPermMask, ptr[rAux]);
-//
-//    if (jcp.paddingMode == PaddingMode::ZEROS) {
-//        vDataTypeSizeB = getVmm();
-//        mov(rAux, dataTypeSize);
-//        vpbroadcastd(vDataTypeSizeB, r32Aux);
-//        vSrcWidthB = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcWidthB)]);
-//        uni_vpbroadcastd(vSrcWidthB, ptr[rAux]);
-//    } else if (jcp.paddingMode == PaddingMode::BORDER) {
-//        vSrcHeightSub1F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcHeightSub1F)]);
-//        uni_vpbroadcastd(vSrcHeightSub1F, ptr[rAux]);
-//        vSrcWidthSub1F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcWidthSub1F)]);
-//        uni_vpbroadcastd(vSrcWidthSub1F, ptr[rAux]);
-//    } else if (jcp.paddingMode == PaddingMode::REFLECTION) {
-//        vSrcHeightMul2F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcHeightMul2F)]);
-//        uni_vpbroadcastd(vSrcHeightMul2F, ptr[rAux]);
-//        vSrcWidthMul2F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2F)]);
-//        uni_vpbroadcastd(vSrcWidthMul2F, ptr[rAux]);
-//        vSrcHeightMul2Sub1F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcHeightMul2Sub1F)]);
-//        uni_vpbroadcastd(vSrcHeightMul2Sub1F, ptr[rAux]);
-//        vSrcWidthMul2Sub1F = getVmm();
-//        mov(rAux, ptr[regParams + GET_OFF(srcWidthMul2Sub1F)]);
-//        uni_vpbroadcastd(vSrcWidthMul2Sub1F, ptr[rAux]);
-//        if (jcp.alignCorners) {
-//            vAbsMask = getVmm();
-//            mov(r32Aux, 0x7fffffff);
-//            vpbroadcastd(vAbsMask, r32Aux);
-//        }
-//    }
 }
 
 template <x64::cpu_isa_t isa>
@@ -627,27 +582,34 @@ void UniqueKernel<x64::avx512_core>::sortInBlocks() {
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::sortInBlocks() {
 
-        }
+}
 
 // Gather samples { w/Nb + j*W, 2*w/Nb + j*w, ... , (Np - 1)*w/Np + j*w },
 // where W - total kernel's work, Nb - blocks num, w = W/Nb, 0 <= j < Nb.
 template <>
 void UniqueKernel<x64::avx512_core>::gatherSamples1() {
-    Xbyak::Label lFinishLoad, lEnd;
-    auto rSrcPtr = getReg64();
-    mov(rSrcPtr,  ptr[regParams + GET_OFF(dstPtr[UNIQUE_DATA])]);
+    Xbyak::Label lInBlock, lInMemory, lFinishLoad, lEnd;
+    auto rSrcPtr     = getReg64();
+    auto rSrcPtrStep = getReg64();
+    mov(rSrcPtr,      ptr[regParams + GET_OFF(dstPtr[UNIQUE_DATA])]);
+    mov(rSrcPtrStep,  ptr[regParams + GET_OFF(samples1Step)]);
 
     auto vSrcShift   = getVmm();
-    auto vShiftShift = getVmm();
+//    auto vShiftShift = getVmm();
     auto rSamplesLen = getReg64();
 
     mov(rSamplesLen, ptr[regParams + GET_OFF(samples1Len)]);
-    uni_vmovups(vSrcShift, ptr[samples1Shift]);
-    uni_vmovups(vShiftShift, ptr[samplesShiftShift]);
+    uni_vmovups(vSrcShift, ptr[regParams + GET_OFF(samples1Shift)]);
+//    uni_vmovups(vShiftShift, ptr[regParams + GET_OFF(samples1Len)]);
+//    mov(rMask, 0xFFFFFFFF);
+//    kmovw(kTailMask, rMask);
 
     // If samples num <= block size, sort in block.
     // If samples num > block size, sort in memory.
     // Load to contiguous vector.
+    cmp(rSamplesLen, contiguousVec.size() * dataElPerVec);
+    jg(lInMemory, T_NEAR);
+
     for (int v = 0; v < contiguousVec.size(); v++) {
         Xbyak::Label lLoadNext, lLoadTail;
         cmp(rSamplesLen, dataElPerVec * (v + 1));
@@ -655,9 +617,9 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
 
         const auto& vec = contiguousVec[v];
         gatherdd(vec, rSrcPtr, vSrcShift, kTailMask, false);
-        uni_vpaddd(vSrcShift, vSrcShift, vShiftShift);
+//        uni_vpaddd(vSrcShift, vSrcShift, vShiftShift);
 
-        add(regSrc, vlen);
+        add(rSrcPtr, rSrcPtrStep);
         jmp(lLoadNext, T_NEAR);
 
         L(lLoadTail);
@@ -665,14 +627,10 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
             cmp(rSamplesLen, dataElPerVec * v);
             je(lFinishLoad, T_NEAR);
 
-            auto rRest = getReg64();
-            mov(rRest, rSamplesLen);
-            sub(rRest, dataElPerVec * v);
-            fillRestWorkMask(kTailMask, rRest, dataTypeSize);
-            uni_vmovups((Vmm)vec | kTailMask, ptr[regSrc]);
-//            imul(rRest, rRest, dataTypeSize);
-//            add(regSrc, rRest);
-//            jmp(lFinishLoad, T_NEAR);
+            sub(rSamplesLen, dataElPerVec * v);
+            fillRestWorkMask(kTailMask, rSamplesLen, dataTypeSize);
+            uni_vmovups((Vmm)vec | kTailMask, ptr[rSrcPtr]);
+            jmp(lFinishLoad, T_NEAR);
         }
 
         L(lLoadNext);
@@ -680,6 +638,10 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
     L(lFinishLoad);
 
     sortContiguousVec(rSamplesLen);
+    jmp(lEnd, T_NEAR);
+
+    L(lInMemory);
+    // TODO: Implement in memory.
 
     L(lEnd);
 }
@@ -689,54 +651,8 @@ void UniqueKernel<isa>::gatherSamples1() {
 
 }
 
-//template <x64::cpu_isa_t isa>
-//void UniqueKernel<isa>::spatialLoop() {
-//    auto vHCoord = getVmm();
-//    auto vWCoord = getVmm();
-//
-//    Xbyak::Label lSpacialLoop, lTail;
-//    L(lSpacialLoop);
-//    {
-//        cmp(regWorkAmount, dataElPerVec);
-//        jl(lTail, T_NEAR);
-//
-//        getCoordinates(vHCoord, vWCoord);
-////        interpolation(vWCoord, vHCoord);
-//
-//        sub(regWorkAmount, dataElPerVec);
-//        add(regDst, vlen);
-//
-//        jmp(lSpacialLoop, T_NEAR);
-//    }
-//
-//    L(lTail);
-//    vHCoord.release();
-//    vWCoord.release();
-//    tail();
-//}
-
-template <x64::cpu_isa_t isa>
-void UniqueKernel<isa>::tail() {
-//    Xbyak::Label lEnd;
-//    cmp(regWorkAmount, 0);
-//    jle(lEnd, T_NEAR);
-//
-//    auto vHCoord = getVmm();
-//    auto vWCoord = getVmm();
-//
-////    getTailCoordinates(vHCoord, vWCoord);
-//
-//    if (dataTypeSize > 1)
-//        sal(regWorkAmount, dataTypeShift); // Multiply by source data type size.
-//    add(regDst, regWorkAmount);
-//
-//    L(lEnd);
-}
-
-
 template class UniqueKernel<x64::avx512_core>;
 template class UniqueKernel<x64::avx2>;
-template class UniqueKernel<x64::avx>;
 template class UniqueKernel<x64::sse41>;
 
 }   // namespace intel_cpu
