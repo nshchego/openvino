@@ -134,7 +134,8 @@ void Unique::createPrimitive() {
     threadsNum = 1;//parallel_get_max_threads();
     execArgsPerThread.resize(threadsNum);
     blockLen.resize(threadsNum);
-    vecNumInBlock.resize(threadsNum);
+    samples1.resize(threadsNum);
+    samples2.resize(threadsNum);
 //    if (!x64::mayiuse(x64::avx512_core)) {
 //        const auto dataElPerVec = kernel->getDataElPerVec();
 //        parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
@@ -163,11 +164,9 @@ void Unique::prepareParams() {
         THROW_ERROR << " has unidentified preferable primitive descriptor.";
     }
 
-    const uint64_t dataElPerVec = kernel->getDataElPerVec();
+//    const uint64_t dataElPerVec = kernel->getDataElPerVec();
     const auto& srcDataShape = dataMemPtr->getStaticDims();
     const int64_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
-//    const int64_t wpt = ((totalWork / dataElPerVec) / threadsNum + 1) * dataElPerVec;
-//    const int64_t wpt = ((totalWork / kernel->getDataElPerBlock()) / threadsNum + 1) * kernel->getDataElPerBlock();
     const int64_t blNum = (totalWork - 1) / kernel->getDataElPerBlock() + 1;
     const int64_t wpt = blNum < threadsNum ? totalWork / blNum : totalWork / threadsNum;
 
@@ -188,32 +187,43 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
             }
         }
 
-std::string blockLenStr, vecNumInBlockStr;
+std::string blockLenStr;
         if (arg.workAmount <= kernel->getDataElPerBlock()) {
             arg.blocksNum = 1;
             blockLen[ithr].resize(1, arg.workAmount);
-            vecNumInBlock[ithr].resize(1, blockLen[ithr][0] / kernel->getDataElPerVec() + (blockLen[ithr][0] % kernel->getDataElPerVec() != 0));
 blockLenStr += std::to_string(blockLen[ithr][0]) + "; ";
-vecNumInBlockStr += std::to_string(vecNumInBlock[ithr][0]) + "; ";
         } else {
             arg.blocksNum = arg.workAmount / kernel->getDataElPerBlock() + 1;
+
             const auto minWork = arg.workAmount / arg.blocksNum;
             auto restWork = arg.workAmount % arg.blocksNum;
             blockLen[ithr].resize(arg.blocksNum, minWork);
-            vecNumInBlock[ithr].resize(arg.blocksNum);
             for (int i = 0; restWork > 0; restWork--, i++) {
                 blockLen[ithr][i]++;
             }
-            for (int i = 0; i < arg.blocksNum; i++) {
-                vecNumInBlock[ithr][i] = blockLen[ithr][i] / kernel->getDataElPerVec() + (blockLen[ithr][i] % kernel->getDataElPerVec() != 0);
+for (int i = 0; i < arg.blocksNum; i++) {
 blockLenStr += std::to_string(blockLen[ithr][i]) + "; ";
-vecNumInBlockStr += std::to_string(vecNumInBlock[ithr][i]) + "; ";
+}
+            arg.samples1Len = arg.blocksNum * (arg.blocksNum - 1);
+            if (arg.samples1Len > kernel->getDataElPerBlock()) {
+                samples1[ithr].resize(arg.samples1Len);
+                arg.samples1Ptr = samples1[ithr].data();
             }
+            const auto samples2Len = arg.blocksNum - 1;
+            if (samples2Len > kernel->getDataElPerBlock()) {
+                samples2[ithr].resize(samples2Len);
+                arg.samples2Ptr = samples2[ithr].data();
+            }
+            samples1Shift.resize(kernel->getDataElPerVec());
+            samples1Shift[0] = blockLen[ithr][0] / arg.blocksNum;
+            for (int i = 1; i < kernel->getDataElPerVec() - 1; i++) {
+                samples1Shift[i] = samples1Shift[0] * (i + 1);
+            }
+            arg.samples1Shift = samples1Shift.data();
         }
         arg.blockLen = blockLen[ithr].data();
-        arg.vecNumInBlock = vecNumInBlock[ithr].data();
 
-printf("[%d] blocksNum: %lu; blockLen {%s}; vecNumInBlock {%s}\n", ithr, arg.blocksNum, blockLenStr.c_str(), vecNumInBlockStr.c_str());
+printf("[%d] blocksNum: %lu; blockLen {%s}\n", ithr, arg.blocksNum, blockLenStr.c_str());
     });
 }
 
