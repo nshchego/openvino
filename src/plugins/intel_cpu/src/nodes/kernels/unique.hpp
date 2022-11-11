@@ -33,7 +33,10 @@ struct UniqueKernelExecArgs {
     int64_t workAmount = 0lu;
     int64_t blocksNum  = 1lu;
     int64_t* blockLen;
-    int64_t* vecNumInBlock;
+    int32_t* samples1Ptr;
+    int32_t* samples2Ptr;
+    int64_t samples1Len = 0lu;
+    int32_t* samples1Shift;
 };
 
 class UniqueKernelBase: public JitKernelBase {
@@ -115,14 +118,14 @@ private:
     RegistersPool::Reg<Vmask> kTailMask;
 
     void initVectors();
-    void quickSort(const Xbyak::Reg64& rSrc);
-    void partition();
     void process();
+    void sortInBlocks();
     void sortContiguousVec(const Xbyak::Reg64& rBlockLen);
+    void gatherSamples1();
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask, bool tail = false);
     void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
-    void interpolation(const Vmm& vWCoord, const Vmm& vHCoord, bool tail = false);
-    void tail();
+    void quickSort(const Xbyak::Reg64& rSrc);
+    void partition();
 
     // Aux
     void alignTailMask(const Vmask& kDst, const Vmask& kSrc, bool even);
