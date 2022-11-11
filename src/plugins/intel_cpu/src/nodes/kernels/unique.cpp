@@ -37,16 +37,16 @@ void UniqueKernel<isa>::generate() {
     this->preamble();
     registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
-    regSrc = getReg64();
-    mov(regSrc,  ptr[regParams + GET_OFF(srcPtr)]);
+//    regSrc = getReg64();
+//    mov(regSrc,  ptr[regParams + GET_OFF(srcPtr)]);
 
 //    for (int i = 0; i < 3; i++) {
-    for (int i = 0; i < 4; i++) {
-        if (jcp.definedOutputs[i]) {
-            regDst[i] = getReg64();
-            mov(regDst[i],  ptr[regParams + GET_OFF(dstPtr[i])]);
-        }
-    }
+//    for (int i = 0; i < 4; i++) {
+//        if (jcp.definedOutputs[i]) {
+//            regDst[i] = getReg64();
+//            mov(regDst[i],  ptr[regParams + GET_OFF(dstPtr[i])]);
+//        }
+//    }
 
     initVectors();
     process();
@@ -332,102 +332,12 @@ void UniqueKernel<isa>::partition() {
 
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::process() {
-    Xbyak::Label lLoop, lFinishLoad, lFinishStore, lTail;
-    const auto& rDstSorted = regDst[UNIQUE_DATA];
+    sortInBlocks();
+    gatherSamples1();
 
-    auto rBlocksNum   = getReg64();
-    auto rBlockLenPtr = getReg64();
-    auto rBlockLen    = getReg64();
+    // Sort samples.
 
-    mov(rBlocksNum,   ptr[regParams + GET_OFF(blocksNum)]);
-    mov(rBlockLenPtr, ptr[regParams + GET_OFF(blockLen)]);
-
-    // SORT IN BLOCKS
-    // Loop over contiguous vectors.
-    L(lLoop);
-    {
-        cmp(rBlocksNum, 0);
-        jle(lTail, T_NEAR);
-
-        // Load to contiguous vector.
-        mov(rBlockLen, ptr[rBlockLenPtr]);
-        for (int v = 0; v < contiguousVec.size(); v++) {
-            Xbyak::Label lLoadNext, lLoadTail;
-            cmp(rBlockLen, dataElPerVec * (v + 1));
-            jl(lLoadTail, T_NEAR);
-
-            const auto& vec = contiguousVec[v];
-            uni_vmovups(vec, ptr[regSrc]);
-
-            add(regSrc, vlen);
-            jmp(lLoadNext, T_NEAR);
-
-            L(lLoadTail);
-            {
-                cmp(rBlockLen, dataElPerVec * v);
-                je(lFinishLoad, T_NEAR);
-
-                auto rRest = getReg64();
-                mov(rRest, rBlockLen);
-                sub(rRest, dataElPerVec * v);
-                fillRestWorkMask(Xbyak::Opmask(kTailMask.getIdx()), rRest, dataTypeSize);
-                uni_vmovups((Vmm) vec | Xbyak::Opmask(kTailMask.getIdx()), ptr[regSrc]);
-                imul(rRest, rRest, dataTypeSize);
-                add(regSrc, rRest);
-                jmp(lFinishLoad, T_NEAR);
-            }
-
-            L(lLoadNext);
-        }
-        L(lFinishLoad);
-
-        sortContiguousVec(rBlockLen);
-
-        // Store from contiguous vector.
-        // TODO: Optimization. Do unique search without storing if all work is fitted into one block.
-        for (int v = 0; v < contiguousVec.size(); v++) {
-            Xbyak::Label lStoreNext, lStoreTail;
-            cmp(rBlockLen, dataElPerVec * (v + 1));
-            jl(lStoreTail, T_NEAR);
-
-            const auto& vec = contiguousVec[v];
-            uni_vmovups(ptr[rDstSorted], vec);
-
-            add(rDstSorted, vlen);
-            jmp(lStoreNext, T_NEAR);
-
-            L(lStoreTail);
-            {
-                cmp(rBlockLen, dataElPerVec * v);
-                je(lFinishStore, T_NEAR);
-
-                uni_vmovups(ptr[rDstSorted] | Xbyak::Opmask(kTailMask.getIdx()), vec);
-                sub(rBlockLen, dataElPerVec * v);
-                imul(rBlockLen, rBlockLen, dataTypeSize);
-                add(rDstSorted, rBlockLen);
-                jmp(lFinishStore, T_NEAR);
-            }
-
-            L(lStoreNext);
-        }
-        L(lFinishStore);
-        // ALL BLOCKS SORTED
-
-        // Gather samples { w/Nb + j*W, 2*w/Nb + j*w, ... , (Np - 1)*w/Np + j*w },
-        // where W - total kernel's work, Nb - blocks num, w = W/Nb, 0 <= j < Nb.
-
-
-        // Sort samples.
-
-        // Gather samples { Nb/2, Nb + Nb/2, ... , (Nb - 2)*p + p/2 },
-
-        dec(rBlocksNum);
-        add(rBlockLenPtr, sizeof(int64_t));
-        jmp(lLoop, T_NEAR);
-    }
-
-    L(lTail);
-    tail();
+    // Gather samples { Nb/2, Nb + Nb/2, ... , (Nb - 2)*p + p/2 },
 }
 
 template <>
@@ -617,6 +527,165 @@ void UniqueKernel<x64::avx512_core>::sortContiguousVec(const Xbyak::Reg64& rBloc
 
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::sortContiguousVec(const Xbyak::Reg64& regVecNum) {
+
+}
+
+template <>
+void UniqueKernel<x64::avx512_core>::sortInBlocks() {
+    Xbyak::Label lBlocksLoop, lFinishLoad, lFinishStore, lEnd;
+    auto rSrcPtr = getReg64();
+    auto rDstPtr = getReg64();
+    mov(rSrcPtr,  ptr[regParams + GET_OFF(srcPtr)]);
+    mov(rDstPtr,  ptr[regParams + GET_OFF(dstPtr[UNIQUE_DATA])]);
+
+    auto rBlocksNum   = getReg64();
+    auto rBlockLenPtr = getReg64();
+    auto rBlockLen    = getReg64();
+
+    mov(rBlocksNum,   ptr[regParams + GET_OFF(blocksNum)]);
+    mov(rBlockLenPtr, ptr[regParams + GET_OFF(blockLen)]);
+
+    // SORT IN BLOCKS
+    // Loop over contiguous vectors.
+    L(lBlocksLoop);
+    {
+        cmp(rBlocksNum, 0);
+        jle(lEnd, T_NEAR);
+
+        // Load to contiguous vector.
+        mov(rBlockLen, ptr[rBlockLenPtr]);
+        for (int v = 0; v < contiguousVec.size(); v++) {
+            Xbyak::Label lLoadNext, lLoadTail;
+            cmp(rBlockLen, dataElPerVec * (v + 1));
+            jl(lLoadTail, T_NEAR);
+
+            const auto& vec = contiguousVec[v];
+            uni_vmovups(vec, ptr[rSrcPtr]);
+
+            add(rSrcPtr, vlen);
+            jmp(lLoadNext, T_NEAR);
+
+            L(lLoadTail);
+            {
+                cmp(rBlockLen, dataElPerVec * v);
+                je(lFinishLoad, T_NEAR);
+
+                auto rRest = getReg64();
+                mov(rRest, rBlockLen);
+                sub(rRest, dataElPerVec * v);
+                fillRestWorkMask(kTailMask, rRest, dataTypeSize);
+                uni_vmovups((Vmm) vec | kTailMask, ptr[rSrcPtr]);
+                imul(rRest, rRest, dataTypeSize);
+                add(rSrcPtr, rRest);
+                jmp(lFinishLoad, T_NEAR);
+            }
+
+            L(lLoadNext);
+        }
+        L(lFinishLoad);
+
+        sortContiguousVec(rBlockLen);
+
+        // Store from contiguous vector.
+        // TODO: Optimization. Do unique search without storing if all work is fitted into one block.
+        for (int v = 0; v < contiguousVec.size(); v++) {
+            Xbyak::Label lStoreNext, lStoreTail;
+            cmp(rBlockLen, dataElPerVec * (v + 1));
+            jl(lStoreTail, T_NEAR);
+
+            const auto& vec = contiguousVec[v];
+            uni_vmovups(ptr[rDstPtr], vec);
+
+            add(rDstPtr, vlen);
+            jmp(lStoreNext, T_NEAR);
+
+            L(lStoreTail);
+            {
+                cmp(rBlockLen, dataElPerVec * v);
+                je(lFinishStore, T_NEAR);
+
+                uni_vmovups(ptr[rDstPtr] | kTailMask, vec);
+                sub(rBlockLen, dataElPerVec * v);
+                imul(rBlockLen, rBlockLen, dataTypeSize);
+                add(rDstPtr, rBlockLen);
+                jmp(lFinishStore, T_NEAR);
+            }
+
+            L(lStoreNext);
+        }
+        L(lFinishStore);
+
+        dec(rBlocksNum);
+        add(rBlockLenPtr, sizeof(int64_t));
+        jmp(lBlocksLoop, T_NEAR);
+    }
+    // ALL BLOCKS SORTED
+
+    L(lEnd);
+}
+
+template <x64::cpu_isa_t isa>
+void UniqueKernel<isa>::sortInBlocks() {
+
+        }
+
+// Gather samples { w/Nb + j*W, 2*w/Nb + j*w, ... , (Np - 1)*w/Np + j*w },
+// where W - total kernel's work, Nb - blocks num, w = W/Nb, 0 <= j < Nb.
+template <>
+void UniqueKernel<x64::avx512_core>::gatherSamples1() {
+    Xbyak::Label lFinishLoad, lEnd;
+    auto rSrcPtr = getReg64();
+    mov(rSrcPtr,  ptr[regParams + GET_OFF(dstPtr[UNIQUE_DATA])]);
+
+    auto vSrcShift   = getVmm();
+    auto vShiftShift = getVmm();
+    auto rSamplesLen = getReg64();
+
+    mov(rSamplesLen, ptr[regParams + GET_OFF(samples1Len)]);
+    uni_vmovups(vSrcShift, ptr[samples1Shift]);
+    uni_vmovups(vShiftShift, ptr[samplesShiftShift]);
+
+    // If samples num <= block size, sort in block.
+    // If samples num > block size, sort in memory.
+    // Load to contiguous vector.
+    for (int v = 0; v < contiguousVec.size(); v++) {
+        Xbyak::Label lLoadNext, lLoadTail;
+        cmp(rSamplesLen, dataElPerVec * (v + 1));
+        jl(lLoadTail, T_NEAR);
+
+        const auto& vec = contiguousVec[v];
+        gatherdd(vec, rSrcPtr, vSrcShift, kTailMask, false);
+        uni_vpaddd(vSrcShift, vSrcShift, vShiftShift);
+
+        add(regSrc, vlen);
+        jmp(lLoadNext, T_NEAR);
+
+        L(lLoadTail);
+        {
+            cmp(rSamplesLen, dataElPerVec * v);
+            je(lFinishLoad, T_NEAR);
+
+            auto rRest = getReg64();
+            mov(rRest, rSamplesLen);
+            sub(rRest, dataElPerVec * v);
+            fillRestWorkMask(kTailMask, rRest, dataTypeSize);
+            uni_vmovups((Vmm)vec | kTailMask, ptr[regSrc]);
+//            imul(rRest, rRest, dataTypeSize);
+//            add(regSrc, rRest);
+//            jmp(lFinishLoad, T_NEAR);
+        }
+
+        L(lLoadNext);
+    }
+    L(lFinishLoad);
+
+    sortContiguousVec(rSamplesLen);
+
+    L(lEnd);
+}
+
+template <x64::cpu_isa_t isa>
+void UniqueKernel<isa>::gatherSamples1() {
 
 }
 

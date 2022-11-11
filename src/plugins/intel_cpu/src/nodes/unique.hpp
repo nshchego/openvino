@@ -36,9 +36,13 @@ private:
     void slicedTensorExec();
 
     std::vector<std::vector<int64_t>> blockLen;
-    std::vector<std::vector<int64_t>> vecNumInBlock;
+    std::vector<std::vector<int32_t>> samples1;
+    std::vector<std::vector<int32_t>> samples2;
+    std::vector<int32_t> samples1Shift;
 
     UniqueKernelConfParams jcp;
+    // TODO: Try to create per thread kernels in static case.
+    // std::vector<std::shared_ptr<UniqueKernelBase>> kernels;
     std::shared_ptr<UniqueKernelBase> kernel;
 
 //    bool sorted    = false;
