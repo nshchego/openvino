@@ -35,8 +35,9 @@ struct UniqueKernelExecArgs {
     int64_t* blockLen;
     int32_t* samples1Ptr;
     int32_t* samples2Ptr;
-    int64_t samples1Len = 0lu;
+    int64_t  samples1Len = 0lu;
     int32_t* samples1Shift;
+    int64_t  samples1Step = 0lu;
 };
 
 class UniqueKernelBase: public JitKernelBase {
@@ -46,7 +47,7 @@ public:
         assert(ker_);
         ker_(args);
     }
-    explicit UniqueKernelBase(const UniqueKernelConfParams& jcp) : ker_(nullptr), jcp(jcp) {}
+    explicit UniqueKernelBase(const char* name, const UniqueKernelConfParams& jcp) : JitKernelBase(name), ker_(nullptr), jcp(jcp) {}
 
     virtual void create_ker() = 0;
     uint64_t getVecLen() {
@@ -91,14 +92,14 @@ private:
 
     // Suffix "B" means "In Bytes", "F" - float.
     // 64b registers.
-    RegistersPool::Reg<Xbyak::Reg64> regSrc;
-    RegistersPool::Reg<Xbyak::Reg64> regDst[4];
+//    RegistersPool::Reg<Xbyak::Reg64> regSrc;
+//    RegistersPool::Reg<Xbyak::Reg64> regDst[4];
 //    RegistersPool::Reg<Xbyak::Reg64> regVecCounter;
 //    RegistersPool::Reg<Xbyak::Reg64> regDst2;
 //    RegistersPool::Reg<Xbyak::Reg64> regDst3;
 //    RegistersPool::Reg<Xbyak::Reg64> regLeft;
 //    RegistersPool::Reg<Xbyak::Reg64> regRight;
-    RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
+//    RegistersPool::Reg<Xbyak::Reg64> regWorkAmount;
 
     // Vector registers.
     RegistersPool::Reg<Vmm> vInc;

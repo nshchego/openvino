@@ -89,9 +89,9 @@ void Unique::initSupportedPrimitiveDescriptors() {
     }
     std::vector<PortConfigurator> outPortConfigs;
     for (int i = 0; i < 4; i++) {
-        if (jcp.definedOutputs[i]) {
+//        if (jcp.definedOutputs[i]) {
             outPortConfigs.push_back({LayoutType::ncsp, i == 0 ? jcp.dataPrc : axisPrecision});
-        }
+//        }
     }
 
     addSupportedPrimDesc(inPortConfigs, outPortConfigs, implType, isDynamicNode());
@@ -121,8 +121,6 @@ void Unique::createPrimitive() {
         kernel.reset(new UniqueKernel<x64::avx512_core>(jcp));
     } else if (x64::mayiuse(x64::avx2)) {
         kernel.reset(new UniqueKernel<x64::avx2>(jcp));
-    } else if (x64::mayiuse(x64::avx)) {
-        kernel.reset(new UniqueKernel<x64::avx>(jcp));
     } else if (x64::mayiuse(x64::sse41)) {
         kernel.reset(new UniqueKernel<x64::sse41>(jcp));
     }
@@ -220,6 +218,7 @@ blockLenStr += std::to_string(blockLen[ithr][i]) + "; ";
                 samples1Shift[i] = samples1Shift[0] * (i + 1);
             }
             arg.samples1Shift = samples1Shift.data();
+            arg.samples1Step = samples1Shift[0] * kernel->getDataElPerVec();
         }
         arg.blockLen = blockLen[ithr].data();
 
