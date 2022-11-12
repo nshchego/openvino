@@ -36,9 +36,9 @@ private:
     void slicedTensorExec();
 
     std::vector<std::vector<int64_t>> blockLen;
-    std::vector<std::vector<int32_t>> samples1;
-    std::vector<std::vector<int32_t>> samples2;
-    std::vector<int32_t> samples1Shift;
+    std::vector<std::vector<int32_t>> samples;
+    std::vector<std::vector<int32_t>> pivots;
+    std::vector<std::vector<int32_t>> samplesIdx;
 
     UniqueKernelConfParams jcp;
     // TODO: Try to create per thread kernels in static case.
@@ -49,7 +49,7 @@ private:
 //    bool flattened = true;
 //    int axis = 0;
 //    bool definedOutputs[4] = { false, false, false, false };
-//    uint64_t dataTypeSize = 1lu;
+    int64_t dataTypeSize = 1lu;
 //    InferenceEngine::Precision dataPrecision;
 
     int threadsNum = 1;

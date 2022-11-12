@@ -288,11 +288,17 @@ void UniqueKernel<isa>::partition() {
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::process() {
     sortInBlocks();
-    gatherSamples1();
 
-    // Sort samples.
+    Xbyak::Label lEnd;
+    auto rBlocksNum = getReg64();
+    mov(rBlocksNum,  ptr[regParams + GET_OFF(blocksNum)]);
+    cmp(rBlocksNum, 1);
+    je(lEnd, T_NEAR);
 
-    // Gather samples { Nb/2, Nb + Nb/2, ... , (Nb - 2)*p + p/2 },
+    gatherSamples();
+    gatherPivots();
+
+    L(lEnd);
 }
 
 template <>
@@ -316,7 +322,7 @@ void UniqueKernel<x64::avx512_core>::alignTailMask(const Vmask& kDst, const Vmas
 template <x64::cpu_isa_t isa>
 void UniqueKernel<isa>::alignTailMask(const Vmask& kDst, const Vmask& kSrc, bool even) {
 
-        }
+}
 
 template <>
 void UniqueKernel<x64::avx512_core>::cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask, bool tail) {
@@ -587,19 +593,20 @@ void UniqueKernel<isa>::sortInBlocks() {
 // Gather samples { w/Nb + j*W, 2*w/Nb + j*w, ... , (Np - 1)*w/Np + j*w },
 // where W - total kernel's work, Nb - blocks num, w = W/Nb, 0 <= j < Nb.
 template <>
-void UniqueKernel<x64::avx512_core>::gatherSamples1() {
+void UniqueKernel<x64::avx512_core>::gatherSamples() {
     Xbyak::Label lInBlock, lInMemory, lFinishLoad, lEnd;
     auto rSrcPtr     = getReg64();
     auto rSrcPtrStep = getReg64();
     mov(rSrcPtr,      ptr[regParams + GET_OFF(dstPtr[UNIQUE_DATA])]);
-    mov(rSrcPtrStep,  ptr[regParams + GET_OFF(samples1Step)]);
+    mov(rSrcPtrStep,  ptr[regParams + GET_OFF(samplesIdxStep)]);
 
-    auto vSrcShift   = getVmm();
+    auto vSrcIdx   = getVmm();
 //    auto vShiftShift = getVmm();
     auto rSamplesLen = getReg64();
 
-    mov(rSamplesLen, ptr[regParams + GET_OFF(samples1Len)]);
-    uni_vmovups(vSrcShift, ptr[regParams + GET_OFF(samples1Shift)]);
+    mov(rSamplesLen, ptr[regParams + GET_OFF(samplesIdxPtr)]);
+    uni_vmovups(vSrcIdx, ptr[rSamplesLen]);
+    mov(rSamplesLen, ptr[regParams + GET_OFF(samplesLen)]);
 //    uni_vmovups(vShiftShift, ptr[regParams + GET_OFF(samples1Len)]);
 //    mov(rMask, 0xFFFFFFFF);
 //    kmovw(kTailMask, rMask);
@@ -616,8 +623,8 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
         jl(lLoadTail, T_NEAR);
 
         const auto& vec = contiguousVec[v];
-        gatherdd(vec, rSrcPtr, vSrcShift, kTailMask, false);
-//        uni_vpaddd(vSrcShift, vSrcShift, vShiftShift);
+//        gatherdd(vec, rSrcPtr, vSrcIdx, kTailMask, false);
+//        uni_vpaddd(vSrcIdx, vSrcIdx, vShiftShift);
 
         add(rSrcPtr, rSrcPtrStep);
         jmp(lLoadNext, T_NEAR);
@@ -627,9 +634,12 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
             cmp(rSamplesLen, dataElPerVec * v);
             je(lFinishLoad, T_NEAR);
 
-            sub(rSamplesLen, dataElPerVec * v);
-            fillRestWorkMask(kTailMask, rSamplesLen, dataTypeSize);
-            uni_vmovups((Vmm)vec | kTailMask, ptr[rSrcPtr]);
+            auto rRest = getReg64();
+            mov(rRest, rSamplesLen);
+            sub(rRest, dataElPerVec * v);
+            fillRestWorkMask(kTailMask, rRest, dataTypeSize);
+            kmovq(k0, kTailMask);
+            gatherdd(vec, rSrcPtr, vSrcIdx, kTailMask, true);
             jmp(lFinishLoad, T_NEAR);
         }
 
@@ -637,7 +647,15 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
     }
     L(lFinishLoad);
 
+    kmovq(kTailMask, k0);
     sortContiguousVec(rSamplesLen);
+
+    // TODO: Do not store first Samples. Gather from registers.
+mov(rSrcPtrStep,  ptr[regParams + GET_OFF(samplesPtr)]);
+uni_vmovups(ptr[rSrcPtrStep], contiguousVec[0]);
+//vpbroadcastmw2d(vSrcIdx, kTailMask);
+//uni_vmovups(ptr[rSrcPtrStep], vSrcIdx);
+
     jmp(lEnd, T_NEAR);
 
     L(lInMemory);
@@ -647,7 +665,17 @@ void UniqueKernel<x64::avx512_core>::gatherSamples1() {
 }
 
 template <x64::cpu_isa_t isa>
-void UniqueKernel<isa>::gatherSamples1() {
+void UniqueKernel<isa>::gatherSamples() {
+
+}
+
+template <>
+void UniqueKernel<x64::avx512_core>::gatherPivots() {
+
+}
+
+template <x64::cpu_isa_t isa>
+void UniqueKernel<isa>::gatherPivots() {
 
 }
 
