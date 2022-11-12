@@ -33,11 +33,11 @@ struct UniqueKernelExecArgs {
     int64_t workAmount = 0lu;
     int64_t blocksNum  = 1lu;
     int64_t* blockLen;
-    int32_t* samples1Ptr;
-    int32_t* samples2Ptr;
-    int64_t  samples1Len = 0lu;
-    int32_t* samples1Shift;
-    int64_t  samples1Step = 0lu;
+    int32_t* samplesPtr;
+    int32_t* pivotsPtr;
+    int64_t  samplesLen = 0lu;
+    int32_t* samplesIdxPtr;
+    int64_t  samplesIdxStep = 0lu;
 };
 
 class UniqueKernelBase: public JitKernelBase {
@@ -122,7 +122,8 @@ private:
     void process();
     void sortInBlocks();
     void sortContiguousVec(const Xbyak::Reg64& rBlockLen);
-    void gatherSamples1();
+    void gatherSamples();
+    void gatherPivots();
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask, bool tail = false);
     void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
     void quickSort(const Xbyak::Reg64& rSrc);

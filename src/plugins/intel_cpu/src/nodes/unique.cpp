@@ -72,6 +72,7 @@ void Unique::initSupportedPrimitiveDescriptors() {
     if (jcp.dataPrc != Precision::I32 && jcp.dataPrc != Precision::I8 && jcp.dataPrc != Precision::U8) {
         jcp.dataPrc = Precision::FP32;
     }
+    dataTypeSize = jcp.dataPrc.size();
     const InferenceEngine::Precision axisPrecision = Precision::I32;
 
     impl_desc_type implType = jit_sse42;
@@ -132,8 +133,9 @@ void Unique::createPrimitive() {
     threadsNum = 1;//parallel_get_max_threads();
     execArgsPerThread.resize(threadsNum);
     blockLen.resize(threadsNum);
-    samples1.resize(threadsNum);
-    samples2.resize(threadsNum);
+    samples.resize(threadsNum);
+    pivots.resize(threadsNum);
+    samplesIdx.resize(threadsNum);
 //    if (!x64::mayiuse(x64::avx512_core)) {
 //        const auto dataElPerVec = kernel->getDataElPerVec();
 //        parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
@@ -202,23 +204,30 @@ blockLenStr += std::to_string(blockLen[ithr][0]) + "; ";
 for (int i = 0; i < arg.blocksNum; i++) {
 blockLenStr += std::to_string(blockLen[ithr][i]) + "; ";
 }
-            arg.samples1Len = arg.blocksNum * (arg.blocksNum - 1);
-            if (arg.samples1Len > kernel->getDataElPerBlock()) {
-                samples1[ithr].resize(arg.samples1Len);
-                arg.samples1Ptr = samples1[ithr].data();
+            // SAMPLES
+            arg.samplesLen = arg.blocksNum * arg.blocksNum;
+samples[ithr].resize(std::max(kernel->getDataElPerVec(), uint64_t(arg.samplesLen)), 0);
+arg.samplesPtr = samples[ithr].data();
+            // Store samples if not fitted to block.
+            if (arg.samplesLen > kernel->getDataElPerBlock()) {
+                samples[ithr].resize(arg.samplesLen);
+                arg.samplesPtr = samples[ithr].data();
             }
-            const auto samples2Len = arg.blocksNum - 1;
-            if (samples2Len > kernel->getDataElPerBlock()) {
-                samples2[ithr].resize(samples2Len);
-                arg.samples2Ptr = samples2[ithr].data();
+            samplesIdx[ithr].resize(kernel->getDataElPerVec(), 0);
+            const auto inc = blockLen[ithr][0] / arg.blocksNum * dataTypeSize;
+            for (int i = 1; i < arg.samplesLen && i < samplesIdx[ithr].size(); i++) {
+                samplesIdx[ithr][i] = samplesIdx[ithr][i - 1] + inc;
             }
-            samples1Shift.resize(kernel->getDataElPerVec());
-            samples1Shift[0] = blockLen[ithr][0] / arg.blocksNum;
-            for (int i = 1; i < kernel->getDataElPerVec() - 1; i++) {
-                samples1Shift[i] = samples1Shift[0] * (i + 1);
+            arg.samplesIdxPtr = samplesIdx[ithr].data();
+            arg.samplesIdxStep = inc * kernel->getDataElPerVec();
+
+            // PIVOTS
+            const auto pivotsLen = arg.blocksNum;
+            // Store pivots if not fitted to block.
+            if (pivotsLen > kernel->getDataElPerBlock()) {
+                pivots[ithr].resize(pivotsLen);
+                arg.pivotsPtr = pivots[ithr].data();
             }
-            arg.samples1Shift = samples1Shift.data();
-            arg.samples1Step = samples1Shift[0] * kernel->getDataElPerVec();
         }
         arg.blockLen = blockLen[ithr].data();
 
@@ -385,6 +394,14 @@ for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof
 //    std::cout << sorted[i] << "; ";
 }
 std::cout << std::endl << std::endl;
+for (int ithr = 0; ithr < threadsNum; ithr++) {
+    std::string res;
+    for (int i = 0; i < samples[ithr].size(); i++) {
+        res += std::to_string(samples[ithr][i]) + ";";
+    }
+    printf("[%d] Samples {%s}\n", ithr, res.c_str());
+}
+
 // DEBUG
 }
 
