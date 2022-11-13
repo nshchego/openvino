@@ -32,8 +32,10 @@ protected:
     std::vector<VectorDims> shapeInfer() const override;
 
 private:
-    void flattenTensorExec();
-    void slicedTensorExec();
+    template <typename T>
+    size_t flattenTensorExec();
+    template <typename T>
+    size_t slicedTensorExec();
 
     std::vector<std::vector<int64_t>> blockLen;
     std::vector<std::vector<int32_t>> samples;

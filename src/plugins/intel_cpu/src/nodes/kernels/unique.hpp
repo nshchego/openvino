@@ -12,9 +12,9 @@ namespace ov {
 namespace intel_cpu {
 
 enum UniqueOutputIdx {
-    UNIQUE_DATA,
+    UNIQUE_DATA = 0,
     FIRST_UNIQUE_IDX,
-    ALL_IDX,
+    INPUT_TO_UNIQ_IDX,
     OCCURRENCES_NUM
 };
 
