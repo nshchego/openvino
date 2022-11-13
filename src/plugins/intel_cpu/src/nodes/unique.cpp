@@ -255,7 +255,7 @@ std::cout << std::endl;
 // DEBUG
 
     if (jcp.flattened) {
-        size_t uniqueLen = 0lu;
+        size_t uniqueLen = 1lu;
         if (jcp.dataPrc == Precision::FP32) {
             uniqueLen = flattenTensorExec<PrecisionTrait<Precision::FP32>::value_type>();
         } else if (jcp.dataPrc == Precision::I32) {
@@ -285,103 +285,23 @@ std::cout << std::endl;
         const size_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
 //        redefineOutputMemory({ {uniqueLen}, {uniqueLen}, {totalWork}, {uniqueLen}});
     }
-//    const auto inputLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int);
-//    int* uniqueData = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
-//    std::memcpy(uniqueData, srcDataPtr, inputLen * sizeof(int));
-//    std::sort(uniqueData, uniqueData + inputLen);
-//    auto last = std::unique(uniqueData, uniqueData + inputLen);
-//    const int64_t uniqLen = reinterpret_cast<int64_t>(last - uniqueData) / sizeof(int);
-//
-//    if (!jcp.sorted) {
-//        int* first = uniqueData;
-//        for (int i = 0; i < inputLen; i++) {
-//            if (i > 0 && srcDataPtr[i - 1] == srcDataPtr[i]) {
-//                continue;
-//            }
-//            for (int* it = first; it < last; it++) {
-//                if (srcDataPtr[i] == *it) {
-//                    int val = *first;
-//                    *first++ = *it;
-//                    *it = val;
-//                    break;
-//                }
-//            }
-//            if (first >= last) {
-//                break;
-//            }
-//        }
-//    }
-//    if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
-//        int* idxPtr = reinterpret_cast<int*>(getChildEdgesAtPort(FIRST_UNIQUE_IDX)[0]->getMemoryPtr()->GetPtr());
-//        int* first = uniqueData;
-//        for (int i = 0; i < inputLen; i++) {
-//            if (i > 0 && srcDataPtr[i - 1] == srcDataPtr[i]) {
-//                continue;
-//            }
-//            for (int* it = first; it < last; it++) {
-//                if (srcDataPtr[i] == *it) {
-//                    *idxPtr++ = i;
-//                    first++;
-//                    break;
-//                }
-//            }
-//            if (first >= last) {
-//                break;
-//            }
-//        }
-//    }
-//    if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
-//        int* idxPtr = reinterpret_cast<int*>(getChildEdgesAtPort(INPUT_TO_UNIQ_IDX)[0]->getMemoryPtr()->GetPtr());
-//        for (int i = 0; i < inputLen; i++) {
-//            if (i > 0 && srcDataPtr[i] == srcDataPtr[i - 1]) {
-//                idxPtr[i] = idxPtr[i - 1];
-//                continue;
-//            }
-//            for (int j = 0; j < uniqLen; j++) {
-//                if (srcDataPtr[i] == uniqueData[j]) {
-//                    idxPtr[i] = j;
-//                    break;
-//                }
-//            }
-//        }
-//    }
-//    if (jcp.definedOutputs[OCCURRENCES_NUM]) {
-//        int* idxPtr = reinterpret_cast<int*>(getChildEdgesAtPort(OCCURRENCES_NUM)[0]->getMemoryPtr()->GetPtr());
-//        std::fill(idxPtr, idxPtr + uniqLen, 0);
-//        for (int j = 0; j < uniqLen; j++) {
-//            for (int i = 0; i < inputLen; i++) {
-//                if (srcDataPtr[i] == uniqueData[j]) {
-//                    idxPtr[j]++;
-//                }
-//            }
-//        }
-//    }
-//    parallel_nt(threadsNum,  [&](const int ithr, const int nthr) {
-//        auto& arg = execArgsPerThread[ithr];
-//        if (arg.workAmount == 0lu) {
-//            return;
-//        }
-//        arg.srcPtr = srcDataPtr;
-//
-//        (*kernel)(&arg);
-//    });
 
 // DEBUG
-//std::cout << "OUTPUT: " << std::endl;
-////float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
-////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-////int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-////for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//    if (i > 0 && i % 4 == 0)
-//        std::cout << "| ";
-//    if (i > 0 && i % 16 == 0)
-//        std::cout << std::endl;
-//    std::cout << dstDataF[i] << "; ";
-////    std::cout << sorted[i] << "; ";
-//}
-//std::cout << std::endl << std::endl;
+std::cout << "OUTPUT: " << std::endl;
+//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
+//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+    if (i > 0 && i % 4 == 0)
+        std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
+    std::cout << dstDataF[i] << "; ";
+//    std::cout << sorted[i] << "; ";
+}
+std::cout << std::endl << std::endl;
 //for (int ithr = 0; ithr < threadsNum; ithr++) {
 //    std::string res;
 //    for (int i = 0; i < samples[ithr].size(); i++) {
