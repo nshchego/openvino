@@ -173,7 +173,7 @@ void UniqueKernel<isa>::process() {
     cmp(rBlocksNum, 1);
     je(lEnd, T_NEAR);
 
-    gatherSamples();
+//    gatherSamples();
 //    exchangePartitions();
 //    gatherPivots();
 
@@ -678,13 +678,15 @@ void UniqueKernel<x64::avx512_core>::exchangePartitions() {
     Xbyak::Label lBlocksLoop, lFinishLoad, lFinishStore, lEnd;
     auto rSrcPtr = getReg64();
     auto rDstPtr = getReg64();
-    mov(rSrcPtr, ptr[regParams + GET_OFF(srcPtr)]);
+    mov(rSrcPtr, ptr[regParams + GET_OFF(dstPtr[FIRST_UNIQUE_IDX])]);
     mov(rDstPtr, ptr[regParams + GET_OFF(dstPtr[UNIQUE_DATA])]);
 
+    auto rPivotsNum   = getReg64();
     auto rBlocksNum   = getReg64();
     auto rBlockLenPtr = getReg64();
     auto rBlockLen    = getReg64();
 
+    mov(rPivotsNum,   ptr[regParams + GET_OFF(blocksNum)]);
     mov(rBlocksNum,   ptr[regParams + GET_OFF(blocksNum)]);
     mov(rBlockLenPtr, ptr[regParams + GET_OFF(blockLen)]);
 

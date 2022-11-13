@@ -153,12 +153,12 @@ void Unique::prepareParams() {
         THROW_ERROR << " has not allocated input data memory.";
     }
     for (int i = 0; i < 4; i++) {
-        if (jcp.definedOutputs[i]) {
+//        if (jcp.definedOutputs[i]) {
             auto& dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
             if (!dstMemPtr || !dstMemPtr->isAllocated()) {
                 THROW_ERROR << " has not allocated output memory at port " << i;
             }
-        }
+//        }
     }
     if (getSelectedPrimitiveDescriptor() == nullptr) {
         THROW_ERROR << " has unidentified preferable primitive descriptor.";
@@ -236,7 +236,8 @@ printf("[%d] blocksNum: %lu; blockLen {%s}\n", ithr, arg.blocksNum, blockLenStr.
 }
 
 void Unique::execute(dnnl::stream strm) {
-    const void* srcDataPtr = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
+//    const void* srcDataPtr = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
+    const uint8_t * srcDataPtr = reinterpret_cast<const uint8_t *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 
 // DEBUG
 std::cout << "\nINPUT DATA: " << std::endl;
@@ -253,15 +254,21 @@ for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof
 std::cout << std::endl;
 // DEBUG
 
-    parallel_nt(threadsNum,  [&](const int ithr, const int nthr) {
-        auto& arg = execArgsPerThread[ithr];
-        if (arg.workAmount == 0lu) {
-            return;
-        }
-        arg.srcPtr = srcDataPtr;
 
-        (*kernel)(&arg);
-    });
+//    float* srcDataPtr = reinterpret_cast<float *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+//    int* srcDataPtr = reinterpret_cast<int *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+//    std::sort(srcDataPtr, srcDataPtr + getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float));
+    std::unique(srcDataPtr, srcDataPtr + getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(float));
+
+//    parallel_nt(threadsNum,  [&](const int ithr, const int nthr) {
+//        auto& arg = execArgsPerThread[ithr];
+//        if (arg.workAmount == 0lu) {
+//            return;
+//        }
+//        arg.srcPtr = srcDataPtr;
+//
+//        (*kernel)(&arg);
+//    });
 
 //int* dstDataI = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 //const int N = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int);
@@ -380,30 +387,36 @@ std::cout << std::endl;
 //    redefineOutputMemory( {newDims, newDims, {1}} );
 
 // DEBUG
-std::cout << "OUTPUT: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << dstDataF[i] << "; ";
-//    std::cout << sorted[i] << "; ";
-}
-std::cout << std::endl << std::endl;
-for (int ithr = 0; ithr < threadsNum; ithr++) {
-    std::string res;
-    for (int i = 0; i < samples[ithr].size(); i++) {
-        res += std::to_string(samples[ithr][i]) + ";";
-    }
-    printf("[%d] Samples {%s}\n", ithr, res.c_str());
-}
+//std::cout << "OUTPUT: " << std::endl;
+////float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
+////int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+////for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//    if (i > 0 && i % 4 == 0)
+//        std::cout << "| ";
+//    if (i > 0 && i % 16 == 0)
+//        std::cout << std::endl;
+//    std::cout << dstDataF[i] << "; ";
+////    std::cout << sorted[i] << "; ";
+//}
+//std::cout << std::endl << std::endl;
+//for (int ithr = 0; ithr < threadsNum; ithr++) {
+//    std::string res;
+//    for (int i = 0; i < samples[ithr].size(); i++) {
+//        res += std::to_string(samples[ithr][i]) + ";";
+//    }
+//    printf("[%d] Samples {%s}\n", ithr, res.c_str());
+//}
 
 // DEBUG
+
+    // Axis support
+    const auto& srcDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
+    const size_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
+    VectorDims newDims{ totalWork };
+    redefineOutputMemory({newDims, newDims, newDims, newDims});
 }
 
 void Unique::executeDynamicImpl(dnnl::stream strm) {

@@ -339,7 +339,7 @@ ov::Tensor get_random_tensor(const std::pair<std::string, benchmark_app::InputIn
     } else if (type == ov::element::f16) {
         return create_tensor_random<short, short>(inputInfo.second);
     } else if (type == ov::element::i32) {
-        return create_tensor_random<int32_t, int32_t>(inputInfo.second);
+        return create_tensor_random<int32_t, int32_t>(inputInfo.second, 0, 20);
     } else if (type == ov::element::i64) {
         return create_tensor_random<int64_t, int64_t>(inputInfo.second);
     } else if (type == ov::element::u8) {
