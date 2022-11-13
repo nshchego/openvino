@@ -182,9 +182,9 @@ printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - 
             return;
 
         for (int i = 0; i < 4; i++) {
-            if (jcp.definedOutputs[i]) {
+//            if (jcp.definedOutputs[i]) {
                 arg.dstPtr[i] = getChildEdgeAt(i)->getMemoryPtr()->GetPtr();
-            }
+//            }
         }
 
 std::string blockLenStr;
@@ -382,7 +382,8 @@ std::cout << std::endl;
 // DEBUG
 std::cout << "OUTPUT: " << std::endl;
 //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
 //int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
 //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {

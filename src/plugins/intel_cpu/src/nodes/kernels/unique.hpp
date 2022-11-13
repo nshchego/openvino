@@ -122,7 +122,9 @@ private:
     void process();
     void sortInBlocks();
     void sortContiguousVec(const Xbyak::Reg64& rBlockLen);
+    void tmpSort(const Xbyak::Reg64& rBlockLen);
     void gatherSamples();
+    void exchangePartitions();
     void gatherPivots();
     void cmpPerm(const Vmm& vDst, const Vmm& vSrc1, const Vmm& vSrc2, const Vmask& kMinMask, const Vmask& kMaxMask, bool tail = false);
     void permOnEdge(const Vmm& vSrc1, const Vmm& vSrc2, const Vmm& vOrigin1);
