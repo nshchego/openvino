@@ -24,12 +24,12 @@ public:
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
     void execute(dnnl::stream strm) override;
-    bool created() const override;
+    bool created() const override { return getType() == Type::Unique; }
 
 protected:
     void executeDynamicImpl(dnnl::stream strm) override;
     void prepareParams() override;
-    std::vector<VectorDims> shapeInfer() const override;
+    bool needShapeInfer() const override { return false; }
 
 private:
     template <typename T>

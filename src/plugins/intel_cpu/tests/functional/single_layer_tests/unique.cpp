@@ -116,7 +116,8 @@ protected:
             ov::runtime::Tensor tensor;
 
             if (funcInput.get_node()->get_friendly_name() == "data") {
-                int32_t range = std::pow(2, 19);
+//                int32_t range = std::pow(2, 19);
+                int32_t range = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1, std::multiplies<size_t>());
                 tensor = utils::create_and_fill_tensor(
                         funcInput.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
             }
@@ -157,8 +158,6 @@ std::vector<CPUSpecificParams> getCPUInfo() {
         resCPUParams.push_back(CPUSpecificParams{{}, {}, {"jit_avx512"}, "jit_avx512"});
     } else if (InferenceEngine::with_cpu_x86_avx2()) {
         resCPUParams.push_back(CPUSpecificParams{{}, {}, {"jit_avx2"}, "jit_avx2"});
-    } else if (InferenceEngine::with_cpu_x86_avx()) {
-        resCPUParams.push_back(CPUSpecificParams{{}, {}, {"jit_avx"}, "jit_avx"});
     } else if (InferenceEngine::with_cpu_x86_sse42()) {
         resCPUParams.push_back(CPUSpecificParams{{}, {}, {"jit_sse42"}, "jit_sse42"});
     }
