@@ -287,7 +287,7 @@ std::cout << std::endl;
     }
 
 // DEBUG
-std::cout << "OUTPUT: " << std::endl;
+std::cout << "OUTPUT_0: " << std::endl;
 //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
 //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
@@ -302,6 +302,20 @@ for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof
 //    std::cout << sorted[i] << "; ";
 }
 std::cout << std::endl << std::endl;
+for (int o = 1; o < 4; o++) {
+    if (jcp.definedOutputs[o]) {
+        std::cout << "OUTPUT_: " << o << std::endl;
+        int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
+        for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+            if (i > 0 && i % 4 == 0)
+                std::cout << "| ";
+            if (i > 0 && i % 16 == 0)
+                std::cout << std::endl;
+            std::cout << dst1[i] << "; ";
+        }
+        std::cout << std::endl << std::endl;
+    }
+}
 //for (int ithr = 0; ithr < threadsNum; ithr++) {
 //    std::string res;
 //    for (int i = 0; i < samples[ithr].size(); i++) {
@@ -326,7 +340,7 @@ size_t Unique::flattenTensorExec() {
     std::memcpy(uniqueData, srcDataPtr, inputLen * sizeof(T));
     std::sort(uniqueData, uniqueData + inputLen);
     auto last = std::unique(uniqueData, uniqueData + inputLen);
-    const int64_t uniqLen = reinterpret_cast<int64_t>(last - uniqueData) / sizeof(int);
+    const int64_t uniqLen = reinterpret_cast<int64_t>(last - uniqueData);
 
     if (!jcp.sorted) {
         T* first = uniqueData;
