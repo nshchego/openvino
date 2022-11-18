@@ -304,7 +304,7 @@ for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof
 std::cout << std::endl << std::endl;
 for (int o = 1; o < 4; o++) {
     if (jcp.definedOutputs[o]) {
-        std::cout << "OUTPUT_: " << o << std::endl;
+        std::cout << "OUTPUT_" << o << ": " << std::endl;
         int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
         for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
             if (i > 0 && i % 4 == 0)
@@ -499,7 +499,6 @@ size_t Unique::flattenTensorExec() {
 //    }
 //}
 
-
 //        qSort(uniqueData, 0, inputLen);
         std::sort(uniqueData, uniqueData + inputLen);
         auto last = std::unique(uniqueData, uniqueData + inputLen);
@@ -507,19 +506,13 @@ size_t Unique::flattenTensorExec() {
 
         if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
             T* first = uniqueData;
-            for (int i = 0; i < inputLen; i++) {
-                if (i > 0 && srcDataPtr[i - 1] == srcDataPtr[i]) {
-                    continue;
-                }
-                for (T* it = first; it < last; it++) {
+            for (T* it = first; it < last; it++) {
+                for (int i = 0; i < inputLen; i++) {
                     if (srcDataPtr[i] == *it) {
                         *firstPtr++ = i;
                         first++;
                         break;
                     }
-                }
-                if (first >= last) {
-                    break;
                 }
             }
         }
@@ -538,7 +531,7 @@ size_t Unique::flattenTensorExec() {
             }
         }
         if (jcp.definedOutputs[OCCURRENCES_NUM]) {
-            std::fill(occurPtr, occurPtr + uniqLen, 1);
+            std::fill(occurPtr, occurPtr + uniqLen, 0);
             for (int j = 0; j < uniqLen; j++) {
                 for (int i = 0; i < inputLen; i++) {
                     if (srcDataPtr[i] == uniqueData[j]) {
