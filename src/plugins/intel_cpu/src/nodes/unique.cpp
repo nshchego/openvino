@@ -240,18 +240,18 @@ void Unique::execute(dnnl::stream strm) {
 //    const int* srcDataPtr = reinterpret_cast<const int *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 
 // DEBUG
-std::cout << "\nINPUT DATA: " << std::endl;
-//float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-//int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << srcDataF[i] << "; ";
-}
-std::cout << std::endl;
+//std::cout << "\nINPUT DATA: " << std::endl;
+////float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+//int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+////int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//    if (i > 0 && i % 4 == 0)
+//        std::cout << "| ";
+//    if (i > 0 && i % 16 == 0)
+//        std::cout << std::endl;
+//    std::cout << srcDataF[i] << "; ";
+//}
+//std::cout << std::endl;
 // DEBUG
 
     if (jcp.flattened) {
@@ -266,9 +266,8 @@ std::cout << std::endl;
             uniqueLen = flattenTensorExec<PrecisionTrait<Precision::U8>::value_type>();
         }
 
-        const auto& srcDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
-        const size_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
-        redefineOutputMemory({ {uniqueLen}, {uniqueLen}, {totalWork}, {uniqueLen}});
+        const size_t totalWork = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / 4;
+        redefineOutputMemory({ {uniqueLen}, {uniqueLen}, {totalWork}, {uniqueLen}}); // TODO: check for diff shapes
     } else {
         size_t uniqueLen = 0lu;
         if (jcp.dataPrc == Precision::FP32) {
@@ -287,35 +286,35 @@ std::cout << std::endl;
     }
 
 // DEBUG
-std::cout << "OUTPUT_0: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << dstDataF[i] << "; ";
-//    std::cout << sorted[i] << "; ";
-}
-std::cout << std::endl << std::endl;
-for (int o = 1; o < 4; o++) {
-    if (jcp.definedOutputs[o]) {
-        std::cout << "OUTPUT_" << o << ": " << std::endl;
-        int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
-        for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-            if (i > 0 && i % 4 == 0)
-                std::cout << "| ";
-            if (i > 0 && i % 16 == 0)
-                std::cout << std::endl;
-            std::cout << dst1[i] << "; ";
-        }
-        std::cout << std::endl << std::endl;
-    }
-}
+//std::cout << "OUTPUT_0: " << std::endl;
+////float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
+////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
+////int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+////for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//    if (i > 0 && i % 4 == 0)
+//        std::cout << "| ";
+//    if (i > 0 && i % 16 == 0)
+//        std::cout << std::endl;
+//    std::cout << dstDataF[i] << "; ";
+////    std::cout << sorted[i] << "; ";
+//}
+//std::cout << std::endl << std::endl;
+//for (int o = 1; o < 4; o++) {
+//    if (jcp.definedOutputs[o]) {
+//        std::cout << "OUTPUT_" << o << ": " << std::endl;
+//        int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
+//        for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//            if (i > 0 && i % 4 == 0)
+//                std::cout << "| ";
+//            if (i > 0 && i % 16 == 0)
+//                std::cout << std::endl;
+//            std::cout << dst1[i] << "; ";
+//        }
+//        std::cout << std::endl << std::endl;
+//    }
+//}
 //for (int ithr = 0; ithr < threadsNum; ithr++) {
 //    std::string res;
 //    for (int i = 0; i < samples[ithr].size(); i++) {
@@ -363,6 +362,23 @@ size_t Unique::flattenTensorExec() {
     if (jcp.sorted) {
         auto partition = [&](T* toSort, int64_t start, int64_t end) {
 // std::cout << "PARTITION: " << start << "; " << end << std::endl;
+
+            const auto mid = start + (end - start) / 2;
+            T a = toSort[start], b = toSort[end - 1], c = toSort[mid];
+            if (a < b) { // c a c b c
+                if (c < a) {
+                    std::swap(toSort[start], toSort[end - 1]);
+                } else if (c < b) {
+                    std::swap(toSort[end - 1], toSort[mid]);
+                } else {
+//                    std::swap(result, a);
+                }
+            } else if (a < c) { // c b c a c
+                std::swap(toSort[start], toSort[end - 1]);
+            } else if (b < c) {
+                std::swap(toSort[end - 1], toSort[mid]);
+            }
+
             auto pivot = toSort[end - 1];
             int64_t i = start - 1;
             for (int j = start; j < end - 1; j++) {
@@ -396,7 +412,7 @@ size_t Unique::flattenTensorExec() {
         };
         std::memcpy(uniqueData, srcDataPtr, inputLen * sizeof(T));
 // std::cout << "SORTING " << std::endl;
-        // qSort(uniqueData, 0, inputLen);
+         qSort(uniqueData, 0, inputLen);
 
 
 //auto unguardedPartition = [](T* first, T* last, T* pivot) {
@@ -500,46 +516,46 @@ size_t Unique::flattenTensorExec() {
 //}
 
 //        qSort(uniqueData, 0, inputLen);
-        std::sort(uniqueData, uniqueData + inputLen);
-        auto last = std::unique(uniqueData, uniqueData + inputLen);
-        uniqLen = reinterpret_cast<int64_t>(last - uniqueData);
+//        std::sort(uniqueData, uniqueData + inputLen);
+//        auto last = std::unique(uniqueData, uniqueData + inputLen);
+//        uniqLen = reinterpret_cast<int64_t>(last - uniqueData);
 
-        if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
-            T* first = uniqueData;
-            for (T* it = first; it < last; it++) {
-                for (int i = 0; i < inputLen; i++) {
-                    if (srcDataPtr[i] == *it) {
-                        *firstPtr++ = i;
-                        first++;
-                        break;
-                    }
-                }
-            }
-        }
-        if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
-            for (int i = 0; i < inputLen; i++) {
-                if (i > 0 && srcDataPtr[i] == srcDataPtr[i - 1]) {
-                    inToOutPtr[i] = inToOutPtr[i - 1];
-                    continue;
-                }
-                for (int j = 0; j < uniqLen; j++) {
-                    if (srcDataPtr[i] == uniqueData[j]) {
-                        inToOutPtr[i] = j;
-                        break;
-                    }
-                }
-            }
-        }
-        if (jcp.definedOutputs[OCCURRENCES_NUM]) {
-            std::fill(occurPtr, occurPtr + uniqLen, 0);
-            for (int j = 0; j < uniqLen; j++) {
-                for (int i = 0; i < inputLen; i++) {
-                    if (srcDataPtr[i] == uniqueData[j]) {
-                        occurPtr[j]++;
-                    }
-                }
-            }
-        }
+//        if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
+//            T* first = uniqueData;
+//            for (T* it = first; it < last; it++) {
+//                for (int i = 0; i < inputLen; i++) {
+//                    if (srcDataPtr[i] == *it) {
+//                        *firstPtr++ = i;
+//                        first++;
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//        if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+//            for (int i = 0; i < inputLen; i++) {
+//                if (i > 0 && srcDataPtr[i] == srcDataPtr[i - 1]) {
+//                    inToOutPtr[i] = inToOutPtr[i - 1];
+//                    continue;
+//                }
+//                for (int j = 0; j < uniqLen; j++) {
+//                    if (srcDataPtr[i] == uniqueData[j]) {
+//                        inToOutPtr[i] = j;
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//        if (jcp.definedOutputs[OCCURRENCES_NUM]) {
+//            std::fill(occurPtr, occurPtr + uniqLen, 0);
+//            for (int j = 0; j < uniqLen; j++) {
+//                for (int i = 0; i < inputLen; i++) {
+//                    if (srcDataPtr[i] == uniqueData[j]) {
+//                        occurPtr[j]++;
+//                    }
+//                }
+//            }
+//        }
     } else {
         uniqueData[0] = srcDataPtr[0];
         if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
