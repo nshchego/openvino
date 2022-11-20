@@ -240,18 +240,18 @@ void Unique::execute(dnnl::stream strm) {
 //    const int* srcDataPtr = reinterpret_cast<const int *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 
 // DEBUG
-//std::cout << "\nINPUT DATA: " << std::endl;
-////float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-//int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-////int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-//    if (i > 0 && i % 4 == 0)
-//        std::cout << "| ";
-//    if (i > 0 && i % 16 == 0)
-//        std::cout << std::endl;
-//    std::cout << srcDataF[i] << "; ";
-//}
-//std::cout << std::endl;
+// std::cout << "\nINPUT DATA: " << std::endl;
+// //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+// int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+// //int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << srcDataF[i] << "; ";
+// }
+// std::cout << std::endl;
 // DEBUG
 
     if (jcp.flattened) {
@@ -286,21 +286,21 @@ void Unique::execute(dnnl::stream strm) {
     }
 
 // DEBUG
-//std::cout << "OUTPUT_0: " << std::endl;
-////float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
-////int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-////int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-//for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-////for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//    if (i > 0 && i % 4 == 0)
-//        std::cout << "| ";
-//    if (i > 0 && i % 16 == 0)
-//        std::cout << std::endl;
-//    std::cout << dstDataF[i] << "; ";
-////    std::cout << sorted[i] << "; ";
-//}
-//std::cout << std::endl << std::endl;
+// std::cout << "OUTPUT_0: " << std::endl;
+// //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
+// //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
+// //int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+// //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << dstDataF[i] << "; ";
+// //    std::cout << sorted[i] << "; ";
+// }
+// std::cout << std::endl << std::endl;
 //for (int o = 1; o < 4; o++) {
 //    if (jcp.definedOutputs[o]) {
 //        std::cout << "OUTPUT_" << o << ": " << std::endl;
@@ -360,34 +360,34 @@ size_t Unique::flattenTensorExec() {
     int64_t uniqLen = inputLen;
 
     if (jcp.sorted) {
-        auto partition = [&](T* toSort, int64_t start, int64_t end) {
+//        auto partition = [&](T* toSort, int64_t start, int64_t end) {
 // std::cout << "PARTITION: " << start << "; " << end << std::endl;
 
-            const auto mid = start + (end - start) / 2;
-            T a = toSort[start], b = toSort[end - 1], c = toSort[mid];
-            if (a < b) { // c a c b c
-                if (c < a) {
-                    std::swap(toSort[start], toSort[end - 1]);
-                } else if (c < b) {
-                    std::swap(toSort[end - 1], toSort[mid]);
-                } else {
-//                    std::swap(result, a);
-                }
-            } else if (a < c) { // c b c a c
-                std::swap(toSort[start], toSort[end - 1]);
-            } else if (b < c) {
-                std::swap(toSort[end - 1], toSort[mid]);
-            }
+// //            const auto mid = start + (end - start) / 2;
+// //            T a = toSort[start], b = toSort[end - 1], c = toSort[mid];
+// //            if (a < b) { // c a c b c
+// //                if (c < a) {
+// //                    std::swap(toSort[start], toSort[end - 1]);
+// //                } else if (c < b) {
+// //                    std::swap(toSort[end - 1], toSort[mid]);
+// //                } else {
+// // //                    std::swap(result, a);
+// //                }
+// //            } else if (a < c) { // c b c a c
+// //                std::swap(toSort[start], toSort[end - 1]);
+// //            } else if (b < c) {
+// //                std::swap(toSort[end - 1], toSort[mid]);
+// //            }
 
-            auto pivot = toSort[end - 1];
-            int64_t i = start - 1;
-            for (int j = start; j < end - 1; j++) {
-                if (toSort[j] <= pivot) {
-                    i++;
-                    std::swap(toSort[i], toSort[j]);
-                }
-            }
-            std::swap(toSort[i + 1], toSort[end - 1]);
+//            auto pivot = toSort[end - 1];
+//            int64_t i = start - 1;
+//            for (int j = start; j < end - 1; j++) {
+//                if (toSort[j] <= pivot) {
+//                    i++;
+//                    std::swap(toSort[i], toSort[j]);
+//                }
+//            }
+//            std::swap(toSort[i + 1], toSort[end - 1]);
 
 // for (int i = 0; i < inputLen; i++) {
 //    if (i > 0 && i % 4 == 0)
@@ -397,25 +397,78 @@ size_t Unique::flattenTensorExec() {
 //    std::cout << toSort[i] << "; ";
 // }
 // std::cout << std::endl << std::endl;
-            return i + 1;
-        };
-        std::function<void(T*, int64_t, int64_t)> qSort = [&](T* toSort, int64_t start, int64_t end) {
-            // void (qSort)(T*, int64_t, int64_t) = [](T* toSort, int64_t start, int64_t end) {
-            if (start < end) {
-                auto p = partition(toSort, start, end);
+//            return i + 1;
+//        };
+
+//        std::function<void(T*, int64_t, int64_t)> qSort = [&](T* toSort, int64_t start, int64_t end) {
+//            // void (qSort)(T*, int64_t, int64_t) = [](T* toSort, int64_t start, int64_t end) {
+//            if (start < end) {
+//                auto p = partition(toSort, start, end);
 // std::cout << "PIVOT idx: " << p << std::endl;
 // std::cout << "LEFT: " << std::endl;
-                qSort(toSort, start, p);
+//                qSort(toSort, start, p);
 // std::cout << "RIGHT: " << std::endl;
-                qSort(toSort, p + 1, end);
+//                qSort(toSort, p + 1, end);
+//            }
+//        };
+
+    auto partition = [&](T* start, T* end) {
+//  std::cout << "PARTITION start: " << *start << "; end: " << *end << std::endl;
+
+       const auto mid = start + (end - start) / 2;
+       auto a = start, b = end, c = mid;
+       if (*a < *b) { // c a c b c
+           if (*c < *a) {
+               std::swap(*a, *b);
+           } else if (*c < *b) {
+               std::swap(*b, *c);
+           }
+       } else if (*a < *c) { // c b c a c
+           std::swap(*a, *b);
+       } else if (*b < *c) {
+           std::swap(*b, *c);
+       }
+
+        auto pivot = end;
+        auto it = start - 1;
+        for (auto curr = start; curr < end; curr++) {
+            if (*curr <= *pivot) {
+                it++;
+                std::swap(*it, *curr);
             }
-        };
+        }
+        it++;
+        std::swap(*it, *pivot);
+
+//  for (int i = 0; i < inputLen; i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << uniqueData[i] << "; ";
+//  }
+//  std::cout << std::endl << std::endl;
+        return it;
+    };
+
+    std::function<void(T*, T*)> qSort = [&](T* start, T* end) {
+        if (start < end) {
+            auto p = partition(start, end);
+//  std::cout << "PIVOT: " << *p << std::endl;
+//  std::cout << "LEFT: " << std::endl;
+            qSort(start, p - 1);
+//  std::cout << "RIGHT: " << std::endl;
+            qSort(p + 1, end);
+        }
+    };
+
         std::memcpy(uniqueData, srcDataPtr, inputLen * sizeof(T));
 // std::cout << "SORTING " << std::endl;
-         qSort(uniqueData, 0, inputLen);
+        // qSort(uniqueData, 0, inputLen);
+         qSort(uniqueData, uniqueData + inputLen - 1);
 
 
-//auto unguardedPartition = [](T* first, T* last, T* pivot) {
+// auto unguardedPartition = [](T* first, T* last, T* pivot) {
 //    while (true) {
 //        while (*first < *pivot) {
 //            ++first;
@@ -430,34 +483,34 @@ size_t Unique::flattenTensorExec() {
 //        std::swap(first, last);
 //        ++first;
 //    }
-//};
-//
-//auto moveMedianToFirst = [](T* result, T* a, T* b, T* c)
-//{
+// };
+
+// auto moveMedianToFirst = [](T* result, T* a, T* b, T* c)
+// {
 //    if (*a < *b) {
 //        if (*b < *c) {
-//            std::swap(result, b);
+//            std::swap(*result, *b);
 //        } else if (*a < *c) {
-//            std::swap(result, c);
+//            std::swap(*result, *c);
 //        } else {
-//            std::swap(result, a);
+//            std::swap(*result, *a);
 //        }
 //    } else if (*a < *c) {
-//        std::swap(result, a);
+//        std::swap(*result, *a);
 //    } else if (*b < *c) {
-//        std::swap(result, c);
+//        std::swap(*result, *c);
 //    } else {
-//        std::swap(result, b);
+//        std::swap(*result, *b);
 //    }
-//};
-//
-//auto unguardedPartitionPivot = [&](T* first, T* last) {
+// };
+
+// auto unguardedPartitionPivot = [&](T* first, T* last) {
 //    T* mid = first + (last - first) / 2;
 //    moveMedianToFirst(first, first + 1, mid, last - 1);
 //    return unguardedPartition(first + 1, last, first);
-//};
-//
-//auto introsortLoop = [&](T* first, T* last, int64_t depthLimit) {
+// };
+
+// std::function<void(T*, T*, int64_t)> introsortLoop = [&](T* first, T* last, int64_t depthLimit) {
 //    while (last - first > int(std::_S_threshold)) {
 //        if (depthLimit == 0) {
 //            std::__partial_sort(first, last, last);
@@ -468,10 +521,10 @@ size_t Unique::flattenTensorExec() {
 //        introsortLoop(cut, last, depthLimit);
 //        last = cut;
 //    }
-//};
-//
-//auto unguardedLinearInsert = [](T* last) {
-//    typename iterator_traits<T*>::value_type __val = _GLIBCXX_MOVE(*last);
+// };
+
+// auto unguardedLinearInsert = [&](T* last) {
+//    T __val = _GLIBCXX_MOVE(*last);
 //    T* next = last;
 //    --next;
 //    while (__val < next) {
@@ -480,42 +533,43 @@ size_t Unique::flattenTensorExec() {
 //        --next;
 //    }
 //    *last = _GLIBCXX_MOVE(__val);
-//};
-//
-//void insertionSort(T* first, T* last)
-//{
+// };
+
+// std::function<void(T*, T*)> insertionSort = [&](T* first, T* last)
+// {
 //    if (first == last) {
 //        return;
 //    }
-//
-//    for (T* i = first + 1; __i != last; ++__i) {
-//        if (__i < first) {
-//            typename iterator_traits<T*>::value_type __val = _GLIBCXX_MOVE(*__i);
-//            _GLIBCXX_MOVE_BACKWARD3(first, __i, __i + 1);
+
+//    for (T* it = first + 1; it != last; ++it) {
+//        if (it < first) {
+//            T __val = _GLIBCXX_MOVE(*it);
+//            _GLIBCXX_MOVE_BACKWARD3(first, it, it + 1);
 //            *first = _GLIBCXX_MOVE(__val);
 //        } else {
-//            unguardedLinearInsert(__i);
+//            unguardedLinearInsert(it);
 //        }
 //    }
-//}
-//
-//finalInsertionSort(T* first, T* last) {
-//    if (last - first > int(_S_threshold)) {
-//        insertionSort(first, first + int(_S_threshold));
-//        std::__unguarded_insertion_sort(first + int(_S_threshold), last);
+// };
+
+// std::function<void(T*, T*)> finalInsertionSort = [&](T* first, T* last) {
+//    if (last - first > int(std::_S_threshold)) {
+//        insertionSort(first, first + int(std::_S_threshold));
+//        std::__unguarded_insertion_sort(first + int(std::_S_threshold), last);
 //    } else {
 //        insertionSort(first, last);
 //    }
-//}
-//
-//qSort(T* first, T* last) {
+// };
+
+// std::function<void(T*, T*)> qSort = [&](T* first, T* last) {
 //    if (first != last) {
 //        introsortLoop(first, last, std::__lg(last - first) * 2);
 //        finalInsertionSort(first, last);
 //    }
-//}
+// };
 
-//        qSort(uniqueData, 0, inputLen);
+        // qSort(uniqueData, uniqueData + inputLen - 1);
+    //    qSort(uniqueData, 0, inputLen);
 //        std::sort(uniqueData, uniqueData + inputLen);
 //        auto last = std::unique(uniqueData, uniqueData + inputLen);
 //        uniqLen = reinterpret_cast<int64_t>(last - uniqueData);
