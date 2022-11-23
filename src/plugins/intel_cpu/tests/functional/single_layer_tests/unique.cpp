@@ -96,7 +96,7 @@ protected:
         auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         std::shared_ptr<ov::Node> uniqueNode;
         if (flattened) {
-            uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],sorted);
+            uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0], sorted);
         } else {
             axis = std::get<1>(flatOrAxis);
             uniqueNode = std::make_shared<ov::op::v10::Unique>(paramOuts[0],

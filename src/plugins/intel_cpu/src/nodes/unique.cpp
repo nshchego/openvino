@@ -73,7 +73,7 @@ void Unique::initSupportedPrimitiveDescriptors() {
 
     std::vector<PortConfigurator> inPortConfigs = { {LayoutType::ncsp, dataPrecision} };
     if (!flattened) {
-        inPortConfigs.push_back( {LayoutType::ncsp, axisPrecision} );
+        inPortConfigs.push_back({LayoutType::ncsp, axisPrecision});
     }
     std::vector<PortConfigurator> outPortConfigs;
     for (int i = 0; i < 4; i++) {
@@ -197,7 +197,6 @@ void Unique::execute(dnnl::stream strm) {
 //    printf("[%d] Samples {%s}\n", ithr, res.c_str());
 // }
 // DEBUG
-
 }
 
 void Unique::executeDynamicImpl(dnnl::stream strm) {
@@ -362,7 +361,6 @@ size_t Unique::slicedTensorExec() {
         for (int p = 0; p < partsInBl; p++) {
             for (int e = 0; e < elPerPart; e++) {
                 for (int e = 0; e < elPerPart; e++) {
-
                 }
             }
         }
