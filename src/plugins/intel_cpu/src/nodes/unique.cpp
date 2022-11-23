@@ -165,74 +165,74 @@ void Unique::prepareParams() {
     }
 
 //    const uint64_t dataElPerVec = kernel->getDataElPerVec();
-    const auto& srcDataShape = dataMemPtr->getStaticDims();
-    const int64_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
-    const int64_t blNum = (totalWork - 1) / kernel->getDataElPerBlock() + 1;
-    const int64_t wpt = blNum < threadsNum ? totalWork / blNum : totalWork / threadsNum;
+//     const auto& srcDataShape = dataMemPtr->getStaticDims();
+//     const int64_t totalWork = jcp.flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[jcp.axis];
+//     const int64_t blNum = (totalWork - 1) / kernel->getDataElPerBlock() + 1;
+//     const int64_t wpt = blNum < threadsNum ? totalWork / blNum : totalWork / threadsNum;
 
-    parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
-        const uint64_t dstStart = std::min(wpt * ithr, totalWork);
-        const uint64_t dstEnd = std::min(wpt * (ithr + 1), totalWork);
-printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - dstStart);
+//     parallel_nt(threadsNum, [&](const int ithr, const int nthr) {
+//         const uint64_t dstStart = std::min(wpt * ithr, totalWork);
+//         const uint64_t dstEnd = std::min(wpt * (ithr + 1), totalWork);
+// printf("[%d] start: %lu; end: %lu; wa: %lu\n", ithr, dstStart, dstEnd, dstEnd - dstStart);
 
-        auto& arg = execArgsPerThread[ithr];
+//         auto& arg = execArgsPerThread[ithr];
 
-        arg.workAmount = dstEnd - dstStart;
-        if (arg.workAmount == 0)
-            return;
+//         arg.workAmount = dstEnd - dstStart;
+//         if (arg.workAmount == 0)
+//             return;
 
-        for (int i = 0; i < 4; i++) {
-//            if (jcp.definedOutputs[i]) {
-                arg.dstPtr[i] = getChildEdgeAt(i)->getMemoryPtr()->GetPtr();
-//            }
-        }
+//         for (int i = 0; i < 4; i++) {
+// //            if (jcp.definedOutputs[i]) {
+//                 arg.dstPtr[i] = getChildEdgeAt(i)->getMemoryPtr()->GetPtr();
+// //            }
+//         }
 
-std::string blockLenStr;
-        if (arg.workAmount <= kernel->getDataElPerBlock()) {
-            arg.blocksNum = 1;
-            blockLen[ithr].resize(1, arg.workAmount);
-blockLenStr += std::to_string(blockLen[ithr][0]) + "; ";
-        } else {
-            arg.blocksNum = arg.workAmount / kernel->getDataElPerBlock() + 1;
+// std::string blockLenStr;
+//         if (arg.workAmount <= kernel->getDataElPerBlock()) {
+//             arg.blocksNum = 1;
+//             blockLen[ithr].resize(1, arg.workAmount);
+// blockLenStr += std::to_string(blockLen[ithr][0]) + "; ";
+//         } else {
+//             arg.blocksNum = arg.workAmount / kernel->getDataElPerBlock() + 1;
 
-            const auto minWork = arg.workAmount / arg.blocksNum;
-            auto restWork = arg.workAmount % arg.blocksNum;
-            blockLen[ithr].resize(arg.blocksNum, minWork);
-            for (int i = 0; restWork > 0; restWork--, i++) {
-                blockLen[ithr][i]++;
-            }
-for (int i = 0; i < arg.blocksNum; i++) {
-blockLenStr += std::to_string(blockLen[ithr][i]) + "; ";
-}
-            // SAMPLES
-            arg.samplesLen = arg.blocksNum * arg.blocksNum;
-samples[ithr].resize(std::max(kernel->getDataElPerVec(), uint64_t(arg.samplesLen)), 0);
-arg.samplesPtr = samples[ithr].data();
-            // Store samples if not fitted to block.
-            if (arg.samplesLen > kernel->getDataElPerBlock()) {
-                samples[ithr].resize(arg.samplesLen);
-                arg.samplesPtr = samples[ithr].data();
-            }
-            samplesIdx[ithr].resize(kernel->getDataElPerVec(), 0);
-            const auto inc = blockLen[ithr][0] / arg.blocksNum * dataTypeSize;
-            for (int i = 1; i < arg.samplesLen && i < samplesIdx[ithr].size(); i++) {
-                samplesIdx[ithr][i] = samplesIdx[ithr][i - 1] + inc;
-            }
-            arg.samplesIdxPtr = samplesIdx[ithr].data();
-            arg.samplesIdxStep = inc * kernel->getDataElPerVec();
+//             const auto minWork = arg.workAmount / arg.blocksNum;
+//             auto restWork = arg.workAmount % arg.blocksNum;
+//             blockLen[ithr].resize(arg.blocksNum, minWork);
+//             for (int i = 0; restWork > 0; restWork--, i++) {
+//                 blockLen[ithr][i]++;
+//             }
+// for (int i = 0; i < arg.blocksNum; i++) {
+// blockLenStr += std::to_string(blockLen[ithr][i]) + "; ";
+// }
+//             // SAMPLES
+//             arg.samplesLen = arg.blocksNum * arg.blocksNum;
+// samples[ithr].resize(std::max(kernel->getDataElPerVec(), uint64_t(arg.samplesLen)), 0);
+// arg.samplesPtr = samples[ithr].data();
+//             // Store samples if not fitted to block.
+//             if (arg.samplesLen > kernel->getDataElPerBlock()) {
+//                 samples[ithr].resize(arg.samplesLen);
+//                 arg.samplesPtr = samples[ithr].data();
+//             }
+//             samplesIdx[ithr].resize(kernel->getDataElPerVec(), 0);
+//             const auto inc = blockLen[ithr][0] / arg.blocksNum * dataTypeSize;
+//             for (int i = 1; i < arg.samplesLen && i < samplesIdx[ithr].size(); i++) {
+//                 samplesIdx[ithr][i] = samplesIdx[ithr][i - 1] + inc;
+//             }
+//             arg.samplesIdxPtr = samplesIdx[ithr].data();
+//             arg.samplesIdxStep = inc * kernel->getDataElPerVec();
 
-            // PIVOTS
-            const auto pivotsLen = arg.blocksNum;
-            // Store pivots if not fitted to block.
-            if (pivotsLen > kernel->getDataElPerBlock()) {
-                pivots[ithr].resize(pivotsLen);
-                arg.pivotsPtr = pivots[ithr].data();
-            }
-        }
-        arg.blockLen = blockLen[ithr].data();
+//             // PIVOTS
+//             const auto pivotsLen = arg.blocksNum;
+//             // Store pivots if not fitted to block.
+//             if (pivotsLen > kernel->getDataElPerBlock()) {
+//                 pivots[ithr].resize(pivotsLen);
+//                 arg.pivotsPtr = pivots[ithr].data();
+//             }
+//         }
+//         arg.blockLen = blockLen[ithr].data();
 
-printf("[%d] blocksNum: %lu; blockLen {%s}\n", ithr, arg.blocksNum, blockLenStr.c_str());
-    });
+// // printf("[%d] blocksNum: %lu; blockLen {%s}\n", ithr, arg.blocksNum, blockLenStr.c_str());
+//     });
 }
 
 void Unique::execute(dnnl::stream strm) {
@@ -240,18 +240,18 @@ void Unique::execute(dnnl::stream strm) {
 //    const int* srcDataPtr = reinterpret_cast<const int *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 
 // DEBUG
-std::cout << "\nINPUT DATA: " << std::endl;
-//float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-//int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << srcDataF[i] << "; ";
-}
-std::cout << std::endl;
+// std::cout << "\nINPUT DATA: " << std::endl;
+// //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+// int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+// //int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << srcDataF[i] << "; ";
+// }
+// std::cout << std::endl;
 // DEBUG
 
     if (jcp.flattened) {
@@ -286,35 +286,35 @@ std::cout << std::endl;
     }
 
 // DEBUG
-std::cout << "OUTPUT_0: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
-//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << dstDataF[i] << "; ";
-//    std::cout << sorted[i] << "; ";
-}
-std::cout << std::endl << std::endl;
-for (int o = 1; o < 4; o++) {
-   if (jcp.definedOutputs[o]) {
-       std::cout << "OUTPUT_" << o << ": " << std::endl;
-       int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
-       for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-           if (i > 0 && i % 4 == 0)
-               std::cout << "| ";
-           if (i > 0 && i % 16 == 0)
-               std::cout << std::endl;
-           std::cout << dst1[i] << "; ";
-       }
-       std::cout << std::endl << std::endl;
-   }
-}
+// std::cout << "OUTPUT_0: " << std::endl;
+// //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
+// //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
+// //int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+// //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << dstDataF[i] << "; ";
+// //    std::cout << sorted[i] << "; ";
+// }
+// std::cout << std::endl << std::endl;
+// for (int o = 1; o < 4; o++) {
+//    if (jcp.definedOutputs[o]) {
+//        std::cout << "OUTPUT_" << o << ": " << std::endl;
+//        int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
+//        for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//            if (i > 0 && i % 4 == 0)
+//                std::cout << "| ";
+//            if (i > 0 && i % 16 == 0)
+//                std::cout << std::endl;
+//            std::cout << dst1[i] << "; ";
+//        }
+//        std::cout << std::endl << std::endl;
+//    }
+// }
 // for (int ithr = 0; ithr < threadsNum; ithr++) {
 //    std::string res;
 //    for (int i = 0; i < samples[ithr].size(); i++) {
@@ -345,7 +345,7 @@ void Unique::executeDynamicImpl(dnnl::stream strm) {
 template <typename T>
 size_t Unique::flattenTensorExec() {
     const T* srcDataPtr = reinterpret_cast<const T*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-    const auto inputLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(T);
+    const int64_t inputLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(T);
     T* uniqueData = reinterpret_cast<T*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
     int *firstPtr, *inToOutPtr, *occurPtr;
     if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
@@ -660,12 +660,12 @@ size_t Unique::flattenTensorExec() {
 //         }
 //     };
 
-//         std::memcpy(uniqueData, srcDataPtr, inputLen * sizeof(T));
+        // std::memcpy(uniqueData, srcDataPtr, inputLen * sizeof(T));
 // // std::cout << "SORTING " << std::endl;
 //         // qSort(uniqueData, 0, inputLen);
 //          qSort(uniqueData, uniqueData + inputLen - 1);
 
-        uniqueData[0] = srcDataPtr[0];
+        // uniqueData[0] = srcDataPtr[0];
         if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
             firstPtr[0] = 0;
         }
@@ -676,35 +676,127 @@ size_t Unique::flattenTensorExec() {
             std::fill(occurPtr, occurPtr + inputLen, 1);
         }
         uniqLen = 1;
-        for (int i = 1; i < inputLen; i++) {
-            bool found = false;
-            int j = 1;
-            for (; j < uniqLen; j++) {
-                if (uniqueData[j] == srcDataPtr[i]) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                uniqueData[uniqLen] = srcDataPtr[i];
 
-                if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
-                    firstPtr[uniqLen] = i;
-                }
-                if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
-                    inToOutPtr[i] = j;
-                }
+std::cout << "inputLen: " << inputLen << std::endl;
+const int threadsNum = parallel_get_max_threads();
+const int64_t blNum = (inputLen - 1) / 16 + 1;
+const int64_t wpt = blNum < threadsNum ? inputLen / blNum : inputLen / threadsNum;
+int64_t nThr = inputLen / wpt;
+        std::vector<int> uniqLens(threadsNum, 1);
+        std::vector<int> starts(threadsNum, 0);
+        
 
-                uniqLen++;
-            } else {
-                if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
-                    inToOutPtr[i] = j;
+        while (nThr / 2 != 0) {
+
+            parallel_nt(nThr, [&](const int ithr, const int nthr) {
+                    const auto start = starts[ithr] = std::min(ithr * wpt, inputLen);
+                    const auto end = std::min((ithr + 1) * wpt, inputLen);
+                    const auto wa = end - start;
+                    if (wa == 0) {
+                        return;
+                    }
+                    auto srcPtr  = srcDataPtr + start;
+                    auto uniData = uniqueData + start;
+                    uniData[0] = srcPtr[0];
+                    auto& uniqLen = uniqLens[ithr];
+printf("[%d] start: %d; end: %d\n", ithr, start, end);
+
+                    for (int i = 1; i < wa; i++) {
+                        bool found = false;
+                        int j = 0;
+                        for (; j < uniqLen; j++) {
+                            if (uniData[j] == srcPtr[i]) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            uniData[uniqLen] = srcPtr[i];
+
+                            // if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
+                            //     firstPtr[uniqLen] = i;
+                            // }
+                            // if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                            //     inToOutPtr[i] = j;
+                            // }
+
+                            uniqLen++;
+                        } else {
+                            // if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                            //     inToOutPtr[i] = j;
+                            // }
+                            // if (jcp.definedOutputs[OCCURRENCES_NUM]) {
+                            //     occurPtr[j]++;
+                            // }
+                        }
+                    }
+                });
+
+                nThr = nThr / 2 + (nThr % 2 != 0);
+        }
+
+        uniqLen = uniqLens[0];
+        for (int t = 1; t < threadsNum; t++) {
+            auto srcPtr = uniqueData + starts[t];
+            for (int i = 0; i < uniqLens[t]; i++) {
+                bool found = false;
+                int j = 0;
+                for (; j < uniqLen; j++) {
+                    if (uniqueData[j] == srcPtr[i]) {
+                        found = true;
+                        break;
+                    }
                 }
-                if (jcp.definedOutputs[OCCURRENCES_NUM]) {
-                    occurPtr[j]++;
+                if (!found) {
+                    uniqueData[uniqLen] = srcPtr[i];
+
+                    if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
+                        firstPtr[uniqLen] = i;
+                    }
+                    if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                        inToOutPtr[i] = j;
+                    }
+
+                    uniqLen++;
+                } else {
+                    if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                        inToOutPtr[i] = j;
+                    }
+                    if (jcp.definedOutputs[OCCURRENCES_NUM]) {
+                        occurPtr[j]++;
+                    }
                 }
             }
         }
+        // for (int i = 1; i < inputLen; i++) {
+        //     bool found = false;
+        //     int j = 1;
+        //     for (; j < uniqLen; j++) {
+        //         if (uniqueData[j] == srcDataPtr[i]) {
+        //             found = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!found) {
+        //         uniqueData[uniqLen] = srcDataPtr[i];
+
+        //         if (jcp.definedOutputs[FIRST_UNIQUE_IDX]) {
+        //             firstPtr[uniqLen] = i;
+        //         }
+        //         if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+        //             inToOutPtr[i] = j;
+        //         }
+
+        //         uniqLen++;
+        //     } else {
+        //         if (jcp.definedOutputs[INPUT_TO_UNIQ_IDX]) {
+        //             inToOutPtr[i] = j;
+        //         }
+        //         if (jcp.definedOutputs[OCCURRENCES_NUM]) {
+        //             occurPtr[j]++;
+        //         }
+        //     }
+        // }
     }
 
     return uniqLen;
