@@ -53,8 +53,8 @@ Unique::Unique(const std::shared_ptr<ov::Node>& op, const dnnl::engine& eng, Wei
         if (axis < 0) {
             axis += op->get_input_partial_shape(IN_DATA).rank().get_length();
         }
-        if (axis < 0) {
-            THROW_ERROR << "has invalid axis value " << ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXIS))->cast_vector<int>()[0];
+        if (axis < 0 || axis >= op->get_input_partial_shape(IN_DATA).rank().get_length()) {
+            THROW_ERROR << "has invalid axis value: " << ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXIS))->cast_vector<int>()[0];
         }
     } else {
         flattened = true;
@@ -114,18 +114,18 @@ void Unique::execute(dnnl::stream strm) {
 //    const int* srcDataPtr = reinterpret_cast<const int *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 
 // DEBUG
-// std::cout << "\nINPUT DATA: " << std::endl;
-// //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-// int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-// //int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-// for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-//     if (i > 0 && i % 4 == 0)
-//         std::cout << "| ";
-//     if (i > 0 && i % 16 == 0)
-//         std::cout << std::endl;
-//     std::cout << srcDataF[i] << "; ";
-// }
-// std::cout << std::endl;
+std::cout << "\nINPUT DATA: " << std::endl;
+//float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+//int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+    if (i > 0 && i % 4 == 0)
+        std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
+    std::cout << srcDataF[i] << "; ";
+}
+std::cout << std::endl;
 // DEBUG
 
     if (flattened) {
@@ -140,10 +140,10 @@ void Unique::execute(dnnl::stream strm) {
             uniqueLen = flattenTensorExec<PrecisionTrait<Precision::U8>::value_type>();
         }
 
-        const size_t totalWork = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / 4;
-        redefineOutputMemory({ {uniqueLen}, {uniqueLen}, {totalWork}, {uniqueLen}}); // TODO: check for diff shapes
+        const size_t srcLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / dataPrecision.size();
+        redefineOutputMemory({ {uniqueLen}, {uniqueLen}, {srcLen}, {uniqueLen}});
     } else {
-        size_t uniqueLen = 0lu;
+        size_t uniqueLen = 1lu;
         if (dataPrecision == Precision::FP32) {
             uniqueLen = slicedTensorExec<PrecisionTrait<Precision::FP32>::value_type>();
         } else if (dataPrecision == Precision::I32) {
@@ -154,63 +154,57 @@ void Unique::execute(dnnl::stream strm) {
             uniqueLen = slicedTensorExec<PrecisionTrait<Precision::U8>::value_type>();
         }
 
-        const auto& srcDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
-//        const size_t totalWork = flattened ? std::accumulate(srcDataShape.begin(), srcDataShape.end(), 1, std::multiplies<Dim>()) : srcDataShape[axis];
-//        redefineOutputMemory({ {uniqueLen}, {uniqueLen}, {totalWork}, {uniqueLen}});
+        auto dstDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
+        dstDataShape[axis] = uniqueLen;
+        const size_t srcLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / dataPrecision.size();
+        redefineOutputMemory({ dstDataShape, {uniqueLen}, {srcLen}, {uniqueLen}});
     }
 
 // DEBUG
-// std::cout << "OUTPUT_0: " << std::endl;
-// //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-// int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
-// //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-// //int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-// for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-// //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//     if (i > 0 && i % 4 == 0)
-//         std::cout << "| ";
-//     if (i > 0 && i % 16 == 0)
-//         std::cout << std::endl;
-//     std::cout << dstDataF[i] << "; ";
-// //    std::cout << sorted[i] << "; ";
-// }
-// std::cout << std::endl << std::endl;
-// for (int o = 1; o < 4; o++) {
-//    if (definedOutputs[o]) {
-//        std::cout << "OUTPUT_" << o << ": " << std::endl;
-//        int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
-//        for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
-//            if (i > 0 && i % 4 == 0)
-//                std::cout << "| ";
-//            if (i > 0 && i % 16 == 0)
-//                std::cout << std::endl;
-//            std::cout << dst1[i] << "; ";
-//        }
-//        std::cout << std::endl << std::endl;
-//    }
-// }
-// for (int ithr = 0; ithr < threadsNum; ithr++) {
-//    std::string res;
-//    for (int i = 0; i < samples[ithr].size(); i++) {
-//        res += std::to_string(samples[ithr][i]) + ";";
-//    }
-//    printf("[%d] Samples {%s}\n", ithr, res.c_str());
-// }
+std::cout << "OUTPUT_0: " << std::endl;
+//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
+//int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
+//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+//for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+    if (i > 0 && i % 4 == 0)
+        std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
+    std::cout << dstDataF[i] << "; ";
+//    std::cout << sorted[i] << "; ";
+}
+std::cout << std::endl << std::endl;
+for (int o = 1; o < 4; o++) {
+   if (definedOutputs[o]) {
+       std::cout << "OUTPUT_" << o << ": " << std::endl;
+       int *dst1 = reinterpret_cast<int *>(getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetPtr());
+       for (int i = 0; i < getChildEdgesAtPort(o)[0]->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+           if (i > 0 && i % 4 == 0)
+               std::cout << "| ";
+           if (i > 0 && i % 16 == 0)
+               std::cout << std::endl;
+           std::cout << dst1[i] << "; ";
+       }
+       std::cout << std::endl << std::endl;
+   }
+}
 // DEBUG
 }
 
 void Unique::executeDynamicImpl(dnnl::stream strm) {
-    const auto& srcDataDims = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
-    VectorDims dstDataDims;
-    Dim uniqLen = 0;
-    if (flattened) {
-        uniqLen = std::accumulate(srcDataDims.begin(), srcDataDims.end(), 1, std::multiplies<Dim>());
-        dstDataDims = { uniqLen };
-    } else {
-        uniqLen = dstDataDims[axis];
-        dstDataDims = getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->getStaticDims();
-    }
-    redefineOutputMemory({ dstDataDims, {uniqLen}, {uniqLen}, {uniqLen}});
+    // const auto& srcDataDims = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
+    // VectorDims dstDataDims;
+    // Dim uniqLen = 1;
+    // if (flattened) {
+    //     uniqLen = std::accumulate(srcDataDims.begin(), srcDataDims.end(), 1, std::multiplies<Dim>());
+    //     dstDataDims = { uniqLen };
+    // } else {
+    //     uniqLen = srcDataDims[axis];
+    //     dstDataDims = srcDataDims;
+    // }
+    // redefineOutputMemory({ dstDataDims, {uniqLen}, {uniqLen}, {uniqLen}});
 
     execute(strm);
 }
@@ -289,7 +283,7 @@ size_t Unique::flattenTensorExec() {
 
          for (int i = 1; i < inputLen; i++) {
              bool found = false;
-             int j = 1;
+             int j = 0;
              for (; j < uniqLen; j++) {
                  if (uniqueData[j] == srcDataPtr[i]) {
                      found = true;
@@ -338,80 +332,87 @@ size_t Unique::slicedTensorExec() {
     }
 
     const auto& srcDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
+size_t uniqLen = srcDataShape[axis];
 
-    const auto cmpBlNum = srcDataShape[axis]; // Blocks to compare.
-    const auto partsInBl = std::accumulate(srcDataShape.begin(), srcDataShape.begin() + axis - 1, 1, std::multiplies<Dim>()); // Parts in block.
-    const auto elPerPart = std::accumulate(srcDataShape.begin() + axis + 1, srcDataShape.end(), 1, std::multiplies<Dim>()); // Elements in part.
-    const auto partLen = elPerPart * dataPrecision.size();
-    const auto partStep = elPerPart * cmpBlNum;
+    // const auto cmpBlNum = srcDataShape[axis]; // Blocks to compare.
+    // int64_t partsInBl = 1; // Parts in block
+    // if (axis > 1) {
+    //     partsInBl = std::accumulate(srcDataShape.begin(), srcDataShape.begin() + axis - 1, 1, std::multiplies<Dim>());
+    // }
+    // int64_t elPerPart = 1; // Elements in part.
+    // if (axis < srcDataShape.size() - 1) {
+    //     elPerPart = std::accumulate(srcDataShape.begin() + axis + 1, srcDataShape.end(), 1, std::multiplies<Dim>());
+    // }
+    // const auto partLen = elPerPart * dataPrecision.size();
+    // const auto partStep = elPerPart * cmpBlNum;
 
-    if (definedOutputs[FIRST_UNIQUE_IDX]) {
-        firstPtr[0] = 0;
-    }
-    if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-        inToOutPtr[0] = 0;
-    }
-    if (definedOutputs[OCCURRENCES_NUM]) {
-        occurPtr[0] = 1;
-        std::fill(occurPtr, occurPtr + inputLen, 1);
-    }
+    // if (definedOutputs[FIRST_UNIQUE_IDX]) {
+    //     firstPtr[0] = 0;
+    // }
+    // if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+    //     inToOutPtr[0] = 0;
+    // }
+    // if (definedOutputs[OCCURRENCES_NUM]) {
+    //     occurPtr[0] = 1;
+    //     std::fill(occurPtr, occurPtr + inputLen, 1);
+    // }
 
-    size_t uniqLen = 1;
+    // size_t uniqLen = 1;
     if (sorted) {
-        for (int p = 0; p < partsInBl; p++) {
-            for (int e = 0; e < elPerPart; e++) {
-                for (int e = 0; e < elPerPart; e++) {
-                }
-            }
-        }
+        // for (int p = 0; p < partsInBl; p++) {
+        //     for (int e = 0; e < elPerPart; e++) {
+        //         for (int e = 0; e < elPerPart; e++) {
+        //         }
+        //     }
+        // }
     } else {
-        auto first1 = srcDataPtr;
-        auto first2 = uniqueData;
-        for (int p = 0; p < partsInBl; p++) {
-            memcpy(first2, first1, partLen);
-            first1 += partStep;
-            first2 += partStep;
-        }
+        // auto first1 = srcDataPtr;
+        // auto first2 = uniqueData;
+        // for (int p = 0; p < partsInBl; p++) {
+        //     memcpy(first2, first1, partLen);
+        //     first1 += partStep;
+        //     first2 += partStep;
+        // }
 
-        const T* last1;
-        for (int b1 = 1; b1 < cmpBlNum; b1++) {
-            first1 = srcDataPtr + b1 * partLen;
-            last1 = srcDataPtr + (b1 + 1) * partLen;
-            bool equal = true;
-            int b2 = 0;
-            for (; b2 < uniqLen; b2++) {
-                first2 = uniqueData + b2 * partLen;
-                equal = true;
-                for (int p = 0; p < partsInBl; p++) {
-                    equal = std::equal(first1, last1, first2);
-                    if (!equal) {
-                        break;
-                    }
-                }
-                if (equal) {
-                    break;
-                }
-            }
-            if (!equal) {
-                first2 = uniqueData + uniqLen * partLen;
-                for (int p = 0; p < partsInBl; p++) {
-                    memcpy(first2, first1, partLen);
-                    first1 += partStep;
-                    first2 += partStep;
-                }
+        // const T* last1;
+        // for (int b1 = 1; b1 < cmpBlNum; b1++) {
+        //     first1 = srcDataPtr + b1 * partLen;
+        //     last1 = srcDataPtr + (b1 + 1) * partLen;
+        //     bool equal = true;
+        //     int b2 = 0;
+        //     for (; b2 < uniqLen; b2++) {
+        //         first2 = uniqueData + b2 * partLen;
+        //         equal = true;
+        //         for (int p = 0; p < partsInBl; p++) {
+        //             equal = std::equal(first1, last1, first2);
+        //             if (!equal) {
+        //                 break;
+        //             }
+        //         }
+        //         if (equal) {
+        //             break;
+        //         }
+        //     }
+        //     if (!equal) {
+        //         first2 = uniqueData + uniqLen * partLen;
+        //         for (int p = 0; p < partsInBl; p++) {
+        //             memcpy(first2, first1, partLen);
+        //             first1 += partStep;
+        //             first2 += partStep;
+        //         }
 
-                if (definedOutputs[FIRST_UNIQUE_IDX]) {
-                    firstPtr[uniqLen ] = b1;
-                }
-                if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-                    inToOutPtr[b1] = uniqLen;
-                }
+        //         if (definedOutputs[FIRST_UNIQUE_IDX]) {
+        //             firstPtr[uniqLen ] = b1;
+        //         }
+        //         if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+        //             inToOutPtr[b1] = uniqLen;
+        //         }
 
-                uniqLen++;
-            } else if (definedOutputs[OCCURRENCES_NUM]) {
-                occurPtr[b2]++;
-            }
-        }
+        //         uniqLen++;
+        //     } else if (definedOutputs[OCCURRENCES_NUM]) {
+        //         occurPtr[b2]++;
+        //     }
+        // }
     }
 
     return uniqLen;
