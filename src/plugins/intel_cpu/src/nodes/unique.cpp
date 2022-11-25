@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "unique.hpp"
-#include "ie_parallel.hpp"
 #include <ngraph/opsets/opset1.hpp>
 
 using namespace InferenceEngine;
@@ -44,7 +43,6 @@ Unique::Unique(const std::shared_ptr<ov::Node>& op, const dnnl::engine& eng, Wei
 
     for (int i = 0; i < 4; i++) {
         definedOutputs[i] = !op->get_output_target_inputs(i).empty();
-// std::cout << "OUT_" << i << ": " << op->get_output_partial_shape(i).to_string() << std::endl;
     }
 
     sorted = ov::as_type_ptr<ov::op::v10::Unique>(op)->get_sorted();
@@ -78,17 +76,13 @@ void Unique::initSupportedPrimitiveDescriptors() {
     }
     std::vector<PortConfigurator> outPortConfigs;
     for (int i = 0; i < 4; i++) {
-        if (definedOutputs[i]) {
-            outPortConfigs.push_back({LayoutType::ncsp, i == 0 ? dataPrecision : axisPrecision});
-        }
+        outPortConfigs.push_back({LayoutType::ncsp, i == 0 ? dataPrecision : axisPrecision});
     }
 
     addSupportedPrimDesc(inPortConfigs, outPortConfigs, implType, isDynamicNode());
 }
 
 void Unique::createPrimitive() {
-    threadsNum = parallel_get_max_threads();
-
     Node::createPrimitive();
 }
 
@@ -111,9 +105,6 @@ void Unique::prepareParams() {
 }
 
 void Unique::execute(dnnl::stream strm) {
-//    const void* srcDataPtr = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr();
-//    const int* srcDataPtr = reinterpret_cast<const int *>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-
 // DEBUG
 std::cout << "\nINPUT DATA: " << std::endl;
 //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
@@ -195,18 +186,6 @@ for (int o = 1; o < 4; o++) {
 }
 
 void Unique::executeDynamicImpl(dnnl::stream strm) {
-    // const auto& srcDataDims = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
-    // VectorDims dstDataDims;
-    // Dim uniqLen = 1;
-    // if (flattened) {
-    //     uniqLen = std::accumulate(srcDataDims.begin(), srcDataDims.end(), 1, std::multiplies<Dim>());
-    //     dstDataDims = { uniqLen };
-    // } else {
-    //     uniqLen = srcDataDims[axis];
-    //     dstDataDims = srcDataDims;
-    // }
-    // redefineOutputMemory({ dstDataDims, {uniqLen}, {uniqLen}, {uniqLen}});
-
     execute(strm);
 }
 
@@ -333,14 +312,13 @@ size_t Unique::slicedTensorExec() {
     }
 
     const auto& srcDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
-// size_t uniqLen = srcDataShape[axis];
 
     const auto cmpBlNum = srcDataShape[axis]; // Blocks to compare.
     int64_t partsInBl = 1; // Parts in block
-    if (axis > 1) {
-        partsInBl = std::accumulate(srcDataShape.begin(), srcDataShape.begin() + axis - 1, 1, std::multiplies<Dim>());
+    if (axis > 0) {
+        partsInBl = std::accumulate(srcDataShape.begin(), srcDataShape.begin() + axis, 1, std::multiplies<Dim>());
     }
-    int64_t elPerPart = 1; // Elements in part.
+    int64_t elPerPart = 1; // Elements number in part.
     if (axis < srcDataShape.size() - 1) {
         elPerPart = std::accumulate(srcDataShape.begin() + axis + 1, srcDataShape.end(), 1, std::multiplies<Dim>());
     }
@@ -361,65 +339,95 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
     }
 
     size_t uniqLen = 1;
-    if (sorted) {
-        // for (int p = 0; p < partsInBl; p++) {
-        //     for (int e = 0; e < elPerPart; e++) {
-        //         for (int e = 0; e < elPerPart; e++) {
-        //         }
-        //     }
-        // }
-    } else {
-        // Copy the first block.
-        auto first1 = srcDataPtr;
-        auto first2 = uniqueData;
-        for (int p = 0; p < partsInBl; p++) {
-            memcpy(first2, first1, partLenB);
-            first1 += partStep;
-            first2 += partStep;
-        }
+    // Copy the first block.
+    auto first1 = srcDataPtr;
+    auto first2 = uniqueData;
+    for (int p = 0; p < partsInBl; p++) {
+        memcpy(first2, first1, partLenB);
+        first1 += partStep;
+        first2 += partStep;
+    }
 
-        const T* last1;
-        for (int b1 = 1; b1 < cmpBlNum; b1++) {
-            first1 = srcDataPtr + b1 * elPerPart;
-            last1 = srcDataPtr + (b1 + 1) * elPerPart;
-            bool equal = true;
-            int b2 = 0;
-            // Compare with unique blocks.
-            for (; b2 < uniqLen; b2++) {
-                first2 = uniqueData + b2 * elPerPart;
-                equal = true;
-                for (int p = 0; p < partsInBl; p++) {
-                    equal = std::equal(first1, last1, first2);
-                    if (!equal) {
-                        break;
-                    }
-                }
-                if (equal) {
+    const T* last1;
+    for (int b1 = 1; b1 < cmpBlNum; b1++) {
+        first1 = srcDataPtr + b1 * elPerPart;
+        last1 = srcDataPtr + (b1 + 1) * elPerPart;
+        bool equal = true;
+        int b2 = 0;
+        // Compare with unique blocks.
+        for (; b2 < uniqLen; b2++) {
+            first2 = uniqueData + b2 * elPerPart;
+            equal = true;
+            for (int p = 0; p < partsInBl; p++) {
+                equal = std::equal(first1, last1, first2);
+                if (!equal) {
                     break;
                 }
+                first2 += partStep;
             }
-            if (!equal) {
-                first2 = uniqueData + uniqLen * elPerPart;
-                for (int p = 0; p < partsInBl; p++) {
-                    memcpy(first2, first1, partLenB);
-                    first1 += partStep;
-                    first2 += partStep;
-                }
+            if (equal) {
+                break;
+            }
+        }
+        if (!equal) {
+            first2 = uniqueData + uniqLen * elPerPart;
+            for (int p = 0; p < partsInBl; p++) {
+                memcpy(first2, first1, partLenB);
+                first1 += partStep;
+                first2 += partStep;
+            }
 
-                if (definedOutputs[FIRST_UNIQUE_IDX]) {
-                    firstPtr[uniqLen] = b1;
-                }
-                if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-                    inToOutPtr[b1] = b2;
-                }
+            if (definedOutputs[FIRST_UNIQUE_IDX]) {
+                firstPtr[uniqLen] = b1;
+            }
+            if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                inToOutPtr[b1] = b2;
+            }
 
-                uniqLen++;
-            } else {
-                if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-                    inToOutPtr[b1] = b2;
+            uniqLen++;
+        } else {
+            if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                inToOutPtr[b1] = b2;
+            }
+            if (definedOutputs[OCCURRENCES_NUM]) {
+                occurPtr[b2]++;
+            }
+        }
+    }
+
+    if (sorted) {
+        const auto elInBl = elPerPart * partsInBl;
+        struct OrdEl {
+            T val;
+            int64_t idx;
+        };
+
+        std::vector<OrdEl> colToSort(cmpBlNum);
+        std::vector<T> buff(elPerPart);
+        for (int64_t p = partsInBl - 1; p >= 0; p--) {
+            for (int64_t e = elPerPart - 1; e >= 0 ; e--) {
+                int64_t pos1 = p * partStep + e;
+                for (int64_t i = 0; i < cmpBlNum; i++) {
+                    int64_t pos2 = i * elInBl + pos1;
+                    colToSort[i] = {uniqueData[pos2], i};
                 }
-                if (definedOutputs[OCCURRENCES_NUM]) {
-                    occurPtr[b2]++;
+                std::stable_sort(colToSort.begin(), colToSort.end(), [](const OrdEl &el1, const OrdEl &el2) { return el1.val < el2.val; });
+
+                // perm
+                for (int64_t i = 0; i < cmpBlNum; i++) {
+                    if (colToSort[i].idx == i) {
+                        continue;
+                    }
+                    T* dst = uniqueData + i * elPerPart;
+                    T* src = uniqueData + colToSort[i].idx * elPerPart;
+                    for (int p = 0; p < partsInBl; p++) {
+                        memcpy(buff.data(), dst, partLenB);
+                        memcpy(dst, src, partLenB);
+                        memcpy(src, buff.data(), partLenB);
+                        dst += partStep;
+                        src += partStep;
+                    }
+                    colToSort[colToSort[i].idx].idx = colToSort[i].idx;
                 }
             }
         }
