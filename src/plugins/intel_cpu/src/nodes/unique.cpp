@@ -21,7 +21,7 @@ bool Unique::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std
             errorMessage = "Not supported Unique operation version. CPU plug-in supports only 10th version.";
             return false;
         }
-        if (op->get_input_size() > AXIS && !ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXIS))) { // TODO: check get_input_size
+        if (op->get_input_size() > AXIS && !ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXIS))) {
             errorMessage = "CPU plug-in supports only constant Axis input.";
             return false;
         }
@@ -44,6 +44,7 @@ Unique::Unique(const std::shared_ptr<ov::Node>& op, const dnnl::engine& eng, Wei
 
     for (int i = 0; i < 4; i++) {
         definedOutputs[i] = !op->get_output_target_inputs(i).empty();
+// std::cout << "OUT_" << i << ": " << op->get_output_partial_shape(i).to_string() << std::endl;
     }
 
     sorted = ov::as_type_ptr<ov::op::v10::Unique>(op)->get_sorted();
@@ -155,8 +156,8 @@ std::cout << std::endl;
         }
 
         auto dstDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
+        const size_t srcLen = dstDataShape[axis];
         dstDataShape[axis] = uniqueLen;
-        const size_t srcLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / dataPrecision.size();
         redefineOutputMemory({ dstDataShape, {uniqueLen}, {srcLen}, {uniqueLen}});
     }
 
@@ -332,32 +333,34 @@ size_t Unique::slicedTensorExec() {
     }
 
     const auto& srcDataShape = getParentEdgeAt(IN_DATA)->getMemoryPtr()->getStaticDims();
-size_t uniqLen = srcDataShape[axis];
+// size_t uniqLen = srcDataShape[axis];
 
-    // const auto cmpBlNum = srcDataShape[axis]; // Blocks to compare.
-    // int64_t partsInBl = 1; // Parts in block
-    // if (axis > 1) {
-    //     partsInBl = std::accumulate(srcDataShape.begin(), srcDataShape.begin() + axis - 1, 1, std::multiplies<Dim>());
-    // }
-    // int64_t elPerPart = 1; // Elements in part.
-    // if (axis < srcDataShape.size() - 1) {
-    //     elPerPart = std::accumulate(srcDataShape.begin() + axis + 1, srcDataShape.end(), 1, std::multiplies<Dim>());
-    // }
-    // const auto partLen = elPerPart * dataPrecision.size();
-    // const auto partStep = elPerPart * cmpBlNum;
+    const auto cmpBlNum = srcDataShape[axis]; // Blocks to compare.
+    int64_t partsInBl = 1; // Parts in block
+    if (axis > 1) {
+        partsInBl = std::accumulate(srcDataShape.begin(), srcDataShape.begin() + axis - 1, 1, std::multiplies<Dim>());
+    }
+    int64_t elPerPart = 1; // Elements in part.
+    if (axis < srcDataShape.size() - 1) {
+        elPerPart = std::accumulate(srcDataShape.begin() + axis + 1, srcDataShape.end(), 1, std::multiplies<Dim>());
+    }
+    const auto partLenB = elPerPart * dataPrecision.size();
+    const auto partStep = elPerPart * cmpBlNum;
+std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPerPart: " << elPerPart
+<< "; partLenB: " << partLenB << "; partStep: " << partStep << std::endl;
 
-    // if (definedOutputs[FIRST_UNIQUE_IDX]) {
-    //     firstPtr[0] = 0;
-    // }
-    // if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-    //     inToOutPtr[0] = 0;
-    // }
-    // if (definedOutputs[OCCURRENCES_NUM]) {
-    //     occurPtr[0] = 1;
-    //     std::fill(occurPtr, occurPtr + inputLen, 1);
-    // }
+    if (definedOutputs[FIRST_UNIQUE_IDX]) {
+        firstPtr[0] = 0;
+    }
+    if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+        inToOutPtr[0] = 0;
+    }
+    if (definedOutputs[OCCURRENCES_NUM]) {
+        occurPtr[0] = 1;
+        std::fill(occurPtr, occurPtr + inputLen, 1);
+    }
 
-    // size_t uniqLen = 1;
+    size_t uniqLen = 1;
     if (sorted) {
         // for (int p = 0; p < partsInBl; p++) {
         //     for (int e = 0; e < elPerPart; e++) {
@@ -366,53 +369,60 @@ size_t uniqLen = srcDataShape[axis];
         //     }
         // }
     } else {
-        // auto first1 = srcDataPtr;
-        // auto first2 = uniqueData;
-        // for (int p = 0; p < partsInBl; p++) {
-        //     memcpy(first2, first1, partLen);
-        //     first1 += partStep;
-        //     first2 += partStep;
-        // }
+        // Copy the first block.
+        auto first1 = srcDataPtr;
+        auto first2 = uniqueData;
+        for (int p = 0; p < partsInBl; p++) {
+            memcpy(first2, first1, partLenB);
+            first1 += partStep;
+            first2 += partStep;
+        }
 
-        // const T* last1;
-        // for (int b1 = 1; b1 < cmpBlNum; b1++) {
-        //     first1 = srcDataPtr + b1 * partLen;
-        //     last1 = srcDataPtr + (b1 + 1) * partLen;
-        //     bool equal = true;
-        //     int b2 = 0;
-        //     for (; b2 < uniqLen; b2++) {
-        //         first2 = uniqueData + b2 * partLen;
-        //         equal = true;
-        //         for (int p = 0; p < partsInBl; p++) {
-        //             equal = std::equal(first1, last1, first2);
-        //             if (!equal) {
-        //                 break;
-        //             }
-        //         }
-        //         if (equal) {
-        //             break;
-        //         }
-        //     }
-        //     if (!equal) {
-        //         first2 = uniqueData + uniqLen * partLen;
-        //         for (int p = 0; p < partsInBl; p++) {
-        //             memcpy(first2, first1, partLen);
-        //             first1 += partStep;
-        //             first2 += partStep;
-        //         }
+        const T* last1;
+        for (int b1 = 1; b1 < cmpBlNum; b1++) {
+            first1 = srcDataPtr + b1 * elPerPart;
+            last1 = srcDataPtr + (b1 + 1) * elPerPart;
+            bool equal = true;
+            int b2 = 0;
+            // Compare with unique blocks.
+            for (; b2 < uniqLen; b2++) {
+                first2 = uniqueData + b2 * elPerPart;
+                equal = true;
+                for (int p = 0; p < partsInBl; p++) {
+                    equal = std::equal(first1, last1, first2);
+                    if (!equal) {
+                        break;
+                    }
+                }
+                if (equal) {
+                    break;
+                }
+            }
+            if (!equal) {
+                first2 = uniqueData + uniqLen * elPerPart;
+                for (int p = 0; p < partsInBl; p++) {
+                    memcpy(first2, first1, partLenB);
+                    first1 += partStep;
+                    first2 += partStep;
+                }
 
-        //         if (definedOutputs[FIRST_UNIQUE_IDX]) {
-        //             firstPtr[uniqLen ] = b1;
-        //         }
-        //         if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-        //             inToOutPtr[b1] = uniqLen;
-        //         }
+                if (definedOutputs[FIRST_UNIQUE_IDX]) {
+                    firstPtr[uniqLen] = b1;
+                }
+                if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                    inToOutPtr[b1] = b2;
+                }
 
-        //         uniqLen++;
-        //     } else if (definedOutputs[OCCURRENCES_NUM]) {
-        //         occurPtr[b2]++;
-        //     }
-        // }
+                uniqLen++;
+            } else {
+                if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                    inToOutPtr[b1] = b2;
+                }
+                if (definedOutputs[OCCURRENCES_NUM]) {
+                    occurPtr[b2]++;
+                }
+            }
+        }
     }
 
     return uniqLen;
