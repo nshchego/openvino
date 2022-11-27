@@ -107,10 +107,10 @@ void Unique::prepareParams() {
 void Unique::execute(dnnl::stream strm) {
 // DEBUG
 std::cout << "\nINPUT DATA: " << std::endl;
-//float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
 // int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-int8_t * srcDataF = reinterpret_cast<int8_t*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize(); i++) {
+// int8_t * srcDataF = reinterpret_cast<int8_t*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
     if (i > 0 && i % 4 == 0)
         std::cout << "| ";
     if (i > 0 && i % 16 == 0)
@@ -154,11 +154,11 @@ std::cout << std::endl;
 
 // DEBUG
 std::cout << "OUTPUT_0: " << std::endl;
-//float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 // int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
 //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize(); i++) {
+// int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
 //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i > 0 && i % 4 == 0)
         std::cout << "| ";
@@ -339,24 +339,15 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
     }
 
     size_t uniqLen = 1;
-    // Copy the first block.
-    auto first1 = srcDataPtr;
-    auto first2 = uniqueData;
-    for (int p = 0; p < partsInBl; p++) {
-        memcpy(first2, first1, partLenB);
-        first1 += partStep;
-        first2 += partStep;
-    }
-
-    const T* last1;
+    std::vector<int64_t> uniqIdx(cmpBlNum, 0);
     for (int b1 = 1; b1 < cmpBlNum; b1++) {
-        first1 = srcDataPtr + b1 * elPerPart;
-        last1 = srcDataPtr + (b1 + 1) * elPerPart;
+        auto first1 = srcDataPtr + b1 * elPerPart;
+        auto last1 = srcDataPtr + (b1 + 1) * elPerPart;
         bool equal = true;
         int b2 = 0;
         // Compare with unique blocks.
         for (; b2 < uniqLen; b2++) {
-            first2 = uniqueData + b2 * elPerPart;
+            auto first2 = srcDataPtr + uniqIdx[b2] * elPerPart;
             equal = true;
             for (int p = 0; p < partsInBl; p++) {
                 equal = std::equal(first1, last1, first2);
@@ -370,13 +361,6 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
             }
         }
         if (!equal) {
-            first2 = uniqueData + uniqLen * elPerPart;
-            for (int p = 0; p < partsInBl; p++) {
-                memcpy(first2, first1, partLenB);
-                first1 += partStep;
-                first2 += partStep;
-            }
-
             if (definedOutputs[FIRST_UNIQUE_IDX]) {
                 firstPtr[uniqLen] = b1;
             }
@@ -384,7 +368,7 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
                 inToOutPtr[b1] = b2;
             }
 
-            uniqLen++;
+            uniqIdx[uniqLen++] = b1;
         } else {
             if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
                 inToOutPtr[b1] = b2;
@@ -392,6 +376,17 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
             if (definedOutputs[OCCURRENCES_NUM]) {
                 occurPtr[b2]++;
             }
+        }
+    }
+
+    const auto dstPrtStep = elPerPart * uniqLen;
+    for (int b1 = 0; b1 < uniqLen; b1++) {
+        auto first1 = srcDataPtr + uniqIdx[b1] * elPerPart;
+        auto first2 = uniqueData + b1 * elPerPart;
+        for (int p = 0; p < partsInBl; p++) {
+            memcpy(first2, first1, partLenB);
+            first1 += partStep;
+            first2 += dstPrtStep;
         }
     }
 
@@ -406,7 +401,7 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
         std::vector<T> buff(elPerPart);
         for (int64_t p = partsInBl - 1; p >= 0; p--) {
             for (int64_t e = elPerPart - 1; e >= 0 ; e--) {
-                int64_t pos1 = p * partStep + e;
+                int64_t pos1 = p * dstPrtStep + e;
                 for (int64_t i = 0; i < cmpBlNum; i++) {
                     int64_t pos2 = i * elInBl + pos1;
                     colToSort[i] = {uniqueData[pos2], i};
@@ -424,8 +419,8 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
                         memcpy(buff.data(), dst, partLenB);
                         memcpy(dst, src, partLenB);
                         memcpy(src, buff.data(), partLenB);
-                        dst += partStep;
-                        src += partStep;
+                        dst += dstPrtStep;
+                        src += dstPrtStep;
                     }
                     colToSort[colToSort[i].idx].idx = colToSort[i].idx;
 
