@@ -108,14 +108,14 @@ void Unique::execute(dnnl::stream strm) {
 // DEBUG
 std::cout << "\nINPUT DATA: " << std::endl;
 //float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-//int8_t * srcDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+// int* srcDataF = reinterpret_cast<int*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
+int8_t * srcDataF = reinterpret_cast<int8_t*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize(); i++) {
     if (i > 0 && i % 4 == 0)
         std::cout << "| ";
     if (i > 0 && i % 16 == 0)
         std::cout << std::endl;
-    std::cout << srcDataF[i] << "; ";
+    std::cout << int(srcDataF[i]) << "; ";
 }
 std::cout << std::endl;
 // DEBUG
@@ -155,16 +155,16 @@ std::cout << std::endl;
 // DEBUG
 std::cout << "OUTPUT_0: " << std::endl;
 //float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
+// int* dstDataF = reinterpret_cast<int*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
 //int* dstDataF = reinterpret_cast<int*>(getChildEdgeAt(FIRST_UNIQUE_IDX)->getMemoryPtr()->GetPtr());
-//int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(int); i++) {
+int8_t * dstDataF = reinterpret_cast<int8_t*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+for (int i = 0; i < getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize(); i++) {
 //for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
     if (i > 0 && i % 4 == 0)
         std::cout << "| ";
     if (i > 0 && i % 16 == 0)
         std::cout << std::endl;
-    std::cout << dstDataF[i] << "; ";
+    std::cout << int(dstDataF[i]) << "; ";
 //    std::cout << sorted[i] << "; ";
 }
 std::cout << std::endl << std::endl;
@@ -428,6 +428,22 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
                         src += partStep;
                     }
                     colToSort[colToSort[i].idx].idx = colToSort[i].idx;
+
+                    if (definedOutputs[FIRST_UNIQUE_IDX]) {
+                        auto idx = firstPtr[colToSort[i].idx];
+                        firstPtr[colToSort[i].idx] = firstPtr[i];
+                        firstPtr[i] = idx;
+                    }
+                    if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
+                        auto idx = inToOutPtr[colToSort[i].idx];
+                        inToOutPtr[colToSort[i].idx] = inToOutPtr[i];
+                        inToOutPtr[i] = idx;
+                    }
+                    if (definedOutputs[OCCURRENCES_NUM]) {
+                        auto idx = occurPtr[colToSort[i].idx];
+                        occurPtr[colToSort[i].idx] = occurPtr[i];
+                        occurPtr[i] = idx;
+                    }
                 }
             }
         }

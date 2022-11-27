@@ -199,7 +199,7 @@ for (int i = 0; i < expected.get_size(); i++) {
         std::cout << "| ";
     if (i > 0 && i % 16 == 0)
         std::cout << std::endl;
-    std::cout << expected_data[i] << "; ";
+    std::cout << int(expected_data[i]) << "; ";
 }
 std::cout << std::endl;
 
