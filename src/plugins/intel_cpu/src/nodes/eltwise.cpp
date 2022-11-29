@@ -891,6 +891,9 @@ const std::map<const ngraph::DiscreteTypeInfo, Eltwise::Initializer> Eltwise::in
     }},
     {ov::op::v10::IsInf::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
         node.algorithm = Algorithm::EltwiseIsInf;
+        const auto& attributes = ov::as_type_ptr<ov::op::v10::IsInf>(op)->get_attributes();
+        node.detectNegative = attributes.detect_negative;
+        node.detectPositive = attributes.detect_positive;
     }},
     {ov::op::v10::IsNaN::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
         node.algorithm = Algorithm::EltwiseIsNaN;
@@ -1518,7 +1521,9 @@ public:
                     case Algorithm::EltwiseErf:               *dst_ptr_f = std::erf(src_f[0]); break;
                     case Algorithm::EltwiseSoftSign:          *dst_ptr_f = src_f[0] / (1 + std::fabs(src_f[0])); break;
                     case Algorithm::EltwiseIsFinite:          *dst_ptr_f = std::isfinite(src_f[0]); break;
-                    case Algorithm::EltwiseIsInf:             *dst_ptr_f = std::isinf(src_f[0]); break;
+                    case Algorithm::EltwiseIsInf:
+                        *dst_ptr_f = std::isinf(src_f[0]) && (_opData.detectNegative && (src_f[0] < 0) || _opData.detectPositive && (src_f[0] > 0));
+                        break;
                     case Algorithm::EltwiseIsNaN:             *dst_ptr_f = std::isnan(src_f[0]); break;
                     default: IE_THROW() << "Unsupported operation type for Eltwise executor";
                 }
@@ -1551,7 +1556,9 @@ bool Eltwise::EltwiseData::operator==(const EltwiseData &rhs) const noexcept {
            onednnAlgorithm == rhs.onednnAlgorithm &&
            alpha == rhs.alpha &&
            beta == rhs.beta &&
-           gamma == rhs.gamma;
+           gamma == rhs.gamma &&
+           detectNegative == rhs.detectNegative &&
+           detectPositive == rhs.detectPositive;
 }
 
 static Eltwise::executorPtr buildExecutor(const EltwiseKey& key) {
@@ -1990,7 +1997,7 @@ void Eltwise::prepareParams() {
         if (node->getType() == Type::Eltwise) {
             if (auto eltwise = std::dynamic_pointer_cast<Eltwise>(node)) {
                 key.eltwise_data.push_back({eltwise->getAlgorithm(), eltwise->getOneDnnAlgorithm(), eltwise->getAlpha(),
-                                            eltwise->getBeta(), eltwise->getGamma()});
+                                            eltwise->getBeta(), eltwise->getGamma(), eltwise->getNegative(), eltwise->getPositive()});
             }
         } else if (node->getType() == Type::FakeQuantize) {
             node->appendPostOps(key.postOps, {}, fqDataPtrs);
