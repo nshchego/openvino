@@ -32,9 +32,6 @@ std::vector<ngraph::helpers::ComparisonTypes> comparisonOpTypes = {
         ngraph::helpers::ComparisonTypes::NOT_EQUAL,
         ngraph::helpers::ComparisonTypes::GREATER,
         ngraph::helpers::ComparisonTypes::GREATER_EQUAL,
-        ngraph::helpers::ComparisonTypes::IS_FINITE,
-        ngraph::helpers::ComparisonTypes::IS_INF,
-        ngraph::helpers::ComparisonTypes::IS_NAN,
         ngraph::helpers::ComparisonTypes::LESS,
         ngraph::helpers::ComparisonTypes::LESS_EQUAL,
 };
@@ -57,5 +54,23 @@ const auto ComparisonTestParams = ::testing::Combine(
         ::testing::Values(additional_config));
 
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs, ComparisonLayerTest, ComparisonTestParams, ComparisonLayerTest::getTestCaseName);
+
+std::vector<ngraph::helpers::ComparisonTypes> comparisonOpTypesIs = {
+        ngraph::helpers::ComparisonTypes::IS_FINITE,
+        ngraph::helpers::ComparisonTypes::IS_INF,
+        ngraph::helpers::ComparisonTypes::IS_NAN
+};
+
+const auto ComparisonTestParamsIs = ::testing::Combine(
+        ::testing::ValuesIn(CommonTestUtils::combineParams(inputShapes)),
+        ::testing::Values(InferenceEngine::Precision::FP32),
+        ::testing::ValuesIn(comparisonOpTypesIs),
+        ::testing::ValuesIn(secondInputTypes),
+        ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
+        ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
+        ::testing::Values(CommonTestUtils::DEVICE_CPU),
+        ::testing::Values(additional_config));
+
+INSTANTIATE_TEST_SUITE_P(smoke_IsOp, ComparisonLayerTest, ComparisonTestParamsIs, ComparisonLayerTest::getTestCaseName);
 
 }  // namespace
