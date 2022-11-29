@@ -886,6 +886,15 @@ const std::map<const ngraph::DiscreteTypeInfo, Eltwise::Initializer> Eltwise::in
     {ngraph::op::v1::NotEqual::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Eltwise& node) {
         node.algorithm = Algorithm::EltwiseNotEqual;
     }},
+    {ov::op::v10::IsFinite::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
+        node.algorithm = Algorithm::EltwiseIsFinite;
+    }},
+    {ov::op::v10::IsInf::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
+        node.algorithm = Algorithm::EltwiseIsInf;
+    }},
+    {ov::op::v10::IsNaN::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
+        node.algorithm = Algorithm::EltwiseIsNaN;
+    }},
     {ngraph::op::v1::Greater::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Eltwise& node) {
         node.algorithm = Algorithm::EltwiseGreater;
     }},
@@ -1508,6 +1517,9 @@ public:
                     case Algorithm::EltwisePrelu:             *dst_ptr_f = src_f[0] > 0 ? src_f[0] : src_f[0] * src_f[1]; break;
                     case Algorithm::EltwiseErf:               *dst_ptr_f = std::erf(src_f[0]); break;
                     case Algorithm::EltwiseSoftSign:          *dst_ptr_f = src_f[0] / (1 + std::fabs(src_f[0])); break;
+                    case Algorithm::EltwiseIsFinite:          *dst_ptr_f = std::isfinite(src_f[0]); break;
+                    case Algorithm::EltwiseIsInf:             *dst_ptr_f = std::isinf(src_f[0]); break;
+                    case Algorithm::EltwiseIsNaN:             *dst_ptr_f = std::isnan(src_f[0]); break;
                     default: IE_THROW() << "Unsupported operation type for Eltwise executor";
                 }
             }
@@ -1592,6 +1604,9 @@ Eltwise::Eltwise(const std::shared_ptr<ngraph::Node>& op, const dnnl::engine& en
 
 size_t Eltwise::getOpInputsNum() const {
     switch (getAlgorithm()) {
+        case Algorithm::EltwiseIsFinite:
+        case Algorithm::EltwiseIsInf:
+        case Algorithm::EltwiseIsNaN:
         case Algorithm::EltwiseRelu:
         case Algorithm::EltwiseGelu:
         case Algorithm::EltwiseElu:

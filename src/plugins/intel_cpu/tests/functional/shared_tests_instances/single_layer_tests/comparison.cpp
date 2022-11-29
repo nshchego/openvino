@@ -32,6 +32,9 @@ std::vector<ngraph::helpers::ComparisonTypes> comparisonOpTypes = {
         ngraph::helpers::ComparisonTypes::NOT_EQUAL,
         ngraph::helpers::ComparisonTypes::GREATER,
         ngraph::helpers::ComparisonTypes::GREATER_EQUAL,
+        ngraph::helpers::ComparisonTypes::IS_FINITE,
+        ngraph::helpers::ComparisonTypes::IS_INF,
+        ngraph::helpers::ComparisonTypes::IS_NAN,
         ngraph::helpers::ComparisonTypes::LESS,
         ngraph::helpers::ComparisonTypes::LESS_EQUAL,
 };
