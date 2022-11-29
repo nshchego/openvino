@@ -116,7 +116,6 @@ protected:
             ov::runtime::Tensor tensor;
 
             if (funcInput.get_node()->get_friendly_name() == "data") {
-//                int32_t range = std::pow(2, 19);
                 int32_t range = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1, std::multiplies<size_t>());
                 tensor = utils::create_and_fill_tensor(
                         funcInput.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
@@ -170,8 +169,8 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
         { { {}, { {1, 1, 7} } } },    // Static shapes
         { { {}, { {2, 2, 2} } } },    // Static shapes
         { { {}, { {1, 8, 1} } } },    // Static shapes
-        { { {}, { {3, 3, 1} } } },    // Static shapes
-        { { {}, { {1, 5, 2} } } },    // Static shapes
+        { { {}, { {3, 3, 1, 1} } } }, // Static shapes
+        { { {}, { {1, 5, 2, 1} } } }, // Static shapes
         { { {}, { {1, 1, 11} } } },   // Static shapes
         { { {}, { {32, 35, 37} } } }, // Static shapes
         { { {}, { {2, 3, 2} } } },    // Static shapes
@@ -180,7 +179,7 @@ std::vector<std::vector<InputShape>> getStaticShapes() {
         { { {}, { {3, 5, 1} } } },    // Static shapes
         { { {}, { {4, 2, 2} } } },    // Static shapes
         { { {}, { {1, 17, 1} } } },   // Static shapes
-        { { {}, { {3, 2, 3} } } },    // Static shapes
+        { { {}, { {3, 2, 3, 1} } } }, // Static shapes
         { { {}, { {8, 16, 32} } } },  // Static shapes
         { { {}, { {37, 19, 11} } } }, // Static shapes
         { { {}, { {1, 19, 1} } } },   // Static shapes
@@ -217,49 +216,23 @@ INSTANTIATE_TEST_SUITE_P(nightly_static, UniqueLayerTestCPU,
                         ::testing::Values(additionalConfig[0])),
                 UniqueLayerTestCPU::getTestCaseName);
 
-INSTANTIATE_TEST_SUITE_P(nightly_static_BF16, UniqueLayerTestCPU,
-                ::testing::Combine(
-                        ::testing::ValuesIn(getStaticShapes()),
-                        ::testing::ValuesIn(flatOrAxis),
-                        ::testing::ValuesIn(sorted),
-                        ::testing::Values(ElementType::f32),
-                        ::testing::ValuesIn(getCPUInfo()),
-                        ::testing::Values(additionalConfig[1])),
-                UniqueLayerTestCPU::getTestCaseName);
-
 const std::vector<std::vector<InputShape>> dynamicInSapes = {
-   { { { ov::Dimension(1, 15), -1, -1, -1 },                               // Dynamic shape 0
-       { {1, 1, 1, 1}, {6, 3, 1, 2}, {4, 5, 3, 1}, {2, 7, 2, 2} } },       // Target shapes
-     { { ov::Dimension(1, 16), -1, -1, -1 },                               // Dynamic shape 1
-       { {1, 1, 1, 2}, {6, 2, 2, 2}, {4, 1, 3, 2}, {2, 1, 2, 2} } } },     // Target shapes
-   { { { -1, -1, -1, -1 },                                                 // Dynamic shape 0
-       { {1, 2, 1, 5}, {3, 4, 2, 3}, {5, 6, 7, 1}, {7, 8, 2, 4} } },       // Target shapes
-     { { -1, -1, -1, 2 },                                                  // Dynamic shape 1
-       { {1, 2, 4, 2}, {3, 1, 7, 2}, {5, 2, 3, 2}, {7, 1, 5, 2} } } },     // Target shapes
-   { { { ov::Dimension(2, 15), -1, -1, -1 },                               // Dynamic shape 0
-       { {8, 3, 3, 3}, {6, 5, 2, 5}, {4, 7, 1, 11}, {2, 9, 3, 4} } },      // Target shapes
-     { { -1, 3, 7, 2 },                                                    // Dynamic shape 1
-       { {8, 3, 7, 2}, {6, 3, 7, 2}, {4, 3, 7, 2}, {2, 3, 7, 2} } } },     // Target shapes
-   { { { 3, 4, 4, 5 },                                                     // Dynamic shape 0
-       { {3, 4, 4, 5}, {3, 4, 4, 5}, {3, 4, 4, 5}, {3, 4, 4, 5} } },       // Target shapes
-     { { -1, -1, -1, 2 },                                                  // Dynamic shape 1
-       { {3, 3, 4, 2}, {3, 1, 11, 2}, {3, 2, 5, 2}, {3, 3, 3, 2} } } },    // Target shapes
-   { { { -1, -1, -1, -1 },                                                 // Dynamic shape 0
-       { {1, 2, 1, 13}, {3, 4, 7, 2}, {5, 6, 3, 5}, {7, 8, 4, 4} } },      // Target shapes
-     { { -1, -1, -1, -1 },                                                 // Dynamic shape 1
-       { {1, 4, 4, 2}, {3, 3, 5, 2}, {5, 2, 7, 2}, {7, 1, 13, 2} } } },    // Target shapes
-   { { { -1, -1, -1, -1 },                                                 // Dynamic shape 0
-       { {2, 11, 1, 17}, {4, 9, 6, 3}, {6, 7, 7, 3}, {8, 3, 2, 11} } },    // Target shapes
-     { { -1, -1, -1, 2 },                                                  // Dynamic shape 1
-       { {2, 5, 4, 2}, {4, 1, 19, 2}, {6, 6, 3, 2}, {8, 1, 17, 2} } } },   // Target shapes
-   { { { 3, -1, -1, -1 },                                                  // Dynamic shape 0
-       { {3, 2, 1, 23}, {3, 4, 3, 8}, {3, 6, 5, 5}, {3, 8, 31, 1} } },     // Target shapes
-     { { -1, -1, -1, 2 },                                                  // Dynamic shape 1
-       { {3, 31, 1, 2}, {3, 6, 4, 2}, {3, 23, 1, 2}, {3, 11, 2, 2} } } },  // Target shapes
-   { { { -1, 3, -1, -1 },                                                  // Dynamic shape 0
-       { {8, 3, 8, 4}, {6, 3, 33, 1}, {4, 3, 8, 6}, {2, 3, 8, 8} } },      // Target shapes
-     { { -1, -1, -1, 2 },                                                  // Dynamic shape 1
-       { {8, 8, 8, 2}, {6, 8, 7, 2}, {4, 1, 33, 2}, {2, 4, 8, 2} } } }     // Target shapes
+   { { { ov::Dimension(1, 15), -1, -1, -1 },                               // Dynamic shape
+       { {1, 1, 1, 1}, {6, 3, 1, 2}, {4, 5, 3, 1}, {2, 7, 2, 2} } } },     // Target shapes
+   { { { -1, -1, -1, -1 },                                                 // Dynamic shape
+       { {1, 2, 1, 5}, {3, 4, 2, 3}, {5, 6, 7, 1}, {7, 8, 2, 4} } } },     // Target shapes
+   { { { ov::Dimension(2, 15), -1, -1, -1 },                               // Dynamic shape
+       { {8, 3, 3, 3}, {6, 5, 2, 5}, {4, 7, 1, 11}, {2, 9, 3, 4} } } },    // Target shapes
+   { { { 3, 4, 4, 5 },                                                     // Dynamic shape
+       { {3, 4, 4, 5}, {3, 4, 4, 5}, {3, 4, 4, 5}, {3, 4, 4, 5} } } },     // Target shapes
+   { { { -1, -1, -1, -1 },                                                 // Dynamic shape
+       { {1, 2, 1, 13}, {3, 4, 7, 2}, {5, 6, 3, 5}, {7, 8, 4, 4} } } },    // Target shapes
+   { { { -1, -1, -1, -1 },                                                 // Dynamic shape
+       { {2, 11, 1, 17}, {4, 9, 6, 3}, {6, 7, 7, 3}, {8, 3, 2, 11} } } },  // Target shapes
+   { { { 3, -1, -1, -1 },                                                  // Dynamic shape
+       { {3, 2, 1, 23}, {3, 4, 3, 8}, {3, 6, 5, 5}, {3, 8, 31, 1} } } },   // Target shapes
+   { { { -1, 3, -1, -1 },                                                  // Dynamic shape
+       { {8, 3, 8, 4}, {6, 3, 33, 1}, {4, 3, 8, 6}, {2, 3, 8, 8} } } }     // Target shapes
 };
 
 INSTANTIATE_TEST_SUITE_P(smoke_dynamic, UniqueLayerTestCPU,
