@@ -4,7 +4,6 @@
 
 #include <vector>
 #include "single_layer_tests/is_inf.hpp"
-//#include "common_test_utils/test_constants.hpp"
 
 using namespace ov::test;
 using namespace ov::test::subgraph;
@@ -30,12 +29,11 @@ std::vector<std::vector<InputShape>> inShapesStatic = {
         { {{}, {{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}}} }
 };
 
-std::vector<std::vector<ov::test::InputShape>> inShapesDynamic = {
-        {{{ngraph::Dimension(1, 10), 200}, {{2, 200}, {1, 200}}},
-         {{ngraph::Dimension(1, 10), 200}, {{2, 200}, {5, 200}}}},
+std::vector<std::vector<InputShape>> inShapesDynamic = {
+        {{{ngraph::Dimension(1, 10), 200}, {{2, 200}, {1, 200}}}}
 };
 
-std::vector<ov::test::ElementType> netPrecisions = {
+std::vector<ElementType> netPrecisions = {
         ov::element::f32
 };
 

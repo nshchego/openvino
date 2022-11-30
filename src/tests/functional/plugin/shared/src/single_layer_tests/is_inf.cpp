@@ -14,23 +14,35 @@
 using namespace ov::test::subgraph;
 
 std::string IsInfLayerTest::getTestCaseName(const testing::TestParamInfo<IsInfParams>& obj) {
-    std::vector<InputShape> shapes;
+    std::vector<InputShape> inputShapes;
     ElementType dataPrc;
     bool detectNegative, detectPositive;
     std::string targetName;
     std::map<std::string, std::string> additionalConfig;
-    std::tie(shapes, detectNegative, detectPositive, dataPrc, targetName, additionalConfig) = obj.param;
+    std::tie(inputShapes, detectNegative, detectPositive, dataPrc, targetName, additionalConfig) = obj.param;
     std::ostringstream result;
 
+    // result << "IS=(";
+    // for (const auto& shape : shapes) {
+    //     result << CommonTestUtils::partialShape2str({shape.first}) << "_";
+    // }
+    // result << ")_TS=(";
+    // for (const auto& shape : shapes) {
+    //     for (const auto& item : shape.second) {
+    //         result << CommonTestUtils::vec2str(item) << "_";
+    //     }
+    // }
     result << "IS=(";
-    for (const auto& shape : shapes) {
-        result << CommonTestUtils::partialShape2str({shape.first}) << "_";
+    for (size_t i = 0lu; i < inputShapes.size(); i++) {
+        result << CommonTestUtils::partialShape2str({inputShapes[i].first}) << (i < inputShapes.size() - 1lu ? "_" : "");
     }
-    result << ")_TS=(";
-    for (const auto& shape : shapes) {
-        for (const auto& item : shape.second) {
-            result << CommonTestUtils::vec2str(item) << "_";
+    result << ")_TS=";
+    for (size_t i = 0lu; i < inputShapes.front().second.size(); i++) {
+        result << "{";
+        for (size_t j = 0lu; j < inputShapes.size(); j++) {
+            result << CommonTestUtils::vec2str(inputShapes[j].second[i]) << (j < inputShapes.size() - 1lu ? "_" : "");
         }
+        result << "}_";
     }
     result << ")_detectNegative=" << (detectNegative ? "True" : "False") << "_";
     result << "detectPositive=" << (detectPositive ? "True" : "False") << "_";
@@ -84,7 +96,7 @@ void IsInfLayerTest::generate_inputs(const std::vector<ov::Shape>& targetInputSt
 
     auto pointer = tensor.data<element_type_traits<ov::element::Type_t::f32>::value_type>();
     testing::internal::Random random(1);
-//    random.Generate(range);
+    random.Generate(range);
     for (size_t i = 0; i < range / 2; i++) {
         pointer[random.Generate(range)] = i % 2 == 0 ? std::numeric_limits<float>::infinity() : -std::numeric_limits<float>::infinity();
     }

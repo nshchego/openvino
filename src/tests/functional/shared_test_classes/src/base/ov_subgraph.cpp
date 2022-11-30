@@ -287,6 +287,7 @@ std::vector<ov::Tensor> SubgraphBaseTest::calculate_refs() {
     for (size_t i = 0; i < inputNodes.size(); ++i) {
         auto itr = std::find_if(inputs.begin(), inputs.end(),
                                 [&](const InputsMap::value_type& item) {
+std::cout << "ITEM: " << item.first->get_friendly_name() << "; NODE: " << inputNodes[i].get_node_shared_ptr()->get_friendly_name() << std::endl;
                                     return item.first->get_friendly_name() == inputNodes[i].get_node_shared_ptr()->get_friendly_name();
                                 });
         if (itr != inputs.end()) {

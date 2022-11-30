@@ -1437,17 +1437,17 @@ public:
 
     void exec(const jit_eltwise_call_args_ptrs &args_ptrs, const VectorDims &dims_out) override {
 // DEBUG
-std::cout << "\nINPUT DATA: " << std::endl;
-// float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
-auto srcDataF = reinterpret_cast<const float*>(args_ptrs.src_ptr);
-for (int i = 0; i < _fullWorkAmount; i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << srcDataF[i] << "; ";
-}
-std::cout << std::endl;
+// std::cout << "\nINPUT DATA: " << std::endl;
+// // float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
+// auto srcDataF = reinterpret_cast<const float*>(args_ptrs.src_ptr);
+// for (int i = 0; i < _fullWorkAmount; i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << srcDataF[i] << "; ";
+// }
+// std::cout << std::endl;
 // DEBUG
         std::shared_ptr<ref_eltwise_scalar_fwd_t> ref_eltwise_injector = nullptr;
         if (_opData.onednnAlgorithm != dnnl::algorithm::undef) {
@@ -1545,17 +1545,17 @@ std::cout << "_opData.alpha: " << _opData.alpha << "; _opData.beta: " << _opData
             }
         });
 // DEBUG
-std::cout << "OUTPUT_0: " << std::endl;
-// float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-auto dstDataF = reinterpret_cast<const float*>(args_ptrs.dst_ptr);
-for (int i = 0; i < _fullWorkAmount; i++) {
-    if (i > 0 && i % 4 == 0)
-        std::cout << "| ";
-    if (i > 0 && i % 16 == 0)
-        std::cout << std::endl;
-    std::cout << dstDataF[i] << "; ";
-}
-std::cout << std::endl << std::endl;
+// std::cout << "OUTPUT_0: " << std::endl;
+// // float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// auto dstDataF = reinterpret_cast<const float*>(args_ptrs.dst_ptr);
+// for (int i = 0; i < _fullWorkAmount; i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << dstDataF[i] << "; ";
+// }
+// std::cout << std::endl << std::endl;
 // DEBUG
     }
 
