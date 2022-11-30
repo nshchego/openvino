@@ -59,12 +59,19 @@ void IsInfLayerTest::SetUp() {
     init_input_shapes(shapes);
     configuration.insert(additionalConfig.begin(), additionalConfig.end());
 
-    auto parameters = ngraph::builder::makeDynamicParams(dataPrc, { inputDynamicShapes.front() });
+    auto parameters = ngraph::builder::makeDynamicParams(dataPrc, inputDynamicShapes );
     parameters[0]->set_friendly_name("Data");
 
     ov::op::v10::IsInf::Attributes attributes {detectNegative, detectPositive};
     auto isInf = std::make_shared<ov::op::v10::IsInf>(parameters[0], attributes);
-    function = std::make_shared<ngraph::Function>(isInf, parameters, "IsInf");
+//    function = std::make_shared<ngraph::Function>(isInf, parameters, "IsInf");
+//    function = makeNgraphFunction(dataPrc, parameters, isInf, "IsInf");
+    ngraph::ResultVector results;
+
+    for (int i = 0; i < isInf->get_output_size(); i++)
+        results.push_back(std::make_shared<ov::op::v0::Result>(isInf->output(i)));
+
+    function = std::make_shared<ov::Model>(results, parameters, "IsInf");
 }
 
 void IsInfLayerTest::generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) {
