@@ -1523,6 +1523,7 @@ public:
                     case Algorithm::EltwiseIsFinite:          *dst_ptr_f = std::isfinite(src_f[0]); break;
                     case Algorithm::EltwiseIsInf:
                         *dst_ptr_f = std::isinf(src_f[0]) && (_opData.detectNegative && (src_f[0] < 0) || _opData.detectPositive && (src_f[0] > 0));
+                        printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::to_string(*dst_ptr_f).c_str());
                         break;
                     case Algorithm::EltwiseIsNaN:             *dst_ptr_f = std::isnan(src_f[0]); break;
                     default: IE_THROW() << "Unsupported operation type for Eltwise executor";
