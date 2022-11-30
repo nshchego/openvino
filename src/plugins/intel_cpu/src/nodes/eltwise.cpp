@@ -1436,12 +1436,24 @@ public:
     }
 
     void exec(const jit_eltwise_call_args_ptrs &args_ptrs, const VectorDims &dims_out) override {
+// DEBUG
+// std::cout << "\nINPUT DATA: " << std::endl;
+// float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
+// for (int i = 0; i < getParentEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << int(srcDataF[i]) << "; ";
+// }
+// std::cout << std::endl;
+// DEBUG
         std::shared_ptr<ref_eltwise_scalar_fwd_t> ref_eltwise_injector = nullptr;
         if (_opData.onednnAlgorithm != dnnl::algorithm::undef) {
             ref_eltwise_injector = std::make_shared<ref_eltwise_scalar_fwd_t>(
                     static_cast<dnnl_alg_kind_t>(_opData.onednnAlgorithm), _opData.alpha, _opData.beta, 1.f);
         }
-
+std::cout << "_opData.detectNegative: " << _opData.detectNegative << "; _opData.detectPositive: " << _opData.detectPositive << std::endl;
         parallel_nt(0, [&](const int ithr, const int nthr) {
             size_t start = 0, end = 0;
             splitter(_fullWorkAmount, nthr, ithr, start, end);
@@ -1522,14 +1534,27 @@ public:
                     case Algorithm::EltwiseSoftSign:          *dst_ptr_f = src_f[0] / (1 + std::fabs(src_f[0])); break;
                     case Algorithm::EltwiseIsFinite:          *dst_ptr_f = std::isfinite(src_f[0]); break;
                     case Algorithm::EltwiseIsInf:
-                        *dst_ptr_f = std::isinf(src_f[0]) && (_opData.detectNegative && (src_f[0] < 0) || _opData.detectPositive && (src_f[0] > 0));
-                        printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::to_string(*dst_ptr_f).c_str());
+                        *dst_ptr_f = (_opData.detectNegative && (src_f[0] == -std::numeric_limits<float>::infinity()) ||
+                                      _opData.detectPositive && (src_f[0] == std::numeric_limits<float>::infinity()));
+printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::to_string(*dst_ptr_f).c_str());
                         break;
                     case Algorithm::EltwiseIsNaN:             *dst_ptr_f = std::isnan(src_f[0]); break;
                     default: IE_THROW() << "Unsupported operation type for Eltwise executor";
                 }
             }
         });
+// DEBUG
+// std::cout << "OUTPUT_0: " << std::endl;
+// float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
+// for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
+//     if (i > 0 && i % 4 == 0)
+//         std::cout << "| ";
+//     if (i > 0 && i % 16 == 0)
+//         std::cout << std::endl;
+//     std::cout << int(dstDataF[i]) << "; ";
+// }
+// std::cout << std::endl << std::endl;
+// DEBUG
     }
 
     const VectorDims& getOutDims() const override {
@@ -1988,15 +2013,16 @@ void Eltwise::prepareParams() {
 
     auto outPrc = getChildEdgeAt(0)->getMemory().getDesc().getPrecision();
 
-    EltwiseData thisOp{getAlgorithm(), getOneDnnAlgorithm(), getAlpha(), getBeta(), getGamma()};
+    EltwiseData thisOp{getAlgorithm(), getOneDnnAlgorithm(), getAlpha(), getBeta(), getGamma(), getNegative(), getPositive()};
 
     EltwiseKey key = {{thisOp}, {getType()}, currentOutBlkDims, outOrder, dims_in, inpPrc, outPrc, dnnl::post_ops(), isDynBatchEnabled, canUseOptimizedImpl};
-
+std::cout << "Eltwise::prepareParams()" << std::endl;
     fqDataPtrs.clear();
     for (const auto &node : fusedWith) {
         key.ops_list.push_back(node->getType());
         if (node->getType() == Type::Eltwise) {
             if (auto eltwise = std::dynamic_pointer_cast<Eltwise>(node)) {
+std::cout << "eltwise->getNegative(): " << eltwise->getNegative() << "; eltwise->getPositive(): " << eltwise->getPositive() << std::endl;
                 key.eltwise_data.push_back({eltwise->getAlgorithm(), eltwise->getOneDnnAlgorithm(), eltwise->getAlpha(),
                                             eltwise->getBeta(), eltwise->getGamma(), eltwise->getNegative(), eltwise->getPositive()});
             }
