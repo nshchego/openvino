@@ -1437,16 +1437,17 @@ public:
 
     void exec(const jit_eltwise_call_args_ptrs &args_ptrs, const VectorDims &dims_out) override {
 // DEBUG
-// std::cout << "\nINPUT DATA: " << std::endl;
+std::cout << "\nINPUT DATA: " << std::endl;
 // float* srcDataF = reinterpret_cast<float*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
-// for (int i = 0; i < getParentEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//     if (i > 0 && i % 4 == 0)
-//         std::cout << "| ";
-//     if (i > 0 && i % 16 == 0)
-//         std::cout << std::endl;
-//     std::cout << int(srcDataF[i]) << "; ";
-// }
-// std::cout << std::endl;
+auto srcDataF = reinterpret_cast<const float*>(args_ptrs.src_ptr);
+for (int i = 0; i < _fullWorkAmount; i++) {
+    if (i > 0 && i % 4 == 0)
+        std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
+    std::cout << srcDataF[i] << "; ";
+}
+std::cout << std::endl;
 // DEBUG
         std::shared_ptr<ref_eltwise_scalar_fwd_t> ref_eltwise_injector = nullptr;
         if (_opData.onednnAlgorithm != dnnl::algorithm::undef) {
@@ -1536,7 +1537,7 @@ std::cout << "_opData.alpha: " << _opData.alpha << "; _opData.beta: " << _opData
                     case Algorithm::EltwiseIsInf:
                         *dst_ptr_f = _opData.alpha && (src_f[0] == -std::numeric_limits<float>::infinity()) ||
                                      _opData.beta  && (src_f[0] == std::numeric_limits<float>::infinity());
-printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::to_string(*dst_ptr_f).c_str());
+// printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::to_string(*dst_ptr_f).c_str());
                         break;
                     case Algorithm::EltwiseIsNaN:             *dst_ptr_f = std::isnan(src_f[0]); break;
                     default: IE_THROW() << "Unsupported operation type for Eltwise executor";
@@ -1544,16 +1545,17 @@ printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::t
             }
         });
 // DEBUG
-// std::cout << "OUTPUT_0: " << std::endl;
+std::cout << "OUTPUT_0: " << std::endl;
 // float* dstDataF = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
-// for (int i = 0; i < getChildEdgeAt(0)->getMemoryPtr()->GetSize() / sizeof(float); i++) {
-//     if (i > 0 && i % 4 == 0)
-//         std::cout << "| ";
-//     if (i > 0 && i % 16 == 0)
-//         std::cout << std::endl;
-//     std::cout << int(dstDataF[i]) << "; ";
-// }
-// std::cout << std::endl << std::endl;
+auto dstDataF = reinterpret_cast<const float*>(args_ptrs.dst_ptr);
+for (int i = 0; i < _fullWorkAmount; i++) {
+    if (i > 0 && i % 4 == 0)
+        std::cout << "| ";
+    if (i > 0 && i % 16 == 0)
+        std::cout << std::endl;
+    std::cout << dstDataF[i] << "; ";
+}
+std::cout << std::endl << std::endl;
 // DEBUG
     }
 
@@ -2014,7 +2016,6 @@ void Eltwise::prepareParams() {
     EltwiseData thisOp{getAlgorithm(), getOneDnnAlgorithm(), getAlpha(), getBeta(), getGamma()};
 
     EltwiseKey key = {{thisOp}, {getType()}, currentOutBlkDims, outOrder, dims_in, inpPrc, outPrc, dnnl::post_ops(), isDynBatchEnabled, canUseOptimizedImpl};
-std::cout << "Eltwise::prepareParams()" << std::endl;
     fqDataPtrs.clear();
     for (const auto &node : fusedWith) {
         key.ops_list.push_back(node->getType());

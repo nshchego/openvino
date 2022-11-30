@@ -78,14 +78,14 @@ void ComparisonLayerTest::SetUp() {
 }
 
 InferenceEngine::Blob::Ptr ComparisonLayerTest::GenerateInput(const InferenceEngine::InputInfo &inputInfo) const {
-    LayerTestsUtils::LayerTestsCommon::GenerateInput(inputInfo);
+    auto blob = LayerTestsUtils::LayerTestsCommon::GenerateInput(inputInfo);
 
     if (comparisonOpType == ComparisonTypes::IS_FINITE || comparisonOpType == ComparisonTypes::IS_NAN) {
-        auto& blob = inputs[0];
+        // auto& blob = inputs[0];
         auto *dataPtr = blob->buffer().as<float*>();
         auto range = blob->size();
         testing::internal::Random random(1);
-//        random.Generate(range);
+        // random.Generate(range);
 
         if (comparisonOpType == ComparisonTypes::IS_FINITE) {
             for (size_t i = 0; i < range / 2; i++) {
@@ -99,6 +99,8 @@ InferenceEngine::Blob::Ptr ComparisonLayerTest::GenerateInput(const InferenceEng
             }
         }
     }
+
+    return blob;
 }
 
 } // namespace LayerTestsDefinitions
