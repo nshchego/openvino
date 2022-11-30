@@ -196,6 +196,12 @@ void Unique::executeDynamicImpl(dnnl::stream strm) {
         uniqLen = srcDataDims[axis];
         dstDataDims = srcDataDims;
     }
+    std::string dimsStr = "dstDataDims={";
+for (auto& dim : dstDataDims) {
+    dimsStr += std::to_string(dim) + "; ";
+}
+dimsStr += "}; uniqLen: ";
+std::cout << dimsStr << uniqLen << std::endl;
     redefineOutputMemory({ dstDataDims, {uniqLen}, {uniqLen}, {uniqLen}});
 
     execute(strm);
@@ -310,7 +316,6 @@ size_t Unique::flattenTensorExec() {
 template <typename T>
 size_t Unique::slicedTensorExec() {
     const T* srcDataPtr = reinterpret_cast<const T*>(getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetPtr());
-    const auto inputLen = getParentEdgeAt(IN_DATA)->getMemoryPtr()->GetSize() / sizeof(T);
     T* uniqueData = reinterpret_cast<T*>(getChildEdgesAtPort(UNIQUE_DATA)[0]->getMemoryPtr()->GetPtr());
     int *firstPtr, *inToOutPtr, *occurPtr;
     if (definedOutputs[FIRST_UNIQUE_IDX]) {
@@ -347,7 +352,7 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
     }
     if (definedOutputs[OCCURRENCES_NUM]) {
         occurPtr[0] = 1;
-        std::fill(occurPtr, occurPtr + inputLen, 1);
+        std::fill(occurPtr, occurPtr + cmpBlNum, 1);
     }
 
     size_t uniqLen = 1;
@@ -355,6 +360,7 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
     for (int b1 = 1; b1 < cmpBlNum; b1++) {
         auto first1 = srcDataPtr + b1 * elPerPart;
         auto last1 = srcDataPtr + (b1 + 1) * elPerPart;
+// std::cout << "b1: " << b1 << "; first1: " << *first1 << "; last1: " << *last1 << std::endl;
         bool equal = true;
         int b2 = 0;
         // Compare with unique blocks.
@@ -362,10 +368,13 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
             auto first2 = srcDataPtr + uniqIdx[b2] * elPerPart;
             equal = true;
             for (int p = 0; p < partsInBl; p++) {
+// std::cout << "b2: " << b2 << "; first2: " << *first2  << std::endl;
                 equal = std::equal(first1, last1, first2);
                 if (!equal) {
                     break;
                 }
+                first1 += partStep;
+                last1  += partStep;
                 first2 += partStep;
             }
             if (equal) {
@@ -444,9 +453,6 @@ for (int k = 0; k < uniqLen; k++) {
 }
 // std::cout << moveStr << "}" <<std::endl;
 
-                // if (std::equal(movToCur.begin(), movToCur.end(), movToPrev.begin())) {
-                //     continue;
-                // }
                 moveToSwitch = !moveToSwitch;
 
                 // perm
@@ -458,10 +464,7 @@ for (int k = 0; k < uniqLen; k++) {
                     auto currDst = uniqueData + pb * dstPrtStep;
                     memcpy(buff1.data(), currDst, partLenB);
                     auto dstIdx = movToCur[0];
-                    // int64_t blCount = 0l;
-                    // while (blCount < uniqLen) {
                     for (int64_t b = 0; b < uniqLen; b++) {
-                        // T* src = uniqueData + srcIdx * elPerPart;
                         if (dstIdx == movToCur[dstIdx]) {
                             dstIdx = movToCur[++dstIdx];
                             continue;
@@ -475,21 +478,13 @@ for (int k = 0; k < uniqLen; k++) {
                         memcpy(dst, bSrc.data(), partLenB);
 
                         dstIdx = movToCur[dstIdx];
-                        // dst += dstPrtStep;
-                        // src += dstPrtStep;
-
-                        // blCount++;
                     }
-                    // colToSort[colToSort[i].idx].idx = colToSort[i].idx;
                 }
 
                 auto mPos = movToCur[0];
-                int32_t firstSrc = 0, firstDst = 0, ioSrc = 0, ioDst = 0, ocSrc = 0, ocDst = 0;
+                int32_t firstSrc = 0, firstDst = 0, ocSrc = 0, ocDst = 0;
                 if (definedOutputs[FIRST_UNIQUE_IDX]) {
                     firstSrc = firstPtr[0];
-                }
-                if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-                    ioSrc = 0;
                 }
                 if (definedOutputs[OCCURRENCES_NUM]) {
                     ocSrc = occurPtr[0];
@@ -506,17 +501,6 @@ for (int k = 0; k < uniqLen; k++) {
                         fDst = firstPtr[mPos];
                         firstPtr[mPos] = fSrc;
                     }
-//                     if (definedOutputs[INPUT_TO_UNIQ_IDX]) {
-//                         // auto& iSrc = k % 2 == 0 ? ioSrc : ioDst;
-//                         // auto& iDst = k % 2 == 0 ? ioDst : ioSrc;
-// std::cout << "INPUT_TO_UNIQ_IDX ioSrc: " << ioSrc << "; mPos: " << mPos << std::endl;
-//                         for (int l = 0; l < cmpBlNum; l++) {
-//                             if (inToOutPtr[l] == ioSrc) {
-//                                 inToOutPtr[l] = mPos;
-//                             }
-//                         }
-//                         ioSrc = mPos;
-//                     }
                     if (definedOutputs[OCCURRENCES_NUM]) {
                         auto& oSrc = k % 2 == 0 ? ocSrc : ocDst;
                         auto& oDst = k % 2 == 0 ? ocDst : ocSrc;
