@@ -187,6 +187,8 @@ std::vector<std::string> disabledTestPatterns() {
         R"(.*GridSampleLayerTestCPU.*(BILINEAR|BICUBIC).*(i32|i8).*)",
         // 94989. BF16 Reference produces different results.
         R"(.*GridSampleLayerTestCPU.*(BILINEAR|BICUBIC).*gridPrc=bf16.*)",
+        // 98151. Not valid sorting for slices in reference.
+        R"(.*UniqueLayerTestCPU.*axis.*True.*)"
     };
 
 #define FIX_62820 0

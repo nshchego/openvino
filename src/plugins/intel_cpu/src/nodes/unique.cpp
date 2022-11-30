@@ -419,10 +419,9 @@ std::cout << "cmpBlNum: " << cmpBlNum << "; partsInBl: " << partsInBl << "; elPe
         };
 
         std::vector<OrdEl> colToSort(uniqLen);
-        std::vector<int64_t> moveTo1(uniqLen);
-        std::vector<int64_t> moveTo2(uniqLen);
+        std::vector<int64_t> moveTo(uniqLen);
         for (int k = 0; k < uniqLen; k++) {
-            moveTo2[k] = k;
+            moveTo[k] = k;
         }
         bool moveToSwitch = true;
         std::vector<T> buff1(elPerPart);
@@ -441,15 +440,13 @@ for (int k = 0; k < uniqLen; k++) {
     sortStr += std::to_string(colToSort[k].val) + "; ";
 }
 // std::cout << sortStr << "}" <<std::endl;
-                auto& movToCur = moveToSwitch ? moveTo1 : moveTo2;
-                auto& movToPrev = moveToSwitch ? moveTo2 : moveTo1;
                 for (int k = 0; k < uniqLen; k++) {
-                    movToCur[colToSort[k].idx] = k;
+                    moveTo[colToSort[k].idx] = k;
                 }
 
     std::string moveStr = "moveTo {";
 for (int k = 0; k < uniqLen; k++) {
-    moveStr += std::to_string(movToCur[k]) + "; ";
+    moveStr += std::to_string(moveTo[k]) + "; ";
 }
 // std::cout << moveStr << "}" <<std::endl;
 
@@ -457,16 +454,12 @@ for (int k = 0; k < uniqLen; k++) {
 
                 // perm
                 for (int64_t pb = 0; pb < partsInBl; pb++) {
-                    // if (colToSort[i].idx == i) {
-                    //     continue;
-                    // }
-                    // auto srcIdx = 0;
                     auto currDst = uniqueData + pb * dstPrtStep;
                     memcpy(buff1.data(), currDst, partLenB);
-                    auto dstIdx = movToCur[0];
+                    auto dstIdx = moveTo[0];
                     for (int64_t b = 0; b < uniqLen; b++) {
-                        if (dstIdx == movToCur[dstIdx]) {
-                            dstIdx = movToCur[++dstIdx];
+                        if (dstIdx == moveTo[dstIdx]) {
+                            dstIdx = moveTo[++dstIdx];
                             continue;
                         }
                         T* dst = currDst + dstIdx * elPerPart;
@@ -477,11 +470,11 @@ for (int k = 0; k < uniqLen; k++) {
                         memcpy(bDst.data(), dst, partLenB);
                         memcpy(dst, bSrc.data(), partLenB);
 
-                        dstIdx = movToCur[dstIdx];
+                        dstIdx = moveTo[dstIdx];
                     }
                 }
 
-                auto mPos = movToCur[0];
+                auto mPos = moveTo[0];
                 int32_t firstSrc = 0, firstDst = 0, ocSrc = 0, ocDst = 0;
                 if (definedOutputs[FIRST_UNIQUE_IDX]) {
                     firstSrc = firstPtr[0];
@@ -490,8 +483,8 @@ for (int k = 0; k < uniqLen; k++) {
                     ocSrc = occurPtr[0];
                 }
                 for (int k = 0; k < uniqLen; k++) {
-                    if (mPos == movToCur[mPos]) {
-                        mPos = movToCur[++mPos];
+                    if (mPos == moveTo[mPos]) {
+                        mPos = moveTo[++mPos];
                         continue;
                     }
 
@@ -508,7 +501,7 @@ for (int k = 0; k < uniqLen; k++) {
                         occurPtr[mPos] = oSrc;
                     }
 
-                    mPos = movToCur[mPos];
+                    mPos = moveTo[mPos];
                 }
             }
         }
