@@ -16,7 +16,7 @@ namespace subgraph {
 using IsInfParams = std::tuple<InferenceEngine::SizeVector,  // Data shape
                             bool,                            // Detect negative
                             bool,                            // Detect positive
-                            InferenceEngine::Precision,      // Data precision
+                            ElementType,                     // Data precision
                             std::string>;                    // Device name
 
 class IsInfLayerTest : public testing::WithParamInterface<IsInfParams>,

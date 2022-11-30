@@ -56,7 +56,8 @@ void IsInfLayerTest::SetUp() {
     auto parameters = ngraph::builder::makeDynamicParams(dataPrc, { inputDynamicShapes.front() });
     parameters[0]->set_friendly_name("Data");
 
-    auto isInf = std::make_shared<ov::op::v10::IsInf>(parameters[0], {detectNegative, detectPositive});
+    ov::op::v10::IsInf::Attributes attributes {detectNegative, detectPositive};
+    auto isInf = std::make_shared<ov::op::v10::IsInf>(parameters[0], attributes);
     function = std::make_shared<ngraph::Function>(isInf, parameters, "IsInf");
 }
 
