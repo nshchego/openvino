@@ -59,14 +59,14 @@ void IsInfLayerTest::SetUp() {
     init_input_shapes(shapes);
     configuration.insert(additionalConfig.begin(), additionalConfig.end());
 
-    auto parameters = ngraph::builder::makeDynamicParams(dataPrc, inputDynamicShapes );
+    auto parameters = ngraph::builder::makeDynamicParams(dataPrc, inputDynamicShapes);
     parameters[0]->set_friendly_name("Data");
 
     ov::op::v10::IsInf::Attributes attributes {detectNegative, detectPositive};
     auto isInf = std::make_shared<ov::op::v10::IsInf>(parameters[0], attributes);
 //    function = std::make_shared<ngraph::Function>(isInf, parameters, "IsInf");
 //    function = makeNgraphFunction(dataPrc, parameters, isInf, "IsInf");
-    ngraph::ResultVector results;
+    ov::ResultVector results;
 
     for (int i = 0; i < isInf->get_output_size(); i++)
         results.push_back(std::make_shared<ov::op::v0::Result>(isInf->output(i)));
@@ -80,7 +80,8 @@ void IsInfLayerTest::generate_inputs(const std::vector<ov::Shape>& targetInputSt
 
     int32_t range = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1u, std::multiplies<uint32_t>());
     auto tensor = utils::create_and_fill_tensor(
-            input.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
+//            input.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
+            ov::element::Type_t::f32, targetInputStaticShapes[0], range, -range / 2, 1);
 
     auto pointer = tensor.data<element_type_traits<ov::element::Type_t::f32>::value_type>();
     testing::internal::Random random(1);
