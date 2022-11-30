@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include "single_layer_tests/is_inf.hpp"
 #include "ngraph_functions/builders.hpp"
 #include "ie_test_utils/common_test_utils/ov_tensor_utils.hpp"
-#include "single_layer_tests/is_inf.hpp"
+#include "ie_plugin_config.hpp"
+//#include "shared_test_classes/base/ov_subgraph.hpp"
+//#include <common_test_utils/ov_tensor_utils.hpp>
 
 //#include "functional_test_utils/plugin_cache.hpp"
 
@@ -15,31 +18,34 @@ std::string IsInfLayerTest::getTestCaseName(const testing::TestParamInfo<IsInfPa
     ElementType dataPrc;
     bool detectNegative, detectPositive;
     std::string targetName;
-    ov::AnyMap additionalConfig;
+    std::map<std::string, std::string> additionalConfig;
     std::tie(shapes, detectNegative, detectPositive, dataPrc, targetName, additionalConfig) = obj.param;
-    std::ostringstream results;
+    std::ostringstream result;
 
-    results << "IS=(";
+    result << "IS=(";
     for (const auto& shape : shapes) {
-        results << CommonTestUtils::partialShape2str({shape.first}) << "_";
+        result << CommonTestUtils::partialShape2str({shape.first}) << "_";
     }
-    results << ")_TS=(";
+    result << ")_TS=(";
     for (const auto& shape : shapes) {
         for (const auto& item : shape.second) {
-            results << CommonTestUtils::vec2str(item) << "_";
+            result << CommonTestUtils::vec2str(item) << "_";
         }
     }
-    results << ")_detectNegative=" << (detectNegative ? "True" : "False") << "_";
-    results << "detectPositive=" << (detectPositive ? "True" : "False") << "_";
-    results << "dataPrc=" << dataPrc << "_";
-    results << "trgDev=" << targetName;
+    result << ")_detectNegative=" << (detectNegative ? "True" : "False") << "_";
+    result << "detectPositive=" << (detectPositive ? "True" : "False") << "_";
+    result << "dataPrc=" << dataPrc << "_";
+    result << "trgDev=" << targetName;
 
-    for (auto const& configItem : additionalConfig) {
-        results << "_configItem=" << configItem.first << "_";
-        configItem.second.print(results);
+    if (!additionalConfig.empty()) {
+        result << "_PluginConf";
+        for (auto &item : additionalConfig) {
+            if (item.second == InferenceEngine::PluginConfigParams::YES)
+                result << "_" << item.first << "=" << item.second;
+        }
     }
 
-    return results.str();
+    return result.str();
 }
 
 void IsInfLayerTest::SetUp() {
@@ -47,7 +53,7 @@ void IsInfLayerTest::SetUp() {
     ElementType dataPrc;
     bool detectNegative, detectPositive;
     std::string targetName;
-    ov::AnyMap additionalConfig;
+    std::map<std::string, std::string> additionalConfig;
     std::tie(shapes, detectNegative, detectPositive, dataPrc, targetDevice, additionalConfig) = this->GetParam();
 
     init_input_shapes(shapes);
