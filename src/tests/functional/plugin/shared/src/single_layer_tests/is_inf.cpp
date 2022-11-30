@@ -65,19 +65,15 @@ void IsInfLayerTest::SetUp() {
 
     ov::op::v10::IsInf::Attributes attributes {detectNegative, detectPositive};
     auto isInf = std::make_shared<ov::op::v10::IsInf>(paramOuts[0], attributes);
-//    function = std::make_shared<ngraph::Function>(isInf, parameters, "IsInf");
-//    function = makeNgraphFunction(dataPrc, parameters, isInf, "IsInf");
     ov::ResultVector results;
-
-    for (int i = 0; i < isInf->get_output_size(); i++)
+    for (int i = 0; i < isInf->get_output_size(); i++) {
         results.push_back(std::make_shared<ov::op::v0::Result>(isInf->output(i)));
+    }
 
     function = std::make_shared<ov::Model>(results, parameters, "IsInf");
 }
 
 void IsInfLayerTest::generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) {
-// std::cout << "IsInfLayerTest::generate_inputs" <<std::endl;
-//     SubgraphBaseTest::generate_inputs(targetInputStaticShapes);
     inputs.clear();
     const auto& funcInputs = function->inputs();
     const auto& input = funcInputs[0];
@@ -88,7 +84,7 @@ void IsInfLayerTest::generate_inputs(const std::vector<ov::Shape>& targetInputSt
 
     auto pointer = tensor.data<element_type_traits<ov::element::Type_t::f32>::value_type>();
     testing::internal::Random random(1);
-    random.Generate(range);
+//    random.Generate(range);
     for (size_t i = 0; i < range / 2; i++) {
         pointer[random.Generate(range)] = i % 2 == 0 ? std::numeric_limits<float>::infinity() : -std::numeric_limits<float>::infinity();
     }

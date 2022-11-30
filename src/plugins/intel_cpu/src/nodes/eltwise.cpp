@@ -892,8 +892,8 @@ const std::map<const ngraph::DiscreteTypeInfo, Eltwise::Initializer> Eltwise::in
     {ov::op::v10::IsInf::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
         node.algorithm = Algorithm::EltwiseIsInf;
         const auto& attributes = ov::as_type_ptr<ov::op::v10::IsInf>(op)->get_attributes();
-        node.detectNegative = attributes.detect_negative;
-        node.detectPositive = attributes.detect_positive;
+        node.alpha = attributes.detect_negative;
+        node.beta  = attributes.detect_positive;
     }},
     {ov::op::v10::IsNaN::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Eltwise& node) {
         node.algorithm = Algorithm::EltwiseIsNaN;
@@ -1453,7 +1453,7 @@ public:
             ref_eltwise_injector = std::make_shared<ref_eltwise_scalar_fwd_t>(
                     static_cast<dnnl_alg_kind_t>(_opData.onednnAlgorithm), _opData.alpha, _opData.beta, 1.f);
         }
-std::cout << "_opData.detectNegative: " << _opData.detectNegative << "; _opData.detectPositive: " << _opData.detectPositive << std::endl;
+std::cout << "_opData.alpha: " << _opData.alpha << "; _opData.beta: " << _opData.beta << std::endl;
         parallel_nt(0, [&](const int ithr, const int nthr) {
             size_t start = 0, end = 0;
             splitter(_fullWorkAmount, nthr, ithr, start, end);
@@ -1534,8 +1534,8 @@ std::cout << "_opData.detectNegative: " << _opData.detectNegative << "; _opData.
                     case Algorithm::EltwiseSoftSign:          *dst_ptr_f = src_f[0] / (1 + std::fabs(src_f[0])); break;
                     case Algorithm::EltwiseIsFinite:          *dst_ptr_f = std::isfinite(src_f[0]); break;
                     case Algorithm::EltwiseIsInf:
-                        *dst_ptr_f = (_opData.detectNegative && (src_f[0] == -std::numeric_limits<float>::infinity()) ||
-                                      _opData.detectPositive && (src_f[0] == std::numeric_limits<float>::infinity()));
+                        *dst_ptr_f = _opData.alpha && (src_f[0] == -std::numeric_limits<float>::infinity()) ||
+                                     _opData.beta  && (src_f[0] == std::numeric_limits<float>::infinity());
 printf("[%d] src: %s; dst: %s\n", ithr, std::to_string(src_f[0]).c_str(), std::to_string(*dst_ptr_f).c_str());
                         break;
                     case Algorithm::EltwiseIsNaN:             *dst_ptr_f = std::isnan(src_f[0]); break;
@@ -1582,9 +1582,7 @@ bool Eltwise::EltwiseData::operator==(const EltwiseData &rhs) const noexcept {
            onednnAlgorithm == rhs.onednnAlgorithm &&
            alpha == rhs.alpha &&
            beta == rhs.beta &&
-           gamma == rhs.gamma &&
-           detectNegative == rhs.detectNegative &&
-           detectPositive == rhs.detectPositive;
+           gamma == rhs.gamma;
 }
 
 static Eltwise::executorPtr buildExecutor(const EltwiseKey& key) {
@@ -2013,7 +2011,7 @@ void Eltwise::prepareParams() {
 
     auto outPrc = getChildEdgeAt(0)->getMemory().getDesc().getPrecision();
 
-    EltwiseData thisOp{getAlgorithm(), getOneDnnAlgorithm(), getAlpha(), getBeta(), getGamma(), getNegative(), getPositive()};
+    EltwiseData thisOp{getAlgorithm(), getOneDnnAlgorithm(), getAlpha(), getBeta(), getGamma()};
 
     EltwiseKey key = {{thisOp}, {getType()}, currentOutBlkDims, outOrder, dims_in, inpPrc, outPrc, dnnl::post_ops(), isDynBatchEnabled, canUseOptimizedImpl};
 std::cout << "Eltwise::prepareParams()" << std::endl;
@@ -2022,9 +2020,8 @@ std::cout << "Eltwise::prepareParams()" << std::endl;
         key.ops_list.push_back(node->getType());
         if (node->getType() == Type::Eltwise) {
             if (auto eltwise = std::dynamic_pointer_cast<Eltwise>(node)) {
-std::cout << "eltwise->getNegative(): " << eltwise->getNegative() << "; eltwise->getPositive(): " << eltwise->getPositive() << std::endl;
                 key.eltwise_data.push_back({eltwise->getAlgorithm(), eltwise->getOneDnnAlgorithm(), eltwise->getAlpha(),
-                                            eltwise->getBeta(), eltwise->getGamma(), eltwise->getNegative(), eltwise->getPositive()});
+                                            eltwise->getBeta(), eltwise->getGamma()});
             }
         } else if (node->getType() == Type::FakeQuantize) {
             node->appendPostOps(key.postOps, {}, fqDataPtrs);
