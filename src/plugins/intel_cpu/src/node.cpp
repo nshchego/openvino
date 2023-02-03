@@ -108,6 +108,7 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
     }
 
     if (typeStr != "Result" && typeStr != "Assign") {
+//    if (type != Type::Output && type != Type::MemoryOutput) {
         if (op->get_output_size() == 0) {
             IE_THROW() << "Node with type '" << typeStr << "' and name '" << name << "' does not have any outputs.";
         }
@@ -122,7 +123,9 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
             originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     }
-
+if (originalOutputPrecisions.size() > 0) {
+    std::cout << "CPU Node ctr {" << typeStr << "} originalOutputPrecisions[0]: " << originalOutputPrecisions[0] << std::endl;
+}
     isDynamic = std::any_of(inputShapes.begin(), inputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); }) ||
                 std::any_of(outputShapes.begin(), outputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); });
 

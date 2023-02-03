@@ -45,6 +45,7 @@ std::vector<ov::test::ElementType> netPrecisions = {
         ov::element::f32,
         ov::element::f16,
         ov::element::i32,
+        ov::element::i64,
 };
 
 std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {

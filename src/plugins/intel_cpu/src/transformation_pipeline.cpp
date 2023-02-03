@@ -193,8 +193,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
 
     auto get_convert_precisions = []() {
         precisions_map map = {
-            {ov::element::i64,     ov::element::i32},
-            {ov::element::u64,     ov::element::i32},
+            {ov::element::u64,     ov::element::i64},
             {ov::element::i16,     ov::element::i32},
             {ov::element::u16,     ov::element::i32},
             {ov::element::u32,     ov::element::i32},

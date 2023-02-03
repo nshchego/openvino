@@ -42,6 +42,7 @@ ov::pass::NormalizeL2Fusion::NormalizeL2Fusion() {
     auto divide_or_mul = std::make_shared<pattern::op::Or>(OutputVector{divide, mul});
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "NormalizeL2Fusion callback" << std::endl;
         const auto& pattern_to_output = m.get_pattern_value_map();
 
         const auto data_input = pattern_to_output.at(input);

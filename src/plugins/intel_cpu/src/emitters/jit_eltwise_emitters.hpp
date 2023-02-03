@@ -256,7 +256,6 @@ private:
     void emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const;
 
     void register_table_entries() override;
-    size_t aux_vecs_count() const override;
 };
 
 

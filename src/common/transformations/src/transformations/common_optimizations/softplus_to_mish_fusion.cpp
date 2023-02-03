@@ -13,6 +13,7 @@
 #include "itt.hpp"
 
 ov::pass::SoftPlusToMishFusion::SoftPlusToMishFusion() {
+std::cout << "SoftPlusToMishFusion CTR" << std::endl;
     MATCHER_SCOPE(SoftPlusToMishFusion);
     auto input = pass::pattern::any_input();
     auto softplus = ngraph::pattern::wrap_type<opset4::SoftPlus>({input}, pattern::consumers_count(1));
@@ -20,6 +21,7 @@ ov::pass::SoftPlusToMishFusion::SoftPlusToMishFusion() {
     auto mul = std::make_shared<opset4::Multiply>(input, tanh);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "SoftPlusToMishFusion callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto exp_input = pattern_to_output.at(input);
 
