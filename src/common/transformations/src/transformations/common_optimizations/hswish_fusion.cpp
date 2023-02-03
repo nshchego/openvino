@@ -26,6 +26,7 @@ ov::pass::HSwishFusionWithReluDiv::HSwishFusionWithReluDiv() {
     auto div = std::make_shared<opset8::Divide>(mul, div_constant);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "HSwishFusionWithReluDiv callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto x_output = pattern_to_output.at(input);
 
@@ -81,6 +82,7 @@ ov::pass::HSwishFusionWithReluMul::HSwishFusionWithReluMul() {
     auto mul_second = std::make_shared<opset8::Multiply>(mul_first, mul_constant);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "HSwishFusionWithReluMul callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto x_output = pattern_to_output.at(input);
 
@@ -127,6 +129,7 @@ ov::pass::HSwishFusionWithHSigmoid::HSwishFusionWithHSigmoid() {
     auto mul_pattern = pattern::wrap_type<opset8::Multiply>({input, hsigmoid_pattern});
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "HSwishFusionWithHSigmoid callback" << std::endl;
         const auto& pattern_to_output = m.get_pattern_value_map();
         auto hsigmoid = pattern_to_output.at(hsigmoid_pattern).get_node_shared_ptr();
         auto mul = pattern_to_output.at(mul_pattern).get_node_shared_ptr();
@@ -152,6 +155,7 @@ ov::pass::HSwishFusionWithClamp::HSwishFusionWithClamp() {
     const auto mul = ngraph::pattern::wrap_type<opset8::Multiply>({clamp, input});
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "HSwishFusionWithClamp callback" << std::endl;
         const auto& pattern_to_output = m.get_pattern_value_map();
         const auto x_output = pattern_to_output.at(input);
         const auto add_const_value =

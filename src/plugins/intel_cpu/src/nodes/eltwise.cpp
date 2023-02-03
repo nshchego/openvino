@@ -1,4 +1,3 @@
-
 // Copyright (C) 2018-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -72,7 +71,7 @@ struct EltwiseEmitterContext {
     jit_generator *host;
     cpu_isa_t host_isa;
     const Eltwise::EltwiseData& opData;
-    InferenceEngine::Precision exec_prc;
+    Precision exec_prc;
 };
 
 template<typename T>
@@ -229,6 +228,7 @@ InferenceEngine::Precision eltwise_precision_helper::get_precision(const size_t 
             element::i16,
             element::bf16,
             element::i32,
+            element::i64,
             element::f32
     };
 
@@ -328,10 +328,11 @@ struct jit_uni_eltwise_generic : public jit_uni_eltwise_kernel, public jit_gener
     }
 
     void generate() override {
-        auto const exec_prc = eltwise_precision_helper::get_precision(jep_.inputs_number, jep_.src_prc, eltwise_data_);
 
+std::cout << "ELTW ALGO: " << int(eltwise_data_.front().algo) << std::endl;
         eltwise_emitter = create_eltwise_emitter(eltwise_data_.front(), exec_prc);
         for (size_t i = 1; i < eltwise_data_.size(); ++i) {
+std::cout << "ELTW ALGO: " << int(eltwise_data_[i].algo) << std::endl;
             post_op_emitters.push_back(create_eltwise_emitter(eltwise_data_[i], exec_prc));
         }
 
@@ -748,9 +749,15 @@ private:
 
         if (broadcast) {
             load_scalar(xmm_src, op, src_prc, dst_prc);
-            uni_vbroadcastss(vmm_src, xmm_src);
+            if (src_prc.size() == 4) {
+                uni_vbroadcastss(vmm_src, xmm_src);
+            } else if (src_prc.size() == 8) {
+                uni_vbroadcastsd(vmm_src, xmm_src);
+            }
         } else {
             switch (src_prc) {
+                case Precision::I64:
+//                    vmovupd(vmm_src, op);
                 case Precision::FP32:
                 case Precision::I32:
                     uni_vmovups(vmm_src, op);
@@ -784,6 +791,8 @@ private:
                     if (src_prc == Precision::FP32 || src_prc == Precision::BF16)
                         uni_vcvtps2dq(vmm_src, vmm_src);
                     break;
+                case Precision::I64:
+                    break;
                 default:
                     assert(!"unknown dst_prc");
             }
@@ -792,6 +801,9 @@ private:
 
     inline void load_scalar(Xmm xmm_src, const Xbyak::Address &op, Precision src_prc, Precision dst_prc) {
         switch (src_prc) {
+            case Precision::I64:
+                uni_vmovsd(xmm_src, op);
+                break;
             case Precision::FP32:
             case Precision::I32:
                 uni_vmovss(xmm_src, op);
@@ -829,6 +841,8 @@ private:
                 if (src_prc == Precision::FP32 || src_prc == Precision::BF16)
                     uni_vcvtps2dq(xmm_src, xmm_src);
                 break;
+            case Precision::I64:
+                break;
             default:
                 assert(!"unknown dst_prc");
         }
@@ -847,11 +861,15 @@ private:
                 if (dst_prc == Precision::FP32 || dst_prc == Precision::BF16)
                     uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 break;
+            case Precision::I64:
+                break;
             default:
                 assert(!"unknown src_prc");
         }
 
         switch (dst_prc) {
+            case Precision::I64:
+//                vmovupd(op, vmm_dst);
             case Precision::FP32:
             case Precision::I32:
                 uni_vmovups(op, vmm_dst);
@@ -931,11 +949,16 @@ private:
                 if (dst_prc == Precision::FP32 || dst_prc == Precision::BF16)
                     uni_vcvtdq2ps(xmm_dst, xmm_dst);
                 break;
+            case Precision::I64:
+                break;
             default:
                 assert(!"unknown src_prc");
         }
 
         switch (dst_prc) {
+            case Precision::I64:
+                uni_vmovsd(op, xmm_dst);
+                break;
             case Precision::FP32:
             case Precision::I32:
                 uni_vmovss(op, xmm_dst);
@@ -1207,8 +1230,8 @@ struct EltwiseKey {
     VectorDims outBlkDims;
     VectorDims outOrder;
     std::vector<VectorDims> inpDims;
-    std::vector<InferenceEngine::Precision> inpPrc;
-    InferenceEngine::Precision outPrc;
+    std::vector<Precision> inpPrc;
+    Precision outPrc;
     dnnl::post_ops postOps;
     bool useDynBatch;
     EltwiseImplType implType;
@@ -1309,8 +1332,8 @@ public:
                        const VectorDims& outBlkDims,
                        const VectorDims& outOrder,
                        std::vector<VectorDims> inpDims,
-                       const std::vector<InferenceEngine::Precision>& inpPrc,
-                       const InferenceEngine::Precision& outPrc,
+                       const std::vector<Precision>& inpPrc,
+                       const Precision& outPrc,
                        const dnnl::post_ops& post_ops,
                        bool useDynBatch,
                        bool useRuntimePtrs) {
@@ -1503,6 +1526,7 @@ public:
         std::transform(jep.oc_offsets.begin(), jep.oc_offsets.end(), jep.oc_offsets.begin(),
                        [](size_t& offset) { return offset * sizeof(float);});
 
+std::cout << "KERNEL PRC: " << inpPrc[0] << "; " << (inpPrc.size() > 1 ? inpPrc[1] : Precision(Precision::UNSPECIFIED)) << std::endl;
         if (mayiuse(x64::avx512_core)) {
             _pKernel.reset(new jit_uni_eltwise_generic<x64::avx512_core>(jep, eltwise_data, ops_list, post_ops));
         } else if (mayiuse(x64::avx2)) {
@@ -1522,6 +1546,7 @@ public:
             IE_THROW() << "Can't execute, kernel for eltwise node is not compiled";
 
         if (_pKernel->jep_.input_size == optimalTensorRank) {
+std::cout << "exec Optimized 6D" << std::endl;
             // execute Optimized 6D
             parallel_for5d(dims_out[0], dims_out[1], dims_out[2], dims_out[3], dims_out[4],
                            [&](size_t i0, size_t i1, size_t i2, size_t i3, size_t i4) {
@@ -1535,6 +1560,7 @@ public:
                                (*_pKernel)(&args_ptrs, &args);
                            });
         } else {
+std::cout << "exec Optimized Generic" << std::endl;
             // execute Optimized Generic
             if (_pKernel->jep_.use_runtime_ptrs) {
                 // recalculate _schedulerWorkAmount
@@ -1803,6 +1829,11 @@ bool Eltwise::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op
 
 Eltwise::Eltwise(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
     Node(op, context, EltwiseShapeInferFactory()), broadcastingPolicy(Undefined) {
+std::cout << "Eltwise ctr OP PRC: " << op->get_element_type() << std::endl;
+              //std::cout << "Eltwise ctr OP PRC: " << op->get_element_type() << "; in0: " << op->get_input_node_ptr(0)->get_element_type() << "; in1: " <<
+//        op->get_input_node_ptr(1)->get_element_type() << std::endl;
+//std::cout << "Eltwise ctr IN PRC: " << getOriginalInputPrecisionAtPort(0) << "; " << (!ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(1)) ?
+//        getOriginalInputPrecisionAtPort(1) : Precision(Precision::UNSPECIFIED)) << std::endl;
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
@@ -1891,7 +1922,8 @@ void Eltwise::initSupportedPrimitiveDescriptors() {
             Precision::U16,
             Precision::I16,
             Precision::BF16,
-            Precision::I32
+            Precision::I32,
+            Precision::I64
     };
 
     if (!supportedPrimitiveDescriptors.empty())
@@ -1920,7 +1952,7 @@ void Eltwise::initSupportedPrimitiveDescriptors() {
         IE_THROW() << "Eltwise node with name `" << getName() << "` has invalid input number of inputs: expected = " << expectedInputsNum
                            << " (actual = " << getParentEdges().size() << ")";
 
-    std::vector<InferenceEngine::Precision> inputPrecisions;
+    std::vector<Precision> inputPrecisions;
     for (const auto &prec : getOriginalInputPrecisions()) {
         inputPrecisions.push_back(prec);
     }
@@ -1942,7 +1974,7 @@ void Eltwise::initSupportedPrimitiveDescriptors() {
     if (inputPrecisions.size() != getParentEdges().size())
         IE_THROW() << "Eltwise node with name `" << getName() << "` has invalid input precisions configuration.";
 
-    InferenceEngine::Precision outputPrecision = getOriginalOutputPrecisionAtPort(0);
+    Precision outputPrecision = getOriginalOutputPrecisionAtPort(0);
     if (!fusedWith.empty()) {
         outputPrecision = fusedWith[fusedWith.size() - 1]->getOriginalOutputPrecisionAtPort(0);
     }
@@ -1961,8 +1993,10 @@ void Eltwise::initSupportedPrimitiveDescriptors() {
         if (implType == EltwiseImplType::reference) {
             return Precision(Precision::FP32);
         } else if (std::find(supportedPrecisions.begin(), supportedPrecisions.end(), prc) == supportedPrecisions.end()) {
-            if (prc == Precision::U32 || prc == Precision::I64 || prc == Precision::U64) {
+            if (prc == Precision::U32) {
                 return Precision(Precision::I32);
+            } else if (prc == Precision::U64) {
+                return Precision(Precision::I64);
             } else {
                 IE_THROW() << "Eltwise node with name `" << getName() << "` doesn't support " << prc << " precision.";
             }
@@ -2282,6 +2316,72 @@ void Eltwise::selectOptimalPrimitiveDescriptor() {
 }
 
 void Eltwise::execute(dnnl::stream strm) {
+// DEBUG
+    // std::cout << "\nFIRST INPUT: " << std::endl;
+    // std::cout << "Size: " << getParentEdgeAt(0)->getMemoryPtr()->GetSize() << std::endl;
+    // const int elPerVec = 64 / getOriginalInputPrecisionAtPort(0).size();
+
+    // void* firstData = getParentEdgeAt(0)->getMemoryPtr()->GetPtr();
+    // const auto dims = getParentEdgeAt(0)->getMemoryPtr()->getStaticDims();
+    // const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+    // for (int i = 0; i < blLen; i++) {
+    //     if (i != 0 && i % elPerVec == 0) {
+    //         std::cout << "| ";
+    //     }
+    //     if (getOriginalInputPrecisionAtPort(0) == Precision::I64) {
+    //         std::cout << reinterpret_cast<int64_t*>(firstData)[i] << "; ";
+    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::I32) {
+    //         std::cout << reinterpret_cast<int32_t*>(firstData)[i] << "; ";
+    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::FP32) {
+    //         std::cout << reinterpret_cast<float*>(firstData)[i] << "; ";
+    //     }
+    // }
+    // std::cout << std::endl;
+
+    // if (getParentEdges().size() > 1) {
+    //     std::cout << "SECOND INPUT: " << std::endl;
+    //     std::cout << "Size: " << getParentEdgeAt(1)->getMemoryPtr()->GetSize() << std::endl;
+
+    //     const auto dims = getParentEdgeAt(1)->getMemoryPtr()->getStaticDims();
+    //     const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+    //     auto* secData = getParentEdgeAt(1)->getMemoryPtr()->GetPtr();
+    //     for (int i = 0; i < blLen; i++) {
+    //         if (i != 0 && i % elPerVec == 0) {
+    //             std::cout << "| ";
+    //         }
+    //         if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
+    //             std::cout << reinterpret_cast<int64_t*>(secData)[i] << "; ";
+    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
+    //             std::cout << reinterpret_cast<int32_t*>(secData)[i] << "; ";
+    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
+    //             std::cout << reinterpret_cast<float*>(secData)[i] << "; ";
+    //         }
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // if (getParentEdges().size() > 2) {
+    //     std::cout << "THIRD INPUT: " << std::endl;
+    //     std::cout << "Size: " << getParentEdgeAt(2)->getMemoryPtr()->GetSize() << std::endl;
+
+    //     const auto dims = getParentEdgeAt(2)->getMemoryPtr()->getStaticDims();
+    //     const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+    //     auto thrData = getParentEdgeAt(2)->getMemoryPtr()->GetPtr();
+    //     for (int i = 0; i < blLen; i++) {
+    //         if (i != 0 && i % elPerVec == 0) {
+    //             std::cout << "| ";
+    //         }
+    //         if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
+    //             std::cout << reinterpret_cast<int64_t*>(thrData)[i] << "; ";
+    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
+    //             std::cout << reinterpret_cast<int32_t*>(thrData)[i] << "; ";
+    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
+    //             std::cout << reinterpret_cast<float*>(thrData)[i] << "; ";
+    //         }
+    //     }
+    //     std::cout << std::endl;
+    // }
+// DEBUG
+
     if (execPtr) {
         jit_eltwise_call_args_ptrs args_ptrs = {};
         VectorDims dims_out = implType == EltwiseImplType::optimizedShapeAgnostic ? execParams.outDims : execPtr->getOutDims();
@@ -2312,6 +2412,28 @@ void Eltwise::execute(dnnl::stream strm) {
     } else {
         IE_THROW() << "Can't execute eltwise node with name: " << getName() << ". Primitive isn't created";
     }
+
+// DEBUG
+    // std::cout << "OUTPUT: " << std::endl;
+    // std::cout << "Size: " << getChildEdgeAt(0)->getMemoryPtr()->GetSize() << std::endl;
+
+    // const auto oDims = getChildEdgeAt(0)->getMemoryPtr()->getStaticDims();
+    // const auto oBlLen = std::accumulate(oDims.begin(), oDims.end(), 1, std::multiplies<Dim>());
+    // auto* dstData = getChildEdgeAt(0)->getMemoryPtr()->GetPtr();
+    // for (int i = 0; i < oBlLen; i++) {
+    //     if (i != 0 && i % elPerVec  == 0) {
+    //         std::cout << "| ";
+    //     }
+    //     if (getOriginalOutputPrecisionAtPort(0) == Precision::I64) {
+    //         std::cout << reinterpret_cast<int64_t*>(dstData)[i] << "; ";
+    //     } else if (getOriginalOutputPrecisionAtPort(0) == Precision::I32) {
+    //         std::cout << reinterpret_cast<int32_t*>(dstData)[i] << "; ";
+    //     } else if (getOriginalOutputPrecisionAtPort(0) == Precision::FP32) {
+    //         std::cout << reinterpret_cast<float*>(dstData)[i] << "; ";
+    //     }
+    // }
+    // std::cout << std::endl << std::endl;
+// DEBUG
 }
 
 void Eltwise::executeDynamicImpl(dnnl::stream strm) {
@@ -2654,8 +2776,8 @@ bool Eltwise::canFuse(const NodePtr& node) const {
     return false;
 }
 
-InferenceEngine::Precision Eltwise::getRuntimePrecision() const {
-    std::vector<InferenceEngine::Precision> inputPrecisions;
+Precision Eltwise::getRuntimePrecision() const {
+    std::vector<Precision> inputPrecisions;
     // Don't take bias precision into account
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         auto parentEdge = getParentEdgeAt(i);
