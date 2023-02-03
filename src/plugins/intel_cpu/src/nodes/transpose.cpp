@@ -21,12 +21,12 @@ namespace node {
 bool Transpose::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!one_of(op->get_type_info(),
-                ov::op::v1::Transpose::get_type_info_static())) {
+                op::v1::Transpose::get_type_info_static())) {
             errorMessage = "Node is not an instance of the Transpose operation from opset1.";
             return false;
         }
 
-        if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+        if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() != op::v0::Constant::get_type_info_static()) {
             // TODO: Support parameterized Order input for dynamic shapes.
             errorMessage = "Constant expected as the second input for static shapes.";
             return false;
@@ -88,7 +88,7 @@ class TransposeShapeInferFactory : public ShapeInferFactory {
 public:
     TransposeShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
-        if (const auto order = ov::as_type_ptr<const ov::op::v0::Constant>(m_op->get_input_node_shared_ptr(ov::op::v1::Transpose::ORDER))) {
+        if (const auto order = ov::as_type_ptr<const op::v0::Constant>(m_op->get_input_node_shared_ptr(op::v1::Transpose::ORDER))) {
             const auto axes_vec = order->cast_vector<size_t>();
             return std::make_shared<TransposeShapeInfer>(m_op->get_output_partial_shape(0).rank().get_length(), axes_vec);
         } else {
@@ -101,16 +101,20 @@ private:
 };
 } // namespace
 
-Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, TransposeShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
+    if (auto inputOrder = ov::as_type<op::v0::Constant>(op->get_input_node_ptr(INPUT_ORDER_IDX))) {
         isInputOrderConst = true;
-        order = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(INPUT_ORDER_IDX))->cast_vector<size_t>();
+        if (one_of(inputOrder->get_element_type(), ov::element::i64, ov::element::u64)) {
+            order = inputOrder->get_vector<size_t>();
+        } else {
+            order = inputOrder->cast_vector<size_t>();
+        }
 
         if (order.empty()) {
             size_t rank = getInputShapeAtPort(INPUT_DATA_IDX).getRank();
@@ -128,7 +132,11 @@ void Transpose::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    prec = getOriginalInputPrecisionAtPort(0);
+    const auto &dataPrc = getOriginalInputPrecisionAtPort(0);
+    auto orderPrc = getOriginalInputPrecisionAtPort(1);
+    if (!one_of(orderPrc, Precision::I32, Precision::I64)) {
+        orderPrc = Precision::I32;
+    }
 
     auto& creatorsMap = BlockedDescCreator::getCommonCreators();
 
@@ -139,37 +147,37 @@ void Transpose::initSupportedPrimitiveDescriptors() {
     config.inConfs[INPUT_DATA_IDX].constant(false);
     config.inConfs[INPUT_ORDER_IDX].constant(isInputOrderConst);
     config.inConfs[INPUT_ORDER_IDX].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(
-            Precision::I32, getInputShapeAtPort(INPUT_ORDER_IDX)));
+            orderPrc, getInputShapeAtPort(INPUT_ORDER_IDX)));
     config.outConfs[0].inPlace(-1);
     config.outConfs[0].constant(false);
 
     const auto& inputDataShape = getInputShapeAtPort(INPUT_DATA_IDX);
     const auto& outputDataShape = getOutputShapeAtPort(0);
     if (inputDataShape.getRank() == 4 || inputDataShape.getRank() == 5) {
-        config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(prec, inputDataShape));
-        config.outConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(prec, outputDataShape));
+        config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(dataPrc, inputDataShape));
+        config.outConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(dataPrc, outputDataShape));
         supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
 
         const auto& srcDims = inputDataShape.getDims();
         if (srcDims[1] != Shape::UNDEFINED_DIM && srcDims[1] % 8 == 0) {
-            config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::nCsp8c)->createSharedDesc(prec, inputDataShape));
+            config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::nCsp8c)->createSharedDesc(dataPrc, inputDataShape));
             supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
         }
 
         if (srcDims[1] != Shape::UNDEFINED_DIM && srcDims[1] % 16 == 0) {
-            config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::nCsp16c)->createSharedDesc(prec, inputDataShape));
+            config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::nCsp16c)->createSharedDesc(dataPrc, inputDataShape));
             supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
         }
 
-        if (prec == Precision::FP32 || prec == Precision::I8 || prec == Precision::U8) {
-            config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::nspc)->createSharedDesc(prec, inputDataShape));
-            config.outConfs[0].setMemDesc(creatorsMap.at(LayoutType::nspc)->createSharedDesc(prec, outputDataShape));
+        if (one_of(dataPrc, Precision::FP32, Precision::I8, Precision::U8)) {
+            config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::nspc)->createSharedDesc(dataPrc, inputDataShape));
+            config.outConfs[0].setMemDesc(creatorsMap.at(LayoutType::nspc)->createSharedDesc(dataPrc, outputDataShape));
             supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
         }
     } else {
         // general plain case
-        config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(prec, inputDataShape));
-        config.outConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(prec, outputDataShape));
+        config.inConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(dataPrc, inputDataShape));
+        config.outConfs[0].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc(dataPrc, outputDataShape));
         supportedPrimitiveDescriptors.push_back({config, impl_desc_type::unknown});
     }
 }
@@ -216,9 +224,15 @@ void Transpose::prepareParams() {
     params.dst_block_dims = dstDesc->getBlockDims();
 
     if (!isInputOrderConst) {
-        auto orderPtr = reinterpret_cast<const int32_t*>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
-        auto orderLen = getParentEdgeAt(0)->getMemoryPtr()->GetSize();
-        params.order.assign(orderPtr, orderPtr + orderLen);
+        auto mem = getParentEdgeAt(0)->getMemoryPtr();
+        auto orderLen = mem->GetSize();
+        if (mem->getDesc().getPrecision() == Precision::I64) {
+            auto orderPtr = reinterpret_cast<const int64_t*>(mem->GetPtr());
+            params.order.assign(orderPtr, orderPtr + orderLen);
+        } else {
+            auto orderPtr = reinterpret_cast<const int32_t*>(mem->GetPtr());
+            params.order.assign(orderPtr, orderPtr + orderLen);
+        }
     }
 
     auto engine = getEngine();
@@ -413,7 +427,8 @@ void Transpose::TransposeRefExecutor::exec(Transpose* node, MemoryPtr& srcMemPtr
     OV_SWITCH(intel_cpu, TransposeOptimizedEmitter, ctx, dataSize,
               OV_CASE(1u, PrecisionTrait<Precision::U8>::value_type),
               OV_CASE(2u, PrecisionTrait<Precision::U16>::value_type),
-              OV_CASE(4u, PrecisionTrait<Precision::I32>::value_type));
+              OV_CASE(4u, PrecisionTrait<Precision::I32>::value_type),
+              OV_CASE(8u, PrecisionTrait<Precision::I64>::value_type));
 }
 
 bool Transpose::created() const {

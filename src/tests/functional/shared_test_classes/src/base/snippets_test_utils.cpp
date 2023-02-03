@@ -18,6 +18,7 @@ void SnippetsTestsCommon::validateNumSubgraphs() {
     size_t num_nodes = 0;
     for (const auto &op : compiled_model->get_ops()) {
         auto layer_type = op->get_rt_info().at(ExecGraphInfoSerialization::LAYER_TYPE).as<std::string>();
+std::cout << "layer_type: " << layer_type <<std::endl;
         // todo: Ignore reorders only after (Const or Inputs) or before outputs.
         //  Alternatively, force plain layouts for convolutions, matmuls, FCs, etc., so reorders won't be inserted.
         if (layer_type == "Const" ||

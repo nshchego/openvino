@@ -42,6 +42,7 @@ ov::intel_cpu::MHAFloatFusion::MHAFloatFusion() {
     auto transpose3 = std::make_shared<ngraph::opset3::Transpose>(matmul1, in10);
 
     ngraph::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "MHAFloatFusion callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto transpose0_in = pattern_to_output.at(in0);
         auto transpose1_in = pattern_to_output.at(in1);
@@ -181,6 +182,7 @@ ov::intel_cpu::MHAFloatFusion2::MHAFloatFusion2() {
     auto transpose3 = std::make_shared<ngraph::opset3::Transpose>(matmul1, in10);
 
     ngraph::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "MHAFloatFusion2 callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto transpose0_in = pattern_to_output.at(in0);
         auto transpose1_in = pattern_to_output.at(in1);
@@ -294,6 +296,7 @@ ov::intel_cpu::MHAQuantFusion::MHAQuantFusion() {
     auto transpose3 = std::make_shared<ngraph::opset3::Transpose>(fakeQuantize2, in10);
 
     ngraph::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "MHAQuantFusion callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto transpose0_in = pattern_to_output.at(in0);
         auto transpose1_in = pattern_to_output.at(in1);
@@ -475,6 +478,7 @@ ov::intel_cpu::MHAQuantFusion2::MHAQuantFusion2() {
     auto transpose3 = std::make_shared<ngraph::opset3::Transpose>(in11, in10);
 
     ngraph::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "MHAQuantFusion2 callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto transpose0_in = pattern_to_output.at(in0);
         auto transpose1_in = pattern_to_output.at(in1);

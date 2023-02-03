@@ -3,6 +3,8 @@
 //
 
 #include "ngraph/op/util/evaluate_helpers.hpp"
+#include "ngraph/util.hpp"
+#include "ngraph/validation_util.hpp"
 
 namespace ngraph {
 AxisSet get_normalized_axes_from_tensor(const HostTensorPtr tensor,

@@ -11,6 +11,7 @@
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/product.hpp"
 #include "ngraph/shape_util.hpp"
+#include "ngraph/validation_util.hpp"
 
 using namespace std;
 using namespace ngraph;
@@ -46,6 +47,7 @@ bool evaluate_product(const HostTensorPtr& arg, const HostTensorPtr& out, const 
         NGRAPH_TYPE_CASE(evaluate_product, u64, arg, out, axes, keep_dims);
         NGRAPH_TYPE_CASE(evaluate_product, f16, arg, out, axes, keep_dims);
         NGRAPH_TYPE_CASE(evaluate_product, f32, arg, out, axes, keep_dims);
+        NGRAPH_TYPE_CASE(evaluate_product, f64, arg, out, axes, keep_dims);
     default:
         rc = false;
         break;
@@ -77,6 +79,7 @@ bool op::v1::ReduceProd::has_evaluate() const {
     case ngraph::element::u64:
     case ngraph::element::f16:
     case ngraph::element::f32:
+    case ngraph::element::f64:
         return true;
     default:
         break;

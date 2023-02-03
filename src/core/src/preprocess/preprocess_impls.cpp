@@ -96,6 +96,7 @@ InputInfo::InputInfoImpl::InputInfoData InputInfo::InputInfoImpl::create_new_par
     // Create separate parameter for each plane. Shape is based on color format
     for (size_t plane = 0; plane < color_info->planes_count(); plane++) {
         auto plane_shape = color_info->shape(plane, new_param_shape, res.m_tensor_layout);
+std::cout << "InputInfoData tensor_elem_type: " << tensor_elem_type << "; plane_shape: " << plane_shape << std::endl; 
         auto plane_param = std::make_shared<opset8::Parameter>(tensor_elem_type, plane_shape);
         if (plane < get_tensor_data()->planes_sub_names().size()) {
             std::unordered_set<std::string> plane_tensor_names;

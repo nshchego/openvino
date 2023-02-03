@@ -16,8 +16,6 @@
 
 #include "ngraph/axis_set.hpp"
 #include "ngraph/descriptor/tensor.hpp"
-#include "ngraph/util.hpp"
-#include "ngraph/validation_util.hpp"
 
 namespace ngraph {
 /// \brief Extracts the tensor data and returns a set of normalized axes created out of it.

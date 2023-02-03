@@ -3,30 +3,26 @@
 //
 
 #include "reshape.h"
-#include "utils.hpp"
-#include <string>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
-#include <openvino/opsets/opset1.hpp>
-#include <ie_ngraph_utils.hpp>
-#include <utils/shape_inference/static_shape.hpp>
-#include <utils/shape_inference/shape_inference.hpp>
-#include "utils/shape_inference/shape_inference_cpu.hpp"
 
 #include "common/cpu_memcpy.h"
+#include <ie_ngraph_utils.hpp>
+#include <openvino/op/reshape.hpp>
+#include <openvino/op/squeeze.hpp>
+#include <openvino/op/unsqueeze.hpp>
+#include <utils.hpp>
 
-using namespace dnnl;
 using namespace InferenceEngine;
 
 namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool Reshape::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Reshape::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!std::dynamic_pointer_cast<const ov::opset1::Reshape>(op) &&
-            !std::dynamic_pointer_cast<const ov::opset1::Squeeze>(op) &&
-                !std::dynamic_pointer_cast<const ov::opset1::Unsqueeze>(op)) {
+        if (!one_of(op->get_type_info(),
+                    op::v1::Reshape::get_type_info_static(),
+                    op::v0::Squeeze::get_type_info_static(),
+                    op::v0::Unsqueeze::get_type_info_static())) {
             errorMessage = "Only opset1 Reshape, Squeeze, Unsqueeze operations are supported";
             return false;
         }
@@ -226,30 +222,28 @@ private:
 };
 } // namespace
 
-Reshape::Reshape(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+Reshape::Reshape(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context) :
         Node(op, context, ReshapeShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string(op->get_type_name()) + " node with name '" + getName() + "'";
-
     if (isDynamicNode()) {
-        auto checkSecondInput = [](const std::shared_ptr<ngraph::Node>& op, const std::string opType) {
+        auto checkSecondInput = [](const std::shared_ptr<ov::Node>& op, const std::string &opType) {
             if (op->get_input_partial_shape(1).is_dynamic()) {
                 IE_THROW() << "CPU plug-in doesn't support " << opType << " node with non static second input";
             }
         };
 
-        if (std::dynamic_pointer_cast<const ov::opset1::Reshape>(op)) {
-            checkSecondInput(op, "Reshape");
-        } else if (std::dynamic_pointer_cast<const ov::opset1::Squeeze>(op)) {
+        if (op->get_type_info() == op::v1::Reshape::get_type_info_static()) {
+            checkSecondInput(op, getTypeStr());
+        } else if (op->get_type_info() == op::v0::Squeeze::get_type_info_static()) {
             if (op->get_input_size() == 1)
                 IE_THROW() << "CPU plug-in doesn't support Squeeze node with inputs num equal 1";
-            checkSecondInput(op, "Squeeze");
-        } else if (std::dynamic_pointer_cast<const ov::opset1::Unsqueeze>(op)) {
-            checkSecondInput(op, "Unsqueeze");
+            checkSecondInput(op, getTypeStr());
+        } else if (op->get_type_info() == op::v0::Unsqueeze::get_type_info_static()) {
+            checkSecondInput(op, getTypeStr());
         } else {
             IE_THROW() << "Unsupported operation type via reshape node";
         }
@@ -264,15 +258,30 @@ bool Reshape::needShapeInfer() const {
     if (lastSecondInputValues.empty()) {
         lastSecondInputValues.resize(mem.getStaticDims()[0], 0);
     }
-    const int32_t *sndInput = reinterpret_cast<const int32_t *>(mem.GetPtr());
-    for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
-        if (lastSecondInputValues[i] != sndInput[i]) {
-            for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
-                lastSecondInputValues[i] = sndInput[i];
+
+    const auto shapePrc = mem.getDesc().getPrecision();
+    if (shapePrc == Precision::I64) {
+        const auto sndInput = reinterpret_cast<const int64_t *>(mem.GetPtr());
+        for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
+            if (lastSecondInputValues[i] != sndInput[i]) {
+                for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
+                    lastSecondInputValues[i] = sndInput[i];
+                }
+                return true;
             }
-            return true;
+        }
+    } else if (shapePrc == Precision::I32) {
+        const auto sndInput = reinterpret_cast<const int32_t *>(mem.GetPtr());
+        for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
+            if (lastSecondInputValues[i] != sndInput[i]) {
+                for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
+                    lastSecondInputValues[i] = sndInput[i];
+                }
+                return true;
+            }
         }
     }
+
     return false;
 }
 
@@ -287,9 +296,12 @@ void Reshape::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    InferenceEngine::Precision inPrec = getOriginalInputPrecisionAtPort(0);
-    InferenceEngine::Precision outPrec = getOriginalOutputPrecisionAtPort(0);
-    InferenceEngine::Precision secondInPrc = InferenceEngine::Precision::I32;
+    auto inPrec = getOriginalInputPrecisionAtPort(0);
+    Precision secondInPrc = Precision::I32;
+    if (getOriginalInputPrecisions().size() > 1) {
+        secondInPrc = getOriginalInputPrecisionAtPort(1);
+    }
+    const auto &outPrec = getOriginalOutputPrecisionAtPort(0);
 
     // Current reshape implementation is simple memory reinterpret,
     // same precision on input and output is required
@@ -308,7 +320,7 @@ void Reshape::initSupportedPrimitiveDescriptors() {
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         config.inConfs[i].inPlace(-1);
         config.inConfs[i].constant(false);
-        config.inConfs[i].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc((i > 0 ? secondInPrc : inPrec), getInputShapeAtPort(i)));
+        config.inConfs[i].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc((i == 0 ? inPrec : secondInPrc), getInputShapeAtPort(i)));
     }
     config.outConfs.resize(1);
     config.outConfs[0].inPlace(canBeInPlace ? 0 : -1);

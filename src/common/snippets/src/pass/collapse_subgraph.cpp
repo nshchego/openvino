@@ -188,7 +188,7 @@ auto has_supported_in_out(const std::shared_ptr<const Node> &n) -> bool {
         //  So i32 is supported exclusively for transposes and broadcast
         return t.get_partial_shape().is_static() &&
                (TokenizeSnippets::supported_element_types.count(t.get_element_type()) != 0 ||
-                (t.get_element_type() == ov::element::i32 &&
+                ((t.get_element_type() == element::i32 || t.get_element_type() == element::i64) &&
                         (ov::is_type<const opset1::Transpose>(n) ||
                          ov::is_type<const opset1::Broadcast>(n))));
     };

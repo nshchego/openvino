@@ -40,6 +40,7 @@ ov::pass::SwishFusionWithSigmoid::SwishFusionWithSigmoid() {
     auto mul = std::make_shared<opset4::Multiply>(input, sigmoid);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "SwishFusionWithSigmoid callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto exp_input = pattern_to_output.at(input);
 
@@ -67,6 +68,7 @@ ov::pass::SwishFusionWithSigmoidWithBeta::SwishFusionWithSigmoidWithBeta() {
     auto mul = std::make_shared<opset4::Multiply>(input, sigmoid);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "SwishFusionWithSigmoidWithBeta callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto exp_input = pattern_to_output.at(input);
         auto beta_input = pattern_to_output.at(beta);
@@ -116,6 +118,7 @@ ov::pass::SwishFusionWithBeta::SwishFusionWithBeta() {
     auto div = std::make_shared<opset4::Divide>(input, add);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "SwishFusionWithBeta callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto exp_input = pattern_to_output.at(input);
 
@@ -155,6 +158,7 @@ ov::pass::SwishFusionWithoutBeta::SwishFusionWithoutBeta() {
     auto div = std::make_shared<opset4::Divide>(input, add);
 
     ov::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {
+std::cout << "SwishFusionWithoutBeta callback" << std::endl;
         auto& pattern_to_output = m.get_pattern_value_map();
         auto exp_input = pattern_to_output.at(input);
 

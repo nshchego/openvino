@@ -4,8 +4,8 @@
 
 #include "test_utils/cpu_test_utils.hpp"
 #include "ngraph_functions/builders.hpp"
-
 #include "shared_test_classes/base/ov_subgraph.hpp"
+#include <cpp_interfaces/interface/ie_internal_plugin_config.hpp>
 // Since the Transpose ngraph operation is converted to the transpose node, we will use it in the transpose test
 
 using namespace InferenceEngine;
@@ -15,24 +15,22 @@ using namespace ov::test;
 namespace CPULayerTestsDefinitions {
 
 typedef std::tuple<
-        InputShape,                    // Input shapes
+        InputShape,                         // Input shapes
         std::vector<size_t>,                // Input order
-        InferenceEngine::Precision,         // Net precision
-        std::string,                        // Target device name
-        std::map<std::string, std::string>, // Additional network configuration
+        ElementType ,                       // Net precision
+        ov::AnyMap,                         // Additional network configuration
         CPUSpecificParams> TransposeLayerCPUTestParamSet;
 
 class TransposeLayerCPUTest : public testing::WithParamInterface<TransposeLayerCPUTestParamSet>,
                               public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
     static std::string getTestCaseName(testing::TestParamInfo<TransposeLayerCPUTestParamSet> obj) {
-        Precision netPrecision;
+        ElementType netPrecision;
         InputShape inputShapes;
         std::vector<size_t> inputOrder;
-        std::string targetDevice;
         CPUSpecificParams cpuParams;
-        std::map<std::string, std::string> additionalConfig;
-        std::tie(inputShapes, inputOrder, netPrecision, targetDevice, additionalConfig, cpuParams) = obj.param;
+        ov::AnyMap additionalConfig;
+        std::tie(inputShapes, inputOrder, netPrecision, additionalConfig, cpuParams) = obj.param;
 
         std::ostringstream result;
         result << "IS=" << CommonTestUtils::partialShape2str({inputShapes.first}) << "_";
@@ -42,31 +40,27 @@ public:
         }
         result << ")_";
         result << "inputOrder=" << CommonTestUtils::vec2str(inputOrder) << "_";
-        result << "netPRC=" << netPrecision.name() << "_";
-        result << "trgDev=" << targetDevice;
+        result << "netPRC=" << netPrecision << "_";
         result << CPUTestsBase::getTestCaseName(cpuParams);
         return result.str();
     }
 protected:
     void SetUp() override {
-        Precision netPrecision;
+        targetDevice = CommonTestUtils::DEVICE_CPU;
+
+        ElementType netPrecision;
         InputShape inputShapes;
         std::vector<size_t> inputOrder;
         CPUSpecificParams cpuParams;
-        std::map<std::string, std::string> additionalConfig;
-        std::tie(inputShapes, inputOrder, netPrecision, targetDevice, additionalConfig, cpuParams) = this->GetParam();
-        configuration.insert(additionalConfig.begin(), additionalConfig.end());
-
-        inType = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
-        outType = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
+        std::tie(inputShapes, inputOrder, netPrecision, configuration, cpuParams) = this->GetParam();
 
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
 
-        selectedType = makeSelectedTypeStr("unknown", inType);
+        selectedType = makeSelectedTypeStr("unknown", netPrecision);
 
         init_input_shapes({inputShapes});
 
-        auto params = ngraph::builder::makeDynamicParams(inType, { inputDynamicShapes[0] });
+        auto params = ngraph::builder::makeDynamicParams(netPrecision, { inputDynamicShapes[0] });
 
         const auto inputOrderOp = std::make_shared<ov::op::v0::Constant>(ov::element::i64,
                                                                          ov::Shape({inputOrder.size()}),
@@ -86,7 +80,8 @@ TEST_P(TransposeLayerCPUTest, CompareWithRefs) {
 }
 
 namespace {
-std::map<std::string, std::string> additional_config;
+ov::AnyMap emptyConfig = {};
+ov::AnyMap i64Config = {{PluginConfigInternalParams::KEY_CPU_NATIVE_I64, PluginConfigParams::YES}};
 
 const auto cpuParams_nChw16c = CPUSpecificParams {{nChw16c}, {}, {}, {}};
 const auto cpuParams_nCdhw16c = CPUSpecificParams {{nCdhw16c}, {}, {}, {}};
@@ -100,13 +95,13 @@ const auto cpuParams_ndhwc = CPUSpecificParams {{ndhwc}, {}, {}, {}};
 const auto cpuParams_nchw = CPUSpecificParams {{nchw}, {}, {}, {}};
 const auto cpuParams_ncdhw = CPUSpecificParams {{ncdhw}, {}, {}, {}};
 
-const std::vector<InferenceEngine::Precision> netPrecisions = {
-        Precision::I8,
-        Precision::BF16,
-        Precision::FP32
+const std::vector<ElementType> netPrecisions = {
+        ElementType::i8,
+        ElementType::bf16,
+        ElementType::f32
 };
 
-const std::vector<InferenceEngine::Precision> netPrecisionsPerChannels = {Precision::I8, Precision::FP32};
+const std::vector<ElementType> netPrecisionsPerChannels = { ElementType::i8, ElementType::f32 };
 
 const std::vector<InputShape> staticInputShapes4DC16 = {InputShape{// dynamic
                                                                    {-1, 16, -1, -1},
@@ -155,8 +150,16 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes4DC16_Transpose, TransposeLayerCPUTes
                                  ::testing::ValuesIn(staticInputShapes4DC16),
                                  ::testing::ValuesIn(inputOrder4D),
                                  ::testing::ValuesIn(netPrecisions),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
+                                 ::testing::ValuesIn(CPUParams4D)),
+                         TransposeLayerCPUTest::getTestCaseName);
+
+INSTANTIATE_TEST_SUITE_P(smoke_staticShapes4DC16_Transpose_I64, TransposeLayerCPUTest,
+                         ::testing::Combine(
+                                 ::testing::ValuesIn(staticInputShapes4DC16),
+                                 ::testing::ValuesIn(inputOrder4D),
+                                 ::testing::Values(ElementType::i64),
+                                 ::testing::Values(i64Config),
                                  ::testing::ValuesIn(CPUParams4D)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -165,8 +168,16 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes4DC32_Transpose, TransposeLayerCPUTes
                                  ::testing::ValuesIn(staticInputShapes4DC32),
                                  ::testing::ValuesIn(inputOrder4D),
                                  ::testing::ValuesIn(netPrecisions),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
+                                 ::testing::ValuesIn(CPUParams4D)),
+                         TransposeLayerCPUTest::getTestCaseName);
+
+INSTANTIATE_TEST_SUITE_P(smoke_staticShapes4DC32_Transpose_i64, TransposeLayerCPUTest,
+                         ::testing::Combine(
+                                 ::testing::ValuesIn(staticInputShapes4DC32),
+                                 ::testing::ValuesIn(inputOrder4D),
+                                 ::testing::Values(ElementType::i64),
+                                 ::testing::Values(i64Config),
                                  ::testing::ValuesIn(CPUParams4D)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -175,8 +186,16 @@ INSTANTIATE_TEST_SUITE_P(smoke_dynamicShapes4D_Transpose, TransposeLayerCPUTest,
                                  ::testing::ValuesIn(dynamicInputShapes4D),
                                  ::testing::ValuesIn(inputOrder4D),
                                  ::testing::ValuesIn(netPrecisions),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
+                                 ::testing::Values(CPUSpecificParams{})),
+                         TransposeLayerCPUTest::getTestCaseName);
+
+INSTANTIATE_TEST_SUITE_P(smoke_dynamicShapes4D_Transpose_I64, TransposeLayerCPUTest,
+                         ::testing::Combine(
+                                 ::testing::ValuesIn(dynamicInputShapes4D),
+                                 ::testing::ValuesIn(inputOrder4D),
+                                 ::testing::Values(ElementType::i64),
+                                 ::testing::Values(i64Config),
                                  ::testing::Values(CPUSpecificParams{})),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -185,8 +204,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes4DC16_PermutePerChannels, TransposeLa
                                  ::testing::ValuesIn(staticInputShapes4DC16),
                                  ::testing::ValuesIn(inputOrderPerChannels4D),
                                  ::testing::ValuesIn(netPrecisionsPerChannels),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(cpuParams_nhwc)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -195,8 +213,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes4DC32_PermutePerChannels, TransposeLa
                                  ::testing::ValuesIn(staticInputShapes4DC32),
                                  ::testing::ValuesIn(inputOrderPerChannels4D),
                                  ::testing::ValuesIn(netPrecisionsPerChannels),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(cpuParams_nhwc)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -205,8 +222,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_dynamicShapes4D_PermutePerChannels, TransposeLaye
                                  ::testing::ValuesIn(dynamicInputShapes4D),
                                  ::testing::ValuesIn(inputOrderPerChannels4D),
                                  ::testing::ValuesIn(netPrecisionsPerChannels),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(CPUSpecificParams{})),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -265,8 +281,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes5DC16_Transpose, TransposeLayerCPUTes
                                  ::testing::ValuesIn(staticInputShapes5DC16),
                                  ::testing::ValuesIn(inputOrder5D),
                                  ::testing::ValuesIn(netPrecisions),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::ValuesIn(CPUParams5D)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -275,8 +290,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes5DC32_Transpose, TransposeLayerCPUTes
                                  ::testing::ValuesIn(staticInputShapes5DC32),
                                  ::testing::ValuesIn(inputOrder5D),
                                  ::testing::ValuesIn(netPrecisions),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::ValuesIn(CPUParams5D)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -285,8 +299,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_dynamicShapes5D_Transpose, TransposeLayerCPUTest,
                                  ::testing::ValuesIn(dynamicInputShapes5D),
                                  ::testing::ValuesIn(inputOrder5D),
                                  ::testing::ValuesIn(netPrecisions),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(CPUSpecificParams{})),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -295,8 +308,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes5DC16_PermutePerChannels, TransposeLa
                                  ::testing::ValuesIn(staticInputShapes5DC16),
                                  ::testing::ValuesIn(inputOrderPerChannels5D),
                                  ::testing::ValuesIn(netPrecisionsPerChannels),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(cpuParams_ndhwc)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -305,8 +317,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_staticShapes5DC32_PermutePerChannels, TransposeLa
                                  ::testing::ValuesIn(staticInputShapes5DC32),
                                  ::testing::ValuesIn(inputOrderPerChannels5D),
                                  ::testing::ValuesIn(netPrecisionsPerChannels),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(cpuParams_ndhwc)),
                          TransposeLayerCPUTest::getTestCaseName);
 
@@ -315,8 +326,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_dynamicShapes5D_PermutePerChannels, TransposeLaye
                                  ::testing::ValuesIn(dynamicInputShapes5D),
                                  ::testing::ValuesIn(inputOrderPerChannels5D),
                                  ::testing::ValuesIn(netPrecisionsPerChannels),
-                                 ::testing::Values(CommonTestUtils::DEVICE_CPU),
-                                 ::testing::Values(additional_config),
+                                 ::testing::Values(emptyConfig),
                                  ::testing::Values(CPUSpecificParams{})),
                          TransposeLayerCPUTest::getTestCaseName);
 
