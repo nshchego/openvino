@@ -65,7 +65,7 @@ void jit_add_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std
         case Precision::FP32: h->uni_vaddps(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I32:  h->uni_vpaddd(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I64:  h->uni_vpaddq(vmm_dst, vmm_src0, vmm_src1); break;
-        default: assert(!"unsupported precision");
+        default: IE_THROW() << "jit_add_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
@@ -195,7 +195,7 @@ void jit_subtract_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, cons
         case Precision::FP32: h->uni_vsubps(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I32:  h->uni_vpsubd(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I64:  h->uni_vpsubq(vmm_dst, vmm_src0, vmm_src1); break;
-        default: assert(!"unsupported precision");
+        default: IE_THROW() << "jit_subtract_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
@@ -234,7 +234,7 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, cons
         case Precision::FP32: h->uni_vmulps(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I32:  h->uni_vpmulld(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I64:  h->vpmullq(vmm_dst, vmm_src0, vmm_src1); break;
-        default: assert(!"unsupported precision");
+        default: IE_THROW() << "jit_multiply_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
@@ -784,40 +784,24 @@ void jit_equal_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const s
 
     // TODO: Actually the Result is bool in U8 representation. 0x01 or 0xFF - is there a difference for real models?
     // Remove all vpsrld instructions if there is no difference.
-    if (isa == x64::sse41) {
-        Vmm vmm_src0N = vmm_src0;
-        
-        if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+    if (isa == x64::sse41 || isa == x64::avx2) {
+        Vmm vmm_src0_t = vmm_src0;
+        if (isa == x64::sse41 && vmm_dst.getIdx() != vmm_src0.getIdx()) {
             h->uni_vmovups(vmm_dst, vmm_src0);
+            vmm_src0_t = vmm_dst;
         }
         switch (exec_prc_) {
             case Precision::FP32:
-                h->uni_vcmpps(vmm_dst, vmm_dst, vmm_src1, _cmp_eq_oq);
+                h->uni_vcmpps(vmm_dst, vmm_src0_t, vmm_src1, _cmp_eq_oq);
                 h->uni_vandps(vmm_dst, vmm_dst, table_val("oneF"));
                 break;
             case Precision::I32:
-                h->uni_vpcmpeqd(vmm_dst, vmm_dst, vmm_src1);
+                h->uni_vpcmpeqd(vmm_dst, vmm_src0_t, vmm_src1);
                 h->uni_vpsrld(vmm_dst, vmm_dst, 31);
                 break;
             case Precision::I64:
-                h->pcmpeqq(vmm_dst, vmm_src1);
-                h->psrlq(vmm_dst, 63);
-                break;
-            default: IE_THROW() << "jit_equal_emitter doesn't support precision '" << exec_prc_ << "'";
-        }
-    } else if (isa == x64::avx2) {
-        switch (exec_prc_) {
-            case Precision::FP32:
-                h->uni_vcmpps(vmm_dst, vmm_src0, vmm_src1, _cmp_eq_oq);
-                h->vmaskmovps(vmm_dst, vmm_dst, table_val("oneF"));
-                break;
-            case Precision::I32:
-                h->uni_vpcmpeqd(vmm_dst, vmm_src0, vmm_src1);
-                h->uni_vpsrld(vmm_dst, vmm_dst, 31);
-                break;
-            case Precision::I64:
-                h->vpcmpeqq(vmm_dst, vmm_src0, vmm_src1);
-                h->vpsrlq(vmm_dst, vmm_dst, 63);
+                h->uni_vpcmpeqq(vmm_dst, vmm_src0_t, vmm_src1);
+                h->uni_vpsrlq(vmm_dst, vmm_dst, 63);
                 break;
             default: IE_THROW() << "jit_equal_emitter doesn't support precision '" << exec_prc_ << "'";
         }
@@ -843,8 +827,6 @@ void jit_equal_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const s
 }
 
 void jit_equal_emitter::register_table_entries() {
-//    switch (exec_prc_) {
-//    case Precision::FP32:
     if (exec_prc_ == Precision::FP32) {
         push_arg_entry_of("oneF", CONST_1_F, true);
     }

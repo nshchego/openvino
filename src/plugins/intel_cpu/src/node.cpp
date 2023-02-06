@@ -123,10 +123,16 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
             originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     }
-if (originalOutputPrecisions.size() > 0) {
-    std::cout << "CPU Node ctr {" << typeStr << "} originalOutputPrecisions[0]: " << originalOutputPrecisions[0] << std::endl;
+std::cout << "CPU Node ctr {" << typeStr << "} originalInputPrecisions: ";
+for (auto& prc : originalInputPrecisions) {
+    std::cout << prc << "; ";
 }
-    isDynamic = std::any_of(inputShapes.begin(), inputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); }) ||
+std::cout << "; originalOutputPrecisions: ";
+for (auto& prc : originalOutputPrecisions) {
+    std::cout << prc << "; ";
+}
+std::cout << std::endl;
+              isDynamic = std::any_of(inputShapes.begin(), inputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); }) ||
                 std::any_of(outputShapes.begin(), outputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); });
 
     if (isDynamic) {
