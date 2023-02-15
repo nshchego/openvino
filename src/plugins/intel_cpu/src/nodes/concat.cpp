@@ -36,10 +36,9 @@ bool Concat::isExecutable() const {
     return !hasEmptyOutputTensors() && !isOptimized();
 }
 
-bool Concat::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Concat::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto concatOp = ngraph::as_type_ptr<const ngraph::op::v0::Concat>(op);
-        if (!concatOp) {
+        if (op->get_type_info() != ov::op::v0::Concat::get_type_info_static()) {
             errorMessage = "Node is not an instance of the Concat operation.";
             return false;
         }
@@ -49,7 +48,7 @@ bool Concat::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
     return true;
 }
 
-Concat::Concat(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
@@ -57,7 +56,7 @@ Concat::Concat(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr
     }
 
     const auto inRank = getInputShapeAtPort(0).getRank();
-    auto concatOp = ngraph::as_type_ptr<ngraph::op::v0::Concat>(op);
+    auto concatOp = ov::as_type_ptr<ov::op::v0::Concat>(op);
     auto axis = concatOp->get_axis();
     if (axis < 0) {
         axis += inRank;
@@ -549,17 +548,21 @@ void Concat::initOptimalPrimitiveDescriptor() {
 
 void Concat::execute(dnnl::stream strm) {
     if (isOptimized()) {
+std::cout << "Concat::execute Optimized" << std::endl;
         return;
     }
 
     if (canOptimizeNspc) {
+std::cout << "Concat::execute execNspcSpecCase" << std::endl;
         execNspcSpecCase();
         return;
     }
 
     if (canExecRef) {
+std::cout << "Concat::execute REF" << std::endl;
         execRef();
     } else {
+std::cout << "Concat::execute prim" << std::endl;
         const Memory& dst_memory = getChildEdgeAt(0)->getMemory();
         const size_t num_src = getParentEdges().size();
         std::unordered_map<int, memory> mem_ags {{DNNL_ARG_DST, dst_memory.GetPrimitive()}};

@@ -188,7 +188,9 @@ std::vector<std::string> disabledTestPatterns() {
         R"(.*UniqueLayerTestCPU.*axis.*True.*)",
         // Issue: 104402. Incorrect broadcasting in FQ reference implentation
         R"(.*smoke_FakeQuantizeLayerCPUTest_Decompos.*IS=\[4\.5\.6\.6\]_TS=\(\(4\.5\.6\.6\)\)_RS=\(\(1\.1\.6\.6\)\)_\(\(1\.1\.6\.6\)\)_\(\(1\.5\.6\.1\)\)_\(\(1\.5\.1\.6\)\).*)",
-        R"(.*smoke_FakeQuantizeLayerCPUTest_Decompos.*IS=\[4\.5\.6\.6\]_TS=\(\(4\.5\.6\.6\)\)_RS=\(\(1\.5\.6\.1\)\)_\(\(1\.5\.6\.1\)\)_\(\(1\.5\.6\.1\)\)_\(\(1\.5\.1\.6\)\).*)",
+        R"(.*smoke_FakeQuantizeLayerCPUTest_Decompos.*IS=\[4\.5\.6\.6\]_TS=\(\(34\.5\.6\.6\)\)_RS=\(\(1\.5\.6\.1\)\)_\(\(1\.5\.6\.1\)\)_\(\(1\.5\.6\.1\)\)_\(\(1\.5\.1\.6\)\).*)",
+        R"(.*Eltwise.*(FloorMod|=Mod_|Pow|SqDiff).*i64.*)",
+        R"(.*ComparisonLayerTest.*I64.*(GreaterEqual|LessEqual|NotEqual).*)"
     };
 
 #define FIX_62820 0

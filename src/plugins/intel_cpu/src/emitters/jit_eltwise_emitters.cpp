@@ -50,7 +50,7 @@ void jit_add_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, const st
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_add_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -180,7 +180,7 @@ void jit_subtract_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, con
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_subtract_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -219,7 +219,7 @@ void jit_multiply_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, con
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_multiply_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -248,9 +248,9 @@ std::set<std::vector<element::Type>> jit_multiply_emitter::get_supported_precisi
 
 /// DIVIDE ///
 jit_divide_emitter::jit_divide_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-: jit_emitter(host, host_isa, node, get_arithmetic_binary_exec_precision(node)) {}
+	: jit_emitter(host, host_isa, node, get_arithmetic_binary_exec_precision(node)) {}
 jit_divide_emitter::jit_divide_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-: jit_emitter(host, host_isa, exec_prc) {}
+    : jit_emitter(host, host_isa, exec_prc) {}
 
 size_t jit_divide_emitter::get_inputs_num() const { return 2; }
 
@@ -262,7 +262,7 @@ void jit_divide_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, const
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_divide_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -291,7 +291,19 @@ void jit_divide_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const 
                 h->uni_vcvtps2dq(vmm_dst, vmm_dst);
                 break;
             }
-            default: assert(!"unsupported precision");
+            case Precision::I64: {
+                Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+
+                // The opset doesn't contain vector instruction for integer divide operation
+                // As WA we emulate its behavior via fp divide followed by rounding to zero
+                h->vcvtqq2pd(vmm_dst, vmm_src0);
+                h->vcvtqq2pd(vmm_aux0, vmm_src1);
+                h->vdivpd(vmm_dst, vmm_dst, vmm_aux0); // uni_vdivpd
+                h->vrndscalepd(vmm_dst, vmm_dst, 3); // rounding to zero uni_vroundpd
+                h->vcvtpd2qq(vmm_dst, vmm_dst);
+                break;
+            }
+            default: IE_THROW() << "jit_divide_emitter doesn't support precision '" << exec_prc_ << "'";
         }
     };
 
@@ -304,11 +316,11 @@ void jit_divide_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const 
 }
 
 std::set<std::vector<element::Type>> jit_divide_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
-    return {{element::f32, element::f32}, {element::i32, element::i32}};
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
 }
 
 size_t jit_divide_emitter::aux_vecs_count() const {
-    return exec_prc_ == Precision::I32 ? 1 : 0;
+    return (exec_prc_ == Precision::I32 || exec_prc_ == Precision::I64) ? 1 : 0;
 }
 
 /// FLOOR ///
@@ -901,11 +913,11 @@ size_t jit_not_equal_emitter::aux_vecs_count() const {
 
 /// GREATER ///
 jit_greater_emitter::jit_greater_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-: jit_emitter(host, host_isa, node, exec_prc) {
+        : jit_emitter(host, host_isa, node, exec_prc) {
     prepare_table();
 }
 jit_greater_emitter::jit_greater_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-: jit_emitter(host, host_isa, exec_prc) {
+        : jit_emitter(host, host_isa, exec_prc) {
     prepare_table();
 }
 
@@ -923,7 +935,7 @@ void jit_greater_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs, cons
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_greater_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -933,33 +945,57 @@ void jit_greater_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
     Vmm vmm_src0 = Vmm(in_vec_idxs[0]);
     Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
-    Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
-    Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
 
-    if (isa == x64::sse41) {
-        h->movups(vmm_aux0, vmm_src0);
-        h->cmpps(vmm_aux0, vmm_src1, _cmp_gt_os);
-        h->movups(vmm_aux1, table_val("one"));
-        h->pxor(vmm_dst, vmm_dst);
-        h->blendvps(vmm_dst, vmm_aux1);
-    } else if (isa == x64::avx2) {
-        h->vcmpgtps(vmm_aux0, vmm_src0, vmm_src1);
-        h->uni_vmovups(vmm_dst, table_val("zero"));
-        h->vblendvps(vmm_dst, vmm_dst, table_val("one"), vmm_aux0);
+    if (isa == x64::sse41 || isa == x64::avx2) {
+        Vmm vmm_src0_t = vmm_src0;
+        if (isa == x64::sse41 && vmm_dst.getIdx() != vmm_src0.getIdx()) {
+            h->uni_vmovups(vmm_dst, vmm_src0);
+            vmm_src0_t = vmm_dst;
+        }
+        switch (exec_prc_) {
+            case Precision::FP32:
+                h->uni_vcmpps(vmm_dst, vmm_src0_t, vmm_src1, _cmp_gt_os);
+                h->uni_vandps(vmm_dst, vmm_dst, table_val("oneF"));
+                break;
+            case Precision::I32:
+                h->uni_vpcmpgtd(vmm_dst, vmm_src0_t, vmm_src1);
+                h->uni_vpsrld(vmm_dst, vmm_dst, 31);
+                break;
+            case Precision::I64:
+                h->uni_vpcmpgtq(vmm_dst, vmm_src0_t, vmm_src1);
+                h->uni_vpsrlq(vmm_dst, vmm_dst, 63);
+                break;
+            default: IE_THROW() << "jit_greater_emitter doesn't support precision '" << exec_prc_ << "'";
+        }
     } else {
-        h->vcmpps(k_mask, vmm_src0, vmm_src1, _cmp_gt_os);
-        h->uni_vmovups(vmm_dst, table_val("zero"));
-        h->vblendmps(vmm_dst | k_mask, vmm_dst, table_val("one"));
+        switch (exec_prc_) {
+            case Precision::FP32:
+                h->vcmpps(k_mask, vmm_src0, vmm_src1, _cmp_gt_os);
+                h->uni_vmovups(vmm_dst | k_mask | h->T_z, table_val("oneF"));
+                break;
+            case Precision::I32:
+                h->vpcmpgtd(k_mask, vmm_src0, vmm_src1);
+                h->vpmovm2d(vmm_dst, k_mask);
+                h->uni_vpsrld(vmm_dst, vmm_dst, 31);
+                break;
+            case Precision::I64:
+                h->vpcmpgtq(k_mask, vmm_src0, vmm_src1);
+                h->vpmovm2q(vmm_dst, k_mask);
+                h->vpsrlq(vmm_dst, vmm_dst, 63);
+                break;
+            default: IE_THROW() << "jit_greater_emitter doesn't support precision '" << exec_prc_ << "'";
+        }
     }
 }
 
 void jit_greater_emitter::register_table_entries() {
-    push_arg_entry_of("zero", 0x00000000, true);
-    push_arg_entry_of("one", CONST_1_F, true);
+    if (exec_prc_ == Precision::FP32) {
+        push_arg_entry_of("oneF", CONST_1_F, true);
+    }
 }
 
-size_t jit_greater_emitter::aux_vecs_count() const {
-    return 2;
+std::set<Precision> jit_greater_emitter::get_supported_precisions() {
+    return { Precision::FP32, Precision::I32, Precision::I64 };
 }
 
 /// GREATER_EQUAL ///
@@ -1028,11 +1064,11 @@ size_t jit_greater_equal_emitter::aux_vecs_count() const {
 
 /// LESS ///
 jit_less_emitter::jit_less_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-: jit_emitter(host, host_isa, node, exec_prc) {
+        : jit_emitter(host, host_isa, node, exec_prc) {
     prepare_table();
 }
 jit_less_emitter::jit_less_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-: jit_emitter(host, host_isa, exec_prc) {
+        : jit_emitter(host, host_isa, exec_prc) {
     prepare_table();
 }
 
@@ -1050,7 +1086,7 @@ void jit_less_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs, const s
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_less_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -1060,33 +1096,57 @@ void jit_less_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const st
     Vmm vmm_src0 = Vmm(in_vec_idxs[0]);
     Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
-    Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
-    Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
 
-    if (isa == x64::sse41) {
-        h->movups(vmm_aux0, vmm_src0);
-        h->cmpps(vmm_aux0, vmm_src1, _cmp_lt_os);
-        h->movups(vmm_aux1, table_val("one"));
-        h->pxor(vmm_dst, vmm_dst);
-        h->blendvps(vmm_dst, vmm_aux1);
-    } else if (isa == x64::avx2) {
-        h->vcmpltps(vmm_aux0, vmm_src0, vmm_src1);
-        h->uni_vmovups(vmm_dst, table_val("zero"));
-        h->vblendvps(vmm_dst, vmm_dst, table_val("one"), vmm_aux0);
+    if (isa == x64::sse41 || isa == x64::avx2) {
+        Vmm vmm_src0_t = vmm_src0;
+        if (isa == x64::sse41 && vmm_dst.getIdx() != vmm_src0.getIdx()) {
+            h->uni_vmovups(vmm_dst, vmm_src0);
+            vmm_src0_t = vmm_dst;
+        }
+        switch (exec_prc_) {
+            case Precision::FP32:
+                h->uni_vcmpps(vmm_dst, vmm_src0_t, vmm_src1, _cmp_lt_os);
+                h->uni_vandps(vmm_dst, vmm_dst, table_val("oneF"));
+                break;
+            case Precision::I32:
+                h->uni_vpcmpgtd(vmm_dst, vmm_src1, vmm_src0_t);
+                h->uni_vpsrld(vmm_dst, vmm_dst, 31);
+                break;
+            case Precision::I64:
+                h->uni_vpcmpgtq(vmm_dst, vmm_src1, vmm_src0_t);
+                h->uni_vpsrlq(vmm_dst, vmm_dst, 63);
+                break;
+            default: IE_THROW() << "jit_less_emitter doesn't support precision '" << exec_prc_ << "'";
+        }
     } else {
-        h->vcmpps(k_mask, vmm_src0, vmm_src1, _cmp_lt_os);
-        h->uni_vmovups(vmm_dst, table_val("zero"));
-        h->vblendmps(vmm_dst | k_mask, vmm_dst, table_val("one"));
+        switch (exec_prc_) {
+            case Precision::FP32:
+                h->vcmpps(k_mask, vmm_src0, vmm_src1, _cmp_lt_os);
+                h->uni_vmovups(vmm_dst | k_mask | h->T_z, table_val("oneF"));
+                break;
+            case Precision::I32:
+                h->vpcmpgtd(k_mask, vmm_src1, vmm_src0);
+                h->vpmovm2d(vmm_dst, k_mask);
+                h->uni_vpsrld(vmm_dst, vmm_dst, 31);
+                break;
+            case Precision::I64:
+                h->vpcmpgtq(k_mask, vmm_src1, vmm_src0);
+                h->vpmovm2q(vmm_dst, k_mask);
+                h->vpsrlq(vmm_dst, vmm_dst, 63);
+                break;
+            default: IE_THROW() << "jit_less_emitter doesn't support precision '" << exec_prc_ << "'";
+        }
     }
 }
 
 void jit_less_emitter::register_table_entries() {
-    push_arg_entry_of("zero", 0x00000000, true);
-    push_arg_entry_of("one", CONST_1_F, true);
+    if (exec_prc_ == Precision::FP32) {
+        push_arg_entry_of("oneF", CONST_1_F, true);
+    }
 }
 
-size_t jit_less_emitter::aux_vecs_count() const {
-    return 2;
+std::set<Precision> jit_less_emitter::get_supported_precisions() {
+    return { Precision::FP32, Precision::I32, Precision::I64 };
 }
 
 /// LESS_EQUAL ///
