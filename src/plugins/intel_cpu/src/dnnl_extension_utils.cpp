@@ -31,7 +31,7 @@ uint8_t DnnlExtensionUtils::sizeOfDataType(memory::data_type dataType) {
     case memory::data_type::undef:
         return 0;
     default:
-        IE_THROW() << "Unsupported data type.";
+        IE_THROW() << "Unsupported data type: " << DataTypeToIEPrecision(dataType);
     }
 }
 
