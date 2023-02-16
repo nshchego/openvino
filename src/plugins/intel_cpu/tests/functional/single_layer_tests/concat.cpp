@@ -75,7 +75,7 @@ protected:
 
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
         // selectedType += std::string("_") + InferenceEngine::details::convertPrecision(netPrecision).name();
-        selectedType = makeSelectedTypeStr(getPrimitiveType(), netPrecision);
+        selectedType = makeSelectedTypeStr(selectedType, netPrecision);
 
         init_input_shapes(inputShape);
 
