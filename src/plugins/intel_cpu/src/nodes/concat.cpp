@@ -231,8 +231,14 @@ void Concat::selectOptimalPrimitiveDescriptor() {
     // be replicated. Inplace approach is not applicable
     // for that case.
     for (int i = 0; i < getParentEdges().size(); i++) {
+        if (!canBeInPlace) {
+            break;
+        }
         for (int j = i + 1; j < getParentEdges().size(); j++) {
-            if (getParentEdgeAt(i) == getParentEdgeAt(j)) canBeInPlace = false;
+            if (getParentEdgeAt(i) == getParentEdgeAt(j)) {
+                canBeInPlace = false;
+                break;
+            }
         }
     }
 

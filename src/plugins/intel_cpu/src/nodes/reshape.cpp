@@ -96,8 +96,8 @@ void Reshape::initSupportedPrimitiveDescriptors() {
         return;
 
     InferenceEngine::Precision inPrec = getOriginalInputPrecisionAtPort(0);
+    InferenceEngine::Precision secondInPrc = getOriginalInputPrecisionAtPort(1);
     InferenceEngine::Precision outPrec = getOriginalOutputPrecisionAtPort(0);
-    InferenceEngine::Precision secondInPrc = InferenceEngine::Precision::I32;
 
     // Current reshape implementation is simple memory reinterpret,
     // same precision on input and output is required
