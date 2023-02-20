@@ -123,7 +123,7 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
             originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     }
-std::cout << "CPU Node ctr {" << typeStr << "} originalInputPrecisions: ";
+std::cout << "CPU Node CTR {" << typeStr << "} originalInputPrecisions: ";
 for (auto& prc : originalInputPrecisions) {
     std::cout << prc << "; ";
 }
@@ -202,6 +202,7 @@ Node::Node(const std::string& type, const std::string& name, const GraphContext:
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
+std::cout << "CPU Node CTR {" << typeStr << "}" << std::endl;
     // TODO [NM]: What about filling inDims and outDims?
 }
 

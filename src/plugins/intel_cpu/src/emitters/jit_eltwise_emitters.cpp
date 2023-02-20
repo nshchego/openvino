@@ -233,7 +233,20 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, cons
     switch (exec_prc_) {
         case Precision::FP32: h->uni_vmulps(vmm_dst, vmm_src0, vmm_src1); break;
         case Precision::I32:  h->uni_vpmulld(vmm_dst, vmm_src0, vmm_src1); break;
-        case Precision::I64:  h->vpmullq(vmm_dst, vmm_src0, vmm_src1); break;
+        case Precision::I64:
+            if (isa == x64::avx512_core) {
+                h->vpmullq(vmm_dst, vmm_src0, vmm_src1);
+            } else {
+                // h->vpsrad();
+                // h->vpblendw();
+                // h->vpaddq();
+                // h->vpblendw();
+                // h->vsubpd();
+                // h->vaddpd();
+
+                // h->vmulpd();
+            }
+            break;
         default: IE_THROW() << "jit_multiply_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
