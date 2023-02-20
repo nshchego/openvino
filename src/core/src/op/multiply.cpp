@@ -56,7 +56,7 @@ bool evaluate_multiply(const HostTensorPtr& arg0,
 // ------------------------------------ v1 -------------------------------------
 op::v1::Multiply::Multiply(const Output<Node>& arg0, const Output<Node>& arg1, const AutoBroadcastSpec& auto_broadcast)
     : BinaryElementwiseArithmetic(arg0, arg1, auto_broadcast) {
-std::cout << "Multiply CTR" << std::endl;
+std::cout << "Multiply CTR CORE" << std::endl;
     constructor_validate_and_infer_types();
 }
 

@@ -1,0 +1,300 @@
+// Copyright (C) 2018-2023 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+//
+
+#pragma once
+
+#include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
+#include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
+#include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
+#include "emitters/jit_bf16_emitters.hpp"
+
+namespace ov {
+namespace intel_cpu {
+namespace kernel {
+
+enum ReduceLayoutType {
+    reduce_ncsp,
+    reduce_nspc,
+    reduce_blocked
+};
+
+struct JitReduceConfigParams {
+    ReduceLayoutType layout;
+    Algorithm reduce_mode;
+    dnnl::memory::data_type src_dt;
+    dnnl::memory::data_type dst_dt;
+    int src_data_size;
+    int dst_data_size;
+};
+
+struct JitReduceCallArgs {
+    const void *src;
+    const int *idx;
+    void *dst;
+    size_t work_amount;
+    size_t work_batch;
+    size_t reduce_w = 2;    // only used in planar layout  [1: reduce width dimension]   [0: reduce other dimension] [other value: N/A]
+    size_t reduce_stride;   // only used in planar layout while reducing dimensions except for width
+};
+
+struct JitReducePostCallArgs {
+    const void *src;
+    void *dst;
+    size_t work_amount;
+    size_t reduce_c = 2;    // only used in blocked layout [1: reduce channel dimension] [0: reduce other dimension] [other value: N/A]
+    size_t oc_off;          // offset in byte along channel on output tensor
+    size_t channel_size;    // only for post ops fusion of nspc layout
+    const float *divisor;   // mean = sum / divisor
+    const void** post_op_data;
+};
+
+struct JitReduceKernelBase {
+    void (*ker_)(const JitReduceCallArgs *);
+
+    void operator()(const JitReduceCallArgs *args) {
+        assert(ker_);
+        ker_(args);
+    }
+
+    explicit JitReduceKernelBase(JitReduceConfigParams jcp) : ker_(nullptr), jcp(jcp) {
+        if (jcp.src_data_size <= 4) {
+            exec_data_size = 4;
+        } else if (jcp.src_data_size == 8) {
+            exec_data_size = 8;
+        }
+    }
+    virtual ~JitReduceKernelBase() {}
+
+    virtual void create_ker() = 0;
+
+protected:
+    JitReduceConfigParams jcp;
+    int exec_data_size = 1;
+};
+
+struct JitReducePostKernelBase {
+    void (*ker_)(const JitReducePostCallArgs *);
+
+    void operator()(const JitReducePostCallArgs *args) {
+        assert(ker_);
+        ker_(args);
+    }
+
+    explicit JitReducePostKernelBase(JitReduceConfigParams jcp, const dnnl_primitive_attr &attr) : ker_(nullptr), jcp(jcp), attr(attr) {}
+    virtual ~JitReducePostKernelBase() {}
+
+    virtual void create_ker() = 0;
+
+    JitReduceConfigParams jcp;
+    const dnnl_primitive_attr &attr;
+};
+
+
+template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+struct JitReduceKernel : public JitReduceKernelBase, public dnnl::impl::cpu::x64::jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReduceKernel)
+
+    explicit JitReduceKernel(JitReduceConfigParams jcp)
+    : JitReduceKernelBase(jcp), jit_generator(jit_name()) {}
+
+    void create_ker() override {
+        jit_generator::create_kernel();
+        ker_ = (decltype(ker_))jit_ker();
+    }
+
+    void generate() override;
+
+private:
+    using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
+                                                         isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
+                                                                                             Xbyak::Zmm>::type;
+    const size_t vlen = dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen;
+    bool planar_layout = false;
+
+    Xbyak::Address table_val(int index) { return ptr[reg_table + index * vlen]; }
+
+    const Xbyak::Reg64 &reg_src            = r8;
+    const Xbyak::Reg64 &reg_dst            = r9;
+    const Xbyak::Reg64 &reg_idx            = rdx;
+    const Xbyak::Reg64 &reg_work_amount    = r10;
+    const Xbyak::Reg64 &reg_reduce_w       = r11;
+    const Xbyak::Reg64 &reg_reduce_stride  = r12;
+    const Xbyak::Reg64 &reg_work_batch     = r13;
+    const Xbyak::Reg64 &reg_table          = r14;
+    const Xbyak::Reg64 reg_params          = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
+
+    const Xbyak::Reg8  &reg_tmp_8          = r15b;
+    const Xbyak::Reg32 &reg_tmp_32         = r15d;
+    const Xbyak::Reg64 &reg_tmp_64         = r15;
+
+    const Xbyak::Reg64 &reg_src_aux        = rax;
+    const Xbyak::Reg64 &reg_work_batch_aux = rbx;
+
+    Vmm vmm_aux     = Vmm(0);
+    Vmm vmm_src     = Vmm(1);
+    Vmm vmm_dst     = Vmm(2);
+    Vmm vmm_zero    = Vmm(3);
+    Vmm vmm_dst_aux = Vmm(4);
+    Vmm vmm_idx     = Vmm(8);
+    Vmm vmm_mask    = Vmm(9);
+
+    Xbyak::Xmm xmm_aux  = Xbyak::Xmm(vmm_aux.getIdx());
+    Xbyak::Xmm xmm_src  = Xbyak::Xmm(vmm_src.getIdx());
+    Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
+    Xbyak::Xmm xmm_zero = Xbyak::Xmm(vmm_zero.getIdx());
+    Xbyak::Xmm xmm_aux1 = Xbyak::Xmm(5);
+    Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(6);
+    Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(7);
+
+    const Xbyak::Opmask &k_mask = k1;
+
+    Xbyak::Label l_table;
+
+    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
+    std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> exp_injector;
+
+    void reduce_main();
+
+    void reduce_tail();
+
+    void init_reg_reduce_stride();
+
+    void reduce_kernel();
+
+    void reduce_once();
+
+    void reduce_batch();
+
+    void reduce_gather(const Vmm &vmm_dst, int offset);
+
+    void pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const dnnl::memory::data_type &src_dt);
+
+    void reduce_kernel_tail();
+
+    void reduce_once_tail();
+
+    void reduce_batch_tail();
+
+    void reduce_main_loop();
+
+    void reduce_kernel(const Vmm &vmm_src, const Vmm &vmm_dst);
+
+    void reduce_kernel_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Xmm &xmm_dst);
+
+    void load_dst_vector();
+
+    void store_dst_vector();
+
+    void load_vector(const Vmm &vmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
+
+    void load_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
+
+    void store_vector(const Xbyak::Address &op, const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt);
+
+    void store_scalar(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt);
+
+    void horiz_reduce_store(const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded = false);
+
+    void horiz_store(const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded);
+
+    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+
+    void prepare_aux_table();
+
+    const struct aux_vals_type {
+        int float_one = 0x3f800000; // 1.0f
+        int float_abs = 0x7fffffff; // mask to make positive
+        int float_min = 0xff7fffff; // float minimum
+        int float_max = 0x7f7fffff; // float maximum
+        int int32_min = 0xcf000000; // -2^31 presented in float
+        int int32_max = 0x4effffff; // 2^31-1 presented in float
+    } aux_vals;
+};
+
+template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+struct JitReducePostKernel : public JitReducePostKernelBase, public dnnl::impl::cpu::x64::jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReducePostKernel)
+
+    explicit JitReducePostKernel(JitReduceConfigParams jcp, const dnnl_primitive_attr &attr)
+        : JitReducePostKernelBase(jcp, attr), dnnl::impl::cpu::x64::jit_generator(jit_name()) {}
+
+    void create_ker() override {
+        jit_generator::create_kernel();
+        ker_ = (decltype(ker_))jit_ker();
+    }
+
+    void generate() override;
+
+private:
+    using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
+                                                         isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
+                                                                                             Xbyak::Zmm>::type;
+    const size_t vlen = dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen;
+    bool planar_layout = false;
+
+    const Xbyak::Reg64 &reg_dst               = r8;
+    const Xbyak::Reg64 &reg_work_amount       = r9;
+    const Xbyak::Reg64 &reg_total_work_amount = r10;
+    const Xbyak::Reg64 &reg_channel_size      = r11;
+    const Xbyak::Reg64 &reg_divisor           = r12;
+    const Xbyak::Reg64 &reg_reduce_c          = r13;
+    const Xbyak::Reg64 reg_params             = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
+
+    const Xbyak::Reg8  &reg_tmp_8             = r14b;
+    const Xbyak::Reg32 &reg_tmp_32            = r14d;
+    const Xbyak::Reg64 &reg_tmp_64            = r14;
+
+    const Xbyak::Reg64 &reg_oc_off            = rax;
+    const Xbyak::Reg64 &reg_d_weights         = rbx;
+    const Xbyak::Reg64 &reg_d_bias            = rdx;
+    const Xbyak::Reg64 &reg_post_ops_data     = r15;
+
+    Vmm vmm_aux       = Vmm(0);
+    Vmm vmm_dst       = Vmm(1);
+    Vmm vmm_zero      = Vmm(2);
+    Vmm vmm_dst_aux   = Vmm(3);
+    Vmm vmm_d_weights = Vmm(7);
+    Vmm vmm_d_bias    = Vmm(8);
+
+    Xbyak::Xmm xmm_aux  = Xbyak::Xmm(vmm_aux.getIdx());
+    Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
+    Xbyak::Xmm xmm_aux1 = Xbyak::Xmm(4);
+    Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(5);
+    Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(6);
+
+    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
+    std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
+
+    std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>>> eltwise_injectors;
+    std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_depthwise_injector_f32<isa>>> depthwise_injectors;
+    std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_quantization_injector_f32<isa>>> quantization_injectors;
+
+    void reduce_post_main();
+
+    void reduce_post_tail();
+
+    void apply_post_ops(const dnnl::memory::data_type &dst_dt, bool is_broadcast);
+
+    void reduce_map_kernel(const Vmm &vmm_dst);
+
+    void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
+
+    void load_vector(const Vmm &vmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
+
+    void load_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
+
+    void store_vector(const Xbyak::Address &op, const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt);
+
+    void store_scalar(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt);
+
+    void horiz_reduce_store(const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded = false);
+
+    void horiz_store(const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded);
+
+    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+};
+
+}   // namespace kernel
+}   // namespace intel_cpu
+}   // namespace ov
