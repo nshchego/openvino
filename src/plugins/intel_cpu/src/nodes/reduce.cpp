@@ -71,8 +71,8 @@ size_t ReduceKey::hash() const {
     size_t seed = 0;
     seed = hash_combine(seed, jcp.layout);
     seed = hash_combine(seed, jcp.reduce_mode);
-    seed = hash_combine(seed, jcp.src_dt);
-    seed = hash_combine(seed, jcp.dst_dt);
+    seed = hash_combine(seed, jcp.src_prc);
+    seed = hash_combine(seed, jcp.dst_prc);
     seed = get_post_op_hash(seed, *postOps.get());
 
     return seed;
@@ -80,7 +80,7 @@ size_t ReduceKey::hash() const {
 
 bool ReduceKey::operator==(const ReduceKey &rhs) const {
     return jcp.layout == rhs.jcp.layout && jcp.reduce_mode == rhs.jcp.reduce_mode &&
-           jcp.src_dt == rhs.jcp.src_dt && jcp.dst_dt == rhs.jcp.dst_dt && *postOps.get() == *rhs.postOps.get();
+           jcp.src_prc == rhs.jcp.src_prc && jcp.dst_prc == rhs.jcp.dst_prc && *postOps.get() == *rhs.postOps.get();
 }
 
 } // namespace
@@ -301,8 +301,8 @@ void Reduce::prepareParams() {
         set_reduce_dim_flags();
     }
 
-    auto builder = [&](const ReduceKey &key) -> std::shared_ptr<JitReducePostKernelBase> {
-        std::shared_ptr<JitReducePostKernelBase> postKernel;
+    auto builder = [&](const ReduceKey &key) -> std::shared_ptr<JitReduceKernelBase> {
+        std::shared_ptr<JitReduceKernelBase> postKernel;
 
         if (x64::mayiuse(x64::avx512_core)) {
             postKernel.reset(new JitReducePostKernel<x64::avx512_core>(key.jcp, *attr.get()));
@@ -312,7 +312,7 @@ void Reduce::prepareParams() {
             postKernel.reset(new JitReducePostKernel<x64::sse41>(key.jcp, *attr.get()));
         }
         if (postKernel) {
-            postKernel->create_ker();
+            postKernel->create_kernel();
         }
 
         return postKernel;
@@ -366,10 +366,8 @@ void Reduce::createPrimitive() {
 
     auto selectedPD = getSelectedPrimitiveDescriptor();
     jcp = JitReduceConfigParams();
-    jcp.src_dt = DnnlExtensionUtils::IEPrecisionToDataType(selectedPD->getConfig().inConfs[REDUCE_DATA].getMemDesc()->getPrecision());
-    jcp.dst_dt = DnnlExtensionUtils::IEPrecisionToDataType(selectedPD->getConfig().outConfs[0].getMemDesc()->getPrecision());
-    jcp.src_data_size = DnnlExtensionUtils::sizeOfDataType(jcp.src_dt);
-    jcp.dst_data_size = DnnlExtensionUtils::sizeOfDataType(jcp.dst_dt);
+    jcp.src_prc = selectedPD->getConfig().inConfs[REDUCE_DATA].getMemDesc()->getPrecision();
+    jcp.dst_prc = selectedPD->getConfig().outConfs[0].getMemDesc()->getPrecision();
     jcp.layout = layout;
     jcp.reduce_mode = getAlgorithm();
 
@@ -395,7 +393,7 @@ void Reduce::createPrimitive() {
         reduceKernel.reset(new JitReduceKernel<x64::sse41>(jcp));
     }
     if (reduceKernel) {
-        reduceKernel->create_ker();
+        reduceKernel->create_kernel();
     }
     jit_mode = jit_mode && reduceKernel;
 }
