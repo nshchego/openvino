@@ -22,10 +22,8 @@ enum ReduceLayoutType {
 struct JitReduceConfigParams {
     ReduceLayoutType layout;
     Algorithm reduce_mode;
-    dnnl::memory::data_type src_dt;
-    dnnl::memory::data_type dst_dt;
-    int src_data_size;
-    int dst_data_size;
+    InferenceEngine::Precision src_prc;
+    InferenceEngine::Precision dst_prc;
 };
 
 struct JitReduceCallArgs {
@@ -49,59 +47,48 @@ struct JitReducePostCallArgs {
     const void** post_op_data;
 };
 
-struct JitReduceKernelBase {
-    void (*ker_)(const JitReduceCallArgs *);
+struct JitReduceKernelBase : public dnnl::impl::cpu::x64::jit_generator {
+    template <class CallArgs>
+    void (*kernel_func)(const CallArgs *);
 
-    void operator()(const JitReduceCallArgs *args) {
-        assert(ker_);
-        ker_(args);
+    template <class CallArgs>
+    void operator()(const CallArgs *args) {
+        assert(kernel_func);
+        kernel_func(args);
     }
 
-    explicit JitReduceKernelBase(JitReduceConfigParams jcp) : ker_(nullptr), jcp(jcp) {
-        if (jcp.src_data_size <= 4) {
-            exec_data_size = 4;
-        } else if (jcp.src_data_size == 8) {
-            exec_data_size = 8;
+    explicit JitReduceKernelBase(const JitReduceConfigParams &jcp, const char *name) : jit_generator(name), kernel_func(nullptr), jcp(jcp) {
+        if (jcp.src_prc.size() <= 4) {
+            exec_prc = InferenceEngine::Precision::FP32;
+        } else if (jcp.src_prc.size() == 8) {
+            exec_prc = InferenceEngine::Precision::FP64;
         }
     }
-    virtual ~JitReduceKernelBase() {}
 
-    virtual void create_ker() = 0;
+    virtual ~JitReduceKernelBase() = default;
+
+    virtual dnnl::impl::status_t create_kernel() override;
 
 protected:
-    JitReduceConfigParams jcp;
-    int exec_data_size = 1;
-};
+    void load_vector(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const InferenceEngine::Precision &src_prc);
 
-struct JitReducePostKernelBase {
-    void (*ker_)(const JitReducePostCallArgs *);
+    void load_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const InferenceEngine::Precision &src_prc);
 
-    void operator()(const JitReducePostCallArgs *args) {
-        assert(ker_);
-        ker_(args);
-    }
+    void store_vector(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc);
 
-    explicit JitReducePostKernelBase(JitReduceConfigParams jcp, const dnnl_primitive_attr &attr) : ker_(nullptr), jcp(jcp), attr(attr) {}
-    virtual ~JitReducePostKernelBase() {}
-
-    virtual void create_ker() = 0;
+    void store_scalar(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc);
 
     JitReduceConfigParams jcp;
-    const dnnl_primitive_attr &attr;
+    InferenceEngine::Precision exec_prc;
+    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
 };
 
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-struct JitReduceKernel : public JitReduceKernelBase, public dnnl::impl::cpu::x64::jit_generator {
+struct JitReduceKernel : public JitReduceKernelBase {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReduceKernel)
 
-    explicit JitReduceKernel(JitReduceConfigParams jcp)
-    : JitReduceKernelBase(jcp), jit_generator(jit_name()) {}
-
-    void create_ker() override {
-        jit_generator::create_kernel();
-        ker_ = (decltype(ker_))jit_ker();
-    }
+    explicit JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase(jcp, jit_name()) {}
 
     void generate() override;
 
@@ -151,7 +138,6 @@ private:
 
     Xbyak::Label l_table;
 
-    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> exp_injector;
 
     void reduce_main();
@@ -168,7 +154,7 @@ private:
 
     void reduce_gather(const Vmm &vmm_dst, int offset);
 
-    void pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const dnnl::memory::data_type &src_dt);
+    void pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const InferenceEngine::Precision &src_dt);
 
     void reduce_kernel_tail();
 
@@ -186,17 +172,9 @@ private:
 
     void store_dst_vector();
 
-    void load_vector(const Vmm &vmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
+    void horiz_reduce_store(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void load_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
-
-    void store_vector(const Xbyak::Address &op, const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt);
-
-    void store_scalar(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt);
-
-    void horiz_reduce_store(const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded = false);
-
-    void horiz_store(const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded);
+    void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
     void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 
@@ -213,20 +191,17 @@ private:
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-struct JitReducePostKernel : public JitReducePostKernelBase, public dnnl::impl::cpu::x64::jit_generator {
+struct JitReducePostKernel : public JitReduceKernelBase {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReducePostKernel)
 
-    explicit JitReducePostKernel(JitReduceConfigParams jcp, const dnnl_primitive_attr &attr)
-        : JitReducePostKernelBase(jcp, attr), dnnl::impl::cpu::x64::jit_generator(jit_name()) {}
-
-    void create_ker() override {
-        jit_generator::create_kernel();
-        ker_ = (decltype(ker_))jit_ker();
-    }
+    explicit JitReducePostKernel(const JitReduceConfigParams &jcp, const dnnl_primitive_attr &attr)
+        : JitReduceKernelBase(jcp, jit_name()), attr(attr) {}
 
     void generate() override;
 
 private:
+    const dnnl_primitive_attr &attr;
+
     using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41, Xbyak::Xmm,
                                                          isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
                                                                                              Xbyak::Zmm>::type;
@@ -274,23 +249,15 @@ private:
 
     void reduce_post_tail();
 
-    void apply_post_ops(const dnnl::memory::data_type &dst_dt, bool is_broadcast);
+    void apply_post_ops(const InferenceEngine::Precision &dst_dt, bool is_broadcast);
 
     void reduce_map_kernel(const Vmm &vmm_dst);
 
     void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
 
-    void load_vector(const Vmm &vmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
+    void horiz_reduce_store(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void load_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt);
-
-    void store_vector(const Xbyak::Address &op, const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt);
-
-    void store_scalar(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt);
-
-    void horiz_reduce_store(const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded = false);
-
-    void horiz_store(const Xbyak::Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded);
+    void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
     void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 };

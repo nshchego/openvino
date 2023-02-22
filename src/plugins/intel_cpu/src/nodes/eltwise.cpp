@@ -815,7 +815,7 @@ private:
                 uni_vmovq(xmm_src, reg_tmp_64);
                 break;
             default:
-                assert(!"unknown src_prc");
+                IE_THROW() << "Unkown source precision '" << src_prc << "'";
         }
 
         switch (dst_prc) {

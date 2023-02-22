@@ -134,12 +134,12 @@ enum class Algorithm {
 
     // Elementwise algorithms
     EltwiseAdd,
-    EltwiseIsFinite,
+    EltwiseIsFinite, // 10
     EltwiseIsInf,
     EltwiseIsNaN,
     EltwiseMultiply,
     EltwiseSubtract,
-    EltwiseDivide,
+    EltwiseDivide, //15
     EltwiseFloorMod,
     EltwiseMod,
     EltwiseMaximum,

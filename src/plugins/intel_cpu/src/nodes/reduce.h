@@ -6,7 +6,6 @@
 
 #include <node.h>
 #include "kernels/reduce.hpp"
-// #include <ie_common.h>
 #include <string>
 #include <memory>
 #include <vector>
@@ -93,7 +92,7 @@ private:
     std::vector<uint8_t> vec_reduceDH_prc;
 
     std::shared_ptr<kernel::JitReduceKernelBase> reduceKernel;
-    std::shared_ptr<kernel::JitReducePostKernelBase> reducePostKernel;
+    std::shared_ptr<kernel::JitReduceKernelBase> reducePostKernel;
 
     static const std::map<const ov::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ov::Node>& op, Reduce& node)>> initializers;
 

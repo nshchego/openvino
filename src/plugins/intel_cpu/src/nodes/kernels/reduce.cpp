@@ -9,14 +9,15 @@ using namespace ov::intel_cpu::kernel;
 using namespace dnnl::impl::utils;
 using namespace dnnl::impl::cpu;
 using namespace Xbyak;
+using Precision = typename InferenceEngine::Precision;
 
 #define GET_OFF(field) offsetof(JitReduceCallArgs, field)
 #define GET_OFF_POST(field) offsetof(JitReducePostCallArgs, field)
 
 
 // some utility functions
-static inline bool isFloatCompatible(const dnnl::memory::data_type &type) {
-    return dnnl::memory::data_type::f32 == type || dnnl::memory::data_type::bf16 == type;
+static inline bool isFloatCompatible(const Precision &type) {
+    return Precision::FP32 == type || Precision::BF16 == type;
 }
 
 template <x64::cpu_isa_t isa>
@@ -129,10 +130,10 @@ inline void JitReduceKernel<isa>::reduce_main() {
     //         0x00000000 = 0x00000000 & 0x3f800000 (result: 0.0f)
     //         0x3f800000 = 0xffffffff & 0x3f800000 (result: 1.0f)
     // ================================================================
-    Xbyak::Label reduce_to_vector_label;
-    Xbyak::Label reduce_to_scalar_label;
-    Xbyak::Label reduce_to_gather_label;
-    Xbyak::Label reduce_main_end_label;
+    Label reduce_to_vector_label;
+    Label reduce_to_scalar_label;
+    Label reduce_to_gather_label;
+    Label reduce_main_end_label;
     if (planar_layout) {
         cmp(reg_work_batch, 0);
         je(reduce_to_gather_label, T_NEAR);
@@ -145,7 +146,7 @@ inline void JitReduceKernel<isa>::reduce_main() {
     // cases: [planar layout reducing other dimensions but W] [blocked layout]
     L(reduce_to_vector_label);
     {
-        int step = vlen / jcp.src_data_size < 8 ? 8 : vlen / jcp.src_data_size;
+        int step = vlen / exec_prc.size() < 8 ? 8 : vlen / exec_prc.size();
         cmp(reg_work_amount, step);
         jl(reduce_main_end_label, T_NEAR); //avoid illegal loading and storing
 
@@ -189,19 +190,19 @@ inline void JitReduceKernel<isa>::reduce_main() {
                 uni_vpxor(vmm_dst, vmm_dst, vmm_dst);
                 break;
             case Algorithm::ReduceMax:
-                if (isFloatCompatible(jcp.dst_dt))
+                if (isFloatCompatible(jcp.dst_prc))
                     uni_vmovups(vmm_dst, table_val(2));
                 else
                     uni_vmovups(vmm_dst, table_val(4));
                 break;
             case Algorithm::ReduceMin:
-                if (isFloatCompatible(jcp.dst_dt))
+                if (isFloatCompatible(jcp.dst_prc))
                     uni_vmovups(vmm_dst, table_val(3));
                 else
                     uni_vmovups(vmm_dst, table_val(5));
                 break;
             default:
-                assert(!"unsupported reduce mode");
+                IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
         }
         // reduce
         reduce_main_loop();
@@ -211,7 +212,7 @@ inline void JitReduceKernel<isa>::reduce_main() {
         }
         // store
         // store after horizontal calculation and calculation with loaded original ptr[reg_dst]
-        horiz_reduce_store(vmm_dst, jcp.dst_dt, true);
+        horiz_reduce_store(vmm_dst, jcp.dst_prc, true);
 
         jmp(reduce_main_end_label, T_NEAR);
     }
@@ -235,8 +236,8 @@ inline void JitReduceKernel<isa>::reduce_main() {
         load_dst_vector();
 
         // reduce
-        Xbyak::Label reduce_loop_label;
-        Xbyak::Label reduce_loop_end_label;
+        Label reduce_loop_label;
+        Label reduce_loop_end_label;
         L(reduce_loop_label);
         {
             cmp(reg_work_amount, step);
@@ -244,10 +245,10 @@ inline void JitReduceKernel<isa>::reduce_main() {
 
             reduce_gather(vmm_dst, 0);
             if (isa == x64::sse41) {
-                reduce_gather(vmm_dst_aux, 4 * jcp.src_data_size);
+                reduce_gather(vmm_dst_aux, 4 * jcp.src_prc.size());
             }
 
-            add(reg_src, step * jcp.src_data_size);
+            add(reg_src, step * jcp.src_prc.size());
             sub(reg_work_amount, step);
             jmp(reduce_loop_label, T_NEAR);
         }
@@ -268,9 +269,9 @@ void JitReduceKernel<isa>::reduce_tail() {
         uni_vmovups(xmm_aux, table_val(1));
     }
 
-    Xbyak::Label tail_dst_shifted_label;
-    Xbyak::Label tail_dst_fixed_label;
-    Xbyak::Label reduce_tail_end_label;
+    Label tail_dst_shifted_label;
+    Label tail_dst_fixed_label;
+    Label reduce_tail_end_label;
     if (planar_layout) {
         cmp(reg_reduce_w, 1);  // planar layout reducing W
         je(tail_dst_fixed_label, T_NEAR);
@@ -290,10 +291,10 @@ void JitReduceKernel<isa>::reduce_tail() {
     L(tail_dst_fixed_label);
     {
         // load
-        load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_dt);
+        load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_prc);
 
-        Xbyak::Label reduce_loop_label;
-        Xbyak::Label reduce_loop_end_label;
+        Label reduce_loop_label;
+        Label reduce_loop_end_label;
 
         // reduce
         int step = 1;
@@ -302,7 +303,7 @@ void JitReduceKernel<isa>::reduce_tail() {
             cmp(reg_work_amount, step);
             jl(reduce_loop_end_label, T_NEAR);
 
-            load_scalar(xmm_src, ptr[reg_src], jcp.src_dt);
+            load_scalar(xmm_src, ptr[reg_src], jcp.src_prc);
 
             reduce_kernel_scalar(xmm_src, xmm_dst);
             if (jcp.reduce_mode == Algorithm::ReduceOr) {
@@ -310,7 +311,7 @@ void JitReduceKernel<isa>::reduce_tail() {
                 uni_vandps(xmm_dst, xmm_dst, xmm_aux);
             }
 
-            add(reg_src, step * jcp.src_data_size);
+            add(reg_src, step * jcp.src_prc.size());
             sub(reg_work_amount, step);
 
             jmp(reduce_loop_label, T_NEAR);
@@ -318,7 +319,7 @@ void JitReduceKernel<isa>::reduce_tail() {
         L(reduce_loop_end_label);
 
         // store
-        store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_dt);
+        store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_prc);
     }
 
     L(reduce_tail_end_label);
@@ -327,17 +328,17 @@ void JitReduceKernel<isa>::reduce_tail() {
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::init_reg_reduce_stride() {
     mov(reg_reduce_stride, ptr[reg_params + GET_OFF(reduce_stride)]);
-    mul_by_const(reg_reduce_stride, reg_tmp_64, jcp.src_data_size);
+    mul_by_const(reg_reduce_stride, reg_tmp_64, jcp.src_prc.size());
 }
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_kernel() {
-    Xbyak::Label reduce_label;
-    Xbyak::Label reduce_end_label;
-    Xbyak::Label reduce_batch_label;
-    Xbyak::Label reduce_batch_end_label;
+    Label reduce_label;
+    Label reduce_end_label;
+    Label reduce_batch_label;
+    Label reduce_batch_end_label;
 
-    const int step = vlen / jcp.src_data_size < 8 ? 8 : vlen / jcp.src_data_size;
+    const int step = vlen / jcp.src_prc.size() < 8 ? 8 : vlen / jcp.src_prc.size();
     cmp(reg_work_batch, 1);
     je(reduce_label, T_NEAR);
 
@@ -350,7 +351,7 @@ void JitReduceKernel<isa>::reduce_kernel() {
 
         reduce_batch();
 
-        add(reg_src, step * jcp.src_data_size);
+        add(reg_src, step * jcp.src_prc.size());
         sub(reg_work_amount, step);
         jmp(reduce_batch_label, T_NEAR);
     }
@@ -363,7 +364,7 @@ void JitReduceKernel<isa>::reduce_kernel() {
 
         reduce_once();
 
-        add(reg_src, step * jcp.src_data_size);
+        add(reg_src, step * jcp.src_prc.size());
         sub(reg_work_amount, step);
         jmp(reduce_label, T_NEAR);
     }
@@ -372,11 +373,11 @@ void JitReduceKernel<isa>::reduce_kernel() {
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_once() {
-    load_vector(vmm_src, ptr[reg_src], jcp.src_dt);
+    load_vector(vmm_src, ptr[reg_src], jcp.src_prc);
     reduce_kernel(vmm_src, vmm_dst);
 
     if (isa == x64::sse41) {
-        load_vector(vmm_src, ptr[reg_src + 4 * jcp.src_data_size], jcp.src_dt);
+        load_vector(vmm_src, ptr[reg_src + 4 * jcp.src_prc.size()], jcp.src_prc);
         reduce_kernel(vmm_src, vmm_dst_aux);
     }
 }
@@ -386,17 +387,17 @@ void JitReduceKernel<isa>::reduce_batch() {
     mov(reg_src_aux, reg_src);
     mov(reg_work_batch_aux, reg_work_batch);
 
-    Xbyak::Label reduce_batch_loop_label;
-    Xbyak::Label reduce_batch_loop_end_label;
+    Label reduce_batch_loop_label;
+    Label reduce_batch_loop_end_label;
     L(reduce_batch_loop_label);
     {
         cmp(reg_work_batch_aux, 1);
         jl(reduce_batch_loop_end_label, T_NEAR);
 
-        load_vector(vmm_src, ptr[reg_src_aux], jcp.src_dt);
+        load_vector(vmm_src, ptr[reg_src_aux], jcp.src_prc);
         reduce_kernel(vmm_src, vmm_dst);
         if (isa == x64::sse41) {
-            load_vector(vmm_src, ptr[reg_src_aux + 4 * jcp.src_data_size], jcp.src_dt);
+            load_vector(vmm_src, ptr[reg_src_aux + 4 * jcp.src_prc.size()], jcp.src_prc);
             reduce_kernel(vmm_src, vmm_dst_aux);
         }
 
@@ -409,12 +410,12 @@ void JitReduceKernel<isa>::reduce_batch() {
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_gather(const Vmm &vmm_dst, int offset) {
-    switch (jcp.src_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
+    switch (jcp.src_prc) {
+        case Precision::FP32:
+        case Precision::I32:
             if (isa == x64::avx512_core) {
                 kxnord(k_mask, k_mask, k_mask);
-                if (jcp.src_dt == dnnl::memory::data_type::f32) {
+                if (jcp.src_prc == Precision::FP32) {
                     vgatherdps(vmm_src | k_mask, ptr[reg_src + offset + vmm_idx]);
                 } else {
                     vpgatherdd(vmm_src | k_mask, ptr[reg_src + offset + vmm_idx]);
@@ -422,85 +423,85 @@ void JitReduceKernel<isa>::reduce_gather(const Vmm &vmm_dst, int offset) {
                 }
             } else if (isa == x64::avx2) {
                 uni_vpcmpeqd(vmm_mask, vmm_mask, vmm_mask);
-                if (jcp.src_dt == dnnl::memory::data_type::f32) {
+                if (jcp.src_prc == Precision::FP32) {
                     vgatherdps(vmm_src, ptr[reg_src + offset + vmm_idx], vmm_mask);
                 } else {
                     vpgatherdd(vmm_src, ptr[reg_src + offset + vmm_idx], vmm_mask);
                     uni_vcvtdq2ps(vmm_src, vmm_src);
                 }
             } else {
-                pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_dt);
+                pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_prc);
             }
             break;
-        case dnnl::memory::data_type::bf16:
-        case dnnl::memory::data_type::s8:
-        case dnnl::memory::data_type::u8:
-            pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_dt);
+        case Precision::BF16:
+        case Precision::I8:
+        case Precision::U8:
+            pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_prc);
             break;
         default:
-            assert(!"unknown src_dt");
+            IE_THROW() << "Unkown source precision '" << jcp.src_prc << "'";
     }
     reduce_kernel(vmm_src, vmm_dst);
 }
 
 template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const dnnl::memory::data_type &src_dt) {
+void JitReduceKernel<isa>::pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const Precision &src_prc) {
     sub(rsp, vlen);
     uni_vmovdqu(ptr[rsp], vmm_index);
     int repeats = vlen / sizeof(float);
     for (size_t i = 0; i < repeats; i++) {
         mov(reg_tmp_64.cvt32(), ptr[rsp + i * sizeof(int)]);
-        Xbyak::Address table_idx = ptr[reg_src + offset + reg_tmp_64];
-        switch (src_dt) {
-            case dnnl::memory::data_type::f32:
-            case dnnl::memory::data_type::s32:
+        Address table_idx = ptr[reg_src + offset + reg_tmp_64];
+        switch (src_prc) {
+            case Precision::FP32:
+            case Precision::I32:
                 mov(reg_tmp_64.cvt32(), table_idx);
                 mov(ptr[rsp + i * sizeof(int)], reg_tmp_64.cvt32());
                 break;
-            case dnnl::memory::data_type::bf16:
+            case Precision::BF16:
                 mov(reg_tmp_64.cvt16(), table_idx);
                 mov(ptr[rsp + i * sizeof(ov::intel_cpu::bfloat16_t)], reg_tmp_64.cvt16());
                 break;
-            case dnnl::memory::data_type::s8:
-            case dnnl::memory::data_type::u8:
+            case Precision::I8:
+            case Precision::U8:
                 mov(reg_tmp_64.cvt8(), table_idx);
                 mov(ptr[rsp + i * sizeof(char)], reg_tmp_64.cvt8());
                 break;
             default:
-                assert(!"unknown src_dt");
+                IE_THROW() << "Unkown source precision '" << src_prc << "'";
         }
     }
 
-    switch (src_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
+    switch (src_prc) {
+        case Precision::FP32:
+        case Precision::I32:
             uni_vmovups(vmm_val, ptr[rsp]);
             break;
-        case dnnl::memory::data_type::bf16:
+        case Precision::BF16:
             uni_vpmovzxwd(vmm_val, ptr[rsp]);
             uni_vpslld(vmm_val, vmm_val, 16);
         break;
-        case dnnl::memory::data_type::s8:
+        case Precision::I8:
             uni_vpmovsxbd(vmm_val, ptr[rsp]);
             break;
-        case dnnl::memory::data_type::u8:
+        case Precision::U8:
             uni_vpmovzxbd(vmm_val, ptr[rsp]);
             break;
         default:
-            assert(!"unknown src_dt");
+            IE_THROW() << "Unkown source precision '" << src_prc << "'";
     }
 
-    if (!isFloatCompatible(src_dt))
+    if (!isFloatCompatible(src_prc))
         uni_vcvtdq2ps(vmm_val, vmm_val);
     add(rsp, vlen);
 }
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_kernel_tail() {
-    Xbyak::Label reduce_label;
-    Xbyak::Label reduce_end_label;
-    Xbyak::Label reduce_batch_label;
-    Xbyak::Label reduce_batch_end_label;
+    Label reduce_label;
+    Label reduce_end_label;
+    Label reduce_batch_label;
+    Label reduce_batch_end_label;
 
     int step = 1;
     cmp(reg_work_batch, 1);
@@ -514,16 +515,16 @@ void JitReduceKernel<isa>::reduce_kernel_tail() {
         jl(reduce_end_label, T_NEAR);
 
         // load
-        load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_dt);
+        load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_prc);
 
         // reduce
         reduce_batch_tail();
 
         // store
-        store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_dt);
+        store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_prc);
 
-        add(reg_dst, step * jcp.dst_data_size);
-        add(reg_src, step * jcp.src_data_size);
+        add(reg_dst, step * jcp.dst_prc.size());
+        add(reg_src, step * jcp.src_prc.size());
         sub(reg_work_amount, step);
 
         jmp(reduce_batch_label, T_NEAR);
@@ -536,16 +537,16 @@ void JitReduceKernel<isa>::reduce_kernel_tail() {
         jl(reduce_end_label, T_NEAR);
 
         // load
-        load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_dt);
+        load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_prc);
 
         // reduce
         reduce_batch_tail();
 
         // store
-        store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_dt);
+        store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_prc);
 
-        add(reg_dst, step * jcp.dst_data_size);
-        add(reg_src, step * jcp.src_data_size);
+        add(reg_dst, step * jcp.dst_prc.size());
+        add(reg_src, step * jcp.src_prc.size());
         sub(reg_work_amount, step);
 
         jmp(reduce_label, T_NEAR);
@@ -555,7 +556,7 @@ void JitReduceKernel<isa>::reduce_kernel_tail() {
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_once_tail() {
-    load_scalar(xmm_src, ptr[reg_src], jcp.src_dt);
+    load_scalar(xmm_src, ptr[reg_src], jcp.src_prc);
     reduce_kernel_scalar(xmm_src, xmm_dst);
     if (jcp.reduce_mode == Algorithm::ReduceOr) {
         uni_cmpneqps(xmm_dst, xmm_dst, xmm_zero);
@@ -568,14 +569,14 @@ void JitReduceKernel<isa>::reduce_batch_tail() {
     mov(reg_src_aux, reg_src);
     mov(reg_work_batch_aux, reg_work_batch);
 
-    Xbyak::Label reduce_batch_loop_label;
-    Xbyak::Label reduce_batch_loop_end_label;
+    Label reduce_batch_loop_label;
+    Label reduce_batch_loop_end_label;
     L(reduce_batch_loop_label);
     {
         cmp(reg_work_batch_aux, 1);
         jl(reduce_batch_loop_end_label, T_NEAR);
 
-        load_scalar(xmm_src, ptr[reg_src_aux], jcp.src_dt);
+        load_scalar(xmm_src, ptr[reg_src_aux], jcp.src_prc);
         reduce_kernel_scalar(xmm_src, xmm_dst);
         if (jcp.reduce_mode == Algorithm::ReduceOr) {
             uni_cmpneqps(xmm_dst, xmm_dst, xmm_zero);
@@ -591,8 +592,8 @@ void JitReduceKernel<isa>::reduce_batch_tail() {
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_main_loop() {
-    Xbyak::Label reduce_loop_label;
-    Xbyak::Label reduce_loop_end_label;
+    Label reduce_loop_label;
+    Label reduce_loop_end_label;
 
     int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
     L(reduce_loop_label);
@@ -600,15 +601,15 @@ void JitReduceKernel<isa>::reduce_main_loop() {
         cmp(reg_work_amount, step);
         jl(reduce_loop_end_label, T_NEAR);
 
-        load_vector(vmm_src, ptr[reg_src], jcp.src_dt);
+        load_vector(vmm_src, ptr[reg_src], jcp.src_prc);
         reduce_kernel(vmm_src, vmm_dst);
 
         if (isa == x64::sse41) {
-            load_vector(vmm_src, ptr[reg_src + 4 * jcp.src_data_size], jcp.src_dt);
+            load_vector(vmm_src, ptr[reg_src + 4 * jcp.src_prc.size()], jcp.src_prc);
             reduce_kernel(vmm_src, vmm_dst);
         }
 
-        add(reg_src, step * jcp.src_data_size);
+        add(reg_src, step * jcp.src_prc.size());
         sub(reg_work_amount, step);
 
         jmp(reduce_loop_label, T_NEAR);
@@ -663,7 +664,7 @@ void JitReduceKernel<isa>::reduce_kernel(const Vmm &vmm_src, const Vmm &vmm_dst)
             uni_vmulps(vmm_dst, vmm_dst, vmm_src);
             break;
         default:
-            assert(!"unsupported reduce mode");
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
     }
 }
 
@@ -705,15 +706,15 @@ void JitReduceKernel<isa>::reduce_kernel_scalar(const Xmm &xmm_src, const Xmm &x
             uni_vmulps(xmm_dst, xmm_dst, xmm_src);
             break;
         default:
-            assert(!"unsupported reduce mode");
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
     }
 }
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::load_dst_vector() {
-    load_vector(vmm_dst, ptr[reg_dst], jcp.dst_dt);
+    load_vector(vmm_dst, ptr[reg_dst], jcp.dst_prc);
     if (isa == x64::sse41) {
-        load_vector(vmm_dst_aux, ptr[reg_dst + 4 * jcp.dst_data_size], jcp.dst_dt);
+        load_vector(vmm_dst_aux, ptr[reg_dst + 4 * jcp.dst_prc.size()], jcp.dst_prc);
     }
 }
 
@@ -728,188 +729,22 @@ void JitReduceKernel<isa>::store_dst_vector() {
             uni_vandps(vmm_dst_aux, vmm_dst_aux, vmm_aux);
         }
     }
-    store_vector(ptr[reg_dst], vmm_dst, jcp.dst_dt);
+    store_vector(ptr[reg_dst], vmm_dst, jcp.dst_prc);
     if (isa == x64::sse41) {
-        store_vector(ptr[reg_dst + 4 * jcp.dst_data_size], vmm_dst_aux, jcp.dst_dt);
+        store_vector(ptr[reg_dst + 4 * jcp.dst_prc.size()], vmm_dst_aux, jcp.dst_prc);
     }
 }
 
 template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::load_vector(const Vmm &vmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt) {
-    switch (src_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovups(vmm_src, op);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vpmovzxwd(vmm_src, op);
-            uni_vpslld(vmm_src, vmm_src, 16);
-            break;
-        case dnnl::memory::data_type::s8:
-            uni_vpmovsxbd(vmm_src, op);
-            break;
-        case dnnl::memory::data_type::u8:
-            uni_vpmovzxbd(vmm_src, op);
-            break;
-        case dnnl::memory::data_type::s64:
-            if (isa == x64::avx512_core) {
-                vcvtqq2pd(vmm_src, op);
-            }
-            break;
-        default:
-            IE_THROW() << "Unkown source precision '" << int(src_dt) << "'";
-    }
-
-    if (!isFloatCompatible(src_dt)) {
-        uni_vcvtdq2ps(vmm_src, vmm_src);
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::load_scalar(const Xmm &xmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt) {
-    switch (src_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovss(xmm_src, op);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vpinsrw(xmm_src, xmm_src, op, 0x0);
-            uni_vpslld(xmm_src, xmm_src, 16);
-            break;
-        case dnnl::memory::data_type::s8:
-            movsx(reg_tmp_32, op);
-            uni_vmovq(xmm_src, reg_tmp_64);
-            break;
-        case dnnl::memory::data_type::u8:
-            movzx(reg_tmp_32, op);
-            uni_vmovq(xmm_src, reg_tmp_64);
-            break;
-        case dnnl::memory::data_type::s64:
-            uni_vmovsd(xmm_src, op);
-            if (isa == x64::avx512_core) {
-                vcvtqq2pd(xmm_src, xmm_src);
-            }
-            break;
-        default:
-            IE_THROW() << "Unkown source precision '" << int(src_dt) << "'";
-    }
-
-    if (!isFloatCompatible(src_dt)) {
-        uni_vcvtdq2ps(xmm_src, xmm_src);
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::store_vector(const Xbyak::Address &op, const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt) {
-    Xmm xmm_dst = Xmm(vmm_dst.getIdx());
-    Ymm ymm_dst = Ymm(vmm_dst.getIdx());
-
-    if (!isFloatCompatible(dst_dt)) {
-        uni_vcvtps2dq(vmm_dst, vmm_dst);
-    }
-
-    switch (dst_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovups(op, vmm_dst);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vmm_dst.getIdx())}, {static_cast<size_t>(ymm_dst.getIdx())});
-            vmovdqu16(op, ymm_dst);
-            break;
-        case dnnl::memory::data_type::s8:
-            if (isa == x64::avx512_core) {
-                vpmovsdb(op, vmm_dst);
-            } else {
-                uni_vpackssdw(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41) {
-                    vpermq(ymm_dst, ymm_dst, 0x08);
-                }
-                uni_vpacksswb(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41) {
-                    vmovq(op, xmm_dst);
-                } else {
-                    uni_vmovd(op, xmm_dst);
-                }
-            }
-            break;
-        case dnnl::memory::data_type::u8:
-            if (isa == x64::avx512_core) {
-                vpmaxsd(vmm_dst, vmm_zero, vmm_dst);
-                vpmovusdb(op, vmm_dst);
-            } else {
-                uni_vpackusdw(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41)
-                    vpermq(ymm_dst, ymm_dst, 0x08);
-                uni_vpackuswb(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41)
-                    vmovq(op, xmm_dst);
-                else
-                    uni_vmovd(op, xmm_dst);
-            }
-            break;
-        case dnnl::memory::data_type::s64:
-            if (isa == x64::avx512_core) {
-                vcvtpd2qq(vmm_dst, vmm_dst);
-                uni_vmovups(op, vmm_dst);
-            } else {
-                // TODO:
-            }
-            break;
-        default:
-            IE_THROW() << "Unkown destination precision '" << int(dst_dt) << "'";
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::store_scalar(const Xbyak::Address &op, const Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt) {
-    if (!isFloatCompatible(dst_dt)) {
-        uni_vcvtps2dq(xmm_dst, xmm_dst);
-    }
-
-    switch (dst_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovss(op, xmm_dst);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vpsrld(xmm_dst, xmm_dst, 16);
-            uni_vpextrw(op, xmm_dst, 0x0);
-            break;
-        case dnnl::memory::data_type::s8:
-            uni_vpackssdw(xmm_dst, xmm_dst, xmm_dst);
-            uni_vpacksswb(xmm_dst, xmm_dst, xmm_dst);
-            uni_vmovq(reg_tmp_64, xmm_dst);
-            mov(op, reg_tmp_8);
-            break;
-        case dnnl::memory::data_type::u8:
-            uni_vpackusdw(xmm_dst, xmm_dst, xmm_dst);
-            uni_vpackuswb(xmm_dst, xmm_dst, xmm_dst);
-            uni_vmovq(reg_tmp_64, xmm_dst);
-            mov(op, reg_tmp_8);
-            break;
-        case dnnl::memory::data_type::s64:
-            if (isa == x64::avx512_core) {
-                vcvtpd2qq(vmm_dst, vmm_dst);
-            } else {
-                // TODO:
-            }
-            uni_vmovsd(op, xmm_dst);
-        default:
-            IE_THROW() << "Unkown destination precision '" << int(dst_dt) << "'";
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded) {
+void JitReduceKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
     if (isa == x64::sse41) {
-        horiz_store(vmm_dst, dst_dt, load_embedded);
+        horiz_store(vmm_dst, dst_prc, load_embedded);
     } else if (isa == x64::avx2) {
-        Xbyak::Ymm ymm_dst = Xbyak::Ymm(vmm_dst.getIdx());
+        Ymm ymm_dst = Ymm(vmm_dst.getIdx());
         vextractf128(xmm_aux1, ymm_dst, 0);
         vextractf128(xmm_aux2, ymm_dst, 1);
         horiz_ps(xmm_aux1, xmm_aux2);
-        horiz_store(xmm_aux1, dst_dt, load_embedded);
+        horiz_store(xmm_aux1, dst_prc, load_embedded);
     } else {
         Zmm zmm_dst = Zmm(vmm_dst.getIdx());
         vextractf32x4(xmm_aux1, zmm_dst, 0);
@@ -919,21 +754,21 @@ void JitReduceKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const dnnl::me
         vextractf32x4(xmm_aux3, zmm_dst, 3);
         horiz_ps(xmm_aux2, xmm_aux3);
         horiz_ps(xmm_aux1, xmm_aux2);
-        horiz_store(xmm_aux1, dst_dt, load_embedded);
+        horiz_store(xmm_aux1, dst_prc, load_embedded);
     }
 }
 
 template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::horiz_store(const Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded) {
+void JitReduceKernel<isa>::horiz_store(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
     uni_vmovshdup(xmm_aux3, xmm_dst);          // dst:1,2,3,4; aux3:2,2,4,4
     horiz_ps(xmm_dst, xmm_aux3);               // dst:f(1,2),f(2,2),f(3,4),f(4,4)
     uni_vmovhlps(xmm_aux3, xmm_aux3, xmm_dst); // aux3:f(3,4),f(4,4),4,4
     horiz_ps(xmm_dst, xmm_aux3);               // dst:f(1,2,3,4),...
     if (load_embedded) {
-        load_scalar(xmm_aux3, ptr[reg_dst], dst_dt);
+        load_scalar(xmm_aux3, ptr[reg_dst], dst_prc);
         horiz_ps(xmm_dst, xmm_aux3);
     }
-    store_scalar(ptr[reg_dst], xmm_dst, dst_dt);
+    store_scalar(ptr[reg_dst], xmm_dst, dst_prc);
 }
 
 template <x64::cpu_isa_t isa>
@@ -964,7 +799,7 @@ void JitReduceKernel<isa>::horiz_ps(const Xmm &xmm, const Operand &op) {
             uni_vmulps(xmm, xmm, op);
             break;
         default:
-            assert(!"unsupported reduce mode");
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
     }
 }
 
@@ -986,6 +821,7 @@ void JitReduceKernel<isa>::prepare_aux_table() {
     broadcast_int(aux_vals.int32_min);
     broadcast_int(aux_vals.int32_max);
 }
+
 
 ///////////////////////////////
 ///// JitReducePostKernel /////
@@ -1012,8 +848,9 @@ void JitReducePostKernel<isa>::generate() {
         log_injector = std::make_shared<x64::jit_uni_eltwise_injector_f32<isa>>(this, dnnl::impl::alg_kind::eltwise_log, 0.f, 0.f, 1.f);
     }
 
-    if (x64::mayiuse(x64::avx512_core))
+    if (isa ==x64::avx512_core) {
         uni_vcvtneps2bf16 = std::make_shared<jit_uni_vcvtneps2bf16>(this, isa);
+    }
 
     this->preamble();
 
@@ -1037,8 +874,8 @@ void JitReducePostKernel<isa>::generate() {
         reduce_post_main();
     } else if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0) {
         // the tail of channel dimension should always be concerned during post ops fusing for nspc layout
-        Xbyak::Label reduce_nspc_loop_label;
-        Xbyak::Label reduce_nspc_loop_end_label;
+        Label reduce_nspc_loop_label;
+        Label reduce_nspc_loop_end_label;
         mov(reg_total_work_amount, reg_work_amount);
         L(reduce_nspc_loop_label);
         {
@@ -1061,7 +898,7 @@ void JitReducePostKernel<isa>::generate() {
 
     this->postamble();
 
-    if (x64::mayiuse(x64::avx512_core)) {
+    if (isa == x64::avx512_core) {
         uni_vcvtneps2bf16->emit_data();
     }
 
@@ -1075,8 +912,8 @@ void JitReducePostKernel<isa>::generate() {
 
 template <x64::cpu_isa_t isa>
 void JitReducePostKernel<isa>::reduce_post_main() {
-    Xbyak::Label reduce_channel_label;
-    Xbyak::Label reduce_map_label;
+    Label reduce_channel_label;
+    Label reduce_map_label;
     if (planar_layout) {
         jmp(reduce_map_label, T_NEAR);
     } else {
@@ -1089,8 +926,8 @@ void JitReducePostKernel<isa>::reduce_post_main() {
     // cases: [blocked layout reducing channel dimensions]
     L(reduce_channel_label);
     {
-        Xbyak::Label reduce_loop_label;
-        Xbyak::Label reduce_loop_end_label;
+        Label reduce_loop_label;
+        Label reduce_loop_end_label;
 
         int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
         L(reduce_loop_label);
@@ -1099,16 +936,16 @@ void JitReducePostKernel<isa>::reduce_post_main() {
             jl(reduce_loop_end_label, T_NEAR);
 
             // load
-            load_vector(vmm_dst, ptr[reg_dst], jcp.dst_dt);
+            load_vector(vmm_dst, ptr[reg_dst], jcp.dst_prc);
             if (isa == x64::sse41)
-                load_vector(vmm_dst_aux, ptr[reg_dst + 4 * jcp.dst_data_size], jcp.dst_dt);
+                load_vector(vmm_dst_aux, ptr[reg_dst + 4 * jcp.dst_prc.size()], jcp.dst_prc);
 
             // reduce and store
-            horiz_reduce_store(vmm_dst, jcp.dst_dt);
+            horiz_reduce_store(vmm_dst, jcp.dst_prc);
             if (isa == x64::sse41)
-                horiz_reduce_store(vmm_dst_aux, jcp.dst_dt, true);
+                horiz_reduce_store(vmm_dst_aux, jcp.dst_prc, true);
 
-            add(reg_dst, step * jcp.dst_data_size);
+            add(reg_dst, step * jcp.dst_prc.size());
             sub(reg_work_amount, step);
 
             jmp(reduce_loop_label, T_NEAR);
@@ -1128,8 +965,8 @@ void JitReducePostKernel<isa>::reduce_post_main() {
             if (jcp.reduce_mode == Algorithm::ReduceMean)
                 uni_vbroadcastss(vmm_aux, ptr[reg_divisor]);
 
-            Xbyak::Label reduce_loop_label;
-            Xbyak::Label reduce_loop_end_label;
+            Label reduce_loop_label;
+            Label reduce_loop_end_label;
 
             int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
             L(reduce_loop_label);
@@ -1137,26 +974,26 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                 cmp(reg_work_amount, step);
                 jl(reduce_loop_end_label, T_NEAR);
 
-                load_vector(vmm_dst, ptr[reg_dst], jcp.dst_dt);
+                load_vector(vmm_dst, ptr[reg_dst], jcp.dst_prc);
                 reduce_map_kernel(vmm_dst);
                 if (attr.post_ops_.len() != 0)
-                    apply_post_ops(jcp.dst_dt, jcp.layout == ReduceLayoutType::reduce_ncsp);
-                store_vector(ptr[reg_dst], vmm_dst, jcp.dst_dt);
+                    apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
+                store_vector(ptr[reg_dst], vmm_dst, jcp.dst_prc);
 
                 if (isa == x64::sse41) {
-                    load_vector(vmm_dst, ptr[reg_dst + 4 * jcp.dst_data_size], jcp.dst_dt);
+                    load_vector(vmm_dst, ptr[reg_dst + 4 * jcp.dst_prc.size()], jcp.dst_prc);
                     reduce_map_kernel(vmm_dst);
                     if (attr.post_ops_.len() != 0) {
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
                             add(reg_oc_off, 4 * sizeof(float));
-                        apply_post_ops(jcp.dst_dt, jcp.layout == ReduceLayoutType::reduce_ncsp);
+                        apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
                             sub(reg_oc_off, 4 * sizeof(float));
                     }
-                    store_vector(ptr[reg_dst + 4 * jcp.dst_data_size], vmm_dst, jcp.dst_dt);
+                    store_vector(ptr[reg_dst + 4 * jcp.dst_prc.size()], vmm_dst, jcp.dst_prc);
                 }
 
-                add(reg_dst, step * jcp.dst_data_size);
+                add(reg_dst, step * jcp.dst_prc.size());
                 if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
                     add(reg_oc_off, step * sizeof(float));
                 sub(reg_work_amount, step);
@@ -1166,8 +1003,8 @@ void JitReducePostKernel<isa>::reduce_post_main() {
             L(reduce_loop_end_label);
         } else {
             if (attr.post_ops_.len() != 0) {
-                Xbyak::Label reduce_loop_label;
-                Xbyak::Label reduce_loop_end_label;
+                Label reduce_loop_label;
+                Label reduce_loop_end_label;
 
                 int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
                 L(reduce_loop_label);
@@ -1175,21 +1012,21 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                     cmp(reg_work_amount, step);
                     jl(reduce_loop_end_label, T_NEAR);
 
-                    load_vector(vmm_dst, ptr[reg_dst], jcp.dst_dt);
-                    apply_post_ops(jcp.dst_dt, jcp.layout == ReduceLayoutType::reduce_ncsp);
-                    store_vector(ptr[reg_dst], vmm_dst, jcp.dst_dt);
+                    load_vector(vmm_dst, ptr[reg_dst], jcp.dst_prc);
+                    apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
+                    store_vector(ptr[reg_dst], vmm_dst, jcp.dst_prc);
 
                     if (isa == x64::sse41) {
-                        load_vector(vmm_dst, ptr[reg_dst + 4 * jcp.dst_data_size], jcp.dst_dt);
+                        load_vector(vmm_dst, ptr[reg_dst + 4 * jcp.dst_prc.size()], jcp.dst_prc);
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
                             add(reg_oc_off, 4 * sizeof(float));
-                        apply_post_ops(jcp.dst_dt, jcp.layout == ReduceLayoutType::reduce_ncsp);
+                        apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
                             sub(reg_oc_off, 4 * sizeof(float));
-                        store_vector(ptr[reg_dst + 4 * jcp.dst_data_size], vmm_dst, jcp.dst_dt);
+                        store_vector(ptr[reg_dst + 4 * jcp.dst_prc.size()], vmm_dst, jcp.dst_prc);
                     }
 
-                    add(reg_dst, step * jcp.dst_data_size);
+                    add(reg_dst, step * jcp.dst_prc.size());
                     if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
                         add(reg_oc_off, step * sizeof(float));
                     sub(reg_work_amount, step);
@@ -1211,8 +1048,8 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
         if (jcp.reduce_mode == Algorithm::ReduceMean)
             uni_vbroadcastss(xmm_aux, ptr[reg_divisor]);
 
-        Xbyak::Label reduce_loop_label;
-        Xbyak::Label reduce_loop_end_label;
+        Label reduce_loop_label;
+        Label reduce_loop_end_label;
 
         int step = 1;
         L(reduce_loop_label);
@@ -1221,17 +1058,17 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
             jl(reduce_loop_end_label, T_NEAR);
 
             // load
-            load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_dt);
+            load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_prc);
 
             // reduce
             reduce_map_kernel_scalar(xmm_dst);
 
             // store
             if (attr.post_ops_.len() != 0)
-                apply_post_ops(jcp.dst_dt, jcp.layout == ReduceLayoutType::reduce_ncsp);
-            store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_dt);
+                apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
+            store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_prc);
 
-            add(reg_dst, step * jcp.dst_data_size);
+            add(reg_dst, step * jcp.dst_prc.size());
             if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
                 add(reg_oc_off, step * sizeof(float));
             sub(reg_work_amount, step);
@@ -1241,8 +1078,8 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
         L(reduce_loop_end_label);
     } else {
         if (attr.post_ops_.len() != 0) {
-            Xbyak::Label reduce_loop_label;
-            Xbyak::Label reduce_loop_end_label;
+            Label reduce_loop_label;
+            Label reduce_loop_end_label;
 
             int step = 1;
             L(reduce_loop_label);
@@ -1251,13 +1088,13 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
                 jl(reduce_loop_end_label, T_NEAR);
 
                 // load
-                load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_dt);
+                load_scalar(xmm_dst, ptr[reg_dst], jcp.dst_prc);
 
                 // store
-                apply_post_ops(jcp.dst_dt, jcp.layout == ReduceLayoutType::reduce_ncsp);
-                store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_dt);
+                apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
+                store_scalar(ptr[reg_dst], xmm_dst, jcp.dst_prc);
 
-                add(reg_dst, step * jcp.dst_data_size);
+                add(reg_dst, step * jcp.dst_prc.size());
                 if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
                     add(reg_oc_off, step * sizeof(float));
                 sub(reg_work_amount, step);
@@ -1270,7 +1107,7 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::apply_post_ops(const dnnl::memory::data_type &dst_dt, bool is_broadcast) {
+void JitReducePostKernel<isa>::apply_post_ops(const Precision &dst_prc, bool is_broadcast) {
     const auto &p = attr.post_ops_;
     int eltwise_inj_idx = 0;
     int depthwise_inj_idx = 0;
@@ -1292,7 +1129,7 @@ void JitReducePostKernel<isa>::apply_post_ops(const dnnl::memory::data_type &dst
             depthwise_inj_idx++;
         } else if (post_op.is_quantization()) {
             bool do_dequantization = post_op.quantization.alg == dnnl::impl::alg_kind::quantization_quantize_dequantize;
-            bool do_rounding = do_dequantization || isFloatCompatible(dst_dt) || i != p.len() - 1;
+            bool do_rounding = do_dequantization || isFloatCompatible(dst_prc) || i != p.len() - 1;
 
             int s_idx = vmm_dst.getIdx();
 
@@ -1334,152 +1171,15 @@ void JitReducePostKernel<isa>::reduce_map_kernel_scalar(const Xmm &xmm_dst) {
 }
 
 template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::load_vector(const Vmm &vmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt) {
-    switch (src_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovups(vmm_src, op);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vpmovzxwd(vmm_src, op);
-            uni_vpslld(vmm_src, vmm_src, 16);
-            break;
-        case dnnl::memory::data_type::s8:
-            uni_vpmovsxbd(vmm_src, op);
-            break;
-        case dnnl::memory::data_type::u8:
-            uni_vpmovzxbd(vmm_src, op);
-            break;
-        default:
-            assert(!"unknown src_dt");
-    }
-
-    if (!isFloatCompatible(src_dt))
-        uni_vcvtdq2ps(vmm_src, vmm_src);
-}
-
-template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::load_scalar(const Xmm &xmm_src, const Xbyak::Address &op, const dnnl::memory::data_type &src_dt) {
-    switch (src_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovss(xmm_src, op);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vpinsrw(xmm_src, xmm_src, op, 0x0);
-            uni_vpslld(xmm_src, xmm_src, 16);
-            break;
-        case dnnl::memory::data_type::s8:
-            movsx(reg_tmp_32, op);
-            uni_vmovq(xmm_src, reg_tmp_64);
-            break;
-        case dnnl::memory::data_type::u8:
-            movzx(reg_tmp_32, op);
-            uni_vmovq(xmm_src, reg_tmp_64);
-            break;
-        default:
-            assert(!"unknown src_dt");
-    }
-
-    if (!isFloatCompatible(src_dt)) {
-        uni_vcvtdq2ps(xmm_src, xmm_src);
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::store_vector(const Xbyak::Address &op, const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt) {
-    Xmm xmm_dst = Xmm(vmm_dst.getIdx());
-    Ymm ymm_dst = Ymm(vmm_dst.getIdx());
-
-    if (!isFloatCompatible(dst_dt)) {
-        uni_vcvtps2dq(vmm_dst, vmm_dst);
-    }
-
-    switch (dst_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovups(op, vmm_dst);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vmm_dst.getIdx())}, {static_cast<size_t>(ymm_dst.getIdx())});
-            vmovdqu16(op, ymm_dst);
-            break;
-        case dnnl::memory::data_type::s8:
-            if (isa == x64::avx512_core) {
-                vpmovsdb(op, vmm_dst);
-            } else {
-                uni_vpackssdw(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41)
-                    vpermq(ymm_dst, ymm_dst, 0x08);
-                uni_vpacksswb(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41)
-                    vmovq(op, xmm_dst);
-                else
-                    uni_vmovd(op, xmm_dst);
-            }
-            break;
-        case dnnl::memory::data_type::u8:
-            if (isa == x64::avx512_core) {
-                vpmaxsd(vmm_dst, vmm_zero, vmm_dst);
-                vpmovusdb(op, vmm_dst);
-            } else {
-                uni_vpackusdw(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41)
-                    vpermq(ymm_dst, ymm_dst, 0x08);
-                uni_vpackuswb(vmm_dst, vmm_dst, vmm_dst);
-                if (isa != x64::sse41)
-                    vmovq(op, xmm_dst);
-                else
-                    uni_vmovd(op, xmm_dst);
-            }
-            break;
-        default:
-            assert(!"unknown dst_dt");
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::store_scalar(const Xbyak::Address &op, const Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt) {
-    if (!isFloatCompatible(dst_dt)) {
-        uni_vcvtps2dq(xmm_dst, xmm_dst);
-    }
-
-    switch (dst_dt) {
-        case dnnl::memory::data_type::f32:
-        case dnnl::memory::data_type::s32:
-            uni_vmovss(op, xmm_dst);
-            break;
-        case dnnl::memory::data_type::bf16:
-            uni_vpsrld(xmm_dst, xmm_dst, 16);
-            uni_vpextrw(op, xmm_dst, 0x0);
-            break;
-        case dnnl::memory::data_type::s8:
-            uni_vpackssdw(xmm_dst, xmm_dst, xmm_dst);
-            uni_vpacksswb(xmm_dst, xmm_dst, xmm_dst);
-            uni_vmovq(reg_tmp_64, xmm_dst);
-            mov(op, reg_tmp_8);
-            break;
-        case dnnl::memory::data_type::u8:
-            uni_vpackusdw(xmm_dst, xmm_dst, xmm_dst);
-            uni_vpackuswb(xmm_dst, xmm_dst, xmm_dst);
-            uni_vmovq(reg_tmp_64, xmm_dst);
-            mov(op, reg_tmp_8);
-            break;
-        default:
-            assert(!"unknown dst_dt");
-    }
-}
-
-template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded) {
+void JitReducePostKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
     if (isa == x64::sse41) {
-        horiz_store(vmm_dst, dst_dt, load_embedded);
+        horiz_store(vmm_dst, dst_prc, load_embedded);
     } else if (isa == x64::avx2) {
-        Xbyak::Ymm ymm_dst = Xbyak::Ymm(vmm_dst.getIdx());
+        Ymm ymm_dst = Ymm(vmm_dst.getIdx());
         vextractf128(xmm_aux1, ymm_dst, 0);
         vextractf128(xmm_aux2, ymm_dst, 1);
         horiz_ps(xmm_aux1, xmm_aux2);
-        horiz_store(xmm_aux1, dst_dt, load_embedded);
+        horiz_store(xmm_aux1, dst_prc, load_embedded);
     } else {
         Zmm zmm_dst = Zmm(vmm_dst.getIdx());
         vextractf32x4(xmm_aux1, zmm_dst, 0);
@@ -1489,21 +1189,21 @@ void JitReducePostKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const dnnl
         vextractf32x4(xmm_aux3, zmm_dst, 3);
         horiz_ps(xmm_aux2, xmm_aux3);
         horiz_ps(xmm_aux1, xmm_aux2);
-        horiz_store(xmm_aux1, dst_dt, load_embedded);
+        horiz_store(xmm_aux1, dst_prc, load_embedded);
     }
 }
 
 template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::horiz_store(const Xmm &xmm_dst, const dnnl::memory::data_type &dst_dt, bool load_embedded) {
+void JitReducePostKernel<isa>::horiz_store(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
     uni_vmovshdup(xmm_aux3, xmm_dst);          // dst:1,2,3,4; aux3:2,2,4,4
     horiz_ps(xmm_dst, xmm_aux3);               // dst:f(1,2),f(2,2),f(3,4),f(4,4)
     uni_vmovhlps(xmm_aux3, xmm_aux3, xmm_dst); // aux3:f(3,4),f(4,4),4,4
     horiz_ps(xmm_dst, xmm_aux3);               // dst:f(1,2,3,4),...
     if (load_embedded) {
-        load_scalar(xmm_aux3, ptr[reg_dst], dst_dt);
+        load_scalar(xmm_aux3, ptr[reg_dst], dst_prc);
         horiz_ps(xmm_dst, xmm_aux3);
     }
-    store_scalar(ptr[reg_dst], xmm_dst, dst_dt);
+    store_scalar(ptr[reg_dst], xmm_dst, dst_prc);
 }
 
 template <x64::cpu_isa_t isa>
@@ -1534,9 +1234,194 @@ void JitReducePostKernel<isa>::horiz_ps(const Xmm &xmm, const Operand &op) {
             uni_vmulps(xmm, xmm, op);
             break;
         default:
-            assert(!"unsupported reduce mode");
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
     }
 }
+
+
+///////////////////////////////
+///// JitReduceKernelBase /////
+///////////////////////////////
+
+dnnl::impl::status_t JitReduceKernelBase::create_kernel() {
+    const auto code = jit_generator::create_kernel();
+    if (code != dnnl::impl::status::success) {
+        IE_THROW() << "Could not create kernel. Error code: " << std::to_string(code) << ". " <<
+                    "Xbyak error code: " << ConvertErrorToString(GetError());
+    }
+    kernel_func = (decltype(kernel_func))jit_ker();
+    return code;
+}
+//
+//void JitReduceKernelBase::load_vector(const Xmm &vmm_src, const Address &op, const Precision &src_prc) {
+//    switch (src_prc) {
+//        case Precision::FP32:
+//        case Precision::I32:
+//            uni_vmovups(vmm_src, op);
+//            break;
+//        case Precision::BF16:
+//            uni_vpmovzxwd(vmm_src, op);
+//            uni_vpslld(vmm_src, vmm_src, 16);
+//            break;
+//        case Precision::I8:
+//            uni_vpmovsxbd(vmm_src, op);
+//            break;
+//        case Precision::U8:
+//            uni_vpmovzxbd(vmm_src, op);
+//            break;
+//        case Precision::I64:
+//            if (x64::mayiuse(x64::avx512_core)) {
+//                vcvtqq2pd(vmm_src, op);
+//                return;
+//            } else {
+//
+//            }
+//            break;
+//        default:
+//            IE_THROW() << "Unkown source precision '" << src_prc << "'";
+//    }
+//
+//    if (!isFloatCompatible(src_prc)) {
+//        uni_vcvtdq2ps(vmm_src, vmm_src);
+//    }
+//}
+//
+//void JitReduceKernelBase::load_scalar(const Xmm &xmm_src, const Address &op, const Precision &src_prc) {
+//    switch (src_prc) {
+//        case Precision::FP32:
+//        case Precision::I32:
+//            uni_vmovss(xmm_src, op);
+//            break;
+//        case Precision::BF16:
+//            uni_vpinsrw(xmm_src, xmm_src, op, 0x0);
+//            uni_vpslld(xmm_src, xmm_src, 16);
+//            break;
+//        case Precision::I8:
+//            pinsrb(xmm_src, op, 0);
+//            pmovsxbd(xmm_src, xmm_src);
+//            break;
+//        case Precision::U8:
+//            pinsrb(xmm_src, op, 0);
+//            break;
+//        case Precision::I64:
+//            uni_vmovsd(xmm_src, op);
+//            if (x64::mayiuse(x64::avx512_core)) {
+//                vcvtqq2pd(xmm_src, xmm_src);
+//                return;
+//            } else {
+//                // TODO:
+//            }
+//            break;
+//        default:
+//            IE_THROW() << "Unkown source precision '" << src_prc << "'";
+//    }
+//
+//    if (!isFloatCompatible(src_prc)) {
+//        uni_vcvtdq2ps(xmm_src, xmm_src);
+//    }
+//}
+//
+//void JitReduceKernelBase::store_vector(const Address &op, const Xmm &vmm_dst, const Precision &dst_prc) {
+//    Xmm xmm_dst = Xmm(vmm_dst.getIdx());
+//    Ymm ymm_dst = Ymm(vmm_dst.getIdx());
+//
+//    if (!isFloatCompatible(dst_prc)) {
+//        uni_vcvtps2dq(vmm_dst, vmm_dst);
+//    }
+//
+//    switch (dst_prc) {
+//        case Precision::FP32:
+//        case Precision::I32:
+//            uni_vmovups(op, vmm_dst);
+//            break;
+//        case Precision::BF16:
+//            uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vmm_dst.getIdx())}, {static_cast<size_t>(ymm_dst.getIdx())});
+//            vmovdqu16(op, ymm_dst);
+//            break;
+//        case Precision::I8:
+//            if (x64::mayiuse(x64::avx512_core)) {
+//                vpmovsdb(op, vmm_dst);
+//            } else {
+//                uni_vpackssdw(vmm_dst, vmm_dst, vmm_dst);
+//                if (x64::mayiuse(x64::avx2)) {
+//                    vpermq(ymm_dst, ymm_dst, 0x08);
+//                }
+//                uni_vpacksswb(vmm_dst, vmm_dst, vmm_dst);
+//                if (x64::mayiuse(x64::avx2)) {
+//                    vmovq(op, xmm_dst);
+//                } else {
+//                    uni_vmovd(op, xmm_dst);
+//                }
+//            }
+//            break;
+//        case Precision::U8:
+//            if (x64::mayiuse(x64::avx512_core)) {
+//                uni_vpackusdw(vmm_dst, vmm_dst, vmm_dst);
+//                vpmovuswb(op, vmm_dst);
+//            } else {
+//                uni_vpackusdw(vmm_dst, vmm_dst, vmm_dst);
+//                if (x64::mayiuse(x64::avx2)) {
+//                    vpermq(ymm_dst, ymm_dst, 0x08);
+//                }
+//                uni_vpackuswb(vmm_dst, vmm_dst, vmm_dst);
+//                if (x64::mayiuse(x64::avx2)) {
+//                    vmovq(op, xmm_dst);
+//                } else {
+//                    uni_vmovd(op, xmm_dst);
+//                }
+//            }
+//            break;
+//        case Precision::I64:
+//            if (x64::mayiuse(x64::avx512_core)) {
+//                vcvtpd2qq(vmm_dst, vmm_dst);
+//                uni_vmovups(op, vmm_dst);
+//            } else {
+//                // TODO:
+//            }
+//            break;
+//        default:
+//            IE_THROW() << "Unkown destination precision '" << dst_prc << "'";
+//    }
+//}
+//
+//void JitReduceKernelBase::store_scalar(const Address &op, const Xmm &xmm_dst, const Precision &dst_prc) {
+//    if (!isFloatCompatible(dst_prc)) {
+//        if (exec_prc.size() == 4) {
+//            uni_vcvtps2dq(xmm_dst, xmm_dst);
+//        } else if (exec_prc.size() == 8) {
+//
+//        }
+//    }
+//
+//    switch (dst_prc) {
+//        case Precision::FP32:
+//        case Precision::I32:
+//            uni_vmovss(op, xmm_dst);
+//            break;
+//        case Precision::BF16:
+//            uni_vpsrld(xmm_dst, xmm_dst, 16);
+//            uni_vpextrw(op, xmm_dst, 0x0);
+//            break;
+//        case Precision::I8:
+//            uni_vpackssdw(xmm_dst, xmm_dst, xmm_dst);
+//            uni_vpacksswb(xmm_dst, xmm_dst, xmm_dst);
+//            uni_vmovq(reg_tmp_64, xmm_dst);
+//            mov(op, reg_tmp_8);
+//            break;
+//        case Precision::U8:
+//            uni_vpextrb(op, xmm_dst, 0);
+//            break;
+//        case Precision::I64:
+//            if (x64::mayiuse(x64::avx512_core)) {
+//                vcvtpd2qq(xmm_dst, xmm_dst);
+//            } else {
+//                // TODO:
+//            }
+//            uni_vmovsd(op, xmm_dst);
+//        default:
+//            IE_THROW() << "Unkown destination precision '" << dst_prc << "'";
+//    }
+//}
 
 template class JitReduceKernel<x64::avx512_core>;
 template class JitReduceKernel<x64::avx2>;
