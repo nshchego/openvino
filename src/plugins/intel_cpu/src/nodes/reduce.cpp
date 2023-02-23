@@ -71,8 +71,8 @@ size_t ReduceKey::hash() const {
     size_t seed = 0;
     seed = hash_combine(seed, jcp.layout);
     seed = hash_combine(seed, jcp.reduce_mode);
-    seed = hash_combine(seed, jcp.src_prc);
-    seed = hash_combine(seed, jcp.dst_prc);
+    seed = hash_combine(seed, Precision::ePrecision(jcp.src_prc));
+    seed = hash_combine(seed, Precision::ePrecision(jcp.dst_prc));
     seed = get_post_op_hash(seed, *postOps.get());
 
     return seed;
@@ -301,8 +301,8 @@ void Reduce::prepareParams() {
         set_reduce_dim_flags();
     }
 
-    auto builder = [&](const ReduceKey &key) -> std::shared_ptr<JitReduceKernelBase> {
-        std::shared_ptr<JitReduceKernelBase> postKernel;
+    auto builder = [&](const ReduceKey &key) -> std::shared_ptr<JitReduceKernelBase<JitReducePostCallArgs>> {
+        std::shared_ptr<JitReduceKernelBase<JitReducePostCallArgs>> postKernel;
 
         if (x64::mayiuse(x64::avx512_core)) {
             postKernel.reset(new JitReducePostKernel<x64::avx512_core>(key.jcp, *attr.get()));

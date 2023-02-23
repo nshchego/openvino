@@ -4,14 +4,15 @@
 
 #include "jit_kernel_base.hpp"
 
-using namespace ov;
-using namespace intel_cpu;
+using namespace ov::intel_cpu::kernel;
 using namespace dnnl::impl::cpu;
+using namespace Xbyak;
+using Precision = typename InferenceEngine::Precision;
 
 
-void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& vDst,
-                                    const Xbyak::Xmm& vSrc,
-                                    const Xbyak::Operand& op) {
+void JitKernelBase::uni_vfmsub132ps(const Xmm& vDst,
+                                    const Xmm& vSrc,
+                                    const Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vfmsub132ps(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
@@ -25,9 +26,9 @@ void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& vDst,
     }
 }
 
-void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& vDst,
-                                     const Xbyak::Xmm& vSrc,
-                                     const Xbyak::Operand& op) {
+void JitKernelBase::uni_vfnmadd132ps(const Xmm& vDst,
+                                     const Xmm& vSrc,
+                                     const Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vfnmadd132ps(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
@@ -42,9 +43,9 @@ void JitKernelBase::uni_vfnmadd132ps(const Xbyak::Xmm& vDst,
     }
 }
 
-void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm& vDst,
-                                    const Xbyak::Xmm& vSrc,
-                                    const Xbyak::Operand& op) {
+void JitKernelBase::uni_vfmsub231ps(const Xmm& vDst,
+                                    const Xmm& vSrc,
+                                    const Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vfmsub231ps(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
@@ -59,17 +60,17 @@ void JitKernelBase::uni_vfmsub231ps(const Xbyak::Xmm& vDst,
     }
 }
 
-void JitKernelBase::uni_vpaddd(const Xbyak::Ymm& vDst,
-                               const Xbyak::Ymm& vSrc,
-                               const Xbyak::Operand& op) {
+void JitKernelBase::uni_vpaddd(const Ymm& vDst,
+                               const Ymm& vSrc,
+                               const Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vpaddd(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        Xbyak::Xmm xmmDst(vDst.getIdx());
+        Xmm xmmDst(vDst.getIdx());
         vmovups(vDst, vSrc);
         if (op.isYMM()) {
-            Xbyak::Ymm ymmOp(op.getIdx());
-            Xbyak::Xmm xmmOp(op.getIdx());
+            Ymm ymmOp(op.getIdx());
+            Xmm xmmOp(op.getIdx());
             paddd(xmmDst, xmmOp);
             vperm2f128(vDst, vDst, vDst, 0x1);
             vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
@@ -93,17 +94,17 @@ void JitKernelBase::uni_vpaddd(const Xbyak::Ymm& vDst,
     }
 }
 
-void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
-                               const Xbyak::Ymm& vSrc,
-                               const Xbyak::Operand& op) {
+void JitKernelBase::uni_vpsubd(const Ymm& vDst,
+                               const Ymm& vSrc,
+                               const Operand& op) {
     if (isValidIsa(x64::avx2)) {
         vpsubd(vDst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        Xbyak::Xmm xmmDst(vDst.getIdx());
+        Xmm xmmDst(vDst.getIdx());
         vmovups(vDst, vSrc);
         if (op.isYMM()) {
-            Xbyak::Ymm ymmOp(op.getIdx());
-            Xbyak::Xmm xmmOp(op.getIdx());
+            Ymm ymmOp(op.getIdx());
+            Xmm xmmOp(op.getIdx());
             psubd(xmmDst, xmmOp);
             vperm2f128(vDst, vDst, vDst, 0x1);
             vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
@@ -127,9 +128,9 @@ void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
     }
 }
 
-void JitKernelBase::uni_vdivps(const Xbyak::Xmm& vDst,
-                               const Xbyak::Operand& op1,
-                               const Xbyak::Operand& op2) {
+void JitKernelBase::uni_vdivps(const Xmm& vDst,
+                               const Operand& op1,
+                               const Operand& op2) {
     if (isValidIsa(x64::avx)) {
         vdivps(vDst, op1, op2);
     } else {
@@ -140,9 +141,9 @@ void JitKernelBase::uni_vdivps(const Xbyak::Xmm& vDst,
     }
 }
 
-void JitKernelBase::uni_vandps(const Xbyak::Xmm& vDst,
-                               const Xbyak::Xmm& vSrs,
-                               const Xbyak::Operand &op) {
+void JitKernelBase::uni_vandps(const Xmm& vDst,
+                               const Xmm& vSrs,
+                               const Operand &op) {
     if (isValidIsa(x64::avx)) {
         vandps(vDst, vSrs, op);
     } else {
@@ -153,9 +154,9 @@ void JitKernelBase::uni_vandps(const Xbyak::Xmm& vDst,
     }
 }
 
-void JitKernelBase::uni_vandnps(const Xbyak::Xmm& vDst,
-                                const Xbyak::Xmm& vSrs,
-                                const Xbyak::Operand &op) {
+void JitKernelBase::uni_vandnps(const Xmm& vDst,
+                                const Xmm& vSrs,
+                                const Operand &op) {
     if (isValidIsa(x64::avx)) {
         vandnps(vDst, vSrs, op);
     } else {
@@ -166,10 +167,10 @@ void JitKernelBase::uni_vandnps(const Xbyak::Xmm& vDst,
     }
 }
 
-void JitKernelBase::gatherdd(const Xbyak::Xmm&    vDst,
-                             const Xbyak::Reg64&  rSrcPtr,
-                             const Xbyak::Xmm&    vSrcShift,
-                             const Xbyak::Opmask& kReadMask,
+void JitKernelBase::gatherdd(const Xmm&    vDst,
+                             const Reg64&  rSrcPtr,
+                             const Xmm&    vSrcShift,
+                             const Opmask& kReadMask,
                              const bool useMask,
                              const bool zeroFill) {
     if (kReadMask.getIdx() == 0) {
@@ -183,10 +184,10 @@ void JitKernelBase::gatherdd(const Xbyak::Xmm&    vDst,
     vpgatherdd(vDst | kReadMask, ptr[rSrcPtr + vSrcShift]);
 }
 
-void JitKernelBase::gatherdd(const Xbyak::Xmm&   vDst,
-                             const Xbyak::Reg64& rSrcPtr,
-                             const Xbyak::Xmm&   vSrcShift,
-                             const Xbyak::Xmm&   vReadMask,
+void JitKernelBase::gatherdd(const Xmm&   vDst,
+                             const Reg64& rSrcPtr,
+                             const Xmm&   vSrcShift,
+                             const Xmm&   vReadMask,
                              const bool useMask,
                              const bool zeroFill) {
     if (vDst.getIdx() == vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
@@ -202,11 +203,11 @@ void JitKernelBase::gatherdd(const Xbyak::Xmm&   vDst,
         vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
     } else {
         auto rAux = getReg64();
-        Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
+        Reg32 r32Aux = Reg32(rAux.getIdx());
         const uint8_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / sizeof(int);
 
         for (uint8_t i = 0; i < elPerVec; i++) {
-            Xbyak::Label lLoopNext;
+            Label lLoopNext;
             if (useMask) {
                 uni_vpextrd(r32Aux, vReadMask, i);
                 cmp(r32Aux, 0); // TODO: check significant bit
@@ -221,10 +222,10 @@ void JitKernelBase::gatherdd(const Xbyak::Xmm&   vDst,
     }
 }
 
-void JitKernelBase::gatherdd(const Xbyak::Ymm&   vDst,
-                             const Xbyak::Reg64& rSrcPtr,
-                             const Xbyak::Ymm&   vSrcShift,
-                             const Xbyak::Ymm&   vReadMask,
+void JitKernelBase::gatherdd(const Ymm&   vDst,
+                             const Reg64& rSrcPtr,
+                             const Ymm&   vSrcShift,
+                             const Ymm&   vReadMask,
                              const bool useMask,
                              const bool zeroFill) {
     if (vDst.getIdx() == vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
@@ -238,9 +239,9 @@ void JitKernelBase::gatherdd(const Xbyak::Ymm&   vDst,
 
         vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
     } else {
-        Xbyak::Xmm xmmDst      = Xbyak::Xmm(vDst.getIdx()),
-                   xmmSrcShft  = Xbyak::Xmm(vSrcShift.getIdx()),
-                   xmmReadMask = Xbyak::Xmm(vReadMask.getIdx());
+        Xmm xmmDst      = Xmm(vDst.getIdx()),
+                   xmmSrcShft  = Xmm(vSrcShift.getIdx()),
+                   xmmReadMask = Xmm(vReadMask.getIdx());
         for (uint8_t i = 0; i < 2; i++) {
             gatherdd(xmmDst, rSrcPtr, xmmSrcShft, xmmReadMask, useMask, zeroFill);
 
@@ -252,7 +253,7 @@ void JitKernelBase::gatherdd(const Xbyak::Ymm&   vDst,
     }
 }
 
-void JitKernelBase::uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+void JitKernelBase::uni_vpbroadcastd(const Xmm &x, const Operand &op) {
     if (isValidIsa(x64::avx2)) {
         vpbroadcastd(x, op);
     } else if (isValidIsa(x64::avx)) {
@@ -268,14 +269,14 @@ void JitKernelBase::uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &
     }
 }
 
-void JitKernelBase::uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
+void JitKernelBase::uni_vpbroadcastd(const Ymm &x, const Operand &op) {
     if (isValidIsa(x64::avx2)) {
         vpbroadcastd(x, op);
     } else {
         if (op.isMEM()) {
             vbroadcastss(x, op.getAddress());
         } else {
-            const Xbyak::Xmm t(x.getIdx());
+            const Xmm t(x.getIdx());
             if (!t.isEqualIfNotInherited(op)) {
                 vmovss(t, t, op);
             }
@@ -285,8 +286,8 @@ void JitKernelBase::uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &
     }
 }
 
-void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
-                                     const Xbyak::Reg64& rWorkRest) {
+void JitKernelBase::fillRestWorkMask(const Opmask& dstMask,
+                                     const Reg64& rWorkRest) {
     auto rOnes = getReg64();
 
     mov(rOnes, 0xFFFFFFFFFFFFFFFF);
@@ -295,15 +296,15 @@ void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
     kmovq(dstMask, rOnes);
 }
 
-void JitKernelBase::fillRestWorkMask(const Xbyak::Xmm& xmmDstMask,
-                                     const Xbyak::Reg64& rWorkRest,
+void JitKernelBase::fillRestWorkMask(const Xmm& xmmDstMask,
+                                     const Reg64& rWorkRest,
                                      const uint64_t typeSize) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not fill data with type size " << typeSize;
     }
-    Xbyak::Label lEnd;
+    Label lEnd;
     auto r32Ones = getReg32();
-    Xbyak::Reg64 r64Ones(r32Ones.getIdx());
+    Reg64 r64Ones(r32Ones.getIdx());
     auto elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
 
     mov(r64Ones, 0xFFFFFFFFFFFFFFFF);
@@ -324,22 +325,22 @@ void JitKernelBase::fillRestWorkMask(const Xbyak::Xmm& xmmDstMask,
     L(lEnd);
 }
 
-void JitKernelBase::fillRestWorkMask(const Xbyak::Ymm& ymmDstMask,
-                                     const Xbyak::Reg64& rWorkRest,
+void JitKernelBase::fillRestWorkMask(const Ymm& ymmDstMask,
+                                     const Reg64& rWorkRest,
                                      const uint64_t typeSize) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not fill data with type size " << typeSize;
     }
-    Xbyak::Label lEnd;
+    Label lEnd;
     auto elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
     auto r32Ones = getReg32();
-    Xbyak::Reg64 r64Ones(r32Ones.getIdx());
-    Xbyak::Xmm xmmDstMask(ymmDstMask.getIdx());
+    Reg64 r64Ones(r32Ones.getIdx());
+    Xmm xmmDstMask(ymmDstMask.getIdx());
 
     mov(r64Ones, 0xFFFFFFFFFFFFFFFF);
     uni_vpxor(ymmDstMask, ymmDstMask, ymmDstMask);
     for (uint8_t i = 0; i < 2; i++) {
-        Xbyak::Label lPerm;
+        Label lPerm;
         for (uint8_t j = 0; j < elPerVec; j++) {
             cmp(rWorkRest, i * elPerVec + j);
             jle(i == 0 ? lEnd : lPerm, T_NEAR);
@@ -362,16 +363,16 @@ void JitKernelBase::fillRestWorkMask(const Xbyak::Ymm& ymmDstMask,
     L(lEnd);
 }
 
-void JitKernelBase::load(const Xbyak::Xmm&     vDst,
-                         const Xbyak::Address& srcAddr,
-                         const Xbyak::Reg64&   rLoadNum,
+void JitKernelBase::load(const Xmm&     vDst,
+                         const Address& srcAddr,
+                         const Reg64&   rLoadNum,
                          const size_t          typeSize,
                          const bool            zeroFilling) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not load data with type size " << typeSize;
     }
     const uint8_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
-    Xbyak::Label lEnd;
+    Label lEnd;
     if (zeroFilling)
         pxor(vDst, vDst);
 
@@ -392,22 +393,22 @@ void JitKernelBase::load(const Xbyak::Xmm&     vDst,
     L(lEnd);
 }
 
-void JitKernelBase::load(const Xbyak::Ymm&     vDst,
-                         const Xbyak::Address& srcAddr,
-                         const Xbyak::Reg64&   rLoadNum,
+void JitKernelBase::load(const Ymm&     vDst,
+                         const Address& srcAddr,
+                         const Reg64&   rLoadNum,
                          const size_t          typeSize,
                          const bool            zeroFilling) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not load data with type size " << typeSize;
     }
     const size_t elPerXmm = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
-    Xbyak::Label lEnd;
+    Label lEnd;
     if (zeroFilling)
         uni_vpxor(vDst, vDst, vDst);
-    Xbyak::Xmm xmmDst(vDst.getIdx());
+    Xmm xmmDst(vDst.getIdx());
 
     for (size_t i = 0lu; i < 2lu; i++) {
-        Xbyak::Label lPerm;
+        Label lPerm;
         const size_t idx = i * elPerXmm;
         const size_t offset0 = idx * typeSize;
 
@@ -432,14 +433,14 @@ void JitKernelBase::load(const Xbyak::Ymm&     vDst,
     L(lEnd);
 }
 
-void JitKernelBase::store(const Xbyak::Address& dstAddr,
-                          const Xbyak::Xmm&     vSrc,
-                          const Xbyak::Reg64&   rToStoreNum,
+void JitKernelBase::store(const Address& dstAddr,
+                          const Xmm&     vSrc,
+                          const Reg64&   rToStoreNum,
                           const size_t          typeSize) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not store data with type size " << typeSize;
     }
-    Xbyak::Label lEnd;
+    Label lEnd;
     const size_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
 
     for (size_t i = 0; i < elPerVec; i++) {
@@ -460,19 +461,19 @@ void JitKernelBase::store(const Xbyak::Address& dstAddr,
     L(lEnd);
 }
 
-void JitKernelBase::store(const Xbyak::Address& dstAddr,
-                          const Xbyak::Ymm&     vSrc,
-                          const Xbyak::Reg64&   rToStoreNum,
+void JitKernelBase::store(const Address& dstAddr,
+                          const Ymm&     vSrc,
+                          const Reg64&   rToStoreNum,
                           const size_t          typeSize) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not store data with type size " << typeSize;
     }
-    Xbyak::Label lEnd;
-    Xbyak::Xmm xmmSrc(vSrc.getIdx());
+    Label lEnd;
+    Xmm xmmSrc(vSrc.getIdx());
     const size_t elPerXmm = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
 
     for (int i = 0; i < 2; i++) {
-        Xbyak::Label lPerm;
+        Label lPerm;
         const size_t idx = i * elPerXmm;
         const size_t offset0 = idx * typeSize;
 
@@ -498,16 +499,16 @@ void JitKernelBase::store(const Xbyak::Address& dstAddr,
     L(lEnd);
 }
 
-void JitKernelBase::memMovDD(const Xbyak::Reg64& rDst,
-                             const Xbyak::Reg64& rSrc,
-                             const Xbyak::Xmm&   vReadMask,
-                             const Xbyak::Xmm&   vSrcShift,
-                             const Xbyak::Reg64& rToStoreNum,
+void JitKernelBase::memMovDD(const Reg64& rDst,
+                             const Reg64& rSrc,
+                             const Xmm&   vReadMask,
+                             const Xmm&   vSrcShift,
+                             const Reg64& rToStoreNum,
                              const bool          useMask,
                              const bool          zeroFill) {
-    Xbyak::Label lEnd;
+    Label lEnd;
     auto rAux = getReg64();
-    Xbyak::Reg32 r32Aux = Xbyak::Reg32(rAux.getIdx());
+    Reg32 r32Aux = Reg32(rAux.getIdx());
     const uint8_t typeSize = sizeof(int);
     const uint8_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
 
@@ -515,12 +516,12 @@ void JitKernelBase::memMovDD(const Xbyak::Reg64& rDst,
         cmp(rToStoreNum, i);
         jle(lEnd, T_NEAR);
 
-        Xbyak::Label lLoopNext;
+        Label lLoopNext;
         if (useMask) {
             uni_vpextrd(r32Aux, vReadMask, i);
             cmp(r32Aux, 0);
             if (zeroFill) {
-                Xbyak::Label lNotZero;
+                Label lNotZero;
                 jne(lNotZero, T_NEAR);
                 mov(ptr[rDst.getReg() + i * typeSize], r32Aux);
                 jmp(lLoopNext, T_NEAR);
@@ -538,23 +539,23 @@ void JitKernelBase::memMovDD(const Xbyak::Reg64& rDst,
     L(lEnd);
 }
 
-void JitKernelBase::memMovDD(const Xbyak::Reg64& rDst,
-                             const Xbyak::Reg64& rSrc,
-                             const Xbyak::Ymm&   vReadMask,
-                             const Xbyak::Ymm&   vSrcShift,
-                             const Xbyak::Reg64& rToStoreNum,
+void JitKernelBase::memMovDD(const Reg64& rDst,
+                             const Reg64& rSrc,
+                             const Ymm&   vReadMask,
+                             const Ymm&   vSrcShift,
+                             const Reg64& rToStoreNum,
                              const bool          useMask,
                              const bool          zeroFill) {
-    Xbyak::Label lEnd;
+    Label lEnd;
     if (isValidIsa(x64::avx2)) {
-        auto vAux = RegistersPool::Reg<Xbyak::Ymm>(registersPool);
+        auto vAux = RegistersPool::Reg<Ymm>(registersPool);
         gatherdd(vAux, rSrc, vSrcShift, vReadMask, useMask, zeroFill);
         store(ptr[rDst], vAux, rToStoreNum, sizeof(int));
     } else if (isValidIsa(x64::avx)) {
         const uint8_t typeSize = sizeof(int);
         const uint8_t elPerXmm = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
-        Xbyak::Xmm xmmReadMask  = Xbyak::Xmm(vReadMask.getIdx()),
-                   xmmSrcShft   = Xbyak::Xmm(vSrcShift.getIdx());
+        Xmm xmmReadMask  = Xmm(vReadMask.getIdx()),
+                   xmmSrcShft   = Xmm(vSrcShift.getIdx());
         for (uint8_t i = 0; i < 2; i++) {
             memMovDD(rDst, rSrc, xmmReadMask, xmmSrcShft, rToStoreNum, useMask, zeroFill);
 
@@ -574,4 +575,374 @@ void JitKernelBase::memMovDD(const Xbyak::Reg64& rDst,
         }
     }
     L(lEnd);
+}
+
+void JitKernelBase::loadVector(const Xmm &vDst,
+                               const Address &srcAdr,
+                               const InferenceEngine::Precision &dstPrc,
+                               const InferenceEngine::Precision &srcPrc,
+                               bool broadcast) {
+    Xmm xmmDst = Xmm(vDst.getIdx());
+    Ymm ymmDst = Ymm(vDst.getIdx());
+
+    if (broadcast) {
+        loadScalar(xmmDst, srcAdr, srcPrc, dstPrc);
+        if (srcPrc.size() == 4) {
+            uni_vbroadcastss(vDst, xmmDst);
+        } else if (srcPrc.size() == 8) {
+            uni_vbroadcastsd(vDst, xmmDst);
+        }
+    } else {
+        switch (srcPrc) {
+            case Precision::FP32:
+                if (dstPrc == Precision::FP32) {
+                    uni_vmovups(vDst, srcAdr);
+                }
+                break;
+            case Precision::I32:
+                if (dstPrc == Precision::I32) {
+                    uni_vmovups(vDst, srcAdr);
+                }
+                break;
+            case Precision::I64:
+                if (dstPrc == Precision::I64 || dstPrc == Precision::I32) {
+                    uni_vmovups(vDst, srcAdr);
+                }
+                break;
+            case Precision::BF16:
+                vpmovzxwd(vDst, srcAdr);
+                uni_vpslld(vDst, vDst, 16);
+                break;
+            case Precision::U16:
+                uni_vpmovzxwd(vDst, srcAdr);
+                break;
+            case Precision::I16:
+                uni_vpmovsxwd(vDst, srcAdr);
+                break;
+            case Precision::I8:
+                uni_vpmovsxbd(vDst, srcAdr);
+                break;
+            case Precision::U8:
+                uni_vpmovzxbd(vDst, srcAdr);
+                break;
+            default:
+                IE_THROW() << "Unsupported source precision: " << srcPrc;
+        }
+
+        switch (dstPrc) {
+            case Precision::FP32:
+                if (srcPrc == Precision::I64) {
+                    if (x64::mayiuse(x64::avx512_core)) {
+                        vcvtqq2ps(ymmDst, srcAdr);
+                    } else {
+                        // TODO
+                    }
+                } else if (srcPrc != Precision::FP32 && srcPrc != Precision::BF16) {
+                    uni_vcvtdq2ps(vDst, srcAdr);
+                }
+                break;
+            case Precision::I32:
+                if (srcPrc == Precision::I64) {
+                    if (x64::mayiuse(x64::avx512_core)) {
+                        vpmovsqd(ymmDst, vDst);
+                    } else {
+                        // TODO
+                    }
+                } else if (srcPrc == Precision::FP32 || srcPrc == Precision::BF16) {
+                    uni_vcvtps2dq(vDst, srcAdr);
+                }
+                break;
+            case Precision::I64:
+                break;
+            default:
+                IE_THROW() << "Unsupported destination precision: " << dstPrc;
+        }
+    }
+}
+
+void JitKernelBase::loadScalar(const Xmm &vDst,
+                               const Address &srcAdr,
+                               const InferenceEngine::Precision &dstPrc,
+                               const InferenceEngine::Precision &srcPrc) {
+    switch (srcPrc) {
+        case Precision::I64:
+            uni_vmovsd(vDst, srcAdr);
+            break;
+        case Precision::FP32:
+        case Precision::I32:
+            uni_vmovss(vDst, srcAdr);
+            break;
+        case Precision::BF16:
+            uni_vpinsrw(vDst, vDst, srcAdr, 0);
+            uni_vpslld(vDst, vDst, 16);
+            break;
+        case Precision::I16:
+            uni_vpinsrw(vDst, vDst, srcAdr, 0);
+            uni_vpmovsxwd(vDst, srcAdr);
+            break;
+        case Precision::U16:
+            uni_vpinsrw(vDst, vDst, srcAdr, 0);
+            uni_vpmovzxwd(vDst, srcAdr);
+            break;
+        case Precision::I8:
+            pinsrb(vDst, srcAdr, 0);
+            uni_vpmovsxbd(vDst, vDst);
+            break;
+        case Precision::U8:
+            pinsrb(vDst, srcAdr, 0);
+            uni_vpmovzxbd(vDst, vDst);
+            break;
+        default:
+            IE_THROW() << "Unsupported source precision: " << srcPrc;
+    }
+
+    switch (dstPrc) {
+        case Precision::FP32:
+            if (srcPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtqq2ps(vDst, vDst);
+                } else {
+                    // TODO
+                }
+            } else if (srcPrc != Precision::FP32 && srcPrc != Precision::BF16) {
+                uni_vcvtdq2ps(vDst, vDst);
+            }
+            break;
+        case Precision::I32:
+            if (srcPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vpmovsqd(vDst, vDst);
+                } else {
+                    // TODO
+                }
+            } else if (srcPrc == Precision::FP32 || srcPrc == Precision::BF16) {
+                uni_vcvtps2dq(vDst, vDst);
+            }
+            break;
+        case Precision::I64:
+            break;
+        default:
+            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+    }
+}
+
+void JitKernelBase::storeVector(const Address &dstAdr,
+                                const Xmm &vSrc,
+                                const InferenceEngine::Precision &dstPrc,
+                                const InferenceEngine::Precision &srcPrc) {
+    Xmm xmmSrc = Xmm(vSrc.getIdx());
+    Ymm ymmSrc = Ymm(vSrc.getIdx());
+
+    switch (srcPrc) {
+        case Precision::FP32:
+            if (dstPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtps2qq(vSrc, ymmSrc);
+                } else {
+                    // TODO
+                }
+            } else if ((dstPrc == Precision::U8 || dstPrc == Precision::U16) && x64::mayiuse(x64::avx512_core)) {
+                vcvtps2udq(vSrc, vSrc);
+            } else if (dstPrc != Precision::FP32 && dstPrc != Precision::BF16) {
+                uni_vcvtps2dq(vSrc, vSrc);
+            }
+            break;
+        case Precision::I32:
+            if (dstPrc == Precision::FP32 || dstPrc == Precision::BF16) {
+                uni_vcvtdq2ps(vSrc, vSrc);
+            }
+            break;
+        case Precision::I64:
+            if (dstPrc == Precision::FP32 || dstPrc == Precision::BF16) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtqq2ps(ymmSrc, vSrc);
+                } else {
+                    // TODO
+                }
+            }
+            break;
+        default:
+            IE_THROW() << "Unsupported source precision: " << srcPrc;
+    }
+
+    switch (dstPrc) {
+        case Precision::FP32:
+            if (srcPrc == Precision::I64) {
+                uni_vmovups(dstAdr, ymmSrc);
+            } else {
+                uni_vmovups(dstAdr, vSrc);
+            }
+            break;
+        case Precision::I64:
+            uni_vmovups(dstAdr, vSrc);
+            break;
+        case Precision::I32:
+            if (srcPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vpmovsqd(dstAdr, vSrc);
+                } else {
+                    // TODO
+                }
+            } else {
+                uni_vmovups(dstAdr, vSrc);
+            }
+            break;
+        case Precision::BF16:
+//            TODO: uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
+            vmovdqu16(dstAdr, ymmSrc);
+            break;
+        case Precision::I16:
+            if (x64::mayiuse(x64::avx512_core)) {
+                vpmovsdw(dstAdr, vSrc);
+            } else {
+                uni_vpackssdw(vSrc, vSrc, vSrc);
+                if (x64::mayiuse(x64::avx)) {
+                    vpermq(ymmSrc, ymmSrc, 0x08);
+                    uni_vmovdqu(dstAdr, xmmSrc);
+                } else {
+                    movq(dstAdr, xmmSrc);
+                }
+            }
+            break;
+        case Precision::U16:
+            if (x64::mayiuse(x64::avx512_core)) {
+                vpmovusdw(dstAdr, xmmSrc);
+            } else {
+                uni_vpackusdw(vSrc, vSrc, vSrc);
+                if (x64::mayiuse(x64::avx)) {
+                    vpermq(ymmSrc, ymmSrc, 0x08);
+                    uni_vmovdqu(dstAdr, xmmSrc);
+                } else {
+                    movq(dstAdr, xmmSrc);
+                }
+            }
+            break;
+        case Precision::I8:
+            if (x64::mayiuse(x64::avx512_core)) {
+                if (srcPrc == Precision::I64) {
+                    vpmovsqb(dstAdr, vSrc);
+                } else {
+                    vpmovsdb(dstAdr, vSrc);
+                }
+            } else {
+                uni_vpackssdw(vSrc, vSrc, vSrc);
+                if (x64::mayiuse(x64::avx)) {
+                    vpermq(ymmSrc, ymmSrc, 0x08);
+                }
+                uni_vpacksswb(vSrc, vSrc, vSrc);
+                if (x64::mayiuse(x64::avx)) {
+                    vmovq(dstAdr, xmmSrc);
+                } else {
+                    movd(dstAdr, xmmSrc);
+                }
+            }
+            break;
+        case Precision::U8:
+            if (x64::mayiuse(x64::avx512_core)) {
+                if (srcPrc == Precision::I64) {
+                    vpmovusqb(dstAdr, vSrc);
+                } else {
+                    vpmovusdb(dstAdr, vSrc);
+                }
+            } else {
+                uni_vpackusdw(vSrc, vSrc, vSrc);
+                if (x64::mayiuse(x64::avx)) {
+                    vpermq(ymmSrc, ymmSrc, 0x08);
+                }
+                uni_vpackuswb(vSrc, vSrc, vSrc);
+                if (x64::mayiuse(x64::avx)) {
+                    vmovq(dstAdr, xmmSrc);
+                } else {
+                    movd(dstAdr, xmmSrc);
+                }
+            }
+            break;
+        default:
+            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+    }
+}
+
+void JitKernelBase::storeScalar(const Address &dstAdr,
+                                const Xmm &vSrc,
+                                const InferenceEngine::Precision &dstPrc,
+                                const InferenceEngine::Precision &srcPrc) {
+    switch (srcPrc) {
+        case Precision::FP32:
+            if (dstPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtps2qq(vSrc, vSrc);
+                } else {
+                    // TODO
+                }
+            } else if (dstPrc == Precision::U8 && x64::mayiuse(x64::avx512_core)) {
+                vcvtps2udq(vSrc, vSrc);
+            } else if (dstPrc != Precision::FP32 && dstPrc != Precision::BF16) {
+                uni_vcvtps2dq(vSrc, vSrc);
+            }
+            break;
+        case Precision::I32:
+            if (dstPrc == Precision::FP32 || dstPrc == Precision::BF16) {
+                uni_vcvtdq2ps(vSrc, vSrc);
+            }
+            break;
+        case Precision::I64:
+            if (dstPrc == Precision::FP32 || dstPrc == Precision::BF16) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtqq2ps(vSrc, vSrc);
+                } else {
+                    // TODO
+                }
+            } else if (dstPrc == Precision::I32) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vpmovsqd(vSrc, vSrc);
+                } else {
+                    // TODO
+                }
+            }
+            break;
+        default:
+            IE_THROW() << "Unsupported source precision: " << srcPrc;
+    }
+
+    switch (dstPrc) {
+        case Precision::I64:
+            uni_vmovsd(dstAdr, vSrc);
+            break;
+        case Precision::FP32:
+        case Precision::I32:
+            uni_vmovss(dstAdr, vSrc);
+            break;
+        case Precision::BF16:
+            uni_vpsrld(vSrc, vSrc, 16);
+            uni_vpextrw(dstAdr, vSrc, 0x0);
+            break;
+        case Precision::I16:
+            uni_vpackssdw(vSrc, vSrc, vSrc);
+            uni_vpextrw(dstAdr, vSrc, 0x0);
+            break;
+        case Precision::U16:
+            uni_vpackusdw(vSrc, vSrc, vSrc);
+            uni_vpextrw(dstAdr, vSrc, 0x0);
+            break;
+        case Precision::I8:
+            if (x64::mayiuse(x64::avx512_core)) {
+                vpmovsdb(vSrc, vSrc);
+            } else {
+                uni_vpackssdw(vSrc, vSrc, vSrc);
+                uni_vpacksswb(vSrc, vSrc, vSrc);
+            }
+            uni_vpextrb(dstAdr, vSrc, 0x0);
+            break;
+        case Precision::U8:
+            if (x64::mayiuse(x64::avx512_core)) {
+                vpmovusdb(vSrc, vSrc);
+            } else {
+                uni_vpackusdw(vSrc, vSrc, vSrc);
+                uni_vpackuswb(vSrc, vSrc, vSrc);
+            }
+            uni_vpextrb(dstAdr, vSrc, 0);
+            break;
+        default:
+            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+    }
 }
