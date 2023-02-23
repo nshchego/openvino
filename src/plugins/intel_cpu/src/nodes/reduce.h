@@ -91,8 +91,8 @@ private:
     dnnl::memory prc_mem;
     std::vector<uint8_t> vec_reduceDH_prc;
 
-    std::shared_ptr<kernel::JitReduceKernelBase> reduceKernel;
-    std::shared_ptr<kernel::JitReduceKernelBase> reducePostKernel;
+    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduceKernel;
+    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReducePostCallArgs>> reducePostKernel;
 
     static const std::map<const ov::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ov::Node>& op, Reduce& node)>> initializers;
 

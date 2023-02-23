@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "jit_kernel_base.hpp"
 #include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
@@ -47,17 +48,16 @@ struct JitReducePostCallArgs {
     const void** post_op_data;
 };
 
-struct JitReduceKernelBase : public dnnl::impl::cpu::x64::jit_generator {
-    template <class CallArgs>
+template<typename CallArgs>
+struct JitReduceKernelBase : public JitKernelBase {
     void (*kernel_func)(const CallArgs *);
 
-    template <class CallArgs>
     void operator()(const CallArgs *args) {
         assert(kernel_func);
         kernel_func(args);
     }
 
-    explicit JitReduceKernelBase(const JitReduceConfigParams &jcp, const char *name) : jit_generator(name), kernel_func(nullptr), jcp(jcp) {
+    explicit JitReduceKernelBase(const JitReduceConfigParams &jcp, const char *name) : JitKernelBase(name), kernel_func(nullptr), jcp(jcp) {
         if (jcp.src_prc.size() <= 4) {
             exec_prc = InferenceEngine::Precision::FP32;
         } else if (jcp.src_prc.size() == 8) {
@@ -67,28 +67,27 @@ struct JitReduceKernelBase : public dnnl::impl::cpu::x64::jit_generator {
 
     virtual ~JitReduceKernelBase() = default;
 
-    virtual dnnl::impl::status_t create_kernel() override;
+    virtual dnnl::impl::status_t create_kernel() override {
+        const auto code = jit_generator::create_kernel();
+        if (code != dnnl::impl::status::success) {
+            IE_THROW() << "Could not create kernel. Error code: " << std::to_string(code) << ". " <<
+                       "Xbyak error code: " << Xbyak::ConvertErrorToString(Xbyak::GetError());
+        }
+        kernel_func = (decltype(kernel_func))jit_ker();
+        return code;
+    }
 
 protected:
-    void load_vector(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const InferenceEngine::Precision &src_prc);
-
-    void load_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Address &op, const InferenceEngine::Precision &src_prc);
-
-    void store_vector(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc);
-
-    void store_scalar(const Xbyak::Address &op, const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc);
-
     JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
-    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
 };
 
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-struct JitReduceKernel : public JitReduceKernelBase {
+struct JitReduceKernel : public JitReduceKernelBase<JitReduceCallArgs> {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReduceKernel)
 
-    explicit JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase(jcp, jit_name()) {}
+    explicit JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase<JitReduceCallArgs>(jcp, jit_name()) {}
 
     void generate() override;
 
@@ -138,6 +137,7 @@ private:
 
     Xbyak::Label l_table;
 
+    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> exp_injector;
 
     void reduce_main();
@@ -191,11 +191,11 @@ private:
 };
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-struct JitReducePostKernel : public JitReduceKernelBase {
+struct JitReducePostKernel : public JitReduceKernelBase<JitReducePostCallArgs> {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReducePostKernel)
 
     explicit JitReducePostKernel(const JitReduceConfigParams &jcp, const dnnl_primitive_attr &attr)
-        : JitReduceKernelBase(jcp, jit_name()), attr(attr) {}
+        : JitReduceKernelBase<JitReducePostCallArgs>(jcp, jit_name()), attr(attr) {}
 
     void generate() override;
 

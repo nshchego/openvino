@@ -9,6 +9,7 @@
 
 namespace ov {
 namespace intel_cpu {
+namespace kernel {
 
 #define getReg64() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
 #define getReg32() RegistersPool::Reg<Xbyak::Reg32>(registersPool)
@@ -135,6 +136,28 @@ public:
                   const bool useMask  = true,
                   const bool zeroFill = false);
 
+
+    void loadVector(const Xbyak::Xmm &vDst,
+                    const Xbyak::Address &srcAdr,
+                    const InferenceEngine::Precision &dstPrc,
+                    const InferenceEngine::Precision &srcPrc,
+                    bool broadcast = false);
+
+    void loadScalar(const Xbyak::Xmm &vDst,
+                    const Xbyak::Address &srcAdr,
+                    const InferenceEngine::Precision &dstPrc,
+                    const InferenceEngine::Precision &srcPrc);
+
+    void storeVector(const Xbyak::Address &dstAdr,
+                     const Xbyak::Xmm &vSrc,
+                     const InferenceEngine::Precision &dstPrc,
+                     const InferenceEngine::Precision &srcPrc);
+
+    void storeScalar(const Xbyak::Address &dstAdr,
+                     const Xbyak::Xmm &vSrc,
+                     const InferenceEngine::Precision &dstPrc,
+                     const InferenceEngine::Precision &srcPrc);
+
 protected:
     inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {
         return dnnl::impl::cpu::x64::mayiuse(isa);
@@ -155,5 +178,6 @@ protected:
     };
 };
 
+} // namespace kernel
 } // namespace intel_cpu
 } // namespace ov
