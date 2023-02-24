@@ -38,6 +38,8 @@
 #include "dnnl_postops_composer.h"
 #include "graph_context.h"
 
+#define THROW_CPU_NODE_ERR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
+
 namespace ov {
 namespace intel_cpu {
 
@@ -411,13 +413,13 @@ public:
         return originalOutputPrecisions;
     }
 
-    InferenceEngine::Precision getOriginalInputPrecisionAtPort(size_t port) const {
+    const InferenceEngine::Precision &getOriginalInputPrecisionAtPort(size_t port) const {
         if (originalInputPrecisions.size() <= port) {
             IE_THROW() << "Incorrect input port number for node " << getName();
         }
         return originalInputPrecisions[port];
     }
-    InferenceEngine::Precision getOriginalOutputPrecisionAtPort(size_t port) const {
+    const InferenceEngine::Precision &getOriginalOutputPrecisionAtPort(size_t port) const {
         if (originalOutputPrecisions.size() <= port) {
             IE_THROW() << "Incorrect output port number for node " << getName();
         }
@@ -554,8 +556,8 @@ protected:
 
     std::string originalLayers;  // contains names of the original layers separated by comma
 
-    Node(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr ctx, const ShapeInferFactory& shapeInferFactory);
-    Node(const std::string& type, const std::string& name, const GraphContext::CPtr ctx);
+    Node(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory);
+    Node(const std::string& type, const std::string& name, const GraphContext::CPtr& ctx);
 
     int selectedPrimitiveDescriptorIndex = -1;
     bool permanent = false;
@@ -707,7 +709,7 @@ class Node::NodesFactory : public openvino::cc::Factory<Type,
 public:
     NodesFactory();
 
-    Node* create(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Node* create(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr& context);
 };
 
 template<typename NodeType>

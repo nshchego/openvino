@@ -174,6 +174,6 @@ private:
     void hwShiftPs2dq(const Vmm& vDst, const Vmm& vHCoord, const Vmm& vWCoord, const Vmm& vWidth);
 };
 
-}   // kernel
+}   // namespace kernel
 }   // namespace intel_cpu
 }   // namespace ov
