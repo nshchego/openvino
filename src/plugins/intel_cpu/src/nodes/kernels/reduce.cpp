@@ -338,7 +338,7 @@ void JitReduceKernel<isa>::reduce_kernel() {
     Label reduce_batch_label;
     Label reduce_batch_end_label;
 
-    const int step = vlen / jcp.src_prc.size() < 8 ? 8 : vlen / jcp.src_prc.size();
+    const int step = vlen / exec_prc.size() < 8 ? 8 : vlen / exec_prc.size();
     cmp(reg_work_batch, 1);
     je(reduce_label, T_NEAR);
 
@@ -448,7 +448,7 @@ template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const Precision &src_prc) {
     sub(rsp, vlen);
     uni_vmovdqu(ptr[rsp], vmm_index);
-    int repeats = vlen / sizeof(float);
+    int repeats = vlen / exec_prc.size();
     for (size_t i = 0; i < repeats; i++) {
         mov(reg_tmp_64.cvt32(), ptr[rsp + i * sizeof(int)]);
         Address table_idx = ptr[reg_src + offset + reg_tmp_64];
@@ -595,7 +595,7 @@ void JitReduceKernel<isa>::reduce_main_loop() {
     Label reduce_loop_label;
     Label reduce_loop_end_label;
 
-    int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
+    int step = vlen / exec_prc.size() < 8 ? 8 : vlen / exec_prc.size();
     L(reduce_loop_label);
     {
         cmp(reg_work_amount, step);
@@ -806,7 +806,7 @@ void JitReduceKernel<isa>::horiz_ps(const Xmm &xmm, const Operand &op) {
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::prepare_aux_table() {
     auto broadcast_int = [&](int val) {
-        for (size_t d = 0; d < vlen / sizeof(float); ++d) {
+        for (size_t d = 0; d < vlen / exec_prc.size(); ++d) {
             dd(val);
         }
     };
@@ -929,7 +929,7 @@ void JitReducePostKernel<isa>::reduce_post_main() {
         Label reduce_loop_label;
         Label reduce_loop_end_label;
 
-        int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
+        int step = vlen / exec_prc.size() < 8 ? 8 : vlen / exec_prc.size();
         L(reduce_loop_label);
         {
             cmp(reg_work_amount, step);
@@ -968,7 +968,7 @@ void JitReducePostKernel<isa>::reduce_post_main() {
             Label reduce_loop_label;
             Label reduce_loop_end_label;
 
-            int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
+            int step = vlen / exec_prc.size() < 8 ? 8 : vlen / exec_prc.size();
             L(reduce_loop_label);
             {
                 cmp(reg_work_amount, step);
@@ -985,17 +985,17 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                     reduce_map_kernel(vmm_dst);
                     if (attr.post_ops_.len() != 0) {
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
-                            add(reg_oc_off, 4 * sizeof(float));
+                            add(reg_oc_off, 4 * exec_prc.size());
                         apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
-                            sub(reg_oc_off, 4 * sizeof(float));
+                            sub(reg_oc_off, 4 * exec_prc.size());
                     }
                     storeVector(ptr[reg_dst + 4 * jcp.dst_prc.size()], vmm_dst, jcp.dst_prc, exec_prc);
                 }
 
                 add(reg_dst, step * jcp.dst_prc.size());
                 if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
-                    add(reg_oc_off, step * sizeof(float));
+                    add(reg_oc_off, step * exec_prc.size());
                 sub(reg_work_amount, step);
 
                 jmp(reduce_loop_label, T_NEAR);
@@ -1006,7 +1006,7 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                 Label reduce_loop_label;
                 Label reduce_loop_end_label;
 
-                int step = vlen / sizeof(float) < 8 ? 8 : vlen / sizeof(float);
+                int step = vlen / exec_prc.size() < 8 ? 8 : vlen / exec_prc.size();
                 L(reduce_loop_label);
                 {
                     cmp(reg_work_amount, step);
@@ -1019,16 +1019,16 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                     if (isa == x64::sse41) {
                         loadVector(vmm_dst, ptr[reg_dst + 4 * jcp.dst_prc.size()], exec_prc, jcp.dst_prc);
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
-                            add(reg_oc_off, 4 * sizeof(float));
+                            add(reg_oc_off, 4 * exec_prc.size());
                         apply_post_ops(jcp.dst_prc, jcp.layout == ReduceLayoutType::reduce_ncsp);
                         if (jcp.layout != ReduceLayoutType::reduce_ncsp)
-                            sub(reg_oc_off, 4 * sizeof(float));
+                            sub(reg_oc_off, 4 * exec_prc.size());
                         storeVector(ptr[reg_dst + 4 * jcp.dst_prc.size()], vmm_dst, jcp.dst_prc, exec_prc);
                     }
 
                     add(reg_dst, step * jcp.dst_prc.size());
                     if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
-                        add(reg_oc_off, step * sizeof(float));
+                        add(reg_oc_off, step * exec_prc.size());
                     sub(reg_work_amount, step);
 
                     jmp(reduce_loop_label, T_NEAR);
@@ -1070,7 +1070,7 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
 
             add(reg_dst, step * jcp.dst_prc.size());
             if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
-                add(reg_oc_off, step * sizeof(float));
+                add(reg_oc_off, step * exec_prc.size());
             sub(reg_work_amount, step);
 
             jmp(reduce_loop_label, T_NEAR);
@@ -1096,7 +1096,7 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
 
                 add(reg_dst, step * jcp.dst_prc.size());
                 if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0)
-                    add(reg_oc_off, step * sizeof(float));
+                    add(reg_oc_off, step * exec_prc.size());
                 sub(reg_work_amount, step);
 
                 jmp(reduce_loop_label, T_NEAR);

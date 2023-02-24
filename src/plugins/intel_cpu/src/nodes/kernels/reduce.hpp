@@ -67,7 +67,7 @@ struct JitReduceKernelBase : public JitKernelBase {
 
     virtual ~JitReduceKernelBase() = default;
 
-    virtual dnnl::impl::status_t create_kernel() override {
+    dnnl::impl::status_t create_kernel() override {
         const auto code = jit_generator::create_kernel();
         if (code != dnnl::impl::status::success) {
             IE_THROW() << "Could not create kernel. Error code: " << std::to_string(code) << ". " <<

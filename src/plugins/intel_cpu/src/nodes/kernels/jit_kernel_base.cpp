@@ -788,7 +788,7 @@ void JitKernelBase::storeVector(const Address &dstAdr,
             }
             break;
         case Precision::BF16:
-//            TODO: uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
+            // TODO: uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
             vmovdqu16(dstAdr, ymmSrc);
             break;
         case Precision::I16:
