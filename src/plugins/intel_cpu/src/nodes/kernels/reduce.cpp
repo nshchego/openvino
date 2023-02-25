@@ -411,6 +411,28 @@ void JitReduceKernel<isa>::reduce_batch() {
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_gather(const Vmm &vmm_dst, int offset) {
     switch (jcp.src_prc) {
+        case Precision::FP64:
+        case Precision::I64:
+            if (isa == x64::avx512_core) {
+                kxnord(k_mask, k_mask, k_mask);
+                if (jcp.src_prc == Precision::FP64) {
+                    vgatherdpd(vmm_src | k_mask, ptr[reg_src + offset + vmm_idx]);
+                } else {
+                    vpgatherdq(vmm_src | k_mask, ptr[reg_src + offset + vmm_idx]);
+                    uni_vcvtdq2ps(vmm_src, vmm_src);
+                }
+            } else if (isa == x64::avx2) {
+                uni_vpcmpeqd(vmm_mask, vmm_mask, vmm_mask);
+                if (jcp.src_prc == Precision::FP32) {
+                    vgatherdpd(vmm_src, ptr[reg_src + offset + vmm_idx], vmm_mask);
+                } else {
+                    vpgatherdq(vmm_src, ptr[reg_src + offset + vmm_idx], vmm_mask);
+                    uni_vcvtdq2ps(vmm_src, vmm_src);
+                }
+            } else {
+                pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_prc);
+            }
+            break;
         case Precision::FP32:
         case Precision::I32:
             if (isa == x64::avx512_core) {
@@ -814,12 +836,21 @@ void JitReduceKernel<isa>::prepare_aux_table() {
     align(64);
     L(l_table);
 
-    broadcast_int(aux_vals.float_one);
-    broadcast_int(aux_vals.float_abs);
-    broadcast_int(aux_vals.float_min);
-    broadcast_int(aux_vals.float_max);
-    broadcast_int(aux_vals.int32_min);
-    broadcast_int(aux_vals.int32_max);
+    if (exec_prc == Precision::FP32) {
+        broadcast_int(aux_vals.float_one);
+        broadcast_int(aux_vals.float_abs);
+        broadcast_int(aux_vals.float_min);
+        broadcast_int(aux_vals.float_max);
+        broadcast_int(aux_vals.int32_min);
+        broadcast_int(aux_vals.int32_max);
+    } else if (exec_prc == Precision::FP64) {
+        broadcast_int(aux_vals.float_one);
+        broadcast_int(aux_vals.float_abs);
+        broadcast_int(aux_vals.float_min);
+        broadcast_int(aux_vals.float_max);
+        broadcast_int(aux_vals.int32_min);
+        broadcast_int(aux_vals.int32_max);
+    }
 }
 
 
@@ -1152,12 +1183,13 @@ void JitReducePostKernel<isa>::apply_post_ops(const Precision &dst_prc, bool is_
 
 template <x64::cpu_isa_t isa>
 void JitReducePostKernel<isa>::reduce_map_kernel(const Vmm &vmm_dst) {
-    if (jcp.reduce_mode == Algorithm::ReduceMean)
+    if (jcp.reduce_mode == Algorithm::ReduceMean) {
         uni_vdivps(vmm_dst, vmm_dst, vmm_aux);
-    else if (jcp.reduce_mode == Algorithm::ReduceL2)
+    } else if (jcp.reduce_mode == Algorithm::ReduceL2) {
         uni_vsqrtps(vmm_dst, vmm_dst);
-    else if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp)
+    } else if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
         log_injector->compute_vector_range(vmm_dst.getIdx(), vmm_dst.getIdx() + 1);
+    }
 }
 
 template <x64::cpu_isa_t isa>

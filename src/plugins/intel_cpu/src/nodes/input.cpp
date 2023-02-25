@@ -230,7 +230,7 @@ jit_has_subnormals_base::fn_t jit_has_subnormals_function() {
 
 }   // namespace
 
-Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, PassThroughShapeInferFactory()) {
     if (!one_of(op->get_type_info(),
             v0::Parameter::get_type_info_static(),
@@ -378,7 +378,7 @@ Input::Input(const Shape& shape,
              const InferenceEngine::Precision& prc,
              const std::string& name,
              const std::string& type,
-             const GraphContext::CPtr context)
+             const GraphContext::CPtr& context)
     : Node(type, name, context) {
     constant = ConstantType::NoConst;
     if (getType() == Type::Input) {
@@ -390,7 +390,7 @@ Input::Input(const Shape& shape,
     }
 }
 
-Input::Input(MemoryDescPtr memDesc, const std::string& name, const std::string& type, const GraphContext::CPtr context)
+Input::Input(const MemoryDescPtr& memDesc, const std::string& name, const std::string& type, const GraphContext::CPtr& context)
     : Input(memDesc->getShape(), memDesc->getPrecision(), name, type, context) {
     extMemDesc = memDesc;
 }

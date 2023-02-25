@@ -889,7 +889,7 @@ void Reduce::reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr)
 
 inline void Reduce::reduce_kernel_process(const uint8_t *in_p, uint8_t *out_p, size_t work_amount,
                                                     size_t reduce_w, size_t work_batch, const int *tab_idx) {
-printf("reduce_kernel_process work_amount: %ld\n", work_amount);
+//printf("reduce_kernel_process work_amount: %ld\n", work_amount);
     auto arg = JitReduceCallArgs();
     arg.src = static_cast<const void *>(in_p);
     arg.idx = tab_idx;
@@ -903,35 +903,34 @@ printf("reduce_kernel_process work_amount: %ld\n", work_amount);
 }
 
 inline void Reduce::reduce_kernel_post_process(uint8_t *out_ptr) {
-    return;
-//    const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
-//    const float divisor = static_cast<float>(integerDivisor);
-//    if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
-//        parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
-//            uint8_t *out_p = out_ptr + (ob * OC + oc) * OD * OH * OW * dst_data_size;
-//            auto arg = JitReducePostCallArgs();
-//            arg.dst = static_cast<void *>(out_p);
-//            arg.oc_off = layout == ReduceLayoutType::reduce_nspc ? 0 : oc * sizeof(float);
-//            arg.channel_size = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
-//            arg.work_amount = OD * OH * OW;
-//            arg.divisor = &divisor;
-//            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
-//            (*reducePostKernel)(&arg);
-//        });
-//    } else {
-//        size_t OCB = div_up(OC, blk_size);
-//        parallel_for2d(OB, OCB, [&](size_t ob, size_t ocb) {
-//            uint8_t *out_p = out_ptr + (ob * OCB + ocb) * OD * OH * OW * blk_size * dst_data_size;
-//            auto arg = JitReducePostCallArgs();
-//            arg.dst = static_cast<void *>(out_p);
-//            arg.reduce_c = ReduceC ? 1 : 0;
-//            arg.oc_off = ocb * blk_size * sizeof(float);
-//            arg.work_amount = OD * OH * OW * blk_size;
-//            arg.divisor = &divisor;
-//            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
-//            (*reducePostKernel)(&arg);
-//        });
-//    }
+    const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
+    const float divisor = static_cast<float>(integerDivisor);
+    if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
+        parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
+            uint8_t *out_p = out_ptr + (ob * OC + oc) * OD * OH * OW * dst_data_size;
+            auto arg = JitReducePostCallArgs();
+            arg.dst = static_cast<void *>(out_p);
+            arg.oc_off = layout == ReduceLayoutType::reduce_nspc ? 0 : oc * sizeof(float);
+            arg.channel_size = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
+            arg.work_amount = OD * OH * OW;
+            arg.divisor = &divisor;
+            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
+            (*reducePostKernel)(&arg);
+        });
+    } else {
+        size_t OCB = div_up(OC, blk_size);
+        parallel_for2d(OB, OCB, [&](size_t ob, size_t ocb) {
+            uint8_t *out_p = out_ptr + (ob * OCB + ocb) * OD * OH * OW * blk_size * dst_data_size;
+            auto arg = JitReducePostCallArgs();
+            arg.dst = static_cast<void *>(out_p);
+            arg.reduce_c = ReduceC ? 1 : 0;
+            arg.oc_off = ocb * blk_size * sizeof(float);
+            arg.work_amount = OD * OH * OW * blk_size;
+            arg.divisor = &divisor;
+            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
+            (*reducePostKernel)(&arg);
+        });
+    }
 }
 
 void Reduce::nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {

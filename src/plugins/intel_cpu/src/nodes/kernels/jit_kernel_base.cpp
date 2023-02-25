@@ -586,7 +586,7 @@ void JitKernelBase::loadVector(const Xmm &vDst,
     Ymm ymmDst = Ymm(vDst.getIdx());
 
     if (broadcast) {
-        loadScalar(xmmDst, srcAdr, srcPrc, dstPrc);
+        loadScalar(xmmDst, srcAdr, dstPrc, srcPrc);
         if (srcPrc.size() == 4) {
             uni_vbroadcastss(vDst, xmmDst);
         } else if (srcPrc.size() == 8) {
@@ -602,11 +602,19 @@ void JitKernelBase::loadVector(const Xmm &vDst,
             case Precision::I32:
                 if (dstPrc == Precision::I32) {
                     uni_vmovups(vDst, srcAdr);
+                } if (dstPrc == Precision::FP64) {
+                    vcvtdq2pd(vDst, srcAdr);
                 }
                 break;
             case Precision::I64:
                 if (dstPrc == Precision::I64 || dstPrc == Precision::I32) {
                     uni_vmovups(vDst, srcAdr);
+                } else if (dstPrc == Precision::FP64) {
+                    if (x64::mayiuse(x64::avx512_core)) {
+                        vcvtqq2pd(vDst, srcAdr);
+                    } else {
+                        // TODO
+                    }
                 }
                 break;
             case Precision::BF16:
@@ -637,8 +645,10 @@ void JitKernelBase::loadVector(const Xmm &vDst,
                     } else {
                         // TODO
                     }
-                } else if (srcPrc != Precision::FP32 && srcPrc != Precision::BF16) {
+                } else if (srcPrc == Precision::I32) {
                     uni_vcvtdq2ps(vDst, srcAdr);
+                } else if (srcPrc != Precision::FP32 && srcPrc != Precision::BF16) {
+                    uni_vcvtdq2ps(vDst, vDst);
                 }
                 break;
             case Precision::I32:
@@ -653,6 +663,7 @@ void JitKernelBase::loadVector(const Xmm &vDst,
                 }
                 break;
             case Precision::I64:
+            case Precision::FP64:
                 break;
             default:
                 IE_THROW() << "Unsupported destination precision: " << dstPrc;
@@ -666,11 +677,23 @@ void JitKernelBase::loadScalar(const Xmm &vDst,
                                const InferenceEngine::Precision &srcPrc) {
     switch (srcPrc) {
         case Precision::I64:
-            uni_vmovsd(vDst, srcAdr);
+            if (dstPrc == Precision::I64) {
+                uni_vmovsd(vDst, srcAdr);
+            } else if (dstPrc == Precision::FP64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtqq2pd(vDst, srcAdr); // TODO: bcst
+                } else {
+                    // TODO
+                }
+            }
             break;
         case Precision::FP32:
         case Precision::I32:
-            uni_vmovss(vDst, srcAdr);
+            if (dstPrc == Precision::FP64) {
+                vcvtdq2pd(vDst, srcAdr); // TODO: bcst
+            } else {
+                uni_vmovss(vDst, srcAdr);
+            }
             break;
         case Precision::BF16:
             uni_vpinsrw(vDst, vDst, srcAdr, 0);
@@ -720,6 +743,7 @@ void JitKernelBase::loadScalar(const Xmm &vDst,
             }
             break;
         case Precision::I64:
+        case Precision::FP64:
             break;
         default:
             IE_THROW() << "Unsupported destination precision: " << dstPrc;
@@ -747,6 +771,17 @@ void JitKernelBase::storeVector(const Address &dstAdr,
                 uni_vcvtps2dq(vSrc, vSrc);
             }
             break;
+        case Precision::FP64:
+            if (dstPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtpd2qq(vSrc, vSrc);
+                } else {
+                    // TODO
+                }
+            } else if (dstPrc == Precision::I32) {
+                vcvtpd2dq(ymmSrc, vSrc);
+            }
+            break;
         case Precision::I32:
             if (dstPrc == Precision::FP32 || dstPrc == Precision::BF16) {
                 uni_vcvtdq2ps(vSrc, vSrc);
@@ -759,6 +794,12 @@ void JitKernelBase::storeVector(const Address &dstAdr,
                 } else {
                     // TODO
                 }
+            } else if (dstPrc == Precision::FP64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtqq2pd(vSrc, vSrc);
+                } else {
+                    // TODO
+                }
             }
             break;
         default:
@@ -766,6 +807,8 @@ void JitKernelBase::storeVector(const Address &dstAdr,
     }
 
     switch (dstPrc) {
+        case Precision::FP64:
+            uni_vmovups(dstAdr, vSrc);
         case Precision::FP32:
             if (srcPrc == Precision::I64) {
                 uni_vmovups(dstAdr, ymmSrc);
@@ -783,6 +826,8 @@ void JitKernelBase::storeVector(const Address &dstAdr,
                 } else {
                     // TODO
                 }
+            } else if (srcPrc == Precision::FP64) {
+                uni_vmovups(dstAdr, ymmSrc);
             } else {
                 uni_vmovups(dstAdr, vSrc);
             }
@@ -880,6 +925,19 @@ void JitKernelBase::storeScalar(const Address &dstAdr,
                 uni_vcvtps2dq(vSrc, vSrc);
             }
             break;
+        case Precision::FP64:
+            if (dstPrc == Precision::FP64) {
+                uni_vmovsd(dstAdr, vSrc);
+            } else if (dstPrc == Precision::I64) {
+                if (x64::mayiuse(x64::avx512_core)) {
+                    vcvtpd2qq(vSrc, vSrc);
+                } else {
+                    // TODO
+                }
+            } else if (dstPrc == Precision::I32) {
+                vcvtpd2dq(vSrc, vSrc);
+            }
+            break;
         case Precision::I32:
             if (dstPrc == Precision::FP32 || dstPrc == Precision::BF16) {
                 uni_vcvtdq2ps(vSrc, vSrc);
@@ -907,6 +965,8 @@ void JitKernelBase::storeScalar(const Address &dstAdr,
     switch (dstPrc) {
         case Precision::I64:
             uni_vmovsd(dstAdr, vSrc);
+            break;
+        case Precision::FP64:
             break;
         case Precision::FP32:
         case Precision::I32:
