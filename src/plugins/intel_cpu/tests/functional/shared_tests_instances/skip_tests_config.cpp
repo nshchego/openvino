@@ -81,8 +81,8 @@ std::vector<std::string> disabledTestPatterns() {
         // Issue: 72021 Unreasonable abs_threshold for comparing bf16 results
         R"(.*smoke_Reduce.*type=(Prod|Min).*netPRC=(BF|bf)16.*)",
         // TODO: 56520 Accuracy mismatch
-        R"(.*ReduceOpsLayerTest.*type=Mean_.*netPRC=(I64|I32).*)",
-        R"(.*ReduceOpsLayerTest.*type=Mean_.*netPRC=U64.*)",
+//        R"(.*ReduceOpsLayerTest.*type=Mean_.*netPRC=(I64|I32).*)",
+//        R"(.*ReduceOpsLayerTest.*type=Mean_.*netPRC=U64.*)",
         // Not implemented yet:
         R"(.*Behavior.*ExecutableNetworkBaseTest.*canSetConfigToExecNet.*)",
         R"(.*Behavior.*OVCompiledModelBaseTest.*canSetConfigToCompiledModel.*)",
