@@ -41,7 +41,7 @@ private:
     void reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr);
     inline void reduce_kernel_process(const uint8_t *in_p, uint8_t *out_p, size_t work_amount,
                                       size_t reduce_w = 2, size_t work_batch = 1, const int *tab_idx = NULL);
-    inline void reduce_kernel_post_process(uint8_t *out_ptr);
+    inline void reduceKernelPostProcess(uint8_t *out_ptr);
     inline void initDstData(uint8_t *out_ptr, size_t dst_size);
     inline void create_working_memory();
     inline void create_DH_working_memory();
@@ -57,7 +57,7 @@ private:
     std::vector<int64_t> update_src_dims();
     bool canApplyJIT(const InferenceEngine::Precision &input_prec, const InferenceEngine::Precision &output_prec) const;
 
-    size_t blk_size;
+    size_t blockLen;
     size_t dst_size;
     size_t prc_size;
     static constexpr size_t REDUCE_DATA = 0;
@@ -73,7 +73,7 @@ private:
     size_t IB, IC, ID, IH, IW;
     size_t OB, OC, OD, OH, OW;
     size_t PD, PW;
-    size_t src_data_size, dst_data_size, prc_data_size;
+    size_t srcDataSize, dstDataSize, prcDataSize;
     size_t reduce_stride;
     kernel::ReduceLayoutType layout;
     InferenceEngine::Precision outputPrc;
@@ -95,8 +95,6 @@ private:
     std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReducePostCallArgs>> reducePostKernel;
 
     static const std::map<const ov::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ov::Node>& op, Reduce& node)>> initializers;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

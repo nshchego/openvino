@@ -7,7 +7,7 @@
 
 #include "ie_parallel.hpp"
 #include "gather.h"
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/opsets/opset1.hpp>
 #include "common/cpu_memcpy.h"
 #include <utils/general_utils.h>
 #include "kernels/gather_uni_kernel.hpp"

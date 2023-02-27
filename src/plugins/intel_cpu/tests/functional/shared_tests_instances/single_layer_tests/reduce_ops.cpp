@@ -11,6 +11,8 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 const std::vector<InferenceEngine::Precision> netPrecisions = {
+        InferenceEngine::Precision::FP64,
+        
         InferenceEngine::Precision::FP32,
         InferenceEngine::Precision::FP16,
         InferenceEngine::Precision::I64,

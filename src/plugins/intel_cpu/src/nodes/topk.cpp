@@ -11,7 +11,7 @@
 #include <dnnl_extension_utils.h>
 #include "emitters/jit_load_store_emitters.hpp"
 #include "ie_parallel.hpp"
-#include <ngraph/op/topk.hpp>
+#include <openvino/op/topk.hpp>
 #include <ie_ngraph_utils.hpp>
 #include <algorithm>
 
@@ -19,7 +19,7 @@
 #include <cpu/x64/jit_uni_eltwise.hpp>
 #include "common/cpu_memcpy.h"
 
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/opsets/opset1.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -1788,30 +1788,29 @@ private:
     }
 };
 
-bool TopK::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool TopK::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto topKOp = ngraph::as_type_ptr<const ngraph::op::v1::TopK>(op);
+        const auto topKOp = ov::as_type_ptr<const ov::op::v1::TopK>(op);
         if (!topKOp) {
             errorMessage = "Node is not an instance of the TopK from the operations set v1 or v3";
             return false;
         }
 
         if (!isDynamicNgraphNode(op)) {
-            auto topKConst = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(topKOp->get_input_node_shared_ptr(TOPK_K));
-            if (!topKConst) {
+            if (topKOp->get_input_node_shared_ptr(TOPK_K)->get_type_info() != ov::opset1::Constant::get_type_info_static()) {
                 errorMessage = "Second tensor is not constant in static shape mode";
                 return false;
             }
         }
 
-        if (topKOp->get_mode() != ngraph::op::TopKMode::MAX &&
-                topKOp->get_mode() != ngraph::op::TopKMode::MIN) {
+        if (topKOp->get_mode() != ov::op::TopKMode::MAX &&
+                topKOp->get_mode() != ov::op::TopKMode::MIN) {
             errorMessage = "Unsupported mode.";
             return false;
         }
-        if (!one_of(topKOp->get_sort_type(), ngraph::op::TopKSortType::NONE,
-                                  ngraph::op::TopKSortType::SORT_VALUES,
-                                  ngraph::op::TopKSortType::SORT_INDICES)) {
+        if (!one_of(topKOp->get_sort_type(), ov::op::TopKSortType::NONE,
+                                  ov::op::TopKSortType::SORT_VALUES,
+                                  ov::op::TopKSortType::SORT_INDICES)) {
             errorMessage = "Unsupported sort type.";
             return false;
         }
@@ -1821,54 +1820,53 @@ bool TopK::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, s
     return true;
 }
 
-TopK::TopK(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, PortMask(TOPK_K))) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "TopK layer with name '" + getName() + "'";
-
-        auto topKOp = ngraph::as_type_ptr<ngraph::op::v1::TopK>(op);
-
-        auto in_dims = topKOp->get_input_partial_shape(TOPK_DATA);
-        auto out_dims = topKOp->get_output_partial_shape(TOPK_DATA);
-        auto out_idx_dims = topKOp->get_output_partial_shape(TOPK_INDEX);
-        auto in_dims_size = in_dims.size();
-
-        if (!isDynamicNgraphNode(op)) {
-            auto topKConst = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(topKOp->get_input_node_shared_ptr(TOPK_K));
-            if (!topKConst) {
-                IE_THROW() << errorPrefix <<  "gets non-constant second tensor in static shape mode!";
-            }
-        }
-
-        axis = topKOp->get_axis();
-        mode_max = topKOp->get_mode() == ngraph::op::TopKMode::MAX;
-        sort_index = topKOp->get_sort_type() == ngraph::op::TopKSortType::SORT_INDICES;
-
-        top_k = 0;
-        preset_params_done = false;
-        vec_idx_seq.clear();
-        vec_idx_block.clear();
-
-        if (inputShapes.size() != 2 || outputShapes.size() < 2)
-            IE_THROW() << errorPrefix << " gets incorrect number of input/output edges!";
-
-        if (getInputShapeAtPort(TOPK_DATA).getRank() != getOutputShapeAtPort(TOPK_DATA).getRank())
-            IE_THROW() << errorPrefix << " gets incorrect number of input/output dimensions!";
-
-        if (getInputShapeAtPort(TOPK_K).getRank() != 1)
-            IE_THROW() << errorPrefix << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
-
-        if (out_dims != out_idx_dims)
-            IE_THROW() << errorPrefix << " gets incorrect output tensor dimension sizes!";
-
-        if (axis < 0)
-            axis += in_dims_size;
-        if (axis < 0 || axis >= static_cast<int>(in_dims_size))
-            IE_THROW() << errorPrefix << " gets incorrect input parameters dimensions and axis number!";
-    } else {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
+
+    auto topKOp = ov::as_type_ptr<ov::op::v1::TopK>(op);
+
+    auto in_dims = topKOp->get_input_partial_shape(TOPK_DATA);
+    auto out_dims = topKOp->get_output_partial_shape(TOPK_DATA);
+    auto out_idx_dims = topKOp->get_output_partial_shape(TOPK_INDEX);
+    auto in_dims_size = in_dims.size();
+
+    axis = topKOp->get_axis();
+    mode_max = topKOp->get_mode() == ov::op::TopKMode::MAX;
+    sort_index = topKOp->get_sort_type() == ov::op::TopKSortType::SORT_INDICES;
+
+    if (auto topKL = ov::as_type<ov::opset1::Constant>(topKOp->get_input_node_ptr(TOPK_K))) {
+        if (topKL->get_element_type() == ov::element::i64) {
+            top_k = topKL->get_vector<int64_t>()[0];
+        } else if (topKL->get_element_type() == ov::element::i32) {
+            top_k = topKL->get_vector<int32_t>()[0];
+        }
+    } else {
+        top_k = 0;
+    }
+    preset_params_done = false;
+    vec_idx_seq.clear();
+    vec_idx_block.clear();
+
+    if (inputShapes.size() != 2 || outputShapes.size() < 2)
+        THROW_CPU_NODE_ERR << " gets incorrect number of input/output edges!";
+
+    if (getInputShapeAtPort(TOPK_DATA).getRank() != getOutputShapeAtPort(TOPK_DATA).getRank())
+        THROW_CPU_NODE_ERR << " gets incorrect number of input/output dimensions!";
+
+    if (getInputShapeAtPort(TOPK_K).getRank() != 1)
+        THROW_CPU_NODE_ERR << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
+
+    if (out_dims != out_idx_dims)
+        THROW_CPU_NODE_ERR << " gets incorrect output tensor dimension sizes!";
+
+    if (axis < 0)
+        axis += in_dims_size;
+    if (axis < 0 || axis >= static_cast<int>(in_dims_size))
+        THROW_CPU_NODE_ERR << " gets incorrect input parameters dimensions and axis number!";
 }
 
 void TopK::getSupportedDescriptors() {}
@@ -1898,9 +1896,13 @@ void TopK::initSupportedPrimitiveDescriptors() {
         Precision::U8
     };
 
+    Precision inLenPrc = getOriginalInputPrecisionAtPort(TOPK_K);
+    if (!one_of(inLenPrc, Precision::I32, Precision::I64)) {
+        inLenPrc = Precision::I32;
+    }
     Precision dataPrecision = getOriginalOutputPrecisionAtPort(TOPK_DATA);
     if (dataPrecision == Precision::BF16 && !mayiuse(avx512_core))
-        IE_THROW() << errorPrefix << " gets incorrect isa for BF16! AVX512 must be supported!";
+        THROW_CPU_NODE_ERR << " gets incorrect isa for BF16! AVX512 must be supported!";
     bool precisionSupported = std::find(std::begin(supportedPrecision), std::end(supportedPrecision), dataPrecision)
                                      != std::end(supportedPrecision);
     if (!precisionSupported) {
@@ -1919,7 +1921,7 @@ void TopK::initSupportedPrimitiveDescriptors() {
     };
 
     for (const auto &df : dataFomats) {
-        addSupportedPrimDesc({{df.first, dataPrecision}, {LayoutType::ncsp, Precision::I32}},
+        addSupportedPrimDesc({{df.first, dataPrecision}, {LayoutType::ncsp, inLenPrc}},
                              {{df.second, dataPrecision}, {df.second, Precision::I32}},
                              impl_type);
     }
@@ -1972,11 +1974,11 @@ void TopK::prepareParams() {
     auto &dstMemPtr = getChildEdgeAt(TOPK_DATA)->getMemoryPtr();
     auto &srcMemPtr = getParentEdgeAt(TOPK_DATA)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocated destination memory.";
+        THROW_CPU_NODE_ERR << " has not allocated destination memory.";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocate input memory.";
+        THROW_CPU_NODE_ERR << " has not allocate input memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << errorPrefix << " has nullable preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << " has nullable preferable primitive descriptor";
 
     src_dims = srcMemPtr->getDesc().getShape().getDims();
     dst_dims = dstMemPtr->getDesc().getShape().getDims();
@@ -1984,12 +1986,10 @@ void TopK::prepareParams() {
     if (isDynamicNode()) {
         const int src_k = reinterpret_cast<int *>(getParentEdgeAt(TOPK_K)->getMemoryPtr()->GetPtr())[0];
         if (src_k > src_dims[axis])
-            IE_THROW() << errorPrefix << " gets top_k out of range!";
+            THROW_CPU_NODE_ERR << " gets top_k out of range!";
         if (top_k != src_k) {
             top_k = src_k;
         }
-    } else {
-        top_k = reinterpret_cast<int *>(getParentEdgeAt(TOPK_K)->getMemoryPtr()->GetPtr())[0];
     }
 
     if (jit_mode) {
@@ -2046,11 +2046,7 @@ void TopK::prepareParams() {
 }
 
 void TopK::createPrimitive() {
-    if (inputShapesDefined() && isExecutable()) {
-        if (needPrepareParams())
-            prepareParams();
-        updateLastInputDims();
-    }
+    Node::createPrimitive();
 
     if (jit_mode) {
         if (!preset_params_done) {
@@ -2109,6 +2105,88 @@ void TopK::executeDynamicImpl(dnnl::stream strm) {
 }
 
 void TopK::execute(dnnl::stream strm) {
+// DEBUG
+//    std::cout << "\n[ INPUT 0 ]: size " << getParentEdgeAt(0)->getMemoryPtr()->GetSize()
+//        << "; originPrc: " << getOriginalInputPrecisionAtPort(0)
+//        << "; execPrc: " << getParentEdgeAt(0)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
+//     const int elPerVec = 64 / getOriginalInputPrecisionAtPort(0).size();
+
+//     void* firstData = getParentEdgeAt(0)->getMemoryPtr()->GetPtr();
+//     const auto dims = getParentEdgeAt(0)->getMemoryPtr()->getStaticDims();
+//     const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+//     for (int i = 0; i < blLen; i++) {
+//         if (i != 0 && i % elPerVec == 0) {
+//             std::cout << "| ";
+//         }
+//         if (getOriginalInputPrecisionAtPort(0) == Precision::FP64) {
+//             std::cout << reinterpret_cast<double *>(firstData)[i] << "; ";
+//         } else if (getOriginalInputPrecisionAtPort(0) == Precision::I64) {
+//             std::cout << reinterpret_cast<int64_t *>(firstData)[i] << "; ";
+//         } else if (getOriginalInputPrecisionAtPort(0) == Precision::I32) {
+//             std::cout << reinterpret_cast<int32_t *>(firstData)[i] << "; ";
+//         } else if (getOriginalInputPrecisionAtPort(0) == Precision::FP32) {
+//             std::cout << reinterpret_cast<float *>(firstData)[i] << "; ";
+//         } else if (getOriginalInputPrecisionAtPort(0) == Precision::U8) {
+//             std::cout << int(reinterpret_cast<uint8_t *>(firstData)[i]) << "; ";
+//         } else if (getOriginalInputPrecisionAtPort(0) == Precision::I8) {
+//             std::cout << int(reinterpret_cast<int8_t *>(firstData)[i]) << "; ";
+//         }
+//     }
+//     std::cout << std::endl;
+//
+//     if (getParentEdges().size() > 1) {
+//         std::cout << "[ INPUT 1 ] size: " << getParentEdgeAt(1)->getMemoryPtr()->GetSize()
+//               << "; originPrc: " << getOriginalInputPrecisionAtPort(1)
+//               << "; execPrc: " << getParentEdgeAt(1)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
+//
+//         const auto dims = getParentEdgeAt(1)->getMemoryPtr()->getStaticDims();
+//         const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+//         auto data = getParentEdgeAt(1)->getMemoryPtr()->GetPtr();
+//         auto execPrc = getParentEdgeAt(1)->getMemoryPtr()->getDesc().getPrecision();
+//         for (int i = 0; i < blLen; i++) {
+//             if (i != 0 && i % elPerVec == 0) {
+//                 std::cout << "| ";
+//             }
+//             if (execPrc == Precision::FP64) {
+//                 std::cout << reinterpret_cast<double *>(data)[i] << "; ";
+//             } else if (execPrc == Precision::I64) {
+//                 std::cout << reinterpret_cast<int64_t *>(data)[i] << "; ";
+//             } else if (execPrc == Precision::I32) {
+//                 std::cout << reinterpret_cast<int32_t *>(data)[i] << "; ";
+//             } else if (execPrc == Precision::FP32) {
+//                 std::cout << reinterpret_cast<float *>(data)[i] << "; ";
+//             } else if (execPrc == Precision::U8) {
+//                 std::cout << int(reinterpret_cast<uint8_t *>(data)[i]) << "; ";
+//             } else if (execPrc == Precision::I8) {
+//                 std::cout << int(reinterpret_cast<int8_t *>(data)[i]) << "; ";
+//             }
+//         }
+//         std::cout << std::endl;
+//     }
+//     if (getParentEdges().size() > 2) {
+//         std::cout << "INPUT 2: " << std::endl;
+//         std::cout << "Size: " << getParentEdgeAt(2)->getMemoryPtr()->GetSize() << std::endl;
+//
+//         const auto dims = getParentEdgeAt(2)->getMemoryPtr()->getStaticDims();
+//         const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+//         auto thrData = getParentEdgeAt(2)->getMemoryPtr()->GetPtr();
+//         for (int i = 0; i < blLen; i++) {
+//             if (i != 0 && i % elPerVec == 0) {
+//                 std::cout << "| ";
+//             }
+//             if (getOriginalInputPrecisionAtPort(1) == Precision::FP64) {
+//                 std::cout << reinterpret_cast<double*>(thrData)[i] << "; ";
+//             } else if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
+//                 std::cout << reinterpret_cast<int64_t*>(thrData)[i] << "; ";
+//             } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
+//                 std::cout << reinterpret_cast<int32_t*>(thrData)[i] << "; ";
+//             } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
+//                 std::cout << reinterpret_cast<float*>(thrData)[i] << "; ";
+//             }
+//         }
+//         std::cout << std::endl;
+//     }
+// DEBUG
     auto &srcMemPtr = getParentEdgeAt(TOPK_DATA)->getMemoryPtr();
     auto &dstMemPtr = getChildEdgeAt(TOPK_DATA)->getMemoryPtr();
     auto &dstIndexesMemPtr = getChildEdgeAt(TOPK_INDEX)->getMemoryPtr();
@@ -2126,9 +2204,67 @@ void TopK::execute(dnnl::stream strm) {
             auto out_idx_ptr = reinterpret_cast<int32_t *>(dst_idx);
             topk_ref(in_ptr, out_ptr, out_idx_ptr);
         } else {
-            IE_THROW() << errorPrefix <<  "only support plain layout on machine w/o sse42.";
+            THROW_CPU_NODE_ERR <<  "only support plain layout on machine w/o sse42.";
         }
     }
+
+// DEBUG
+//     std::cout << "[ OUTPUT 0 ]: size: " << getChildEdgeAt(0)->getMemoryPtr()->GetSize()
+//        << "; originPrc: " << getOriginalOutputPrecisionAtPort(0)
+//        << "; execPrc: " << getChildEdgeAt(0)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
+//
+//     const auto oDims = getChildEdgeAt(0)->getMemoryPtr()->getStaticDims();
+//     const auto oBlLen = std::accumulate(oDims.begin(), oDims.end(), 1, std::multiplies<Dim>());
+//     auto* dstData = getChildEdgeAt(0)->getMemoryPtr()->GetPtr();
+//     for (int i = 0; i < oBlLen; i++) {
+//         if (i != 0 && i % elPerVec  == 0) {
+//             std::cout << "| ";
+//         }
+//         if (getOriginalOutputPrecisionAtPort(0) == Precision::FP64) {
+//             std::cout << reinterpret_cast<double*>(dstData)[i] << "; ";
+//         } else if (getOriginalOutputPrecisionAtPort(0) == Precision::I64) {
+//             std::cout << reinterpret_cast<int64_t*>(dstData)[i] << "; ";
+//         } else if (getOriginalOutputPrecisionAtPort(0) == Precision::I32) {
+//             std::cout << reinterpret_cast<int32_t*>(dstData)[i] << "; ";
+//         } else if (getOriginalOutputPrecisionAtPort(0) == Precision::FP32) {
+//             std::cout << reinterpret_cast<float*>(dstData)[i] << "; ";
+//         } else if (getOriginalOutputPrecisionAtPort(0) == Precision::U8) {
+//             std::cout << int(reinterpret_cast<uint8_t *>(dstData)[i]) << "; ";
+//         } else if (getOriginalOutputPrecisionAtPort(0) == Precision::I8) {
+//             std::cout << int(reinterpret_cast<int8_t *>(dstData)[i]) << "; ";
+//         }
+//     }
+//     std::cout << std::endl << std::endl;
+
+//    if (getChildEdges().size() > 1) {
+//        std::cout << "[ OUTPUT 1 ]: size: " << getChildEdgeAt(1)->getMemoryPtr()->GetSize()
+//            << "; originPrc: " << getOriginalOutputPrecisionAtPort(1)
+//            << "; execPrc: " << getChildEdgeAt(1)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
+//
+//        const auto oDims = getChildEdgeAt(1)->getMemoryPtr()->getStaticDims();
+//        const auto oBlLen = std::accumulate(oDims.begin(), oDims.end(), 1, std::multiplies<Dim>());
+//        auto* dstData = getChildEdgeAt(1)->getMemoryPtr()->GetPtr();
+//        for (int i = 0; i < oBlLen; i++) {
+//            if (i != 0 && i % elPerVec  == 0) {
+//                std::cout << "| ";
+//            }
+//            if (getOriginalOutputPrecisionAtPort(1) == Precision::FP64) {
+//                std::cout << reinterpret_cast<double*>(dstData)[i] << "; ";
+//            } else if (getOriginalOutputPrecisionAtPort(1) == Precision::I64) {
+//                std::cout << reinterpret_cast<int64_t*>(dstData)[i] << "; ";
+//            } else if (getOriginalOutputPrecisionAtPort(1) == Precision::I32) {
+//                std::cout << reinterpret_cast<int32_t*>(dstData)[i] << "; ";
+//            } else if (getOriginalOutputPrecisionAtPort(1) == Precision::FP32) {
+//                std::cout << reinterpret_cast<float*>(dstData)[i] << "; ";
+//            } else if (getOriginalOutputPrecisionAtPort(1) == Precision::U8) {
+//                std::cout << int(reinterpret_cast<uint8_t *>(dstData)[i]) << "; ";
+//            } else if (getOriginalOutputPrecisionAtPort(1) == Precision::I8) {
+//                std::cout << int(reinterpret_cast<int8_t *>(dstData)[i]) << "; ";
+//            }
+//        }
+//        std::cout << std::endl << std::endl;
+//    }
+// DEBUG
 }
 
 void TopK::topk_process(const uint8_t *in_ptr, uint8_t *out_ptr, uint8_t *out_idx_ptr) {
