@@ -44,7 +44,7 @@ struct JitReducePostCallArgs {
     size_t reduce_c = 2;    // only used in blocked layout [1: reduce channel dimension] [0: reduce other dimension] [other value: N/A]
     size_t oc_off;          // offset in byte along channel on output tensor
     size_t channel_size;    // only for post ops fusion of nspc layout
-    const float *divisor;   // mean = sum / divisor
+    const void *divisor;    // mean = sum / divisor
     const void** post_op_data;
 };
 
@@ -75,6 +75,10 @@ struct JitReduceKernelBase : public JitKernelBase {
         }
         kernel_func = (decltype(kernel_func))jit_ker();
         return code;
+    }
+
+    const InferenceEngine::Precision &get_exec_prc() {
+        return exec_prc;
     }
 
 protected:
@@ -129,9 +133,12 @@ private:
     Xbyak::Xmm xmm_src  = Xbyak::Xmm(vmm_src.getIdx());
     Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
     Xbyak::Xmm xmm_zero = Xbyak::Xmm(vmm_zero.getIdx());
+    Xbyak::Xmm xmm_idx  = Xbyak::Xmm(vmm_idx.getIdx());
     Xbyak::Xmm xmm_aux1 = Xbyak::Xmm(5);
     Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(6);
     Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(7);
+    
+    Xbyak::Ymm ymm_idx  = Xbyak::Ymm(vmm_idx.getIdx());
 
     const Xbyak::Opmask &k_mask = k1;
 

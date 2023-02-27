@@ -42,6 +42,10 @@ public:
 
     void uni_vandps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
 
+    void uni_vandpd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+
+    void uni_vcmppd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op, const uint8_t imm);
+
     void uni_vandnps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {

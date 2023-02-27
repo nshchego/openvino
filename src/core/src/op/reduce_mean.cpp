@@ -46,6 +46,7 @@ bool evaluate_mean(const HostTensorPtr& arg, const HostTensorPtr& out, const Axi
         NGRAPH_TYPE_CASE(evaluate_mean, u64, arg, out, axes, keep_dims);
         NGRAPH_TYPE_CASE(evaluate_mean, f16, arg, out, axes, keep_dims);
         NGRAPH_TYPE_CASE(evaluate_mean, f32, arg, out, axes, keep_dims);
+        NGRAPH_TYPE_CASE(evaluate_mean, f64, arg, out, axes, keep_dims);
     default:
         rc = false;
         break;
@@ -77,6 +78,7 @@ bool op::v1::ReduceMean::has_evaluate() const {
     case ngraph::element::u64:
     case ngraph::element::f16:
     case ngraph::element::f32:
+    case ngraph::element::f64:
         return true;
     default:
         break;
