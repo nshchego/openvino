@@ -11,7 +11,7 @@
 #include <dnnl_extension_utils.h>
 #include "emitters/jit_load_store_emitters.hpp"
 #include "ie_parallel.hpp"
-#include <openvino/op/topk.hpp>
+// #include <openvino/op/topk.hpp>
 #include <ie_ngraph_utils.hpp>
 #include <algorithm>
 
@@ -2008,6 +2008,7 @@ void TopK::prepareParams() {
             top_k = src_k;
         }
     }
+    
 
     if (jit_mode) {
         if (!preset_params_done) {
