@@ -101,21 +101,21 @@ public:
 
     template<class T_IE, class T_NGRAPH>
     static void Compare(const T_NGRAPH *expected, const T_IE *actual, std::size_t size, float threshold, float abs_threshold = -1.f) {
- std::cout << "COMPARE layer_test_utils: " << std::endl;
- std::cout << "EXPECTED: " << std::endl;
- for (int i = 0; i < size; i++) {
-     if (i != 0 && i % 8  == 0)
-         std::cout << "| ";
-     std::cout << int(expected[i]) << "; ";
- }
- std::cout << std::endl;
- std::cout << "ACTUAL: " << std::endl;
- for (int i = 0; i < size; i++) {
-     if (i != 0 && i % 8  == 0)
-         std::cout << "| ";
-     std::cout << actual[i] << "; ";
- }
- std::cout << std::endl;
+//  std::cout << "COMPARE layer_test_utils: " << std::endl;
+//  std::cout << "EXPECTED: " << std::endl;
+//  for (int i = 0; i < size; i++) {
+//      if (i != 0 && i % 8  == 0)
+//          std::cout << "| ";
+//      std::cout << int(expected[i]) << "; ";
+//  }
+//  std::cout << std::endl;
+//  std::cout << "ACTUAL: " << std::endl;
+//  for (int i = 0; i < size; i++) {
+//      if (i != 0 && i % 8  == 0)
+//          std::cout << "| ";
+//      std::cout << actual[i] << "; ";
+//  }
+//  std::cout << std::endl;
         for (std::size_t i = 0; i < size; ++i) {
             const T_NGRAPH &ref = expected[i];
             const auto &res = actual[i];

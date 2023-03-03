@@ -82,6 +82,10 @@ struct JitReduceKernelBase : public JitKernelBase {
     }
 
 protected:
+    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+
+    void horiz_pd(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+
     JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
 };
@@ -139,6 +143,7 @@ private:
     Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(7);
     
     Xbyak::Ymm ymm_idx  = Xbyak::Ymm(vmm_idx.getIdx());
+    Xbyak::Ymm ymm_aux1 = Xbyak::Ymm(xmm_aux1.getIdx());
 
     const Xbyak::Opmask &k_mask = k1;
 
@@ -179,11 +184,13 @@ private:
 
     void store_dst_vector();
 
-    void horiz_reduce_store(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+    void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+    void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+
+    void horiz_store_pd(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
     void prepare_aux_table();
 
@@ -195,10 +202,10 @@ private:
         int int32_min = 0xcf000000; // -2^31 presented in float
         int int32_max = 0x4effffff; // 2^31-1 presented in float
 
-        int64_t double_one = 0x3f80000000000000; // 1.0
+        int64_t double_one = 0x3ff0000000000000; // 1.0
         int64_t double_abs = 0x7fffffffffffffff; // mask to make positive
-        int64_t double_min = 0xff7fffffffffffff; // double minimum
-        int64_t double_max = 0x7f7fffffffffffff; // double maximum
+        int64_t double_min = 0x0010000000000000; // double minimum
+        int64_t double_max = 0x7fefffffffffffff; // double maximum
         int64_t int64_min  = 0xcf00000000000000; // -2^31 presented in float
         int64_t int64_max  = 0x4effffffffffffff; // 2^31-1 presented in float
     } aux_vals;
@@ -252,6 +259,8 @@ private:
     Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(5);
     Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(6);
 
+    Xbyak::Ymm ymm_aux1 = Xbyak::Ymm(xmm_aux1.getIdx());
+
     std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
 
@@ -269,11 +278,13 @@ private:
 
     void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
 
-    void horiz_reduce_store(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+
+    void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
-    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+//    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 };
 
 }   // namespace kernel

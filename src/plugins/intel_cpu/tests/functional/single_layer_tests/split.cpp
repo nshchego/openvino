@@ -125,7 +125,8 @@ const std::vector<ElementType> netPrecisions = {
         ElementType::i8,
         ElementType::i32,
         ElementType::f32,
-        ElementType::bf16
+        ElementType::bf16,
+        ElementType::i64
 };
 
 const std::vector<std::vector<size_t>> outIndices3 = {{0, 1, 2}, {0, 1, 1, 0, 2}, {0, 0, 0, 2}};

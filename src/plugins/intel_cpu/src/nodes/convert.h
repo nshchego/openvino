@@ -50,8 +50,6 @@ private:
     MemoryDescPtr input;
     MemoryDescPtr output;
     InferenceEngine::Precision origPrc;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

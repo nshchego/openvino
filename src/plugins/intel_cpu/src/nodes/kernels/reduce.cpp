@@ -20,6 +20,71 @@ static inline bool isFloatCompatible(const Precision &type) {
     return Precision::FP32 == type || Precision::BF16 == type || Precision::FP64 == type;
 }
 
+
+template<typename CallArgs>
+void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm &xmm, const Operand &op) {
+    switch (jcp.reduce_mode) {
+        case Algorithm::ReduceAnd:
+            uni_vandps(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceL1:
+        case Algorithm::ReduceL2:
+        case Algorithm::ReduceLogSum:
+        case Algorithm::ReduceMean:
+        case Algorithm::ReduceSum:
+        case Algorithm::ReduceSumSquare:
+        case Algorithm::ReduceLogSumExp:
+            uni_vaddps(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceMax:
+            uni_vmaxps(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceMin:
+            uni_vminps(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceOr:
+            uni_vorps(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceProd:
+            uni_vmulps(xmm, xmm, op);
+            break;
+        default:
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+    }
+}
+
+template<typename CallArgs>
+void JitReduceKernelBase<CallArgs>::horiz_pd(const Xmm &xmm, const Operand &op) {
+    switch (jcp.reduce_mode) {
+        case Algorithm::ReduceAnd:
+            vandpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceL1:
+        case Algorithm::ReduceL2:
+        case Algorithm::ReduceLogSum:
+        case Algorithm::ReduceMean:
+        case Algorithm::ReduceSum:
+        case Algorithm::ReduceSumSquare:
+        case Algorithm::ReduceLogSumExp:
+            vaddpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceMax:
+            vmaxpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceMin:
+            vminpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceOr:
+            vorpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceProd:
+            vmulpd(xmm, xmm, op);
+            break;
+        default:
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+    }
+}
+
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::generate() {
     if (jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
@@ -190,16 +255,18 @@ inline void JitReduceKernel<isa>::reduce_main() {
                 uni_vpxor(vmm_dst, vmm_dst, vmm_dst);
                 break;
             case Algorithm::ReduceMax:
-                if (isFloatCompatible(jcp.dst_prc))
+                if (isFloatCompatible(jcp.dst_prc)) {
                     uni_vmovups(vmm_dst, table_val(2));
-                else
+                } else {
                     uni_vmovups(vmm_dst, table_val(4));
+                }
                 break;
             case Algorithm::ReduceMin:
-                if (isFloatCompatible(jcp.dst_prc))
+                if (isFloatCompatible(jcp.dst_prc)) {
                     uni_vmovups(vmm_dst, table_val(3));
-                else
+                } else {
                     uni_vmovups(vmm_dst, table_val(5));
+                }
                 break;
             default:
                 IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
@@ -212,7 +279,11 @@ inline void JitReduceKernel<isa>::reduce_main() {
         }
         // store
         // store after horizontal calculation and calculation with loaded original ptr[reg_dst]
-        horiz_reduce_store(vmm_dst, jcp.dst_prc, true);
+        if (exec_prc == Precision::FP32) {
+            horiz_reduce_store_ps(vmm_dst, jcp.dst_prc, true);
+        } else if (exec_prc == Precision::FP64) {
+            horiz_reduce_store_pd(vmm_dst, jcp.dst_prc, true);
+        }
 
         jmp(reduce_main_end_label, T_NEAR);
     }
@@ -792,16 +863,8 @@ void JitReduceKernel<isa>::store_dst_vector() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
-    if (isa == x64::sse41) {
-        horiz_store(vmm_dst, dst_prc, load_embedded);
-    } else if (isa == x64::avx2) {
-        Ymm ymm_dst = Ymm(vmm_dst.getIdx());
-        vextractf128(xmm_aux1, ymm_dst, 0);
-        vextractf128(xmm_aux2, ymm_dst, 1);
-        horiz_ps(xmm_aux1, xmm_aux2);
-        horiz_store(xmm_aux1, dst_prc, load_embedded);
-    } else {
+void JitReduceKernel<isa>::horiz_reduce_store_ps(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
+    if (isa == x64::avx512_core) {
         Zmm zmm_dst = Zmm(vmm_dst.getIdx());
         vextractf32x4(xmm_aux1, zmm_dst, 0);
         vextractf32x4(xmm_aux2, zmm_dst, 1);
@@ -810,16 +873,64 @@ void JitReduceKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const Precisio
         vextractf32x4(xmm_aux3, zmm_dst, 3);
         horiz_ps(xmm_aux2, xmm_aux3);
         horiz_ps(xmm_aux1, xmm_aux2);
-        horiz_store(xmm_aux1, dst_prc, load_embedded);
+        horiz_store_ps(xmm_aux1, dst_prc, load_embedded);
+    } else if (isa == x64::avx2) {
+        Ymm ymm_dst = Ymm(vmm_dst.getIdx());
+        vextractf128(xmm_aux1, ymm_dst, 0);
+        vextractf128(xmm_aux2, ymm_dst, 1);
+        horiz_ps(xmm_aux1, xmm_aux2);
+        horiz_store_ps(xmm_aux1, dst_prc, load_embedded);
+    } else if (isa == x64::sse41) {
+        horiz_store_ps(vmm_dst, dst_prc, load_embedded);
     }
 }
 
+template <>
+void JitReduceKernel<x64::avx512_core>::horiz_reduce_store_pd(const Zmm &zmm_dst, const Precision &dst_prc, bool load_embedded) {
+    auto ymm_dst = Ymm(zmm_dst.getIdx());
+    auto xmm_dst = Ymm(zmm_dst.getIdx());
+    vextractf64x4(ymm_aux1, zmm_dst, 1);
+    horiz_pd(ymm_aux1, ymm_dst);
+    vextractf128(xmm_aux2, ymm_aux1, 1);
+    horiz_pd(xmm_aux1, xmm_aux2);
+    if (one_of(jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
+                                Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
+        vhaddpd(xmm_aux1, xmm_aux1, xmm_aux1);
+    } else {
+        uni_vmovhlps(xmm_aux2, xmm_aux2, xmm_aux1);
+        horiz_pd(xmm_aux1, xmm_aux2);
+    }
+    if (load_embedded) {
+        if (exec_prc == dst_prc) {
+            horiz_pd(xmm_aux1, ptr_b[reg_dst]);
+        } else {
+            loadScalar(xmm_aux2, ptr[reg_dst], exec_prc, dst_prc);
+            horiz_pd(xmm_aux1, xmm_aux2);
+        }
+    }
+    storeScalar(ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
+}
+
+template <>
+void JitReduceKernel<x64::avx2>::horiz_reduce_store_pd(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
+    Ymm ymm_dst = Ymm(vmm_dst.getIdx());
+    vextractf128(xmm_aux1, ymm_dst, 0);
+    vextractf128(xmm_aux2, ymm_dst, 1);
+    horiz_pd(xmm_aux1, xmm_aux2);
+    horiz_store_pd(xmm_aux1, dst_prc, load_embedded);
+}
+
+template <>
+void JitReduceKernel<x64::sse41>::horiz_reduce_store_pd(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
+    horiz_store_pd(vmm_dst, dst_prc, load_embedded);
+}
+
 template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::horiz_store(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
-    uni_vmovshdup(xmm_aux3, xmm_dst);          // dst:1,2,3,4; aux3:2,2,4,4
-    horiz_ps(xmm_dst, xmm_aux3);               // dst:f(1,2),f(2,2),f(3,4),f(4,4)
-    uni_vmovhlps(xmm_aux3, xmm_aux3, xmm_dst); // aux3:f(3,4),f(4,4),4,4
-    horiz_ps(xmm_dst, xmm_aux3);               // dst:f(1,2,3,4),...
+void JitReduceKernel<isa>::horiz_store_ps(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
+    uni_vmovshdup(xmm_aux3, xmm_dst);          // dst: 0,1,2,3; aux3: 1,1,3,3
+    horiz_ps(xmm_dst, xmm_aux3);               // dst: f(0,1),f(1,1),f(2,3),f(3,3)
+    uni_vmovhlps(xmm_aux3, xmm_aux3, xmm_dst); // aux3: f(2,3),f(3,3),3,3
+    horiz_ps(xmm_dst, xmm_aux3);               // dst: f(1,2,3,4),...
     if (load_embedded) {
         loadScalar(xmm_aux3, ptr[reg_dst], exec_prc, dst_prc);
         horiz_ps(xmm_dst, xmm_aux3);
@@ -828,46 +939,32 @@ void JitReduceKernel<isa>::horiz_store(const Xmm &xmm_dst, const Precision &dst_
 }
 
 template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::horiz_ps(const Xmm &xmm, const Operand &op) {
-    switch (jcp.reduce_mode) {
-        case Algorithm::ReduceAnd:
-            uni_vandps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceL1:
-        case Algorithm::ReduceL2:
-        case Algorithm::ReduceLogSum:
-        case Algorithm::ReduceMean:
-        case Algorithm::ReduceSum:
-        case Algorithm::ReduceSumSquare:
-        case Algorithm::ReduceLogSumExp:
-            if (exec_prc == Precision::FP32) {
-                uni_vaddps(xmm, xmm, op);
-            } else if (exec_prc == Precision::FP64) {
-                vaddpd(xmm, xmm, op);
-            }
-            break;
-        case Algorithm::ReduceMax:
-            uni_vmaxps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceMin:
-            uni_vminps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceOr:
-            uni_vorps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceProd:
-            uni_vmulps(xmm, xmm, op);
-            break;
-        default:
-            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+void JitReduceKernel<isa>::horiz_store_pd(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
+    uni_vmovshdup(xmm_aux3, xmm_dst);          // dst:1,2,3,4; aux3:2,2,4,4
+    horiz_pd(xmm_dst, xmm_aux3);               // dst:f(1,2),f(2,2),f(3,4),f(4,4)
+    uni_vmovhlps(xmm_aux3, xmm_aux3, xmm_dst); // aux3:f(3,4),f(4,4),4,4
+    horiz_pd(xmm_dst, xmm_aux3);               // dst:f(1,2,3,4),...
+    if (load_embedded) {
+        if (exec_prc == dst_prc) {
+            horiz_pd(xmm_dst, ptr_b[reg_dst]);
+        } else {
+            loadScalar(xmm_aux3, ptr[reg_dst], exec_prc, dst_prc);
+            horiz_pd(xmm_dst, xmm_aux3);
+        }
     }
+    storeScalar(ptr[reg_dst], xmm_dst, dst_prc, exec_prc);
 }
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::prepare_aux_table() {
-    auto broadcast_int = [&](int val) {
+    auto broadcast_int32 = [&](int32_t val) {
         for (size_t d = 0; d < vlen / exec_prc.size(); ++d) {
             dd(val);
+        }
+    };
+    auto broadcast_int64 = [&](int64_t val) {
+        for (size_t d = 0; d < vlen / exec_prc.size(); ++d) {
+            dq(val);
         }
     };
 
@@ -875,19 +972,19 @@ void JitReduceKernel<isa>::prepare_aux_table() {
     L(l_table);
 
     if (exec_prc == Precision::FP32) {
-        broadcast_int(aux_vals.float_one);
-        broadcast_int(aux_vals.float_abs);
-        broadcast_int(aux_vals.float_min);
-        broadcast_int(aux_vals.float_max);
-        broadcast_int(aux_vals.int32_min);
-        broadcast_int(aux_vals.int32_max);
+        broadcast_int32(aux_vals.float_one);
+        broadcast_int32(aux_vals.float_abs);
+        broadcast_int32(aux_vals.float_min);
+        broadcast_int32(aux_vals.float_max);
+        broadcast_int32(aux_vals.int32_min);
+        broadcast_int32(aux_vals.int32_max);
     } else if (exec_prc == Precision::FP64) {
-        broadcast_int(aux_vals.double_one);
-        broadcast_int(aux_vals.double_abs);
-        broadcast_int(aux_vals.double_min);
-        broadcast_int(aux_vals.double_max);
-        broadcast_int(aux_vals.int64_min);
-        broadcast_int(aux_vals.int64_max);
+        broadcast_int64(aux_vals.double_one);
+        broadcast_int64(aux_vals.double_abs);
+        broadcast_int64(aux_vals.double_min);
+        broadcast_int64(aux_vals.double_max);
+        broadcast_int64(aux_vals.int64_min);
+        broadcast_int64(aux_vals.int64_max);
     }
 }
 
@@ -936,9 +1033,9 @@ void JitReducePostKernel<isa>::generate() {
         mov(reg_oc_off, ptr[reg_params + GET_OFF_POST(oc_off)]);
     }
 
-    if (isa == x64::avx512_core) {
-        uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
-    }
+//    if (isa == x64::avx512_core) {
+//        uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
+//    }
 
     if (jcp.layout == ReduceLayoutType::reduce_blocked) {
         reduce_post_main();
@@ -1013,9 +1110,17 @@ void JitReducePostKernel<isa>::reduce_post_main() {
             }
 
             // reduce and store
-            horiz_reduce_store(vmm_dst, jcp.dst_prc);
+            if (exec_prc == Precision::FP32) {
+                horiz_reduce_store_ps(vmm_dst, jcp.dst_prc);
+            } else if (exec_prc == Precision::FP64) {
+                horiz_reduce_store_pd(vmm_dst, jcp.dst_prc);
+            }
             if (isa == x64::sse41) {
-                horiz_reduce_store(vmm_dst_aux, jcp.dst_prc, true);
+                if (exec_prc == Precision::FP32) {
+                    horiz_reduce_store_ps(vmm_dst_aux, jcp.dst_prc, true);
+                } else if (exec_prc == Precision::FP64) {
+                    horiz_reduce_store_pd(vmm_dst_aux, jcp.dst_prc, true);
+                }
             }
 
             add(reg_dst, step * jcp.dst_prc.size());
@@ -1038,7 +1143,7 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                 if (exec_prc == Precision::FP32) {
                     uni_vbroadcastss(vmm_aux, ptr[reg_divisor]);
                 } else if (exec_prc == Precision::FP64) {
-                    auto zmm_aux = Ymm(xmm_aux.getIdx());
+                    auto zmm_aux = Zmm(vmm_aux.getIdx());
                     vbroadcastsd(zmm_aux, ptr[reg_divisor]);
                 }
             }
@@ -1274,7 +1379,7 @@ void JitReducePostKernel<isa>::reduce_map_kernel_scalar(const Xmm &xmm_dst) {
 }
 
 template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
+void JitReducePostKernel<isa>::horiz_reduce_store_ps(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
     if (isa == x64::sse41) {
         horiz_store(vmm_dst, dst_prc, load_embedded);
     } else if (isa == x64::avx2) {
@@ -1296,6 +1401,45 @@ void JitReducePostKernel<isa>::horiz_reduce_store(const Vmm &vmm_dst, const Prec
     }
 }
 
+template <>
+void JitReducePostKernel<x64::avx512_core>::horiz_reduce_store_pd(const Zmm &zmm_dst, const Precision &dst_prc, bool load_embedded) {
+    auto ymm_dst = Ymm(zmm_dst.getIdx());
+    auto xmm_dst = Ymm(zmm_dst.getIdx());
+    vextractf64x4(ymm_aux1, zmm_dst, 1);
+    horiz_pd(ymm_aux1, ymm_dst);
+    vextractf128(xmm_aux2, ymm_aux1, 1);
+    horiz_pd(xmm_aux1, xmm_aux2);
+    if (one_of(jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
+               Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
+        vhaddpd(xmm_aux1, xmm_aux1, xmm_aux1);
+    } else {
+        uni_vmovhlps(xmm_aux2, xmm_aux2, xmm_aux1);
+        horiz_pd(xmm_aux1, xmm_aux2);
+    }
+    if (load_embedded) {
+        if (exec_prc == dst_prc) {
+            horiz_pd(xmm_aux1, ptr_b[reg_dst]);
+        } else {
+            loadScalar(xmm_aux2, ptr[reg_dst], exec_prc, dst_prc);
+            horiz_pd(xmm_aux1, xmm_aux2);
+        }
+    }
+    storeScalar(ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
+}
+
+template <x64::cpu_isa_t isa>
+void JitReducePostKernel<isa>::horiz_reduce_store_pd(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
+    if (isa == x64::sse41) {
+        horiz_store(vmm_dst, dst_prc, load_embedded);
+    } else if (isa == x64::avx2) {
+        Ymm ymm_dst = Ymm(vmm_dst.getIdx());
+        vextractf128(xmm_aux1, ymm_dst, 0);
+        vextractf128(xmm_aux2, ymm_dst, 1);
+        horiz_ps(xmm_aux1, xmm_aux2);
+        horiz_store(xmm_aux1, dst_prc, load_embedded);
+    }
+}
+
 template <x64::cpu_isa_t isa>
 void JitReducePostKernel<isa>::horiz_store(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
     uni_vmovshdup(xmm_aux3, xmm_dst);          // dst:1,2,3,4; aux3:2,2,4,4
@@ -1307,42 +1451,6 @@ void JitReducePostKernel<isa>::horiz_store(const Xmm &xmm_dst, const Precision &
         horiz_ps(xmm_dst, xmm_aux3);
     }
     storeScalar(ptr[reg_dst], xmm_dst, dst_prc, exec_prc);
-}
-
-template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::horiz_ps(const Xmm &xmm, const Operand &op) {
-    switch (jcp.reduce_mode) {
-        case Algorithm::ReduceAnd:
-            uni_vandps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceL1:
-        case Algorithm::ReduceL2:
-        case Algorithm::ReduceLogSum:
-        case Algorithm::ReduceMean:
-        case Algorithm::ReduceSum:
-        case Algorithm::ReduceSumSquare:
-        case Algorithm::ReduceLogSumExp:
-            if (exec_prc == Precision::FP32) {
-                uni_vaddps(xmm, xmm, op);
-            } else if (exec_prc == Precision::FP64) {
-                vaddpd(xmm, xmm, op);
-            }
-            break;
-        case Algorithm::ReduceMax:
-            uni_vmaxps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceMin:
-            uni_vminps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceOr:
-            uni_vorps(xmm, xmm, op);
-            break;
-        case Algorithm::ReduceProd:
-            uni_vmulps(xmm, xmm, op);
-            break;
-        default:
-            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
-    }
 }
 
 
