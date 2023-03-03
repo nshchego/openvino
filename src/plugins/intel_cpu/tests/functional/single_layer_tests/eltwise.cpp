@@ -199,7 +199,7 @@ std::vector<ngraph::helpers::EltwiseTypes> eltwiseOpTypesDiffInp = { // Differen
 
 ov::AnyMap additional_config;
 
-std::vector<ElementType> netType = {ElementType::bf16, ElementType::f32};
+std::vector<ElementType> netType = {ElementType::bf16, ElementType::f32, ElementType::i64};
 
 std::vector<CPUSpecificParams> cpuParams_4D = {
         CPUSpecificParams({nChw16c, nChw16c}, {nChw16c}, {}, {}),
