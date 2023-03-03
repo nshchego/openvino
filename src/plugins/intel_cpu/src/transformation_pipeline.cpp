@@ -112,7 +112,7 @@ namespace intel_cpu {
 
 using const_node_ptr = const std::shared_ptr<const ov::Node>;
 
-bool Transformations::fuse_type_to_convert(const std::shared_ptr<ngraph::Node>& node, const precisions_map& precisions) {
+bool Transformations::fuse_type_to_convert(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions) {
     const auto& from = node->get_output_element_type(0);
     auto it = precisions.find(from);
     if (it == precisions.end())
@@ -124,7 +124,7 @@ bool Transformations::fuse_type_to_convert(const std::shared_ptr<ngraph::Node>& 
         // is converted to be 1 for boolean, but 0 for u8. Thus an Abs and Ceil node should be added before the
         // Convert node for this scenario.
         if (convert->input(0).get_element_type().is_real() &&
-            convert->get_convert_element_type() == ngraph::element::boolean && to.is_integral_number()) {
+            convert->get_convert_element_type() == ov::element::boolean && to.is_integral_number()) {
             auto abs = std::make_shared<ov::opset10::Abs>(convert->input_value(0).get_node_shared_ptr());
             auto ceil = std::make_shared<ov::opset10::Ceiling>(abs);
             auto new_convert = std::make_shared<ov::opset10::Convert>(ceil, to);
@@ -137,6 +137,10 @@ bool Transformations::fuse_type_to_convert(const std::shared_ptr<ngraph::Node>& 
             return true;
         }
     }
+    return false;
+}
+
+bool Transformations::fuse_type_false(const std::shared_ptr<ov::Node>& node, const ov::element::Type &to, size_t idx) {
     return false;
 }
 
@@ -197,7 +201,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
             {ov::element::i16,     ov::element::i32},
             {ov::element::u16,     ov::element::i32},
             {ov::element::u32,     ov::element::i32},
-            // {ov::element::f64,     ov::element::f32},
+            // {ov::element::f64,     ov::element::f32}, // TODO: revert.
             {ov::element::f16,     ov::element::f32},
             {ov::element::boolean, ov::element::u8},
             {ov::element::i4,      ov::element::i8},
@@ -210,7 +214,8 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         return map;
     };
     static const auto precisions = get_convert_precisions();
-    type_to_fuse_map type_to_fuse = {{ov::opset10::Convert::get_type_info_static(), fuse_type_to_convert}};
+    type_to_fuse_map type_to_fuse = {{ov::opset10::Convert::get_type_info_static(), fuse_type_to_convert},
+                                     /*{ov::opset10::Add::get_type_info_static(), fuse_type_false}*/};
 
     manager.register_pass<ov::pass::AUGRUCellFusion>();
     manager.register_pass<ov::pass::CommonOptimizations>();
