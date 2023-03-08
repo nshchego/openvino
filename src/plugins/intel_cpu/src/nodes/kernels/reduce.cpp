@@ -20,6 +20,9 @@ static inline bool isFloatCompatible(const Precision &type) {
     return Precision::FP32 == type || Precision::BF16 == type || Precision::FP64 == type;
 }
 
+///////////////////////////////
+///// JitReduceKernelBase /////
+///////////////////////////////
 
 template<typename CallArgs>
 void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm &xmm, const Operand &op) {

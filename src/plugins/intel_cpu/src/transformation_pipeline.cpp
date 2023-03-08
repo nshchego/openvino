@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Intel Corporation
+// Copyright (C) 2022-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -22,6 +22,7 @@
 #include "transformations/common_optimizations/fq_mul_fusion.hpp"
 #include "transformations/common_optimizations/mul_fake_quantize_fusion.hpp"
 #include "transformations/common_optimizations/nop_elimination.hpp"
+#include "transformations/common_optimizations/reshape_prelu.hpp"
 #include "transformations/common_optimizations/transpose_sinking.hpp"
 #include "transformations/common_optimizations/weights_dequantize_to_fake_quantize.hpp"
 #include "transformations/common_optimizations/augru_cell_fusion.hpp"
@@ -77,6 +78,7 @@
 #include "transformations/opset_conversions/convert_opset3_to_opset2.hpp"
 #include "transformations/smart_reshape/matmul_sr.hpp"
 #include "transformations/init_node_info.hpp"
+#include "transformations/convert_precision.hpp"
 #include "utils/ngraph_transformation.hpp"
 
 // LPT transformations
@@ -91,6 +93,7 @@
 #include "ngraph_transformations/convert_to_cpu_specific_opset.hpp"
 #include "ngraph_transformations/snippets_mark_skipped.hpp"
 #include "ngraph_transformations/mha_fusion.hpp"
+#include "ngraph_transformations/convert_precision_i64_i32.hpp"
 #include "ngraph_transformations/convert_to_interaction.hpp"
 #include "ngraph_transformations/convert_fq_rnn_to_quantized_rnn.hpp"
 #include "ngraph_transformations/move_eltwise_up_data_movement.hpp"
@@ -139,10 +142,6 @@ bool Transformations::fuse_type_to_convert(const std::shared_ptr<ov::Node>& node
             return true;
         }
     }
-    return false;
-}
-
-bool Transformations::fuse_type_false(const std::shared_ptr<ov::Node>& node, const ov::element::Type &to, size_t idx) {
     return false;
 }
 
@@ -203,7 +202,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
             {ov::element::i16,     ov::element::i32},
             {ov::element::u16,     ov::element::i32},
             {ov::element::u32,     ov::element::i32},
-            // {ov::element::f64,     ov::element::f32}, // TODO: revert.
+//            {ov::element::f64,     ov::element::f32}, // TODO: revert.
             {ov::element::f16,     ov::element::f32},
             {ov::element::boolean, ov::element::u8},
             {ov::element::i4,      ov::element::i8},
@@ -216,8 +215,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         return map;
     };
     static const auto precisions = get_convert_precisions();
-    type_to_fuse_map type_to_fuse = {{ov::opset10::Convert::get_type_info_static(), fuse_type_to_convert},
-                                     /*{ov::opset10::Add::get_type_info_static(), fuse_type_false}*/};
+    type_to_fuse_map type_to_fuse = {{ov::opset10::Convert::get_type_info_static(), fuse_type_to_convert}};
 
     manager.register_pass<ov::pass::AUGRUCellFusion>();
     manager.register_pass<ov::pass::CommonOptimizations>();
@@ -248,6 +246,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
     }
     manager.register_pass<ov::pass::Validate>();
     manager.register_pass<ov::pass::ConvertPrecision>(precisions, type_to_fuse);
+    manager.register_pass<ConvertPrecisionI64ToI32>();
     manager.register_pass<ov::pass::EliminateConvert>();
     manager.register_pass<SwapConvertTranspose>();
     manager.register_pass<ConvertToInteraction>();
