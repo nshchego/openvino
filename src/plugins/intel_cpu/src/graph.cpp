@@ -324,28 +324,28 @@ void Graph::Replicate(const CNNNetwork &network) {
 
     // change precision for input/output nodes to avoid extra data conversion when set input/output blobs
     // also we need to change input/output precisions for consumers/producers to avoid inserting reorder
-    for (auto &input : inputNodesMap) {
-        const auto precToSet = normalizeToSupportedPrecision(inputsInfo.at(input.first)->getPrecision());
-        input.second->setOriginalOutputPrecisionAtPort(0, precToSet);
-        const auto childEdges = input.second->getChildEdgesAtPort(0);
-        for (size_t i = 0; i < childEdges.size(); i++) {
-            const auto child = childEdges[i]->getChild();
-            if (child->getOriginalInputPrecisionAtPort(childEdges[i]->getOutputNum()) != Precision::BF16 &&
-                // remove this WA when #78939 is resolved
-                !hasSubgraphConsumers(child))
-                child->setOriginalInputPrecisionAtPort(childEdges[i]->getOutputNum(), precToSet);
-        }
-    }
+    // for (auto &input : inputNodesMap) {
+    //     const auto precToSet = normalizeToSupportedPrecision(inputsInfo.at(input.first)->getPrecision());
+    //     input.second->setOriginalOutputPrecisionAtPort(0, precToSet);
+    //     const auto childEdges = input.second->getChildEdgesAtPort(0);
+    //     for (size_t i = 0; i < childEdges.size(); i++) {
+    //         const auto child = childEdges[i]->getChild();
+    //         if (child->getOriginalInputPrecisionAtPort(childEdges[i]->getOutputNum()) != Precision::BF16 &&
+    //             // remove this WA when #78939 is resolved
+    //             !hasSubgraphConsumers(child))
+    //             child->setOriginalInputPrecisionAtPort(childEdges[i]->getOutputNum(), precToSet);
+    //     }
+    // }
 
-    for (auto &output : outputNodesMap) {
-        const auto precToSet = normalizeToSupportedPrecision(outputsInfo.at(output.first)->getPrecision());
-        output.second->setOriginalInputPrecisionAtPort(0, precToSet);
-        const auto parentEdges = output.second->getParentEdgesAtPort(0);
-        for (size_t i = 0; i < parentEdges.size(); i++) {
-            const auto parent = parentEdges[i]->getParent();
-            parent->setOriginalOutputPrecisionAtPort(parentEdges[i]->getInputNum(), precToSet);
-        }
-    }
+    // for (auto &output : outputNodesMap) {
+    //     const auto precToSet = normalizeToSupportedPrecision(outputsInfo.at(output.first)->getPrecision());
+    //     output.second->setOriginalInputPrecisionAtPort(0, precToSet);
+    //     const auto parentEdges = output.second->getParentEdgesAtPort(0);
+    //     for (size_t i = 0; i < parentEdges.size(); i++) {
+    //         const auto parent = parentEdges[i]->getParent();
+    //         parent->setOriginalOutputPrecisionAtPort(parentEdges[i]->getInputNum(), precToSet);
+    //     }
+    // }
 
     // Loading mean images
     for (const auto& input : inputsInfo) {
