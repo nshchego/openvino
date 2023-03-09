@@ -2007,7 +2007,7 @@ void TopK::prepareParams() {
             top_k = src_k;
         }
     }
-    
+
 
     if (jit_mode) {
         if (!preset_params_done) {
@@ -2157,12 +2157,12 @@ void TopK::execute(dnnl::stream strm) {
 //         }
 //     }
 //     std::cout << std::endl;
-//
+
 //     if (getParentEdges().size() > 1) {
 //         std::cout << "[ INPUT 1 ] size: " << getParentEdgeAt(1)->getMemoryPtr()->GetSize()
 //               << "; originPrc: " << getOriginalInputPrecisionAtPort(1)
 //               << "; execPrc: " << getParentEdgeAt(1)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
-//
+
 //         const auto dims = getParentEdgeAt(1)->getMemoryPtr()->getStaticDims();
 //         const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
 //         auto data = getParentEdgeAt(1)->getMemoryPtr()->GetPtr();
@@ -2190,7 +2190,7 @@ void TopK::execute(dnnl::stream strm) {
 //     if (getParentEdges().size() > 2) {
 //         std::cout << "INPUT 2: " << std::endl;
 //         std::cout << "Size: " << getParentEdgeAt(2)->getMemoryPtr()->GetSize() << std::endl;
-//
+
 //         const auto dims = getParentEdgeAt(2)->getMemoryPtr()->getStaticDims();
 //         const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
 //         auto thrData = getParentEdgeAt(2)->getMemoryPtr()->GetPtr();
@@ -2236,7 +2236,7 @@ void TopK::execute(dnnl::stream strm) {
 //     std::cout << "[ OUTPUT 0 ]: size: " << getChildEdgeAt(0)->getMemoryPtr()->GetSize()
 //        << "; originPrc: " << getOriginalOutputPrecisionAtPort(0)
 //        << "; execPrc: " << getChildEdgeAt(0)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
-//
+
 //     const auto oDims = getChildEdgeAt(0)->getMemoryPtr()->getStaticDims();
 //     const auto oBlLen = std::accumulate(oDims.begin(), oDims.end(), 1, std::multiplies<Dim>());
 //     auto* dstData = getChildEdgeAt(0)->getMemoryPtr()->GetPtr();
@@ -2264,7 +2264,7 @@ void TopK::execute(dnnl::stream strm) {
 //        std::cout << "[ OUTPUT 1 ]: size: " << getChildEdgeAt(1)->getMemoryPtr()->GetSize()
 //            << "; originPrc: " << getOriginalOutputPrecisionAtPort(1)
 //            << "; execPrc: " << getChildEdgeAt(1)->getMemoryPtr()->getDesc().getPrecision() << std::endl;
-//
+
 //        const auto oDims = getChildEdgeAt(1)->getMemoryPtr()->getStaticDims();
 //        const auto oBlLen = std::accumulate(oDims.begin(), oDims.end(), 1, std::multiplies<Dim>());
 //        auto* dstData = getChildEdgeAt(1)->getMemoryPtr()->GetPtr();

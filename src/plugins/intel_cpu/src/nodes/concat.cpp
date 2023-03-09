@@ -541,21 +541,21 @@ void Concat::initOptimalPrimitiveDescriptor() {
 
 void Concat::execute(dnnl::stream strm) {
     if (isOptimized()) {
-std::cout << "Concat::execute Optimized" << std::endl;
+// std::cout << "Concat::execute Optimized" << std::endl;
         return;
     }
 
     if (canOptimizeNspc) {
-std::cout << "Concat::execute execNspcSpecCase" << std::endl;
+// std::cout << "Concat::execute execNspcSpecCase" << std::endl;
         execNspcSpecCase();
         return;
     }
 
     if (canExecRef) {
-std::cout << "Concat::execute REF" << std::endl;
+// std::cout << "Concat::execute REF" << std::endl;
         execRef();
     } else {
-std::cout << "Concat::execute prim" << std::endl;
+// std::cout << "Concat::execute prim" << std::endl;
         const Memory& dst_memory = getChildEdgeAt(0)->getMemory();
         const size_t num_src = getParentEdges().size();
         std::unordered_map<int, memory> mem_ags {{DNNL_ARG_DST, dst_memory.GetPrimitive()}};

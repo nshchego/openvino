@@ -18,7 +18,6 @@ ov::pass::ConvertSubtract::ConvertSubtract() {
     auto sub = ngraph::pattern::wrap_type<ov::opset1::Subtract>();
 
     matcher_pass_callback callback = [=](pattern::Matcher& m) {
-std::cout << "ConvertSubtract callback" << std::endl;
         auto sub = std::dynamic_pointer_cast<ov::opset1::Subtract>(m.get_match_root());
         if (!sub) {
             return false;
