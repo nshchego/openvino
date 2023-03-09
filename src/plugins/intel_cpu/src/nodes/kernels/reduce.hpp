@@ -141,7 +141,7 @@ private:
     Xbyak::Xmm xmm_aux1 = Xbyak::Xmm(5);
     Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(6);
     Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(7);
-    
+
     Xbyak::Ymm ymm_idx  = Xbyak::Ymm(vmm_idx.getIdx());
     Xbyak::Ymm ymm_aux1 = Xbyak::Ymm(xmm_aux1.getIdx());
 

@@ -122,15 +122,15 @@ Node::Node(const std::shared_ptr<ov::Node>& op,
             originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     }
-std::cout << "CPU Node CTR {" << typeStr << "} originalInputPrecisions: ";
-for (auto& prc : originalInputPrecisions) {
-    std::cout << prc << "; ";
-}
-std::cout << "; originalOutputPrecisions: ";
-for (auto& prc : originalOutputPrecisions) {
-    std::cout << prc << "; ";
-}
-std::cout << std::endl;
+// std::cout << "CPU Node CTR {" << typeStr << "} originalInputPrecisions: ";
+// for (auto& prc : originalInputPrecisions) {
+//     std::cout << prc << "; ";
+// }
+// std::cout << "; originalOutputPrecisions: ";
+// for (auto& prc : originalOutputPrecisions) {
+//     std::cout << prc << "; ";
+// }
+// std::cout << std::endl;
               isDynamic = std::any_of(inputShapes.begin(), inputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); }) ||
                 std::any_of(outputShapes.begin(), outputShapes.end(), [](const Shape& shape){ return shape.isDynamic(); });
 
@@ -201,7 +201,7 @@ Node::Node(const std::string& type, const std::string& name, const GraphContext:
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
-std::cout << "CPU Node CTR {" << typeStr << "}" << std::endl;
+// std::cout << "CPU Node CTR {" << typeStr << "}" << std::endl;
     // TODO [NM]: What about filling inDims and outDims?
 }
 

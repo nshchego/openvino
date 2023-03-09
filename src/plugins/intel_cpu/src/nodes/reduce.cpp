@@ -147,7 +147,6 @@ Reduce::Reduce(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-std::cout << "REDUCE CTR" << std::endl;
 
     initializers.at(op->get_type_info())(op, *this);
 

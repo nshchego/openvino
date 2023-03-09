@@ -8,15 +8,14 @@
 
 namespace ov {
 namespace intel_cpu {
+class ConvertPrecisionI64ToI32: public ov::pass::ModelPass {
+public:
+    OPENVINO_RTTI("ConvertPrecisionI64ToI32", "0");
 
-        class ConvertPrecisionI64ToI32: public ov::pass::ModelPass {
-        public:
-            OPENVINO_RTTI("ConvertPrecisionI64ToI32", "0");
+    ConvertPrecisionI64ToI32() = default;
 
-            ConvertPrecisionI64ToI32() = default;
-
-            bool run_on_model(const std::shared_ptr<ov::Model>& model) override;
-        };
+    bool run_on_model(const std::shared_ptr<ov::Model>& model) override;
+};
 
 }  // namespace intel_cpu
 }  // namespace ov

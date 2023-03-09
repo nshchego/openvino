@@ -659,7 +659,7 @@ void JitKernelBase::loadVector(const Xmm &vDst,
             case Precision::I32:
                 if (dstPrc == Precision::I32) {
                     uni_vmovups(vDst, srcAdr);
-                } if (dstPrc == Precision::FP64) {
+                } else if (dstPrc == Precision::FP64) {
                     vcvtdq2pd(vDst, srcAdr);
                 }
                 break;
@@ -1048,8 +1048,6 @@ void JitKernelBase::storeScalar(const Address &dstAdr,
 
     switch (dstPrc) {
         case Precision::FP64:
-            // uni_vmovsd(dstAdr, vSrc);
-            // break;
         case Precision::I64:
             uni_vmovsd(dstAdr, vSrc);
             break;

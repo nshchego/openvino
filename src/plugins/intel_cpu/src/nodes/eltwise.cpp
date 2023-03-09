@@ -1860,7 +1860,7 @@ bool Eltwise::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
 
 Eltwise::Eltwise(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
     Node(op, context, EltwiseShapeInferFactory()), broadcastingPolicy(Undefined) {
-std::cout << "Eltwise ctr OP PRC: " << op->get_element_type() << std::endl;
+// std::cout << "Eltwise ctr OP PRC: " << op->get_element_type() << std::endl;
               //std::cout << "Eltwise ctr OP PRC: " << op->get_element_type() << "; in0: " << op->get_input_node_ptr(0)->get_element_type() << "; in1: " <<
 //        op->get_input_node_ptr(1)->get_element_type() << std::endl;
 //std::cout << "Eltwise ctr IN PRC: " << getOriginalInputPrecisionAtPort(0) << "; " << (!ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(1)) ?
