@@ -14,7 +14,7 @@ namespace LayerTestsDefinitions {
 
 class AddConvertToReorderTest : virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    void BuildGraph(const ngraph::element::Type& secondInpType) {
+    void BuildGraph(const ov::element::Type& secondInpType) {
         secondConstantType = secondInpType;
         int axis = 2;
         std::vector<int> indices = {0, 3, 2, 1};
@@ -24,30 +24,30 @@ public:
         InferenceEngine::Precision netPrecision = inPrc = outPrc = Precision::FP32;
         targetDevice = CommonTestUtils::DEVICE_CPU;
 
-        ASSERT_EQ(ngraph::shape_size(indicesShape), indices.size())
+        ASSERT_EQ(ov::shape_size(indicesShape), indices.size())
                                     << "Indices vector size and provided indices shape doesn't fit each other";
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
         auto params = ngraph::builder::makeParams(ngPrc, {inputShape});
         auto paramOuts = ngraph::helpers::convert2OutputVector(
-                ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
-        auto indicesNode = ngraph::opset3::Constant::create(secondConstantType, ngraph::Shape(indicesShape), indices);
-        auto axisNode = ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape({}), {axis});
+                ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
+        auto indicesNode = ov::op::v0::Constant::create(secondConstantType, ov::Shape(indicesShape), indices);
+        auto axisNode = ov::op::v0::Constant::create(ov::element::i64, ov::Shape({}), {axis});
         auto gather = std::make_shared<ngraph::opset3::Gather>(paramOuts[0], indicesNode, axisNode);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(gather)};
-        function = std::make_shared<ngraph::Function>(results, params, "gather");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(gather)};
+        function = std::make_shared<ov::Model>(results, params, "gather");
     }
-    std::vector<std::pair<ngraph::element::Type, std::vector<std::uint8_t>>> CalculateRefs() override {
+    std::vector<std::pair<ov::element::Type, std::vector<std::uint8_t>>> CalculateRefs() override {
         // Convert the second input constant precision to i64 to run the reference function
-        if (ngraph::element::Type_t::i8 == secondConstantType) {
-            ngraph::pass::ConvertPrecision<ngraph::element::Type_t::i8, ngraph::element::Type_t::i64>().run_on_model(functionRefs);
-        } else if (ngraph::element::Type_t::bf16 == secondConstantType) {
-            ngraph::pass::ConvertPrecision<ngraph::element::Type_t::bf16, ngraph::element::Type_t::i64>().run_on_model(functionRefs);
+        if (ov::element::Type_t::i8 == secondConstantType) {
+            ngraph::pass::ConvertPrecision<ov::element::Type_t::i8, ov::element::Type_t::i64>().run_on_model(functionRefs);
+        } else if (ov::element::Type_t::bf16 == secondConstantType) {
+            ngraph::pass::ConvertPrecision<ov::element::Type_t::bf16, ov::element::Type_t::i64>().run_on_model(functionRefs);
         }
         return LayerTestsUtils::LayerTestsCommon::CalculateRefs();
     }
 
 private:
-    ngraph::element::Type secondConstantType;
+    ov::element::Type secondConstantType;
 };
 
 namespace  {
@@ -65,7 +65,7 @@ namespace  {
              Output[FP32]
 */
 TEST_F(AddConvertToReorderTest, smoke_TestAddReorder_CPU) {
-    BuildGraph(ngraph::element::i8);
+    BuildGraph(ov::element::i8);
     Run();
     CheckNumberOfNodesWithType(executableNetwork, "Convert", 0);
     CheckNumberOfNodesWithType(executableNetwork, "Reorder", 1);

@@ -6,7 +6,7 @@
 #include <sstream>
 #include <vector>
 
-#include <openvino/core/partial_shape.hpp>
+// #include <openvino/core/partial_shape.hpp>
 #include "ngraph_functions/builders.hpp"
 #include "shared_test_classes/base/layer_test_utils.hpp"
 #include "shared_test_classes/base/ov_subgraph.hpp"
@@ -82,10 +82,10 @@ protected:
 
         init_input_shapes({ inputShapes });
 
-        auto emb_table_node = std::make_shared<ngraph::opset1::Parameter>(inType, inputShapes.first);
-        ngraph::ParameterVector params = {emb_table_node};
+        auto emb_table_node = std::make_shared<ov::op::v0::Parameter>(inType, inputShapes.first);
+        ov::ParameterVector params = {emb_table_node};
 
-        auto embBag = std::dynamic_pointer_cast<ngraph::opset3::EmbeddingSegmentsSum>(ngraph::builder::makeEmbeddingSegmentsSum(
+        auto embBag = ov::as_type_ptr<ngraph::opset3::EmbeddingSegmentsSum>(ngraph::builder::makeEmbeddingSegmentsSum(
             inType,
             indPrecision,
             emb_table_node,
@@ -95,8 +95,8 @@ protected:
             defaultIndex,
             withWeights,
             withDefIndex));
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(embBag)};
-        function = std::make_shared<ngraph::Function>(results, params, "embeddingSegmentsSum");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(embBag)};
+        function = std::make_shared<ov::Model>(results, params, "embeddingSegmentsSum");
     }
 };
 

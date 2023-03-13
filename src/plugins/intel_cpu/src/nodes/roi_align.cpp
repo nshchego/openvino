@@ -3,19 +3,11 @@
 //
 
 #include "roi_align.h"
-#include <string>
-#include <vector>
-#include <math.h>
-#include <onednn/dnnl.h>
-#include <dnnl_extension_utils.h>
-#include <utils/bfloat16.hpp>
-#include <cpu/x64/cpu_isa_traits.hpp>
-#include "ie_parallel.hpp"
-#include <selective_build.h>
-#include <ngraph/opsets/opset9.hpp>
 
 #include <cpu/x64/jit_generator.hpp>
 #include "emitters/x64/jit_load_store_emitters.hpp"
+#include "ie_parallel.hpp"
+#include <openvino/op/roi_align.hpp>
 
 using namespace InferenceEngine;
 using namespace dnnl;
@@ -29,8 +21,8 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-using ngPoolingMode = ngraph::opset9::ROIAlign::PoolingMode;
-using ngAlignedMode = ngraph::opset9::ROIAlign::AlignedMode;
+using ngPoolingMode = ov::op::v9::ROIAlign::PoolingMode;
+using ngAlignedMode = ov::op::v9::ROIAlign::AlignedMode;
 #if defined(OPENVINO_ARCH_X86_64)
 #define GET_OFF(field) offsetof(jit_roi_align_call_args, field)
 
@@ -649,9 +641,9 @@ private:
     }
 };
 #endif
-bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        auto roiAlign = ngraph::as_type_ptr<const ngraph::opset9::ROIAlign>(op);
+        auto roiAlign = ov::as_type_ptr<const ov::op::v9::ROIAlign>(op);
         if (!roiAlign) {
             errorMessage = "Only opset9 ROIAlign operation is supported";
             return false;
@@ -659,13 +651,13 @@ bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
 
         const ngPoolingMode mode = roiAlign->get_mode();
         if (mode != ngPoolingMode::AVG && mode != ngPoolingMode::MAX) {
-            errorMessage = "Doesn't support mode: " + ngraph::as_string(mode);
+            errorMessage = "Doesn't support mode: " + ov::as_string(mode);
             return false;
         }
 
         const ngAlignedMode alignedMode = roiAlign->get_aligned_mode();
         if (alignedMode != ngAlignedMode::ASYMMETRIC && alignedMode != ngAlignedMode::HALF_PIXEL_FOR_NN && alignedMode != ngAlignedMode::HALF_PIXEL) {
-            errorMessage = "Doesn't support mode: " + ngraph::as_string(alignedMode);
+            errorMessage = "Doesn't support mode: " + ov::as_string(alignedMode);
             return false;
         }
     } catch (...) {
@@ -674,13 +666,11 @@ bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
     return true;
 }
 
-ROIAlign::ROIAlign(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ROIAlign::ROIAlign(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "ROIPooling layer with name '" + getName() + "' ";
-
-        auto roiAlign = ngraph::as_type_ptr<const ngraph::opset9::ROIAlign>(op);
+        auto roiAlign = ov::as_type_ptr<const ov::op::v9::ROIAlign>(op);
         pooledH = roiAlign->get_pooled_h();
         pooledW = roiAlign->get_pooled_w();
         spatialScale = roiAlign->get_spatial_scale();
@@ -709,34 +699,34 @@ void ROIAlign::getSupportedDescriptors() {
         return;
 
     if (getParentEdges().size() != 3)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 
     if (getInputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
     }
 
     if (getInputShapeAtPort(1).getRank() != 2) {
-        IE_THROW() << errorPrefix << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
     }
 
     if (getInputShapeAtPort(2).getRank() != 1) {
-        IE_THROW() << errorPrefix << "doesn't support 2nd input with rank: " << getInputShapeAtPort(2).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 2nd input with rank: " << getInputShapeAtPort(2).getRank();
     }
 
     if (getOutputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
     }
 
     const auto& proposalsDims = getInputShapeAtPort(1).getDims();
     if (proposalsDims[1] != 4) {
-        IE_THROW() << errorPrefix << "has invalid shape on 1st input: [" << proposalsDims[0] << "," << proposalsDims[1] << "]";
+        THROW_CPU_NODE_ERR << "has invalid shape on 1st input: [" << proposalsDims[0] << "," << proposalsDims[1] << "]";
     }
 
     const auto& indexesDims = getInputShapeAtPort(2).getDims();
     if (!dimsEqualWeak(proposalsDims[0], indexesDims[0])) {
-        IE_THROW() << errorPrefix << "has different sizes of inputs for proposals ("
+        THROW_CPU_NODE_ERR << "has different sizes of inputs for proposals ("
                    << proposalsDims[0] << ") and indexes (" << indexesDims[0] << ")";
     }
 }
@@ -766,8 +756,8 @@ void ROIAlign::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inputPrec0 = getOriginalInputPrecisionAtPort(0);
-    Precision outputPrec = getOriginalOutputPrecisionAtPort(0);
+    auto inputPrec0 = getOriginalInputPrecisionAtPort(0);
+    auto outputPrec = getOriginalOutputPrecisionAtPort(0);
 
     if (inputPrec0 != Precision::FP32 || outputPrec != Precision::FP32) {
         if ((outputPrec == Precision::BF16 || inputPrec0 == Precision::BF16) && mayiuse(avx512_core)) {
@@ -817,9 +807,9 @@ void ROIAlign::createPrimitive() {
     auto& srcMemPtr = getParentEdgeAt(0)->getMemoryPtr();
     auto& dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate input memory";
+        THROW_CPU_NODE_ERR << " did not allocate input memory";
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate destination memory";
+        THROW_CPU_NODE_ERR << " did not allocate destination memory";
 
     if (!roi_align_kernel) {
         ROIAlignLayoutType selectedLayout = ROIAlignLayoutType::nspc;

@@ -94,7 +94,7 @@ protected:
         }
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
-        std::vector<ngraph::Shape> WRB = {{3 * hiddenSize, inputSize}, {3 * hiddenSize, hiddenSize}, {(linearBeforeReset ? 4 : 3) * hiddenSize}};
+        std::vector<ov::Shape> WRB = {{3 * hiddenSize, inputSize}, {3 * hiddenSize, hiddenSize}, {(linearBeforeReset ? 4 : 3) * hiddenSize}};
         auto gruCellOp = ngraph::builder::makeGRU(
             ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes(params)), WRB, hiddenSize, activations, {}, {}, clip, linearBeforeReset);
 

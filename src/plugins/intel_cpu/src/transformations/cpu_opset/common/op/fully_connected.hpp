@@ -19,13 +19,13 @@ public:
     FullyConnectedNode(const ngraph::Output<Node> &A,
                        const ngraph::Output<Node> &B,
                        const ngraph::Rank& output_rank,
-                       const ngraph::element::Type output_type = ngraph::element::undefined);
+                       const ov::element::Type output_type = ov::element::undefined);
 
     FullyConnectedNode(const ngraph::Output<Node> &A,
                        const ngraph::Output<Node> &B,
                        const ngraph::Output<Node> &C,
                        const ngraph::Rank& output_rank,
-                       const ngraph::element::Type output_type = ngraph::element::undefined);
+                       const ov::element::Type output_type = ov::element::undefined);
 
     bool visit_attributes(ngraph::AttributeVisitor &visitor) override;
 
@@ -34,11 +34,11 @@ public:
     std::shared_ptr<Node> clone_with_new_inputs(const ngraph::OutputVector& new_args) const override;
 
     ngraph::Rank get_output_rank() const { return m_output_rank; }
-    ngraph::element::Type get_output_type() const { return m_output_type; }
+    ov::element::Type get_output_type() const { return m_output_type; }
 
 private:
     ngraph::Rank m_output_rank;
-    ngraph::element::Type m_output_type;
+    ov::element::Type m_output_type;
 };
 
 }   // namespace intel_cpu

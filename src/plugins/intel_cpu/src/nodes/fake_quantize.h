@@ -4,14 +4,8 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
 #include <common/primitive_attr.hpp>
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <utility>
 
 namespace ov {
 namespace intel_cpu {
@@ -77,7 +71,7 @@ struct jit_uni_quantize_kernel {
 
 class FakeQuantize : public Node {
 public:
-    FakeQuantize(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void initSupportedPrimitiveDescriptors() override;
     void getSupportedDescriptors() override;
@@ -142,7 +136,7 @@ public:
                            bool allowBinary = true,
                            bool do_rounding = true);
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     enum BroadcastingPolicy {
         PerChannel, // all FQ operations are per channel
@@ -269,8 +263,6 @@ private:
 
     InferenceEngine::Precision inputPrecision = InferenceEngine::Precision::FP32;
     InferenceEngine::Precision outputPrecision = InferenceEngine::Precision::FP32;
-
-    std::string errorPrefix;
 
     BroadcastingPolicy broadcastingPolicy;
 };

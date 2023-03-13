@@ -25,7 +25,7 @@ using DepthToSpaceLayerCPUTestParamSet = std::tuple<
 class DepthToSpaceLayerCPUTest : public testing::WithParamInterface<DepthToSpaceLayerCPUTestParamSet>,
                                  virtual public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<DepthToSpaceLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<DepthToSpaceLayerCPUTestParamSet> &obj) {
         InputShape shapes;
         ElementType inType;
         DepthToSpace::DepthToSpaceMode mode;

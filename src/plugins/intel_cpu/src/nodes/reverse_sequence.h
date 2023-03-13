@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
 
 namespace ov {
@@ -13,7 +12,7 @@ namespace node {
 
 class ReverseSequence : public Node {
 public:
-    ReverseSequence(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    ReverseSequence(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -23,7 +22,7 @@ public:
     void prepareParams() override;
     void executeDynamicImpl(dnnl::stream strm) override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
     struct ReverseSequenceExecutor {
@@ -53,7 +52,6 @@ private:
     int batch_axis;
 
     InferenceEngine::Precision lengthsPrecision;
-    std::string errorPrefix;
 };
 
 }   // namespace node

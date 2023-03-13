@@ -23,7 +23,7 @@ typedef std::tuple<
 class SplitLayerCPUTest : public testing::WithParamInterface<splitCPUTestParams>,
                           virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<splitCPUTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<splitCPUTestParams> &obj) {
         size_t numSplits;
         int64_t axis;
         ElementType netPrecision;
@@ -72,10 +72,10 @@ protected:
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
         auto paramOuts = ngraph::helpers::convert2OutputVector(
-                ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
-        auto split = std::dynamic_pointer_cast<ngraph::opset5::Split>(ngraph::builder::makeSplit(paramOuts[0],
+                ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
+        auto split = ov::as_type_ptr<ngraph::opset5::Split>(ngraph::builder::makeSplit(paramOuts[0],
                                                                                                  netPrecision, numSplits, axis));
-        ngraph::ResultVector results;
+        ov::ResultVector results;
 
         for (int i = 0; i < outIndices.size(); i++) {
             // This WA is necessary because result nodes connected to the same output of the split node (or any node) are deduplicated
@@ -86,7 +86,7 @@ protected:
             results.push_back(std::make_shared<ngraph::opset5::Result>(fakeEltwise));
         }
         split->get_rt_info() = getCPUInfo();
-        function = std::make_shared<ngraph::Function>(results, params, "split");
+        function = std::make_shared<ov::Model>(results, params, "split");
     }
 };
 

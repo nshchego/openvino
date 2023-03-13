@@ -29,7 +29,7 @@ namespace SubgraphTestsDefinitions {
 
 class ConcatConstantInPlaceTest : public testing::WithParamInterface<InferenceEngine::Precision>, virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<InferenceEngine::Precision> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<InferenceEngine::Precision> &obj) {
         std::ostringstream result;
         result << "ConcatConstantInPlaceTest" << obj.param.name();
         return result.str();
@@ -43,27 +43,27 @@ public:
             configuration.insert({ PluginConfigParams::KEY_ENFORCE_BF16, PluginConfigParams::NO });
 
         const std::vector<size_t> inputShape = {1, 3, 3, 11};
-        auto inputParams = ngraph::builder::makeParams(ngraph::element::f32, {inputShape});
+        auto inputParams = ngraph::builder::makeParams(ov::element::f32, {inputShape});
 
-        auto transposeOrder = ngraph::opset8::Constant::create(ngraph::element::i32, {4}, {0, 3, 2, 1});
+        auto transposeOrder = ov::op::v0::Constant::create(ov::element::i32, {4}, {0, 3, 2, 1});
         auto transpose = std::make_shared<ngraph::opset8::Transpose>(inputParams[0], transposeOrder);
 
-        auto concatConstantInput = ngraph::opset8::Constant::create(ngraph::element::f32, {1, 1, 3, 3}, {10.0f});
+        auto concatConstantInput = ov::op::v0::Constant::create(ov::element::f32, {1, 1, 3, 3}, {10.0f});
         auto concat = ngraph::builder::makeConcat({concatConstantInput, transpose}, 1);
 
         // convolution
         std::vector<float> weightValuesFP32(12);
-        ngraph::Shape convFilterShape = { 1, 12, 1, 1 };
+        ov::Shape convFilterShape = { 1, 12, 1, 1 };
 //        weightValuesFP32.resize(12);
         FuncTestUtils::fillInputsBySinValues(weightValuesFP32.data(), weightValuesFP32.size());
-        auto weightsNode = std::make_shared<ngraph::opset1::Constant>(ngraph::element::f32, convFilterShape, weightValuesFP32);
-        std::shared_ptr<ngraph::Node> conv = std::make_shared<ngraph::opset1::Convolution>(
+        auto weightsNode = std::make_shared<ov::op::v0::Constant>(ov::element::f32, convFilterShape, weightValuesFP32);
+        std::shared_ptr<ov::Node> conv = std::make_shared<ov::op::v1::Convolution>(
             concat, weightsNode, ngraph::Strides({ 1, 1 }), ngraph::CoordinateDiff({ 0, 0 }),
-            ngraph::CoordinateDiff({ 0, 0 }), ngraph::Strides({ 1, 1 }), ngraph::op::PadType::EXPLICIT);
+            ngraph::CoordinateDiff({ 0, 0 }), ngraph::Strides({ 1, 1 }), ov::op::PadType::EXPLICIT);
             conv->set_friendly_name("CONV");
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset8::Result>(conv)};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "ConcatConstantInPlace");
+        ov::ResultVector results{std::make_shared<ngraph::opset8::Result>(conv)};
+        function = std::make_shared<ov::Model>(results, inputParams, "ConcatConstantInPlace");
     }
 };
 

@@ -6,12 +6,11 @@
 
 #include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
-#include "input.h"
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/constant.hpp>
+#include <openvino/op/slice.hpp>
+#include <openvino/op/strided_slice.hpp>
 #include <utils/shape_inference/shape_inference_ngraph.hpp>
 #include "slice_shape_inference_utils.hpp"
-
-#include <string>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -139,22 +138,22 @@ private:
 
 }  // namespace
 
-StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context) :
+StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, StridedSliceShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    errorPrefix = NameFromType(getType()) + " node with name '" + getName() + "' ";
+    errorPrefix = getTypeStr() + " node with name '" + getName() + "' ";
 
     attrs.isStridedSliceOp = ov::is_type<ov::op::v1::StridedSlice>(op);
 
     if ((attrs.isStridedSliceOp && (inputShapes.size() < 3 || inputShapes.size() > 4)) ||
             (!attrs.isStridedSliceOp && (inputShapes.size() < 4 || inputShapes.size() > 5))) {
-        IE_THROW() << errorPrefix << "has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges";
     }
     if (outputShapes.size() != 1) {
-        IE_THROW() << errorPrefix << "has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges";
     }
 
     if (inputShapes.size() > STRIDE_ID) {
@@ -229,7 +228,7 @@ StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphConte
             attrs.ellipsisPos1 = attrs.ellipsisMask[i] == 1 && attrs.ellipsisPos1 == -1 ? i : attrs.ellipsisPos1;
         }
         if (attrs.ellipsisMaskCounter > 1)
-            IE_THROW() << errorPrefix << "has incorrect 'Ellipsis_mask'. Only one non-zero bit is allowed";
+            THROW_CPU_NODE_ERR << "has incorrect 'Ellipsis_mask'. Only one non-zero bit is allowed";
 
         int newAxis = std::accumulate(attrs.newAxisMask.begin(), attrs.newAxisMask.end(), 0);
         int shrinkAxis = std::accumulate(attrs.shrinkAxisMask.begin(), attrs.shrinkAxisMask.end(), 0);
@@ -242,7 +241,7 @@ StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphConte
         if (!isConstantInput[type])
             return;
 
-        const auto constNode = ov::as_type_ptr<const ngraph::opset1::Constant>(op->get_input_node_shared_ptr(type));
+        const auto constNode = ov::as_type_ptr<const op::v0::Constant>(op->get_input_node_shared_ptr(type));
         parameter = constNode->cast_vector<int>();
 
         auto size = constNode->get_shape()[0];
@@ -314,8 +313,8 @@ void StridedSlice::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    const InferenceEngine::Precision dataPrecision = getOriginalInputPrecisionAtPort(DATA_ID);
-    const InferenceEngine::Precision iPrecision = Precision::I32;
+    const auto& dataPrecision = getOriginalInputPrecisionAtPort(DATA_ID);
+    const auto& iPrecision = Precision::I32;
     attrs.dataSize = dataPrecision.size();
 
     const size_t nDims = getInputShapeAtPort(DATA_ID).getRank();
@@ -420,7 +419,7 @@ bool StridedSlice::needShapeInfer() const {
 
 void StridedSlice::execute(dnnl::stream strm) {
     if (!execPtr)
-        IE_THROW() << errorPrefix << "doesn't have compiled executor!";
+        THROW_CPU_NODE_ERR << "doesn't have compiled executor!";
 
     execPtr->exec(srcMemory, dstMemory);
 }

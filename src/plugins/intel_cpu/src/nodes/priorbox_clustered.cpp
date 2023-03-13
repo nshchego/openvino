@@ -4,15 +4,8 @@
 
 #include "priorbox_clustered.h"
 
-#include <algorithm>
-#include <cmath>
-#include <memory>
-#include <vector>
-
 #include <ie_parallel.hpp>
-#include <dnnl_types.h>
-#include <ngraph/ngraph.hpp>
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/prior_box_clustered.hpp>
 
 using namespace InferenceEngine;
 
@@ -49,9 +42,9 @@ private:
 
 class PriorBoxClusteredShapeInferFactory : public ShapeInferFactory {
 public:
-    explicit PriorBoxClusteredShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    explicit PriorBoxClusteredShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
-        auto priorBox = ov::as_type_ptr<const ngraph::opset1::PriorBoxClustered>(m_op);
+        auto priorBox = ov::as_type_ptr<const op::v0::PriorBoxClustered>(m_op);
         if (!priorBox) {
             IE_THROW() << "Unexpected op type in PriorBoxClustered shape inference factory: " << m_op->get_type_name();
         }
@@ -66,10 +59,9 @@ private:
 
 } // namespace
 
-bool PriorBoxClustered::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool PriorBoxClustered::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto priorBox = std::dynamic_pointer_cast<const ngraph::opset1::PriorBoxClustered>(op);
-        if (!priorBox) {
+        if (op->get_type_info() != op::v0::PriorBoxClustered::get_type_info_static()) {
             errorMessage = "Only opset1 PriorBoxClustered operation is supported";
             return false;
         }
@@ -79,15 +71,15 @@ bool PriorBoxClustered::isSupportedOperation(const std::shared_ptr<const ngraph:
     return true;
 }
 
-PriorBoxClustered::PriorBoxClustered(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+PriorBoxClustered::PriorBoxClustered(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, PriorBoxClusteredShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto priorBox = std::dynamic_pointer_cast<const ngraph::opset1::PriorBoxClustered>(op);
-    const ngraph::opset1::PriorBoxClustered::Attributes& attrs = priorBox->get_attrs();
+    auto priorBox = ov::as_type<const op::v0::PriorBoxClustered>(op.get());
+    const op::v0::PriorBoxClustered::Attributes& attrs = priorBox->get_attrs();
 
     widths = attrs.widths;
     heights = attrs.heights;

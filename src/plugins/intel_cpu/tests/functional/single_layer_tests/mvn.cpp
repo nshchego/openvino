@@ -32,7 +32,7 @@ using MvnLayerCPUTestParamSet = std::tuple<
 class MvnLayerCPUTest : public testing::WithParamInterface<MvnLayerCPUTestParamSet>,
                        virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-   static std::string getTestCaseName(testing::TestParamInfo<MvnLayerCPUTestParamSet> obj) {
+   static std::string getTestCaseName(const testing::TestParamInfo<MvnLayerCPUTestParamSet> &obj) {
        basicCpuMvnParams basicParamsSet;
        CPUSpecificParams cpuParams;
        fusingSpecificParams fusingParams;
@@ -93,7 +93,7 @@ protected:
        init_input_shapes({inputShapes});
 
        auto param = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
-       auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(param));
+       auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(param));
        auto mvn = ngraph::builder::makeMVN(paramOuts[0], acrossChanels, normalizeVariance, eps);
        if (!axes.empty()) {
             mvn = ngraph::builder::makeMVN(paramOuts[0], axes, normalizeVariance, eps);

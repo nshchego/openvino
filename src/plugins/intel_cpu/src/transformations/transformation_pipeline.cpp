@@ -118,13 +118,14 @@
 
 #include "dnnl.hpp"
 #include <cpu/x64/cpu_isa_traits.hpp>
+#include "ie_parallel.hpp"
 
 namespace ov {
 namespace intel_cpu {
 
 using const_node_ptr = const std::shared_ptr<const ov::Node>;
 
-bool Transformations::fuse_type_to_convert(const std::shared_ptr<ngraph::Node>& node, const precisions_map& precisions) {
+bool Transformations::fuse_type_to_convert(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions) {
     const auto& from = node->get_output_element_type(0);
     auto it = precisions.find(from);
     if (it == precisions.end())
@@ -136,7 +137,7 @@ bool Transformations::fuse_type_to_convert(const std::shared_ptr<ngraph::Node>& 
         // is converted to be 1 for boolean, but 0 for u8. Thus an Abs and Ceil node should be added before the
         // Convert node for this scenario.
         if (convert->input(0).get_element_type().is_real() &&
-            convert->get_convert_element_type() == ngraph::element::boolean && to.is_integral_number()) {
+            convert->get_convert_element_type() == ov::element::boolean && to.is_integral_number()) {
             auto abs = std::make_shared<ov::opset10::Abs>(convert->input_value(0).get_node_shared_ptr());
             auto ceil = std::make_shared<ov::opset10::Ceiling>(abs);
             auto new_convert = std::make_shared<ov::opset10::Convert>(ceil, to);
@@ -286,22 +287,18 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         ov::pass::ConvertBatchToSpace, ov::pass::ConvertSpaceToBatch);
 
     auto isCellPrimitiveSupported = [](const_node_ptr &node) -> bool {
-        if (const auto &rnn_cell = std::dynamic_pointer_cast<const ov::opset4::RNNCell>(node)) {
+        if (auto rnn_cell = ov::as_type<const ov::opset4::RNNCell>(node.get())) {
             return rnn_cell->get_clip() == 0.0f;
-        } else if (const auto &gru_cell = std::dynamic_pointer_cast<const ov::opset4::GRUCell>(
-                       node)) {
+        } else if (auto gru_cell = ov::as_type<const ov::opset4::GRUCell>(node.get())) {
             return gru_cell->get_clip() == 0.0f
                 && gru_cell->get_activations() == std::vector<std::string>{"sigmoid", "tanh"};
-        } else if (const auto &augru_cell = std::dynamic_pointer_cast<const ov::op::internal::AUGRUCell>(
-                       node)) {
+        } else if (auto augru_cell = ov::as_type<const ov::op::internal::AUGRUCell>(node.get())) {
             return augru_cell->get_clip() == 0.0f
                 && augru_cell->get_activations() == std::vector<std::string>{"sigmoid", "tanh"};
-        } else if (const auto &lstm_cell = std::dynamic_pointer_cast<const ov::opset4::LSTMCell>(
-                       node)) {
+        } else if (auto lstm_cell = ov::as_type<const ov::opset4::LSTMCell>(node.get())) {
             return lstm_cell->get_clip() == 0.0f &&
                 lstm_cell->get_activations() == std::vector<std::string>{"sigmoid", "tanh", "tanh"};
-        } else if (const auto &lstm_cell_v1 = std::dynamic_pointer_cast<const ov::opset1::LSTMCell>(
-                       node)) {
+        } else if (auto lstm_cell_v1 = ov::as_type<const ov::opset1::LSTMCell>(node.get())) {
             return lstm_cell_v1->get_clip() == 0.0f &&
                 lstm_cell_v1->get_activations() == std::vector<std::string>{"sigmoid", "tanh", "tanh"};
         }
@@ -322,24 +319,21 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         if (data_pshape.rank().is_static() && data_pshape.rank().get_length() > 1 && !data_pshape[1].is_static())
             return false;
         auto max_seq_len = data.get_shape().at(1);
-        if (const auto &rnn_seq = std::dynamic_pointer_cast<const ov::opset6::RNNSequence>(node)) {
+        if (const auto &rnn_seq = ov::as_type<const op::v5::RNNSequence>(node.get())) {
             return rnn_seq->get_clip() == 0.0f &&
                 !ov::op::util::is_seq_len_provided(rnn_seq->get_input_node_shared_ptr(2),
                                                    max_seq_len);
-        } else if (const auto &gru_seq = std::dynamic_pointer_cast<const ov::opset6::GRUSequence>(
-                       node)) {
+        } else if (const auto &gru_seq = ov::as_type<const ov::opset6::GRUSequence>(node.get())) {
             return gru_seq->get_clip() == 0.0f &&
                 gru_seq->get_activations() == std::vector<std::string>{"sigmoid", "tanh"} &&
                 !ov::op::util::is_seq_len_provided(gru_seq->get_input_node_shared_ptr(2),
                                                    max_seq_len);
-        } else if (const auto &augru_seq = std::dynamic_pointer_cast<const ov::op::internal::AUGRUSequence>(
-                       node)) {
+        } else if (const auto &augru_seq = ov::as_type<const ov::op::internal::AUGRUSequence>(node.get())) {
             return augru_seq->get_clip() == 0.0f &&
                 augru_seq->get_activations() == std::vector<std::string>{"sigmoid", "tanh"} &&
                 !ov::op::util::is_seq_len_provided(augru_seq->get_input_node_shared_ptr(2),
                                                    max_seq_len);
-        } else if (const auto &lstm_seq = std::dynamic_pointer_cast<const ov::opset6::LSTMSequence>(
-                       node)) {
+        } else if (const auto &lstm_seq = ov::as_type<const ov::opset6::LSTMSequence>(node.get())) {
             return lstm_seq->get_clip() == 0.0f &&
                 lstm_seq->get_activations() == std::vector<std::string>{"sigmoid", "tanh", "tanh"} &&
                 !ov::op::util::is_seq_len_provided(lstm_seq->get_input_node_shared_ptr(3),
@@ -528,7 +522,7 @@ void Transformations::Lpt(const bool hasINT16orINT32Levels, const std::vector<ov
         LayerTransformation::Params(updatePrecision, ov::element::f32, defaultPrecisions));
     CPU_SET_CALLBACK_COMMON(lptManager,
         [](const_node_ptr& node) -> bool {
-            if (const auto mulitply = std::dynamic_pointer_cast<const ov::opset1::Multiply>(node)) {
+            if (const auto mulitply = ov::as_type_ptr<const ov::opset1::Multiply>(node)) {
                 return !MultiplyToGroupConvolutionTransformation::canBeTransformedToGroupConvolution(mulitply);
             }
             return false;

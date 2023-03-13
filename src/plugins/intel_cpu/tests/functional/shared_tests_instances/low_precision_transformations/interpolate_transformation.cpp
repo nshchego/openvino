@@ -8,11 +8,11 @@ using namespace LayerTestsDefinitions;
 using namespace InferenceEngine::details;
 
 namespace {
-const std::vector<ngraph::element::Type> precisions = {
-    ngraph::element::f32
+const std::vector<ov::element::Type> precisions = {
+    ov::element::f32
 };
 
-const std::vector<std::pair<ngraph::PartialShape, ngraph::Shape>> shapes = {
+const std::vector<std::pair<ov::PartialShape, ov::Shape>> shapes = {
     {{1, 4, 16, 16}, {32, 32}},
     {{1, 2, 48, 80}, {50, 60}},
 };

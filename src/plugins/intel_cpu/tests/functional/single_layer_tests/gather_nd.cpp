@@ -23,7 +23,7 @@ using GatherNDLayerCPUTestParamSet = std::tuple<
 class GatherNDLayerCPUTest : public testing::WithParamInterface<GatherNDLayerCPUTestParamSet>,
                              virtual public SubgraphBaseTest {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<GatherNDLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<GatherNDLayerCPUTestParamSet> &obj) {
         InputShape shapes;
         std::pair<Shape, std::vector<int>> indexes;
         ElementType dataElementType, idxElementType;
@@ -56,17 +56,17 @@ protected:
         init_input_shapes({shapes});
 
         auto params = ngraph::builder::makeDynamicParams(dataElementType, inputDynamicShapes);
-        auto indexes_node = ngraph::opset3::Constant::create(idxElementType, indexes.first, indexes.second);
+        auto indexes_node = ov::op::v0::Constant::create(idxElementType, indexes.first, indexes.second);
         auto gather_nd = std::make_shared<ngraph::opset5::GatherND>(params[0], indexes_node, batchDims);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(gather_nd)};
-        function = std::make_shared<ngraph::Function>(results, params, "gatherND");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(gather_nd)};
+        function = std::make_shared<ov::Model>(results, params, "gatherND");
     }
 };
 
 class GatherND8LayerCPUTest : public testing::WithParamInterface<GatherNDLayerCPUTestParamSet>,
                               virtual public SubgraphBaseTest {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<GatherNDLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<GatherNDLayerCPUTestParamSet> &obj) {
         return GatherNDLayerCPUTest::getTestCaseName(obj);
     }
 
@@ -82,10 +82,10 @@ protected:
         init_input_shapes({shapes});
 
         auto params = ngraph::builder::makeDynamicParams(dataElementType, inputDynamicShapes);
-        auto indexes_node = ngraph::opset3::Constant::create(idxElementType, indexes.first, indexes.second);
+        auto indexes_node = ov::op::v0::Constant::create(idxElementType, indexes.first, indexes.second);
         auto gather_nd = std::make_shared<ngraph::opset8::GatherND>(params[0], indexes_node, batchDims);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(gather_nd)};
-        function = std::make_shared<ngraph::Function>(results, params, "gatherND");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(gather_nd)};
+        function = std::make_shared<ov::Model>(results, params, "gatherND");
     }
 };
 

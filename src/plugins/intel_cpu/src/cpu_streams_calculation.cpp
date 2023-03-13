@@ -15,6 +15,7 @@
 #include "openvino/runtime/threading/istreams_executor.hpp"
 #include "performance_heuristics.hpp"
 #include "threading/ie_cpu_streams_info.hpp"
+#include "utils/debug_capabilities.h"
 
 using namespace InferenceEngine;
 using namespace ov;

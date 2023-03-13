@@ -2,14 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
 #include "embedding_bag_sum.h"
-#include <ngraph/opsets/opset1.hpp>
-#include "common/cpu_memcpy.h"
+
+#include "ie_parallel.hpp"
 
 using namespace InferenceEngine;
 
@@ -18,7 +13,7 @@ namespace intel_cpu {
 namespace node {
 
 EmbeddingBagSum::EmbeddingBagSum(
-            const std::shared_ptr<ngraph::Node>& op,
+            const std::shared_ptr<ov::Node>& op,
             size_t requiredInputNum,
             size_t indicesIdx,
             size_t perSampleWeightsIdx,

@@ -10,8 +10,8 @@
 using namespace LayerTestsDefinitions;
 
 namespace {
-const std::vector<ngraph::element::Type> netPrecisions = {
-    ngraph::element::f32
+const std::vector<ov::element::Type> netPrecisions = {
+    ov::element::f32
 };
 
 const std::vector<ngraph::pass::low_precision::LayerTransformation::Params> trasformationParamValues = {
@@ -20,7 +20,7 @@ const std::vector<ngraph::pass::low_precision::LayerTransformation::Params> tras
 
 const std::vector<bool> addPrecisionPreserved = { true, false };
 
-const std::vector<std::pair<ngraph::PartialShape, ngraph::Shape>> inputShapes = {
+const std::vector<std::pair<ov::PartialShape, ov::Shape>> inputShapes = {
     {{ 1, 6, 24, 24 }, { 1, 24, 18, 18 }},
     {{ 1, 6, 24 }, { 1, 24, 18 }}
 };
@@ -30,8 +30,8 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
     {
         3ul,
         -1,
-        { 256ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 256ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "Convolution",
         "U8"
@@ -40,8 +40,8 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
     {
         3ul,
         0,
-        { 256ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 256ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "Convolution",
         "U8"
@@ -50,8 +50,8 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
     {
         3ul,
         1,
-        { 256ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 256ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "Convolution",
         "U8"
@@ -68,7 +68,7 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
             { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f },
             { 25.5f, 25.5f, 25.5f / 2.f, 25.5f / 2.f, 25.5f / 4.f, 25.5f / 4.f }
         },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "Convolution",
         "U8"
@@ -77,8 +77,8 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
     {
         3ul,
         -1,
-        { 256ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 256ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         false,
         "Convolution",
         "U8"
@@ -200,7 +200,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_LPT, GroupConvolutionTransformation,
 }  // namespace test_values_3d
 
 namespace depthwise {
-const std::vector<std::pair<ngraph::PartialShape, ngraph::Shape>> inputShapes = {
+const std::vector<std::pair<ov::PartialShape, ov::Shape>> inputShapes = {
     {{ 1, 6, 24, 24 }, { 1, 6, 18, 18 }},
     {{ 1, 6, 24 }, { 1, 6, 18 }},
 };
@@ -210,8 +210,8 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
     {
         6ul,
         -1,
-        { 256ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 256ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 25.5f }, { 0.f }, { 25.5f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "",
         ""
@@ -228,7 +228,7 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
             { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f },
             { 25.5f, 25.5f, 25.5f / 2.f, 25.5f / 2.f, 25.5f / 4.f, 25.5f / 4.f }
         },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "",
         ""
@@ -245,7 +245,7 @@ const std::vector<LayerTestsDefinitions::GroupConvolutionTransformationParam> pa
             { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f },
             { 25.5f, 25.5f, 25.5f / 2.f, 25.5f / 2.f, 25.5f / 4.f, 25.5f / 4.f }
         },
-        { 255ul, ngraph::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
+        { 255ul, ov::Shape { 1, 1, 1, 1 }, { 0.f }, { 254.f }, { -127.f }, { 127.f } },
         true,
         "",
         ""

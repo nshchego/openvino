@@ -48,7 +48,7 @@ public:
     typedef std::shared_ptr<ExecutorContext> Ptr;
     typedef std::shared_ptr<const ExecutorContext> CPtr;
 
-    ExecutorContext(const GraphContext::CPtr graphContext, const std::vector<impl_desc_type>& implPriorities) {
+    ExecutorContext(const GraphContext::CPtr& graphContext, const std::vector<impl_desc_type>& implPriorities) {
         this->runtimeCache = graphContext->getParamsCache();
         this->scratchPad = graphContext->getScratchPad();
         this->engine = graphContext->getEngine();

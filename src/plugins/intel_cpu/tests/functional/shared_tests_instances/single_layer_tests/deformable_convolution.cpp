@@ -34,7 +34,7 @@ const auto deformableConv2DParams_ExplicitPadding = ::testing::Combine(
     ::testing::ValuesIn(padBegins), ::testing::ValuesIn(padEnds),
     ::testing::ValuesIn(dilations), ::testing::ValuesIn(groups),
     ::testing::ValuesIn(defor_groups), ::testing::ValuesIn(numOutChannels),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT), ::testing::ValuesIn(with_bilinear_interpolation_pad),
+    ::testing::Values(ov::op::PadType::EXPLICIT), ::testing::ValuesIn(with_bilinear_interpolation_pad),
     ::testing::ValuesIn(with_modulated_scalar));
 
 const auto deformableConv2DParams_AutoPadValid = ::testing::Combine(
@@ -44,7 +44,7 @@ const auto deformableConv2DParams_AutoPadValid = ::testing::Combine(
     ::testing::Values(std::vector<ptrdiff_t>({0, 0})),
     ::testing::ValuesIn(dilations), ::testing::ValuesIn(groups),
     ::testing::ValuesIn(defor_groups), ::testing::ValuesIn(numOutChannels),
-    ::testing::Values(ngraph::op::PadType::VALID),
+    ::testing::Values(ov::op::PadType::VALID),
     ::testing::ValuesIn(with_bilinear_interpolation_pad),
     ::testing::ValuesIn(with_modulated_scalar));
 
@@ -55,7 +55,7 @@ const auto deformableConv2DParams_DeformableGroups_AutoPadExplicit = ::testing::
     ::testing::Values(std::vector<ptrdiff_t>({0, 0})),
     ::testing::ValuesIn(dilations), ::testing::ValuesIn(groups),
     ::testing::ValuesIn(multiple_defor_groups), ::testing::ValuesIn(numOutChannels),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(with_bilinear_interpolation_pad),
     ::testing::ValuesIn(with_modulated_scalar));
 
@@ -111,7 +111,7 @@ const auto deformableConv2DParams_SingleTestCase = ::testing::Combine(
     ::testing::ValuesIn(groups),
     ::testing::ValuesIn(single_deform_groups),
     ::testing::ValuesIn(numOutChannels),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(with_bilinear_interpolation_pad),
     ::testing::ValuesIn(with_modulated_scalar)
 );
@@ -142,7 +142,7 @@ INSTANTIATE_TEST_SUITE_P(
                         ::testing::ValuesIn(std::vector<size_t> {2}),  // gr.
                         ::testing::ValuesIn(std::vector<size_t> {2}),  // def. gr.
                         ::testing::ValuesIn(numOutChannels),
-                        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+                        ::testing::Values(ov::op::PadType::EXPLICIT),
                         ::testing::ValuesIn(with_bilinear_interpolation_pad),
                         ::testing::ValuesIn(with_modulated_scalar)),
                         ::testing::ValuesIn(netPrecisions),
@@ -166,7 +166,7 @@ INSTANTIATE_TEST_SUITE_P(
                         ::testing::ValuesIn(std::vector<size_t> {4}),  // gr.
                         ::testing::ValuesIn(std::vector<size_t> {1}),  // def. gr.
                         ::testing::ValuesIn(numOutChannels),
-                        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+                        ::testing::Values(ov::op::PadType::EXPLICIT),
                         ::testing::ValuesIn(with_bilinear_interpolation_pad),
                         ::testing::ValuesIn(with_modulated_scalar)),
                         ::testing::ValuesIn(netPrecisions),

@@ -22,7 +22,7 @@ public:
     static constexpr size_t BATCH_SHAPE = 3lu;
 
 public:
-    Eye(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Eye(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -32,10 +32,9 @@ public:
     bool needShapeInfer() const override {return true;};
     void executeDynamicImpl(dnnl::stream strm) override { execute(strm); }
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
-    std::string errorPrefix = "";
     ov::element::Type outType = ov::element::Type_t::undefined;
     template <typename inputType>
     void executeSpecified();
@@ -44,7 +43,7 @@ private:
     inline const size_t getRowNum() const {
         auto rowMem = getParentEdgeAt(ROWS_NUM)->getMemoryPtr();
         if (rowMem == nullptr)
-            IE_THROW() << errorPrefix << " doesn't contain row_count data";
+            THROW_CPU_NODE_ERR << " doesn't contain row_count data";
         const int *rowPtr = reinterpret_cast<const int *>(rowMem->GetPtr());
 
         return rowPtr[0];
@@ -52,7 +51,7 @@ private:
     inline const size_t getColNum() const {
         auto colMem = getParentEdgeAt(COLS_NUM)->getMemoryPtr();
         if (colMem == nullptr)
-            IE_THROW() << errorPrefix << " doesn't contain col_count data";
+            THROW_CPU_NODE_ERR << " doesn't contain col_count data";
         const int *colPtr =  reinterpret_cast<const int *>(colMem->GetPtr());
 
         return colPtr[0];
@@ -60,7 +59,7 @@ private:
     inline const int getDiagIndex() const {
         auto diagIndMem = getParentEdgeAt(DIAGONAL_INDEX)->getMemoryPtr();
         if (diagIndMem == nullptr)
-            IE_THROW() << errorPrefix << " doesn't contain diag_index data";
+            THROW_CPU_NODE_ERR << " doesn't contain diag_index data";
         const int *diagIndexPtr = reinterpret_cast<const int *>(diagIndMem->GetPtr());
 
         return diagIndexPtr[0];

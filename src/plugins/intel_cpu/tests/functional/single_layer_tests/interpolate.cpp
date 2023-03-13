@@ -41,7 +41,7 @@ using InterpolateLayerCPUTestParamsSet = std::tuple<InterpolateSpecificParams,
 class InterpolateLayerCPUTest : public testing::WithParamInterface<InterpolateLayerCPUTestParamsSet>,
                                 virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<InterpolateLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<InterpolateLayerCPUTestParamsSet> &obj) {
         InterpolateSpecificParams specificParams;
         ShapeParams shapeParams;
         ElementType prec;

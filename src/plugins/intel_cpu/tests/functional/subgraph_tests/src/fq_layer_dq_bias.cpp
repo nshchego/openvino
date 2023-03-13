@@ -35,7 +35,7 @@ class FQLayerDQBias : virtual public SubgraphBaseTest,
                       public CpuTestWithFusing,
                       public testing::WithParamInterface<FQLayerDQBiasParams> {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<FQLayerDQBiasParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<FQLayerDQBiasParams> &obj) {
         InputShape input_shape;
         std::string layer_type;
         std::tie(input_shape, layer_type) = obj.param;

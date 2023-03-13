@@ -43,9 +43,9 @@ using NmsParams = std::tuple<InputShapeParams,                                  
                              int32_t,                                            // Max output boxes per class
                              ThresholdValues,                                    // IOU, Score, Soft NMS sigma
                              ngraph::helpers::InputLayerType,                    // max_output_boxes_per_class input type
-                             ngraph::op::v9::NonMaxSuppression::BoxEncodingType, // Box encoding
+                             ov::op::v9::NonMaxSuppression::BoxEncodingType, // Box encoding
                              bool,                                               // Sort result descending
-                             ngraph::element::Type,                              // Output type
+                             ov::element::Type,                              // Output type
                              std::string>;                                       // Device name
 
 class NmsLayerCPUTest : public testing::WithParamInterface<NmsParams>, virtual public SubgraphBaseTest, public CPUTestsBase {
@@ -129,41 +129,41 @@ protected:
         std::tie(bounds, targetInDims) = inShapeParams;
 
         if (!bounds.empty()) {
-            inputDynamicShapes = std::vector<ngraph::PartialShape>{{bounds[BATCHES], bounds[BOXES], 4}, {bounds[BATCHES], bounds[CLASSES], bounds[BOXES]}};
+            inputDynamicShapes = std::vector<ov::PartialShape>{{bounds[BATCHES], bounds[BOXES], 4}, {bounds[BATCHES], bounds[CLASSES], bounds[BOXES]}};
         } else {
             size_t batches, boxes, classes;
             std::tie(batches, boxes, classes) = targetInDims.front();
             ov::Dimension numBatches(batches), numBoxes(boxes), numClasses(classes);
-            inputDynamicShapes = std::vector<ngraph::PartialShape>{{numBatches, numBoxes, 4}, {numBatches, numClasses, numBoxes}};
+            inputDynamicShapes = std::vector<ov::PartialShape>{{numBatches, numBoxes, 4}, {numBatches, numClasses, numBoxes}};
         }
 
         for (const auto &ts : targetInDims) {
             size_t numBatches, numBoxes, numClasses;
             std::tie(numBatches, numBoxes, numClasses) = ts;
-            targetStaticShapes.push_back(std::vector<ngraph::Shape>{{numBatches, numBoxes, 4}, {numBatches, numClasses, numBoxes}});
+            targetStaticShapes.push_back(std::vector<ov::Shape>{{numBatches, numBoxes, 4}, {numBatches, numClasses, numBoxes}});
             if (maxOutBoxesType == ngraph::helpers::InputLayerType::PARAMETER) {
-                targetStaticShapes.back().push_back(ngraph::Shape{1});
+                targetStaticShapes.back().push_back(ov::Shape{1});
             }
         }
 
-        std::shared_ptr<ngraph::Node> maxOutBoxesPerClassNode;
+        std::shared_ptr<ov::Node> maxOutBoxesPerClassNode;
         auto params = ngraph::builder::makeDynamicParams(paramsPrec, inputDynamicShapes);
         params[0]->set_friendly_name("param_1");
         params[1]->set_friendly_name("param_2");
 
         if (maxOutBoxesType == ngraph::helpers::InputLayerType::PARAMETER) {
-            inputDynamicShapes.push_back(ngraph::PartialShape{1});
-            params.push_back(std::make_shared<ngraph::opset1::Parameter>(element::Type_t::i32, inputDynamicShapes.back()));
+            inputDynamicShapes.push_back(ov::PartialShape{1});
+            params.push_back(std::make_shared<ov::op::v0::Parameter>(element::Type_t::i32, inputDynamicShapes.back()));
             params[1]->set_friendly_name("param_3");
             maxOutBoxesPerClassNode = params.back();
         } else {
-            maxOutBoxesPerClassNode = builder::makeConstant(maxBoxPrec, ngraph::Shape{}, std::vector<int32_t>{maxOutBoxesPerClass});
+            maxOutBoxesPerClassNode = builder::makeConstant(maxBoxPrec, ov::Shape{}, std::vector<int32_t>{maxOutBoxesPerClass});
         }
 
-        auto iouThrNode = builder::makeConstant(thrPrec, ngraph::Shape{}, std::vector<float>{iouThr})->output(0);
-        auto scoreThrNode = builder::makeConstant(thrPrec, ngraph::Shape{}, std::vector<float>{scoreThr})->output(0);
-        auto softNmsSigmaNode = builder::makeConstant(thrPrec, ngraph::Shape{}, std::vector<float>{softNmsSigma})->output(0);
-        auto nms = std::make_shared<ngraph::op::v9::NonMaxSuppression>(params[0], params[1], maxOutBoxesPerClassNode, iouThrNode, scoreThrNode,
+        auto iouThrNode = builder::makeConstant(thrPrec, ov::Shape{}, std::vector<float>{iouThr})->output(0);
+        auto scoreThrNode = builder::makeConstant(thrPrec, ov::Shape{}, std::vector<float>{scoreThr})->output(0);
+        auto softNmsSigmaNode = builder::makeConstant(thrPrec, ov::Shape{}, std::vector<float>{softNmsSigma})->output(0);
+        auto nms = std::make_shared<ov::op::v9::NonMaxSuppression>(params[0], params[1], maxOutBoxesPerClassNode, iouThrNode, scoreThrNode,
                                                                        softNmsSigmaNode, boxEncoding, sortResDescend, outType);
 
         function = makeNgraphFunction(paramsPrec, params, nms, "NMS");

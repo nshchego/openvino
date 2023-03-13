@@ -40,7 +40,7 @@ std::vector<std::vector<size_t>> targetShapesNumpy1D = {
 const auto numpyBroadcast1DInputParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesNumpy1D),
         ::testing::Values(ngraph::AxisSet{}), //not used in numpy mode
-        ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+        ::testing::Values(ov::op::BroadcastType::NUMPY),
         ::testing::Values(std::vector<size_t>{1}),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -52,7 +52,7 @@ INSTANTIATE_TEST_CASE_P(smoke_PrecTransformation, BroadcastLayerTest,
         ::testing::Combine(
             ::testing::Values(targetShapesNumpy1D[0]),
             ::testing::Values(ngraph::AxisSet{}), //not used in numpy mode
-            ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+            ::testing::Values(ov::op::BroadcastType::NUMPY),
             ::testing::Values(std::vector<size_t>{1}),
             ::testing::ValuesIn(inputTPrecisions),
             ::testing::Values(CommonTestUtils::DEVICE_CPU)),
@@ -69,7 +69,7 @@ std::vector<std::vector<size_t>> targetShapesNumpy2D = {
 const auto numpyBroadcast2DInputParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesNumpy2D),
         ::testing::Values(ngraph::AxisSet{}), //not used in numpy mode
-        ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+        ::testing::Values(ov::op::BroadcastType::NUMPY),
         ::testing::Values(std::vector<size_t>{3, 1}),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -88,7 +88,7 @@ std::vector<std::vector<size_t>> targetShapesNumpy3D = {
 const auto numpyBroadcast3DInputParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesNumpy3D),
         ::testing::Values(ngraph::AxisSet{}), //not used in numpy mode
-        ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+        ::testing::Values(ov::op::BroadcastType::NUMPY),
         ::testing::Values(std::vector<size_t>{1, 4, 1}),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -100,7 +100,7 @@ INSTANTIATE_TEST_CASE_P(smoke_TestNumpyBroadcast3D, BroadcastLayerTest, numpyBro
 const auto numpyBroadcastNgraphEvaluateParams = ::testing::Combine(
         ::testing::Values(std::vector<size_t>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}),
         ::testing::Values(ngraph::AxisSet{}), //not used in numpy mode
-        ::testing::Values(ngraph::op::BroadcastType::NUMPY),
+        ::testing::Values(ov::op::BroadcastType::NUMPY),
         ::testing::Values(std::vector<size_t>{1, 2, 1, 4, 1, 6, 1, 8, 1, 10}),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -125,7 +125,7 @@ std::vector<std::vector<size_t>> targetShapesBidi = {
 const auto bidirectionalBroadcastParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesBidi),
         ::testing::Values(ngraph::AxisSet{}), //not used in bidirectional mode
-        ::testing::Values(ngraph::op::BroadcastType::BIDIRECTIONAL),
+        ::testing::Values(ov::op::BroadcastType::BIDIRECTIONAL),
         ::testing::ValuesIn(inShapesBidi),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -142,7 +142,7 @@ std::vector<ngraph::AxisSet> axes1D = { {0}, {2} };
 const auto explicitBroadcast1DInputParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesExplicit1D),
         ::testing::ValuesIn(axes1D),
-        ::testing::Values(ngraph::op::BroadcastType::EXPLICIT),
+        ::testing::Values(ov::op::BroadcastType::EXPLICIT),
         ::testing::ValuesIn(inShapesExplicit1D),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -153,7 +153,7 @@ INSTANTIATE_TEST_CASE_P(smoke_TestExplicitBroadcast1D, BroadcastLayerTest, expli
 const auto bidirectionalBroadcastParams3 = ::testing::Combine(
         ::testing::Values(targetShapesBidi[2]),
         ::testing::Values(ngraph::AxisSet{}), //not used in bidirectional mode
-        ::testing::Values(ngraph::op::BroadcastType::BIDIRECTIONAL),
+        ::testing::Values(ov::op::BroadcastType::BIDIRECTIONAL),
         ::testing::Values(inShapesBidi[2]),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -186,7 +186,7 @@ std::vector<ngraph::AxisSet> axes2D = { {1, 2}, {0, 2} };
 const auto explicitBroadcast2DInputParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesExplicit2D),
         ::testing::ValuesIn(axes2D),
-        ::testing::Values(ngraph::op::BroadcastType::EXPLICIT),
+        ::testing::Values(ov::op::BroadcastType::EXPLICIT),
         ::testing::ValuesIn(inShapesExplicit2D),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)
@@ -202,7 +202,7 @@ std::vector<ngraph::AxisSet> axes3D = { {0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 
 const auto explicitBroadcast3DInputParams = ::testing::Combine(
         ::testing::ValuesIn(targetShapesExplicit3D),
         ::testing::ValuesIn(axes3D),
-        ::testing::Values(ngraph::op::BroadcastType::EXPLICIT),
+        ::testing::Values(ov::op::BroadcastType::EXPLICIT),
         ::testing::ValuesIn(inShapesExplicit3D),
         ::testing::ValuesIn(inputPrecisions),
         ::testing::Values(CommonTestUtils::DEVICE_CPU)

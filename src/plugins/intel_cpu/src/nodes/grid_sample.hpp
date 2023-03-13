@@ -7,17 +7,13 @@
 #include <node.h>
 #include "kernels/x64/grid_sample.hpp"
 
-#include <memory>
-#include <string>
-#include <vector>
-
 namespace ov {
 namespace intel_cpu {
 namespace node {
 
 class GridSample : public Node {
 public:
-    GridSample(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context);
+    GridSample(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void getSupportedDescriptors() override {};

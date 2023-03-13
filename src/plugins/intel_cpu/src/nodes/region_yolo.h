@@ -4,11 +4,7 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
-#include <string>
-#include <memory>
-#include <vector>
 #include <nodes/common/softmax.h>
 
 namespace ov {
@@ -41,7 +37,7 @@ struct jit_uni_logistic_kernel {
 
 class RegionYolo : public Node {
 public:
-    RegionYolo(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    RegionYolo(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -49,7 +45,7 @@ public:
     void execute(dnnl::stream strm) override;
     bool created() const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 protected:
     bool needPrepareParams() const override;
@@ -62,8 +58,6 @@ private:
     float do_softmax;
     std::vector<int64_t> mask;
     InferenceEngine::Precision input_prec, output_prec;
-
-    std::string errorPrefix;
 
     int block_size;
     std::shared_ptr<jit_uni_logistic_kernel> logistic_kernel = nullptr;

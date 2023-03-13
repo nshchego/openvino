@@ -31,7 +31,7 @@ const auto binConv2DParams_ExplicitPadding = ::testing::Combine(
     ::testing::ValuesIn(padsEnd),
     ::testing::ValuesIn(dilations),
     ::testing::ValuesIn(numOutChannels),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(padValues));
 
 const auto binConv2DParams_ValidPadding = ::testing::Combine(
@@ -41,7 +41,7 @@ const auto binConv2DParams_ValidPadding = ::testing::Combine(
     ::testing::Values(std::vector<ptrdiff_t>({0, 0})),
     ::testing::ValuesIn(dilations),
     ::testing::ValuesIn(numOutChannels),
-    ::testing::Values(ngraph::op::PadType::VALID),
+    ::testing::Values(ov::op::PadType::VALID),
     ::testing::ValuesIn(padValues));
 
 INSTANTIATE_TEST_SUITE_P(

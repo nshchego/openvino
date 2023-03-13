@@ -626,7 +626,7 @@ InferRequest::InferRequest(const std::vector<std::shared_ptr<const ov::Node>>& i
                            ExecNetwork::Ptr execNetwork)
 : InferRequestBase(inputs, outputs, execNetwork) {
     for (const std::shared_ptr<const ov::Node>& in : inputs) {
-        modelInputsMap[ov::op::util::get_ie_output_name(ngraph::Output<const ngraph::Node>(in))] = in;
+        modelInputsMap[ov::op::util::get_ie_output_name(ngraph::Output<const ov::Node>(in))] = in;
     }
     for (const std::shared_ptr<const ov::Node>& out : outputs) {
         modelOutputsMap[ov::op::util::get_ie_output_name(out->input_value(0))] = out;

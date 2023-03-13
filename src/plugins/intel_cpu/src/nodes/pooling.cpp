@@ -9,14 +9,15 @@
 #include "concat.h"
 #include <memory>
 #include <oneapi/dnnl/dnnl.hpp>
-#include <string>
-#include <vector>
 #include <onednn/dnnl.h>
 #include <dnnl_extension_utils.h>
 #include <utils/general_utils.h>
 #include <memory_desc/cpu_memory_desc_utils.h>
 #include "memory_desc/dnnl_blocked_memory_desc.h"
 #include <common/primitive_hashing_utils.hpp>
+#include <openvino/op/max_pool.hpp>
+#include <openvino/op/avg_pool.hpp>
+#include "utils/debug_capabilities.h"
 
 // to access and change C pooling primitive desc internal padding field
 #include <common/primitive_desc_iface.hpp>
@@ -161,7 +162,7 @@ bool Pooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
     return true;
 }
 
-Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

@@ -20,7 +20,7 @@ namespace node {
 
 class Pooling : public Node {
 public:
-    Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context);
+    Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void createDescriptor(const std::vector<MemoryDescPtr>& inputDesc,
                           const std::vector<MemoryDescPtr>& outputDesc) override;

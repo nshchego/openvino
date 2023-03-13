@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-#include <algorithm>
+#include "experimental_detectron_roifeatureextractor.h"
 
-#include <ngraph/opsets/opset6.hpp>
+#include <openvino/op/experimental_detectron_roi_feature.hpp>
 #include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
-#include "experimental_detectron_roifeatureextractor.h"
 
 using namespace InferenceEngine;
 
@@ -281,11 +278,10 @@ void split_points(const std::vector<int>& ids, std::vector<int>& rois_per_level,
 
 } // namespace
 
-bool ExperimentalDetectronROIFeatureExtractor::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
+bool ExperimentalDetectronROIFeatureExtractor::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                                                               std::string& errorMessage) noexcept {
     try {
-        const auto roiFeatureExtractor = std::dynamic_pointer_cast<const ngraph::opset6::ExperimentalDetectronROIFeatureExtractor>(op);
-        if (!roiFeatureExtractor) {
+        if (op->get_type_info() != ov::op::v6::ExperimentalDetectronROIFeatureExtractor::get_type_info_static()) {
             errorMessage = "Only opset6 ExperimentalDetectronROIFeatureExtractor operation is supported";
             return false;
         }
@@ -296,15 +292,15 @@ bool ExperimentalDetectronROIFeatureExtractor::isSupportedOperation(const std::s
 }
 
 ExperimentalDetectronROIFeatureExtractor::ExperimentalDetectronROIFeatureExtractor(
-    const std::shared_ptr<ngraph::Node>& op,
-    const GraphContext::CPtr context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        const std::shared_ptr<ov::Node>& op,
+        const GraphContext::CPtr& context)
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto roiFeatureExtractor = std::dynamic_pointer_cast<const ngraph::opset6::ExperimentalDetectronROIFeatureExtractor>(op);
+    const auto roiFeatureExtractor = ov::as_type<const ov::op::v6::ExperimentalDetectronROIFeatureExtractor>(op.get());
     const auto &attr = roiFeatureExtractor->get_attrs();
     output_dim_ = attr.output_size;
     pyramid_scales_ = attr.pyramid_scales;

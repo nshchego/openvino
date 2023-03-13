@@ -16,7 +16,7 @@ namespace node {
 
 class Broadcast : public Node, public TileBroadcastCommon {
 public:
-    Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context);
+    Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -47,8 +47,6 @@ private:
 
     std::vector<int32_t> targetShape;
     std::vector<int32_t> axesMapping;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

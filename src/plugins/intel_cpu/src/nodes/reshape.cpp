@@ -3,17 +3,18 @@
 //
 
 #include "reshape.h"
+
+#include "common/cpu_memcpy.h"
+#include <openvino/op/reshape.hpp>
+#include <openvino/op/squeeze.hpp>
+#include <openvino/op/unsqueeze.hpp>
+
 #include "utils.hpp"
 #include <string>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
-#include <openvino/opsets/opset1.hpp>
 #include <ie_ngraph_utils.hpp>
 #include <utils/shape_inference/static_shape.hpp>
 #include <utils/shape_inference/shape_inference.hpp>
 #include "utils/shape_inference/shape_inference_cpu.hpp"
-
-#include "common/cpu_memcpy.h"
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -22,11 +23,11 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool Reshape::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Reshape::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!std::dynamic_pointer_cast<const ov::opset1::Reshape>(op) &&
-            !std::dynamic_pointer_cast<const ov::opset1::Squeeze>(op) &&
-                !std::dynamic_pointer_cast<const ov::opset1::Unsqueeze>(op)) {
+        if (!one_of(op->get_type_info(), op::v1::Reshape::get_type_info_static(),
+                                         op::v0::Squeeze::get_type_info_static(),
+                                         op::v0::Unsqueeze::get_type_info_static())) {
             errorMessage = "Only opset1 Reshape, Squeeze, Unsqueeze operations are supported";
             return false;
         }
@@ -226,29 +227,27 @@ private:
 };
 } // namespace
 
-Reshape::Reshape(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+Reshape::Reshape(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, ReshapeShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string(op->get_type_name()) + " node with name '" + getName() + "'";
-
     if (isDynamicNode()) {
-        auto checkSecondInput = [](const std::shared_ptr<ngraph::Node>& op, const std::string opType) {
+        auto checkSecondInput = [](const std::shared_ptr<ov::Node>& op, const std::string opType) {
             if (op->get_input_partial_shape(1).is_dynamic()) {
                 IE_THROW() << "CPU plug-in doesn't support " << opType << " node with non static second input";
             }
         };
 
-        if (std::dynamic_pointer_cast<const ov::opset1::Reshape>(op)) {
+        if (op->get_type_info() == ov::op::v1::Reshape::get_type_info_static()) {
             checkSecondInput(op, "Reshape");
-        } else if (std::dynamic_pointer_cast<const ov::opset1::Squeeze>(op)) {
+        } else if (op->get_type_info() == ov::op::v0::Squeeze::get_type_info_static()) {
             if (op->get_input_size() == 1)
                 IE_THROW() << "CPU plug-in doesn't support Squeeze node with inputs num equal 1";
             checkSecondInput(op, "Squeeze");
-        } else if (std::dynamic_pointer_cast<const ov::opset1::Unsqueeze>(op)) {
+        } else if (op->get_type_info() == ov::op::v0::Unsqueeze::get_type_info_static()) {
             checkSecondInput(op, "Unsqueeze");
         } else {
             IE_THROW() << "Unsupported operation type via reshape node";
@@ -287,8 +286,8 @@ void Reshape::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    InferenceEngine::Precision inPrec = getOriginalInputPrecisionAtPort(0);
-    InferenceEngine::Precision outPrec = getOriginalOutputPrecisionAtPort(0);
+    auto inPrec = getOriginalInputPrecisionAtPort(0);
+    const auto& outPrec = getOriginalOutputPrecisionAtPort(0);
     InferenceEngine::Precision secondInPrc = InferenceEngine::Precision::I32;
 
     // Current reshape implementation is simple memory reinterpret,

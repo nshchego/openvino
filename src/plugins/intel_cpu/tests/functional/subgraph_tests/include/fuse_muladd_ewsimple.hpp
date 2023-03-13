@@ -22,7 +22,7 @@ using FuseMulAddAndEwSimpleParams = std::tuple<
 class FuseMulAddAndEwSimpleTest : public testing::WithParamInterface<FuseMulAddAndEwSimpleParams>, public CPUTestUtils::CPUTestsBase,
         virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<FuseMulAddAndEwSimpleParams> obj);
+    static std::string getTestCaseName(const testing::TestParamInfo<FuseMulAddAndEwSimpleParams> &obj);
 
 protected:
     void SetUp() override;

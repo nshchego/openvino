@@ -29,7 +29,7 @@ std::shared_ptr<ov::Model> MakeMatMulModel() {
     auto add = ngraph::builder::makeEltwise(matmul, add_const, ngraph::helpers::EltwiseTypes::ADD);
     auto softmax = std::make_shared<ov::opset9::Softmax>(add);
 
-    ngraph::NodeVector results{softmax};
+    ov::NodeVector results{softmax};
     return std::make_shared<ov::Model>(results, params, "MatMulModel");
 }
 

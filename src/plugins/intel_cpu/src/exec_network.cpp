@@ -22,7 +22,6 @@
 #endif
 #include <threading/ie_cpu_streams_executor.hpp>
 #include <ie_system_conf.h>
-#include <ngraph/opsets/opset1.hpp>
 #include <transformations/utils/utils.hpp>
 #include <ie_ngraph_utils.hpp>
 #include "cpp_interfaces/interface/ie_iplugin_internal.hpp"
@@ -77,7 +76,7 @@ ExecNetwork::ExecNetwork(const InferenceEngine::CNNNetwork &network,
     if (function == nullptr) {
         IE_THROW() << "CPU plug-in doesn't support not ngraph-based model!";
     }
-    bool isFloatModel = !ov::op::util::has_op_with_type<ngraph::op::FakeQuantize>(function);
+    bool isFloatModel = !op::util::has_op_with_type<ngraph::op::FakeQuantize>(function);
 
     _cfg.isNewApi = !isLegacyAPI();
     _mutex = std::make_shared<std::mutex>();
@@ -393,10 +392,10 @@ bool ExecNetwork::CanProcessDynBatch(const InferenceEngine::CNNNetwork &network)
     for (const auto& op : ops) {
         auto type = TypeFromName(op->get_type_name());
         if (type == Type::Tile) {
-            const auto repeatsNode = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(op->get_input_node_shared_ptr(1));
+            const auto repeatsNode = ov::as_type<const op::v0::Constant>(op->get_input_node_shared_ptr(1).get());
             if (!repeatsNode)
                 return false;
-            const auto tile = std::dynamic_pointer_cast<const ngraph::opset1::Tile>(op);
+            const auto tile = ov::as_type<const op::v0::Tile>(op.get());
             if (tile && repeatsNode->cast_vector<int64_t>()[0] == 1)
                 continue;
         }

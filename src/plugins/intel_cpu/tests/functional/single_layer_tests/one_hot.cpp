@@ -58,7 +58,7 @@ public:
         result << CPUTestsBase::getTestCaseName(cpuParams);
         return result.str();
     }
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {
@@ -128,23 +128,23 @@ protected:
 
         compare(expectedOutputs, actualOutputs);
     }
-    std::shared_ptr<ngraph::Function> createFunction(bool depthConst) {
-        auto params = ngraph::builder::makeDynamicParams(ngraph::element::i32, {inputDynamicShapes.front()});
+    std::shared_ptr<ov::Model> createFunction(bool depthConst) {
+        auto params = ngraph::builder::makeDynamicParams(ov::element::i32, {inputDynamicShapes.front()});
         params.front()->set_friendly_name("ParamsIndices");
         std::shared_ptr<ov::Node> depth;
         if (depthConst) {
-            depth = ngraph::op::Constant::create(ngraph::element::i32, ngraph::Shape{ }, {Depth});
+            depth = ov::op::v0::Constant::create(ov::element::i32, ov::Shape{ }, {Depth});
         } else {
-            auto depthParam = std::make_shared<ngraph::op::Parameter>(ngraph::element::i32, ngraph::Shape{ });
+            auto depthParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i32, ov::Shape{ });
             depthParam->set_friendly_name("ParamDepth");
             params.push_back(depthParam);
             depth = depthParam;
         }
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::opset3::Parameter>(params));
-        auto on_value_const = std::make_shared<ngraph::op::Constant>(outType, ngraph::Shape{ }, OnValue);
-        auto off_value_const = std::make_shared<ngraph::op::Constant>(outType, ngraph::Shape{ }, OffValue);
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
+        auto on_value_const = std::make_shared<ov::op::v0::Constant>(outType, ov::Shape{ }, OnValue);
+        auto off_value_const = std::make_shared<ov::op::v0::Constant>(outType, ov::Shape{ }, OffValue);
         auto oneHot = std::make_shared<ngraph::opset5::OneHot>(paramOuts[0], depth, on_value_const, off_value_const, Axis);
-        return makeNgraphFunction(ngraph::element::i32, params, oneHot, "OneHot");
+        return makeNgraphFunction(ov::element::i32, params, oneHot, "OneHot");
     }
     void generateDepth() {
         testing::internal::Random random(time(nullptr));

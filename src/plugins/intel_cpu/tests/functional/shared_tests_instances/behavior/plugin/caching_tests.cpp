@@ -11,35 +11,35 @@ using namespace LayerTestsDefinitions;
 using namespace ngraph;
 
 namespace {
-    static const std::vector<ngraph::element::Type> precisionsCPU = {
-            ngraph::element::f32,
-            ngraph::element::f16,
-            ngraph::element::i32,
-            ngraph::element::i64,
-            ngraph::element::i8,
-            ngraph::element::u8,
-            ngraph::element::i16,
-            ngraph::element::u16,
+    static const std::vector<ov::element::Type> precisionsCPU = {
+            ov::element::f32,
+            ov::element::f16,
+            ov::element::i32,
+            ov::element::i64,
+            ov::element::i8,
+            ov::element::u8,
+            ov::element::i16,
+            ov::element::u16,
     };
 
-   static const std::vector<ngraph::element::Type> floatPrecisionsCPU = {
-            ngraph::element::f32,
-            ngraph::element::f16
+   static const std::vector<ov::element::Type> floatPrecisionsCPU = {
+            ov::element::f32,
+            ov::element::f16
     };
 
     static const std::vector<std::size_t> batchSizesCPU = {
             1, 2
     };
 
-    static const std::vector<ngraph::element::Type> precisionsCPUInternal = {
-            ngraph::element::f32
+    static const std::vector<ov::element::Type> precisionsCPUInternal = {
+            ov::element::f32
     };
 
     static const std::vector<std::size_t> batchSizesCPUInternal = {
             1
     };
 
-    static std::shared_ptr<ngraph::Function> simple_function_non_max_supression_internal(ngraph::element::Type, size_t) {
+    static std::shared_ptr<ov::Model> simple_function_non_max_supression_internal(ov::element::Type, size_t) {
         auto boxes = std::make_shared<opset1::Parameter>(element::f32, Shape{1, 1000, 4});
         auto scores = std::make_shared<opset1::Parameter>(element::f32, Shape{1, 1, 1000});
         auto max_output_boxes_per_class = opset1::Constant::create(element::i32, Shape{1}, {10});
@@ -52,7 +52,7 @@ namespace {
         return func;
     }
 
-    static std::shared_ptr<ngraph::Function> simple_function_matrix_nms_internal(ngraph::element::Type, size_t) {
+    static std::shared_ptr<ov::Model> simple_function_matrix_nms_internal(ov::element::Type, size_t) {
         auto boxes = std::make_shared<opset1::Parameter>(element::f32, Shape{1, 1000, 4});
         auto scores = std::make_shared<opset1::Parameter>(element::f32, Shape{1, 1, 1000});
         ov::op::v8::MatrixNms::Attributes attr;
@@ -64,7 +64,7 @@ namespace {
         return func;
     }
 
-    static std::shared_ptr<ngraph::Function> simple_function_multiclass_nms_internal(ngraph::element::Type, size_t) {
+    static std::shared_ptr<ov::Model> simple_function_multiclass_nms_internal(ov::element::Type, size_t) {
         auto boxes = std::make_shared<opset1::Parameter>(element::f32, Shape{1, 1000, 4});
         auto scores = std::make_shared<opset1::Parameter>(element::f32, Shape{1, 1, 1000});
         op::util::MulticlassNmsBase::Attributes attr;

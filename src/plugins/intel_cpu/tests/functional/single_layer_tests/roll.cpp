@@ -21,7 +21,7 @@ using RollCPUTestParams = typename std::tuple<
 class RollLayerCPUTest : public testing::WithParamInterface<RollCPUTestParams>,
                          virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<RollCPUTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<RollCPUTestParams> &obj) {
         InputShape inputShape;
         ov::element::Type inputPrecision;
         std::vector<int64_t> shift;
@@ -56,13 +56,13 @@ protected:
 
         const auto paramsIn = ngraph::builder::makeDynamicParams(inputPrecision, inputDynamicShapes);
 
-        auto shiftNode = std::make_shared<ngraph::op::Constant>(ngraph::element::Type_t::i64, ngraph::Shape{shift.size()}, shift)->output(0);
-        auto axesNode = std::make_shared<ngraph::op::Constant>(ngraph::element::Type_t::i64, ngraph::Shape{axes.size()}, axes)->output(0);
+        auto shiftNode = std::make_shared<ov::op::v0::Constant>(ov::element::Type_t::i64, ov::Shape{shift.size()}, shift)->output(0);
+        auto axesNode = std::make_shared<ov::op::v0::Constant>(ov::element::Type_t::i64, ov::Shape{axes.size()}, axes)->output(0);
 
-        const auto paramsOut = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(paramsIn));
-        const auto roll = std::dynamic_pointer_cast<ngraph::op::v7::Roll>(ngraph::builder::makeRoll(paramsOut[0], shiftNode, axesNode));
-        const ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(roll)};
-        function = std::make_shared<ngraph::Function>(results, paramsIn, "roll");
+        const auto paramsOut = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(paramsIn));
+        const auto roll = ov::as_type_ptr<ov::op::v7::Roll>(ngraph::builder::makeRoll(paramsOut[0], shiftNode, axesNode));
+        const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(roll)};
+        function = std::make_shared<ov::Model>(results, paramsIn, "roll");
     }
 };
 

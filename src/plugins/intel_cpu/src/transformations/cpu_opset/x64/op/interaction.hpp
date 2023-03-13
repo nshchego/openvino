@@ -26,7 +26,7 @@ public:
 
     std::shared_ptr<Node> clone_with_new_inputs(const ngraph::OutputVector& new_args) const override;
 
-    ngraph::element::Type get_output_type() const { return m_output_type; }
+    ov::element::Type get_output_type() const { return m_output_type; }
 
     void set_fq_scales(const std::vector<float>& scales) {
         m_fq_scales = scales;
@@ -37,7 +37,7 @@ public:
     }
 
 private:
-    ngraph::element::Type m_output_type;
+    ov::element::Type m_output_type;
     std::vector<float> m_fq_scales;
 };
 

@@ -24,7 +24,7 @@ typedef std::tuple<
 class GatherLayerTestCPU : public testing::WithParamInterface<GatherLayerTestCPUParams>,
                            virtual public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<GatherLayerTestCPUParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<GatherLayerTestCPUParams> &obj) {
         std::vector<InputShape> inputShapes;
         std::tuple<int, int> axisAndBatchDims;
         ElementType netPrecision;
@@ -95,7 +95,7 @@ protected:
             }
         }
 
-        ngraph::ParameterVector params {
+        ov::ParameterVector params {
             std::make_shared<ov::op::v0::Parameter>(netPrecision, inputDynamicShapes[0]),
             std::make_shared<ov::op::v0::Parameter>(intInputsPrecision, inputDynamicShapes[1])
         };

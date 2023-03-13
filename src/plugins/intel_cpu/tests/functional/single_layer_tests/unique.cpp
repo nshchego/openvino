@@ -24,7 +24,7 @@ typedef std::tuple<
 class UniqueLayerTestCPU : public testing::WithParamInterface<UniqueLayerTestCPUParams>,
                            virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<UniqueLayerTestCPUParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<UniqueLayerTestCPUParams> &obj) {
         std::vector<InputShape> inputShapes;
         std::tuple<bool, int> flatOrAxis;
         bool sorted;

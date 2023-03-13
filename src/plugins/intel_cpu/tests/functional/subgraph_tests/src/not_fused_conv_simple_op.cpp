@@ -16,7 +16,7 @@ protected:
         targetDevice = CommonTestUtils::DEVICE_CPU;
 
         auto inputParams = builder::makeParams(element::f32, {{1, 3, 12, 9}, {1, 16, 12, 9}});
-        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(inputParams));
+        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
 
         std::shared_ptr<Node> conv;
         {
@@ -35,7 +35,7 @@ protected:
         const auto secondConsumpt = builder::makeEltwise(paramOuts[1], sharedNode, EltwiseTypes::ADD);
 
         NodeVector results{postOpCandidate, secondConsumpt};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "NotFusedConvSimpleOp");
+        function = std::make_shared<ov::Model>(results, inputParams, "NotFusedConvSimpleOp");
     }
 };
 

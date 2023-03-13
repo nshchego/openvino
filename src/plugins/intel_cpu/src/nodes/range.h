@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
 
 namespace ov {
@@ -13,7 +12,7 @@ namespace node {
 
 class Range : public Node {
 public:
-    Range(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Range(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -22,7 +21,7 @@ public:
     bool needPrepareParams() const override {return false;};
     bool needShapeInfer() const override {return false;};
     void executeDynamicImpl(dnnl::stream strm) override;
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
     template <typename data_t>
@@ -33,8 +32,6 @@ private:
     static const size_t RANGE_START = 0;
     static const size_t RANGE_LIMIT = 1;
     static const size_t RANGE_DELTA = 2;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

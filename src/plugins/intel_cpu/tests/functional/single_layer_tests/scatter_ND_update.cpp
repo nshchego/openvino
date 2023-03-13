@@ -28,7 +28,7 @@ using scatterUpdateParams = std::tuple<
 
 class ScatterNDUpdateLayerCPUTest : public testing::WithParamInterface<scatterUpdateParams>, public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<scatterUpdateParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<scatterUpdateParams> &obj) {
         ScatterNDUpdateLayerParams scatterParams;
         ElementType inputPrecision;
         ElementType idxPrecision;
@@ -109,7 +109,7 @@ protected:
 
         auto scatter = std::make_shared<ngraph::opset4::ScatterNDUpdate>(dataParams[0], indicesParam[0], dataParams[1]);
 
-        ngraph::ParameterVector allParams{ dataParams[0], indicesParam[0], dataParams[1] };
+        ov::ParameterVector allParams{ dataParams[0], indicesParam[0], dataParams[1] };
         function = makeNgraphFunction(inputPrecision, allParams, scatter, "ScatterNDUpdateLayerCPUTest");
     }
 };

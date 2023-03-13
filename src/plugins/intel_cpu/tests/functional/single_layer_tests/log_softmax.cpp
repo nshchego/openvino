@@ -23,7 +23,7 @@ class LogSoftmaxLayerCPUTest
           public SubgraphBaseTest,
           public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<logSoftmaxLayerTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<logSoftmaxLayerTestParams> &obj) {
         std::vector<InputShape> inputShapes;
         Precision netPrecision;
         int64_t axis;
@@ -65,10 +65,10 @@ protected:
         init_input_shapes(inputShapes);
 
         const auto params = ngraph::builder::makeDynamicParams(ngPrc, {inputDynamicShapes.front()});
-        const auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
-        const auto logSoftmax = std::make_shared<ngraph::op::v5::LogSoftmax>(paramOuts[0], axis);
-        const ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(logSoftmax)};
-        function = std::make_shared<ngraph::Function>(results, params, "logSoftmax");
+        const auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
+        const auto logSoftmax = std::make_shared<ov::op::v5::LogSoftmax>(paramOuts[0], axis);
+        const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(logSoftmax)};
+        function = std::make_shared<ov::Model>(results, params, "logSoftmax");
     }
 };
 

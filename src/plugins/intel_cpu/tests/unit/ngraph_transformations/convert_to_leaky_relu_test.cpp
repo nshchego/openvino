@@ -23,11 +23,11 @@ using namespace ov::intel_cpu;
 TEST(TransformationTests, ConvertToLeakyReluTest1) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 3, 16, 16 });
-        auto slope = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{}, { -2.f });
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::Shape{ 1, 3, 16, 16 });
+        auto slope = ov::op::v0::Constant::create(ov::element::f32, ngraph::Shape{}, { -2.f });
         auto prelu = std::make_shared<ngraph::opset1::PRelu>(input, slope);
 
-        f = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
         ngraph::pass::Manager m;
         m.register_pass<ov::pass::InitNodeInfo>();
         m.register_pass<ConvertToLeakyRelu>();
@@ -35,10 +35,10 @@ TEST(TransformationTests, ConvertToLeakyReluTest1) {
     }
 
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 3, 16, 16 });
-        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ngraph::element::f32);
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::Shape{ 1, 3, 16, 16 });
+        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ov::element::f32);
 
-        f_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
     }
 
     auto res = compare_functions(f, f_ref);
@@ -48,11 +48,11 @@ TEST(TransformationTests, ConvertToLeakyReluTest1) {
 TEST(TransformationTests, ConvertToLeakyReluTest2) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape::dynamic(4));
-        auto slope = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{}, { -2.f });
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::PartialShape::dynamic(4));
+        auto slope = ov::op::v0::Constant::create(ov::element::f32, ngraph::Shape{}, { -2.f });
         auto prelu = std::make_shared<ngraph::opset1::PRelu>(input, slope);
 
-        f = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
         ngraph::pass::Manager m;
         m.register_pass<ov::pass::InitNodeInfo>();
         m.register_pass<ConvertToLeakyRelu>();
@@ -60,10 +60,10 @@ TEST(TransformationTests, ConvertToLeakyReluTest2) {
     }
 
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape::dynamic(4));
-        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ngraph::element::f32);
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::PartialShape::dynamic(4));
+        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ov::element::f32);
 
-        f_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
     }
 
     auto res = compare_functions(f, f_ref);
@@ -73,11 +73,11 @@ TEST(TransformationTests, ConvertToLeakyReluTest2) {
 TEST(TransformationTests, ConvertToLeakyReluTest3) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape::dynamic());
-        auto slope = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{}, { -2.f });
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::PartialShape::dynamic());
+        auto slope = ov::op::v0::Constant::create(ov::element::f32, ngraph::Shape{}, { -2.f });
         auto prelu = std::make_shared<ngraph::opset1::PRelu>(input, slope);
 
-        f = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
         ngraph::pass::Manager m;
         m.register_pass<ov::pass::InitNodeInfo>();
         m.register_pass<ConvertToLeakyRelu>();
@@ -85,10 +85,10 @@ TEST(TransformationTests, ConvertToLeakyReluTest3) {
     }
 
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape::dynamic());
-        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ngraph::element::f32);
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::PartialShape::dynamic());
+        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ov::element::f32);
 
-        f_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
     }
 
     auto res = compare_functions(f, f_ref);
@@ -98,15 +98,15 @@ TEST(TransformationTests, ConvertToLeakyReluTest3) {
 TEST(TransformationTests, ConvertToLeakyReluTest4) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::u8, ngraph::Shape{ 1, 3, 16, 16 });
-        auto slope = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{}, { -2.f });
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::u8, ngraph::Shape{ 1, 3, 16, 16 });
+        auto slope = ov::op::v0::Constant::create(ov::element::f32, ngraph::Shape{}, { -2.f });
         auto relaxed_prelu = std::make_shared<ov::op::TypeRelaxed<ngraph::opset1::PRelu>>(
-            ngraph::element::TypeVector{ ngraph::element::f32, ngraph::element::f32 },
-            ngraph::element::TypeVector{ ngraph::element::f32 },
-            ov::op::TemporaryReplaceOutputType(input, ngraph::element::f32).get(),
-            ov::op::TemporaryReplaceOutputType(slope, ngraph::element::f32).get());
+            ov::element::TypeVector{ ov::element::f32, ov::element::f32 },
+            ov::element::TypeVector{ ov::element::f32 },
+            ov::op::TemporaryReplaceOutputType(input, ov::element::f32).get(),
+            ov::op::TemporaryReplaceOutputType(slope, ov::element::f32).get());
 
-        f = std::make_shared<ngraph::Function>(ngraph::NodeVector{ relaxed_prelu }, ngraph::ParameterVector{ input });
+        f = std::make_shared<ngraph::Function>(ov::NodeVector{ relaxed_prelu }, ngraph::ParameterVector{ input });
         ngraph::pass::Manager m;
         m.register_pass<ov::pass::InitNodeInfo>();
         m.register_pass<ConvertToLeakyRelu>();
@@ -114,10 +114,10 @@ TEST(TransformationTests, ConvertToLeakyReluTest4) {
     }
 
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::u8, ngraph::Shape{ 1, 3, 16, 16 });
-        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ngraph::element::f32);
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::u8, ngraph::Shape{ 1, 3, 16, 16 });
+        auto prelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(input, -2.f, ov::element::f32);
 
-        f_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
     }
 
     auto res = compare_functions(f, f_ref);
@@ -127,11 +127,11 @@ TEST(TransformationTests, ConvertToLeakyReluTest4) {
 TEST(TransformationTests, ConvertToLeakyReluTest5) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 3, 16, 16 });
-        auto slope = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 3 }, { -2.f, -1.f, -2.f });
+        auto input = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ngraph::Shape{ 1, 3, 16, 16 });
+        auto slope = ov::op::v0::Constant::create(ov::element::f32, ngraph::Shape{ 3 }, { -2.f, -1.f, -2.f });
         auto prelu = std::make_shared<ngraph::opset1::PRelu>(input, slope);
 
-        f = std::make_shared<ngraph::Function>(ngraph::NodeVector{ prelu }, ngraph::ParameterVector{ input });
+        f = std::make_shared<ngraph::Function>(ov::NodeVector{ prelu }, ngraph::ParameterVector{ input });
         f_ref = f;
 
         ngraph::pass::Manager m;

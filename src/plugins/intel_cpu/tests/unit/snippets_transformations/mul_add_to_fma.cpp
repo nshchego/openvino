@@ -119,7 +119,7 @@ typedef std::tuple<
 
 class MulAddToFMATests : public LoweringTests, public testing::WithParamInterface<MulAddToFMAParams> {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<MulAddToFMAParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<MulAddToFMAParams> &obj) {
         std::vector<PartialShape> inputShapes(3);
         PartialShape master_shape;
         size_t add_input_idx;

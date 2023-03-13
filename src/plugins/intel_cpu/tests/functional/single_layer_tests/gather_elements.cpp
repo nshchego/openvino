@@ -70,7 +70,7 @@ public:
         return result.str();
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {
@@ -98,12 +98,12 @@ protected:
         selectedType = std::string("ref_any_") + ov::element::Type(dPrecision).get_type_name();
         init_input_shapes(shapes);
 
-        ngraph::ParameterVector params = {
-            std::make_shared<ngraph::opset1::Parameter>(dPrecision, inputDynamicShapes[0]),
-            std::make_shared<ngraph::opset1::Parameter>(iPrecision, inputDynamicShapes[1]),
+        ov::ParameterVector params = {
+            std::make_shared<ov::op::v0::Parameter>(dPrecision, inputDynamicShapes[0]),
+            std::make_shared<ov::op::v0::Parameter>(iPrecision, inputDynamicShapes[1]),
         };
 
-        auto gather = std::make_shared<ngraph::op::v6::GatherElements>(
+        auto gather = std::make_shared<ov::op::v6::GatherElements>(
             params[0], params[1], axis);
         function = makeNgraphFunction(dPrecision, params, gather, "GatherElements");
     }

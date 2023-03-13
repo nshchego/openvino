@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-
-#include <ngraph/opsets/opset1.hpp>
-#include "ie_parallel.hpp"
 #include "reverse_sequence.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/reverse_sequence.hpp>
 
 using namespace InferenceEngine;
 
@@ -15,10 +13,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool ReverseSequence::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ReverseSequence::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto revSeq = std::dynamic_pointer_cast<const ngraph::opset1::ReverseSequence>(op);
-        if (!revSeq) {
+        if (op->get_type_info() != op::v0::ReverseSequence::get_type_info_static()) {
             errorMessage = "Only opset1 ReverseSequence operation is supported";
             return false;
         }
@@ -28,42 +25,41 @@ bool ReverseSequence::isSupportedOperation(const std::shared_ptr<const ngraph::N
     return true;
 }
 
-ReverseSequence::ReverseSequence(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+ReverseSequence::ReverseSequence(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "ReverseSequence layer with name '" + op->get_friendly_name() + "'";
-    const auto revSeq = std::dynamic_pointer_cast<const ngraph::opset1::ReverseSequence>(op);
+    auto revSeq = ov::as_type<const op::v0::ReverseSequence>(op.get());
     if (revSeq == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of ReverseSequence from opset1.";
 
     if (inputShapes.size() != 2  || outputShapes.size() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
     const auto dataRank = getInputShapeAtPort(REVERSESEQUENCE_DATA).getRank();
 
     if (dataRank < 2)
-        IE_THROW() << errorPrefix << " 'data' rank should be greater than or equal to 2";
+        THROW_CPU_NODE_ERR << " 'data' rank should be greater than or equal to 2";
 
     if (getInputShapeAtPort(REVERSESEQUENCE_LENGTHS).getRank() != 1)
-        IE_THROW() << errorPrefix << " 'seq_lengths' should be 1D tensor";
+        THROW_CPU_NODE_ERR << " 'seq_lengths' should be 1D tensor";
 
     if (dataRank != getOutputShapeAtPort(0).getRank())
-        IE_THROW() << errorPrefix << " has input/output rank mismatch";
+        THROW_CPU_NODE_ERR << " has input/output rank mismatch";
 
     seq_axis = revSeq->get_sequence_axis();
 
     if (seq_axis < 0 || seq_axis >= static_cast<int>(dataRank))
-        IE_THROW() << errorPrefix << " has incorrect 'seq_axis' parameters dimensions and axis number!";
+        THROW_CPU_NODE_ERR << " has incorrect 'seq_axis' parameters dimensions and axis number!";
 
     batch_axis = revSeq->get_batch_axis();
 
     if (batch_axis < 0 || batch_axis >= static_cast<int>(dataRank))
-        IE_THROW() << errorPrefix << " has incorrect 'batch_axis' parameters dimensions and axis number!";
+        THROW_CPU_NODE_ERR << " has incorrect 'batch_axis' parameters dimensions and axis number!";
 }
 
 void ReverseSequence::initSupportedPrimitiveDescriptors() {
@@ -86,13 +82,13 @@ void ReverseSequence::prepareParams() {
     const auto& dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
 
     if (!dataMemPtr || !dataMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocated input memory of 'data'";
+        THROW_CPU_NODE_ERR << " has not allocated input memory of 'data'";
     if (!seqLengthsMemPtr || !seqLengthsMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocated input memory of 'seq_lengths'";
+        THROW_CPU_NODE_ERR << " has not allocated input memory of 'seq_lengths'";
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocated output memory";
+        THROW_CPU_NODE_ERR << " has not allocated output memory";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << errorPrefix << " has unidentified preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << " has unidentified preferable primitive descriptor";
 
     const VectorDims& dataDims = dataMemPtr->getStaticDims();
     const VectorDims& seqLengthsDims = seqLengthsMemPtr->getStaticDims();
@@ -168,7 +164,7 @@ void ReverseSequence::ReverseSequenceExecutor::exec(const MemoryPtr& dataMemPtr,
 
 void ReverseSequence::execute(dnnl::stream strm) {
     if (!execPtr)
-        IE_THROW() << errorPrefix << " has no compiled executor";
+        THROW_CPU_NODE_ERR << " has no compiled executor";
 
     const auto precision = getParentEdgeAt(REVERSESEQUENCE_LENGTHS)->getMemory().getDesc().getPrecision();
     if (!one_of(precision, Precision::FP32, Precision::I32))

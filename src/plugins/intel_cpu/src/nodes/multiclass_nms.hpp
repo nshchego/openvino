@@ -21,14 +21,14 @@ enum class MulticlassNmsSortResultType {
 
 class MultiClassNms : public Node {
 public:
-    MultiClassNms(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    MultiClassNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
     void execute(dnnl::stream strm) override;
     bool created() const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     bool isExecutable() const override;
     void executeDynamicImpl(dnnl::stream strm) override;
@@ -66,8 +66,6 @@ private:
     bool m_normalized = true;
 
     bool m_outStaticShape = false;
-
-    std::string m_errorPrefix;
 
     std::vector<std::vector<size_t>> m_numFiltBox; // number of rois after nms for each class in each image
     std::vector<size_t> m_numBoxOffset;

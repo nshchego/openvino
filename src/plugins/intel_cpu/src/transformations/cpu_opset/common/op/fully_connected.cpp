@@ -8,7 +8,7 @@
 ov::intel_cpu::FullyConnectedNode::FullyConnectedNode(const ngraph::Output<Node>& A,
                                                      const ngraph::Output<Node>& B,
                                                      const ngraph::Rank& output_rank,
-                                                     const ngraph::element::Type output_type)
+                                                     const ov::element::Type output_type)
     : Op({A, B}), m_output_rank(output_rank), m_output_type(output_type) {
     validate_and_infer_types();
 }
@@ -17,12 +17,12 @@ ov::intel_cpu::FullyConnectedNode::FullyConnectedNode(const ngraph::Output<Node>
                                                      const ngraph::Output<Node>& B,
                                                      const ngraph::Output<Node>& C,
                                                      const ngraph::Rank& output_rank,
-                                                     const ngraph::element::Type output_type)
+                                                     const ov::element::Type output_type)
     : Op({A, B, C}), m_output_rank(output_rank), m_output_type(output_type) {
     validate_and_infer_types();
 }
 
-std::shared_ptr<ngraph::Node> ov::intel_cpu::FullyConnectedNode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
+std::shared_ptr<ov::Node> ov::intel_cpu::FullyConnectedNode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
     INTERNAL_OP_SCOPE(FullyConnectedNode_clone_with_new_inputs);
     check_new_args_count(this, new_args);
     if (new_args.size() == 2) {
@@ -92,7 +92,7 @@ void ov::intel_cpu::FullyConnectedNode::validate_and_infer_types() {
         output_pshape = ngraph::PartialShape::dynamic();
     }
 
-    auto output_type = m_output_type == ngraph::element::undefined ? get_input_element_type(0) : m_output_type;
+    auto output_type = m_output_type == ov::element::undefined ? get_input_element_type(0) : m_output_type;
     set_output_type(0, output_type, output_pshape);
 }
 

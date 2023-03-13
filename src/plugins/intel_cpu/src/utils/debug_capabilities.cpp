@@ -466,7 +466,7 @@ std::ostream & operator<<(std::ostream & os, const PrintableModel& model) {
             sep = ",";
         }
 
-        if (auto constop = std::dynamic_pointer_cast<op::v0::Constant>(op)) {
+        if (auto constop = ov::as_type<op::v0::Constant>(op.get())) {
             if (constop->get_element_type() == element::Type_t::f32) {
                 os << PrintableVector<float>(constop->get_vector<float>());
             } else if (constop->get_element_type() == element::Type_t::i8) {
@@ -492,7 +492,7 @@ std::ostream & operator<<(std::ostream & os, const PrintableModel& model) {
         os << std::endl;
 
         // recursively output subgraphs
-        if (auto msubgraph = std::dynamic_pointer_cast<op::util::MultiSubGraphOp>(op)) {
+        if (auto msubgraph = ov::as_type<op::util::MultiSubGraphOp>(op.get())) {
             auto cnt = msubgraph->get_internal_subgraphs_size();
             for (int i = 0; i < cnt; i++) {
                 os << "\t\t MultiSubGraphOp " << tag << msubgraph->get_friendly_name() << "[" << i << "]" << std::endl;

@@ -15,7 +15,7 @@ using namespace test;
 namespace CPULayerTestsDefinitions {
 
 using cumSumParams = std::tuple<
-    ngraph::element::Type, // data precision
+    ov::element::Type, // data precision
     InputShape, // input shape
     std::int64_t, // axis
     bool, // exclusive
@@ -24,8 +24,8 @@ using cumSumParams = std::tuple<
 class CumSumLayerCPUTest : public testing::WithParamInterface<cumSumParams>,
                            public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<cumSumParams> obj) {
-        ngraph::element::Type inputPrecision;
+    static std::string getTestCaseName(const testing::TestParamInfo<cumSumParams> &obj) {
+        ov::element::Type inputPrecision;
         InputShape shapes;
         std::int64_t axis;
         bool exclusive;
@@ -58,10 +58,10 @@ protected:
         init_input_shapes({shapes});
 
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
-        auto axisNode = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{}, std::vector<int64_t>{axis})->output(0);
+        auto axisNode = ov::op::v0::Constant::create(ov::element::i32, ov::Shape{}, std::vector<int64_t>{axis})->output(0);
         auto cumSum = ngraph::builder::makeCumSum(params[0], axisNode, exclusive, reverse);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ cumSum }, params, "CumSumLayerCPUTest");
+        function = std::make_shared<ov::Model>(ov::NodeVector{ cumSum }, params, "CumSumLayerCPUTest");
         functionRefs = ngraph::clone_function(*function);
     }
 };
@@ -71,10 +71,10 @@ TEST_P(CumSumLayerCPUTest, CompareWithRefs) {
     CheckPluginRelatedResults(compiledModel, "CumSum");
 }
 
-const ngraph::element::TypeVector inputPrecision = {
-    ngraph::element::i8,
-    ngraph::element::bf16,
-    ngraph::element::f32
+const ov::element::TypeVector inputPrecision = {
+    ov::element::i8,
+    ov::element::bf16,
+    ov::element::f32
 };
 
 const std::vector<int64_t> axes = { 0, 1, 2, 3, 4, 5, 6 };

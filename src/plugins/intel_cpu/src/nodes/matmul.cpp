@@ -4,24 +4,12 @@
 
 #include "matmul.h"
 
-#include "ie_precision.hpp"
-#include "memory_desc/cpu_blocked_memory_desc.h"
-#include "cpu_types.h"
-#include "eltwise.h"
-
-#include <numeric>
-#include <string>
-#include <vector>
-#include <memory>
-#include "common/cpu_memcpy.h"
-#include <ngraph/opsets/opset1.hpp>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "fake_quantize.h"
-#include "utils/general_utils.h"
-#include "memory_desc/cpu_memory_desc_utils.h"
-#include <dnnl_extension_utils.h>
 #include <common/primitive_hashing_utils.hpp>
 #include <cpu/x64/cpu_isa_traits.hpp>
+#include "eltwise.h"
+#include "fake_quantize.h"
+#include <openvino/op/matmul.hpp>
+#include "utils/debug_capabilities.h"
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -84,23 +72,22 @@ bool canBeExecutedInInt8(const Precision& firstInput, const Precision& secondInp
 }
 } // namespace
 
-bool MatMul::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool MatMul::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto matMul = std::dynamic_pointer_cast<const ngraph::opset1::MatMul>(op);
-        if (!matMul) {
+        if (op->get_type_info() != op::v0::MatMul::get_type_info_static()) {
             errorMessage = "Only opset1 MatMul operation is supported";
             return false;
         }
 
-        for (size_t i = 0; i < matMul->get_input_size(); i++) {
-            const auto inShapeRank = matMul->get_input_partial_shape(i).rank().get_length();
+        for (size_t i = 0; i < op->get_input_size(); i++) {
+            const auto inShapeRank = op->get_input_partial_shape(i).rank().get_length();
             if (inShapeRank < 2) {
                 errorMessage = "Unsupported rank: " + std::to_string(inShapeRank) + " on " + std::to_string(i) + " input";
                 return false;
             }
         }
 
-        const auto outShapeRank = matMul->get_output_partial_shape(0).rank().get_length();
+        const auto outShapeRank = op->get_output_partial_shape(0).rank().get_length();
         if (outShapeRank < 2) {
             errorMessage = "Unsupported rank: " + std::to_string(outShapeRank) + " on output";
             return false;
@@ -169,9 +156,9 @@ private:
 
 class MMShapeInferFactory : public ShapeInferFactory {
 public:
-    MMShapeInferFactory(const std::shared_ptr<ngraph::Node>& op) : m_op(op) {}
+    MMShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
-        if (const auto matmul = ov::as_type_ptr<const ngraph::opset1::MatMul>(m_op)) {
+        if (const auto matmul = ov::as_type_ptr<const op::v0::MatMul>(m_op)) {
             const auto output_rank = matmul->get_output_partial_shape(0).rank().get_length();
             const bool transpose_a = matmul->get_transpose_a();
             const bool transpose_b = matmul->get_transpose_b();
@@ -181,19 +168,17 @@ public:
        }
     }
 private:
-    std::shared_ptr<ngraph::Node> m_op;
+    std::shared_ptr<ov::Node> m_op;
 };
 } // namespace
 
-MatMul::MatMul(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
-    Node(op, context, MMShapeInferFactory(op)), withBiases(false) {
+MatMul::MatMul(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
+        Node(op, context, MMShapeInferFactory(op)), withBiases(false) {
     std::string errorMessage;
-    errorPrefix = "MatMul node with name '" + getName() + "'";
-
     if (!isSupportedOperation(op, errorMessage))
         IE_THROW(NotImplemented) << errorMessage;
 
-    const auto matMul = std::dynamic_pointer_cast<const ngraph::opset1::MatMul>(op);
+    auto matMul = ov::as_type<const op::v0::MatMul>(op.get());
 
     if (!matMul) {
         IE_THROW(NotImplemented) << "Operation with name " << op->get_friendly_name() << ":" << op->get_type_name() <<
@@ -319,9 +304,9 @@ dnnl::memory::desc MatMul::getBiasDescFrom(const DnnlMemoryDescCPtr outMemDesc) 
 
 void MatMul::getSupportedDescriptors() {
     if (getParentEdges().size() != getOriginalInputsNumber())
-        IE_THROW()  << errorPrefix << " has incorrect number of input edges for layer " << getName();
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges for layer " << getName();
     if (getChildEdges().empty())
-        IE_THROW()  << errorPrefix << " has incorrect number of output edges for layer " << getName();
+        THROW_CPU_NODE_ERR << " has incorrect number of output edges for layer " << getName();
 
     withBiases = getOriginalInputsNumber() == 3;
 
@@ -358,7 +343,7 @@ void MatMul::getSupportedDescriptors() {
     const auto& outputShape = getOutputShapeAtPort(0);
 
     if (inputShape0.getRank() != inputShape1.getRank() || inputShape0.getRank() != outputShape.getRank())
-        IE_THROW()  << errorPrefix << " has invalid dims count";
+        THROW_CPU_NODE_ERR << " has invalid dims count";
 
     const int nDims = inputShape0.getRank();
     const auto xAxis = nDims - 1;
@@ -376,14 +361,14 @@ void MatMul::getSupportedDescriptors() {
     if (!dimsEqualWeak(inDims0[xAxis0], inDims1[yAxis1]) ||
         !dimsEqualWeak(inDims0[yAxis0], outDims[yAxis]) ||
         !dimsEqualWeak(inDims1[xAxis1], outDims[xAxis]))
-        IE_THROW()  << errorPrefix << " has incorrect spatial input and output dimensions";
+        THROW_CPU_NODE_ERR << " has incorrect spatial input and output dimensions";
 
     for (int dim_idx = nDims - 3; dim_idx >= 0; dim_idx--) {
         if ((!dimsEqualWeak(inDims0[dim_idx], outDims[dim_idx]) &&
              !dimsEqualWeak(inDims0[dim_idx], 1)) ||
             (!dimsEqualWeak(inDims1[dim_idx], outDims[dim_idx]) &&
              !dimsEqualWeak(inDims1[dim_idx], 1))) {
-            IE_THROW()  << errorPrefix << " has incorrect input batch dimensions";
+            THROW_CPU_NODE_ERR << " has incorrect input batch dimensions";
         }
     }
 
@@ -561,13 +546,13 @@ void MatMul::prepareParams() {
     auto& src0MemPtr = getParentEdgeAt(0)->getMemoryPtr();
     auto& src1MemPtr = getParentEdgeAt(1)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW()  << errorPrefix << " did not allocate destination memory";
+        THROW_CPU_NODE_ERR << " did not allocate destination memory";
     if (!src0MemPtr || !src0MemPtr->isAllocated() || !src1MemPtr || !src1MemPtr->isAllocated())
-        IE_THROW()  << errorPrefix << " did not allocate input memory";
+        THROW_CPU_NODE_ERR << " did not allocate input memory";
 
     const NodeDesc *selected_pd = getSelectedPrimitiveDescriptor();
     if (selected_pd == nullptr)
-        IE_THROW()  << errorPrefix << " did not set preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << " did not set preferable primitive descriptor";
 
     DnnlMemoryDescPtr src0TransposedDesc;
     DnnlMemoryDescPtr src1TransposedDesc;
@@ -599,7 +584,7 @@ void MatMul::prepareParams() {
     if (withBiases) {
         auto& biasMemory = getParentEdgeAt(2)->getMemoryPtr();
         if (!biasMemory || !biasMemory->isAllocated())
-            IE_THROW()  << errorPrefix << " did not allocate bias memory";
+            THROW_CPU_NODE_ERR << " did not allocate bias memory";
         dnnlBiasMemDesc = biasMemory->GetDescWithType<DnnlMemoryDesc>();
     }
 
@@ -671,7 +656,7 @@ void MatMul::execute(dnnl::stream strm) {
     if (execPtr) {
         execPtr->exec(primArgs, strm);
     } else {
-        IE_THROW() << errorPrefix << " doesn't have an initialized executor";
+        THROW_CPU_NODE_ERR << " doesn't have an initialized executor";
     }
 }
 

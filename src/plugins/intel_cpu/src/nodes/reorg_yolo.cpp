@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-
-#include <ngraph/opsets/opset2.hpp>
-#include "ie_parallel.hpp"
 #include "reorg_yolo.h"
+
+#include <openvino/op/reorg_yolo.hpp>
 
 using namespace InferenceEngine;
 
@@ -14,10 +12,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool ReorgYolo::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ReorgYolo::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto reorgYolo = std::dynamic_pointer_cast<const ngraph::opset2::ReorgYolo>(op);
-        if (!reorgYolo) {
+        if (op->get_type_info() != op::v0::ReorgYolo::get_type_info_static()) {
             errorMessage = "Only opset2 ReorgYolo operation is supported";
             return false;
         }
@@ -27,21 +24,20 @@ bool ReorgYolo::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& 
     return true;
 }
 
-ReorgYolo::ReorgYolo(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ReorgYolo::ReorgYolo(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string(op->get_type_name()) + " node with name '" + op->get_friendly_name() + "'";
     if (getOriginalInputsNumber() != 1 || getOriginalOutputsNumber() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
-    const auto reorgYolo = std::dynamic_pointer_cast<const ngraph::opset2::ReorgYolo>(op);
+    auto reorgYolo = ov::as_type<const ov::op::v0::ReorgYolo>(op.get());
     const auto strides = reorgYolo->get_strides();
     if (strides.empty())
-        IE_THROW() << errorPrefix << " has empty strides";
+        THROW_CPU_NODE_ERR << " has empty strides";
     stride = strides[0];
 }
 

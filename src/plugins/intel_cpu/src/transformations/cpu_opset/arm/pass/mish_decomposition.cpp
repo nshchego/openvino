@@ -11,7 +11,7 @@ ov::intel_cpu::MishDecomposition::MishDecomposition() {
     auto mish = ngraph::pattern::wrap_type<opset4::Mish>();
 
     ngraph::matcher_pass_callback callback = [](ngraph::pattern::Matcher& m) {
-        auto mish = std::dynamic_pointer_cast<opset4::Mish>(m.get_match_root());
+        auto mish = ov::as_type<opset4::Mish>(m.get_match_root());
         if (!mish) {
             return false;
         }

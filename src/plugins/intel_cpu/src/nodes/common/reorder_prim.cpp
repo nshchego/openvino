@@ -7,12 +7,11 @@
 #include <dnnl_extension_utils.h>
 #include <dnnl_types.h>
 
-#include <algorithm>
+// #include <algorithm>
 #include <common/primitive_hashing_utils.hpp>
 #include <cpu/x64/cpu_isa_traits.hpp>
-#include <memory>
-#include <string>
 
+#include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
 
 namespace ov {

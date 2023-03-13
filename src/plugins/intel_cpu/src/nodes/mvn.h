@@ -5,10 +5,6 @@
 #pragma once
 
 #include <node.h>
-#include <string>
-#include <memory>
-#include <vector>
-#include <tuple>
 #include "executors/mvn_list.hpp"
 
 namespace ov {
@@ -75,9 +71,9 @@ struct jit_uni_mvn_kernel {
 
 class MVN : public Node {
 public:
-    MVN(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    MVN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     bool created() const override;

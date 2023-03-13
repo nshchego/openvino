@@ -71,17 +71,17 @@ inline auto compare(std::shared_ptr<ngraph::Function>& s, std::shared_ptr<ngraph
 inline auto wrapAsSnippet(std::shared_ptr<ngraph::Function>& f,
                           const ngraph::Shape& shape0,
                           const ngraph::Shape& shape1) -> std::shared_ptr<ngraph::Function> {
-    auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
-    auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
+    auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
+    auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
     auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input0, input1}, ngraph::clone_function(*f.get()));
-    return std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input0, input1});
+    return std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input0, input1});
 }
 
 inline auto wrapAsSnippet(std::shared_ptr<ngraph::Function>& f, const ngraph::Shape& shape0)
     -> std::shared_ptr<ngraph::Function> {
-    auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
+    auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
     auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input0}, ngraph::clone_function(*f.get()));
-    return std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input0});
+    return std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input0});
 }
 
 // Todo: Reimplement Snippets tests, so they won't require evaluate method for OP Subgraph
@@ -92,11 +92,11 @@ TEST(SnippetsTests, GenerateAddParams) {
     auto shape = ngraph::Shape{1, 4, 16, 31};
 
     auto f = ([] (const ngraph::Shape& shape) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input0, input1});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input0, input1});
     })(shape);
 
     auto s = wrapAsSnippet(f, shape, shape);
@@ -110,16 +110,16 @@ TEST(SnippetsTests, GenerateAddConstant) {
     auto shape = ngraph::Shape{1, 4, 16, 31};
 
     auto f = ([] (const ngraph::Shape& shape) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
 
         std::vector<float> vals(ngraph::shape_size(shape));
         for (int i = 0; i < ngraph::shape_size(shape); i++) {
             vals[i] = 1-i/2048.f;
         }
-        auto input1 = std::make_shared<ngraph::opset1::Constant>(ngraph::element::f32, shape, vals);
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
+        auto input1 = std::make_shared<ov::op::v0::Constant>(ov::element::f32, shape, vals);
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input0});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input0});
     })(shape);
 
     auto s = wrapAsSnippet(f, shape);
@@ -133,11 +133,11 @@ TEST(SnippetsTests, GenerateAddConstantScalar) {
     auto shape = ngraph::Shape{1, 4, 16, 31};
 
     auto f = ([] (const ngraph::Shape& shape) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto input1 = std::make_shared<ngraph::opset1::Constant>(ngraph::element::f32, ngraph::Shape{1}, std::vector<float>({42.f}));
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto input1 = std::make_shared<ov::op::v0::Constant>(ov::element::f32, ngraph::Shape{1}, std::vector<float>({42.f}));
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input0});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input0});
     })(shape);
 
     auto s = wrapAsSnippet(f, shape);
@@ -151,11 +151,11 @@ TEST(SnippetsTests, GenerateAddConstantScalarEmptySize) {
     auto shape = ngraph::Shape{1, 4, 16, 31};
 
     auto f = ([] (const ngraph::Shape& shape) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto input1 = std::make_shared<ngraph::opset1::Constant>(ngraph::element::f32, ngraph::Shape(), std::vector<float>({42.f}));
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto input1 = std::make_shared<ov::op::v0::Constant>(ov::element::f32, ngraph::Shape(), std::vector<float>({42.f}));
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input0});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input0});
     })(shape);
 
     auto s = wrapAsSnippet(f, shape);
@@ -170,24 +170,24 @@ TEST(SnippetsTests, GenerateAddBroadcastX2Edges) {
     auto shape1 = ngraph::Shape{1, 4, 16, 1};
 
     auto f = ([] (const ngraph::Shape& shape0, const ngraph::Shape& shape1) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
-        auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
-        auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
+        auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
+        auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
 
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
-        auto mul    = std::make_shared<ngraph::opset1::Add>(input1, input2);
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
+        auto mul    = std::make_shared<op::v1::Add>(input1, input2);
 
-        auto sub = std::make_shared<ngraph::opset1::Add>(add, mul);
+        auto sub = std::make_shared<op::v1::Add>(add, mul);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{sub}, ngraph::ParameterVector{input0, input1, input2});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{sub}, ngraph::ParameterVector{input0, input1, input2});
     })(shape0, shape1);
 
     auto s = ([f] (const ngraph::Shape& shape0, const ngraph::Shape& shape1) -> std::shared_ptr<ngraph::Function>{
-        auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
-        auto input3 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
-        auto input4 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
+        auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
+        auto input3 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
+        auto input4 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
         auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input2, input3, input4}, ngraph::clone_function(*f.get()));
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input2, input3, input4});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input2, input3, input4});
     })(shape0, shape1);
 
     std::vector<std::vector<std::uint8_t>> referenceInputs(3);
@@ -228,11 +228,11 @@ TEST(SnippetsTests, GenerateAddBroadcastY) {
     auto shape1 = ngraph::Shape{1, 4,  1, 31};
 
     auto f = ([] (const ngraph::Shape& shape0, const ngraph::Shape& shape1) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
-        auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
+        auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input0, input1});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input0, input1});
     })(shape0, shape1);
 
     auto s = wrapAsSnippet(f, shape0, shape1);
@@ -272,19 +272,19 @@ TEST(SnippetsTests, GenerateAddNegate) {
     auto shape = ngraph::Shape{1, 4, 16, 31};
 
     auto f = ([] (const ngraph::Shape& shape) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto add    = std::make_shared<ngraph::opset1::Add>(input0, input1);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto add    = std::make_shared<op::v1::Add>(input0, input1);
         auto nagate = std::make_shared<ngraph::opset1::Negative>(add);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{nagate}, ngraph::ParameterVector{input0, input1});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{nagate}, ngraph::ParameterVector{input0, input1});
     })(shape);
 
     auto s = ([f] (const ngraph::Shape& shape) -> std::shared_ptr<ngraph::Function>{
-        auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-        auto input3 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
+        auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+        auto input3 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
         auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input2, input3}, ngraph::clone_function(*f.get()));
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input2, input3});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input2, input3});
     })(shape);
 
     auto referenceInputs = gen_inputs(shape, 2);
@@ -296,19 +296,19 @@ TEST(SnippetsTests, GenerateAddNegate) {
 TEST(SnippetsTests, GenerateAddNegateAdd) {
     GTEST_SKIP();
     auto shape = ngraph::Shape{1, 4, 16, 31};
-    auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto add = std::make_shared<ngraph::opset1::Add>(input1, input2);
+    auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto add = std::make_shared<op::v1::Add>(input1, input2);
     auto nagate = std::make_shared<ngraph::opset1::Negative>(add);
-    auto input3 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto add2 = std::make_shared<ngraph::opset1::Add>(nagate, input3);
-    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ngraph::NodeVector{add2}, ngraph::ParameterVector{input1, input2, input3});
+    auto input3 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto add2 = std::make_shared<op::v1::Add>(nagate, input3);
+    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ov::NodeVector{add2}, ngraph::ParameterVector{input1, input2, input3});
 
-    auto input11 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto input21 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto input31 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
+    auto input11 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto input21 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto input31 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
     auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input11, input21, input31}, ngraph::clone_function(*f.get()));
-    std::shared_ptr<ngraph::Function>  s = std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input11, input21, input31});
+    std::shared_ptr<ngraph::Function>  s = std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input11, input21, input31});
 
     auto referenceInputs = gen_inputs(shape, 3);
     bool isCorrect = compare(s, f, referenceInputs);
@@ -319,12 +319,12 @@ TEST(SnippetsTests, GenerateAddNegateAdd) {
 TEST(SnippetsTests, GenerateAddNegateAddMultiEdge) {
     GTEST_SKIP();
     auto shape = ngraph::Shape{1, 4, 16, 31};
-    auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto add    = std::make_shared<ngraph::opset1::Add>(input1, input2);
+    auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto add    = std::make_shared<op::v1::Add>(input1, input2);
     auto nagate = std::make_shared<ngraph::opset1::Negative>(add);
-    auto add2 = std::make_shared<ngraph::opset1::Add>(nagate, input1);
-    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ngraph::NodeVector{add2}, ngraph::ParameterVector{input1, input2});
+    auto add2 = std::make_shared<op::v1::Add>(nagate, input1);
+    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ov::NodeVector{add2}, ngraph::ParameterVector{input1, input2});
 
     auto s = wrapAsSnippet(f, shape, shape);
     auto referenceInputs = gen_inputs(shape, 2);
@@ -336,16 +336,16 @@ TEST(SnippetsTests, GenerateAddNegateAddMultiEdge) {
 TEST(SnippetsTests, GenerateAddNegateAddMultiEdgeConst) {
     GTEST_SKIP();
     auto shape = ngraph::Shape{1, 4, 16, 31};
-    auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
-    auto input2 = ngraph::op::Constant::create(ngraph::element::f32, ngraph::Shape{}, {0.42});
-    auto add = std::make_shared<ngraph::opset1::Add>(input1, input2);
+    auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
+    auto input2 = ngraph::op::Constant::create(ov::element::f32, ngraph::Shape{}, {0.42});
+    auto add = std::make_shared<op::v1::Add>(input1, input2);
     auto nagate = std::make_shared<ngraph::opset1::Negative>(add);
-    auto add2 = std::make_shared<ngraph::opset1::Add>(nagate, input1);
-    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ngraph::NodeVector{add2}, ngraph::ParameterVector{input1});
+    auto add2 = std::make_shared<op::v1::Add>(nagate, input1);
+    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ov::NodeVector{add2}, ngraph::ParameterVector{input1});
 
-    auto input11 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
+    auto input11 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
     auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input11}, ngraph::clone_function(*f.get()));
-    std::shared_ptr<ngraph::Function>  s = std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input11});
+    std::shared_ptr<ngraph::Function>  s = std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input11});
 
     auto referenceInputs = gen_inputs(shape, 1);
     bool isCorrect = compare(s, f, referenceInputs);
@@ -357,13 +357,13 @@ TEST(SnippetsTests, GenerateErf) {
     GTEST_SKIP();
     auto shape = ngraph::Shape{1, 4, 16, 31};
 
-    auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
+    auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
     auto gelu   = std::make_shared<ngraph::opset1::Erf>(input1);
-    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ngraph::NodeVector{gelu}, ngraph::ParameterVector{input1});
+    std::shared_ptr<ngraph::Function> f = std::make_shared<ngraph::Function>(ov::NodeVector{gelu}, ngraph::ParameterVector{input1});
 
-    auto input11 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape);
+    auto input11 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
     auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input11}, ngraph::clone_function(*f.get()));
-    std::shared_ptr<ngraph::Function> s = std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input11});
+    std::shared_ptr<ngraph::Function> s = std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input11});
 
     auto referenceInputs = gen_inputs(shape, 1);
     bool isCorrect = compare(s, f, referenceInputs);
@@ -381,23 +381,23 @@ TEST(SnippetsTests, GenerateAddBroadcastAutomatic) {
     };
 
     auto f = ([] (const ngraph::Shape& shape0, const ngraph::Shape& shape1, const ngraph::Shape& shape2) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
-        auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
-        auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape2);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
+        auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
+        auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape2);
 
-        auto add = std::make_shared<ngraph::opset1::Add>(input0, input1);
-        auto mul = std::make_shared<ngraph::opset1::Multiply>(input1, input2);
-        auto sub = std::make_shared<ngraph::opset1::Subtract>(add, mul);
+        auto add = std::make_shared<op::v1::Add>(input0, input1);
+        auto mul = std::make_shared<op::v1::Multiply>(input1, input2);
+        auto sub = std::make_shared<op::v1::Subtract>(add, mul);
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{sub}, ngraph::ParameterVector{input0, input1, input2});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{sub}, ngraph::ParameterVector{input0, input1, input2});
     })(shapes[0], shapes[1], shapes[2]);
 
     auto s = ([f] (const ngraph::Shape& shape0, const ngraph::Shape& shape1, const ngraph::Shape& shape2) -> std::shared_ptr<ngraph::Function>{
-        auto input0 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape0);
-        auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape1);
-        auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, shape2);
+        auto input0 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape0);
+        auto input1 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape1);
+        auto input2 = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape2);
         auto snippet = std::make_shared<ngraph::snippets::op::Subgraph>(ngraph::OutputVector{input0, input1, input2}, ngraph::clone_function(*f.get()));
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{snippet}, ngraph::ParameterVector{input0, input1, input2});
+        return std::make_shared<ngraph::Function>(ov::NodeVector{snippet}, ngraph::ParameterVector{input0, input1, input2});
     })(shapes[0], shapes[1], shapes[2]);
 
     std::vector<std::vector<std::uint8_t>> referenceInputs(3);

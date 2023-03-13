@@ -2342,9 +2342,9 @@ void GraphOptimizer::reshapeRnnSeq(Graph &graph) {
             auto edge = childrenEdges[j];
             auto childNode = edge->getChild();
 
-            const auto secondInput = std::make_shared<ngraph::opset1::Constant>(ov::element::i32, ngraph::Shape{1}, std::vector<int>{1});
+            const auto secondInput = std::make_shared<ov::op::v0::Constant>(ov::element::i32, ngraph::Shape{1}, std::vector<int>{1});
             const auto unsqueeze = std::make_shared<ngraph::opset1::Unsqueeze>(
-                std::make_shared<ngraph::opset1::Parameter>(details::convertPrecision(parentNode->getOriginalOutputPrecisionAtPort(0)),
+                std::make_shared<ov::op::v0::Parameter>(details::convertPrecision(parentNode->getOriginalOutputPrecisionAtPort(0)),
                                                             parentNode->getOutputShapeAtPort(0).toPartialShape()), secondInput);
             unsqueeze->set_friendly_name(parentNode->getName() + "_abc_a1bc_" + std::to_string(j));
 

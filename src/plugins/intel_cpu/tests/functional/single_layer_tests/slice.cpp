@@ -30,7 +30,7 @@ typedef std::tuple<
 class Slice8LayerCPUTest : public testing::WithParamInterface<Slice8LayerTestCPUParam>,
                                  virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<Slice8LayerTestCPUParam> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<Slice8LayerTestCPUParam> &obj) {
         std::vector<InputShape> shapes;
         Slice8SpecificParams params;
         ngraph::helpers::InputLayerType secondaryInputType;
@@ -102,17 +102,17 @@ protected:
         std::shared_ptr<ngraph::Node> sliceNode;
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             // Slice start, stop, step, axes are parameters.
-            auto startNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{sliceParams.start.size()});
-            auto stopdNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{sliceParams.stop.size()});
-            auto stepNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{sliceParams.step.size()});
+            auto startNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, ov::Shape{sliceParams.start.size()});
+            auto stopdNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, ov::Shape{sliceParams.stop.size()});
+            auto stepNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, ov::Shape{sliceParams.step.size()});
 
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(startNode));
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(stopdNode));
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(stepNode));
+            params.push_back(startNode);
+            params.push_back(stopdNode);
+            params.push_back(stepNode);
             if (!sliceParams.axes.empty()) {
                 // With axes parameter
-                auto axesNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{sliceParams.axes.size()});
-                params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(axesNode));
+                auto axesNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, ov::Shape{sliceParams.axes.size()});
+                params.push_back(axesNode);
                 sliceNode = ngraph::builder::makeSlice(params[0], startNode, stopdNode, stepNode, axesNode);
             } else {
                 //without axes parameter

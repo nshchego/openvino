@@ -85,11 +85,11 @@ protected:
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
         auto ctcGreedyDecoder = std::make_shared<ov::op::v0::CTCGreedyDecoder>(params[0], params[1], mergeRepeated);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(ctcGreedyDecoder)};
-        function = std::make_shared<ngraph::Function>(results, params, "CTCGreedyDecoderCPU");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(ctcGreedyDecoder)};
+        function = std::make_shared<ov::Model>(results, params, "CTCGreedyDecoderCPU");
     };
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {

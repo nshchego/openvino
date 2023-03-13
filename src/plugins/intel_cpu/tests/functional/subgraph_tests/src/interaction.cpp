@@ -114,7 +114,7 @@ static std::shared_ptr<ov::Model> makeInteraction(const ElementType inType, cons
         auto scale_const = std::make_shared<opset1::Constant>(element::f32, ov::Shape{1}, 1);
         auto sub = std::make_shared<opset1::Subtract>(convert, zp_const);
         auto multipy = std::make_shared<opset1::Multiply>(sub, scale_const);
-        const auto matmul = std::make_shared<ngraph::opset1::MatMul>(concat2, multipy);
+        const auto matmul = std::make_shared<ov::op::v0::MatMul>(concat2, multipy);
         model = std::make_shared<ov::Model>(matmul, inputsParams, "interaction");
     } else {
         model = std::make_shared<ov::Model>(concat2, inputsParams, "interaction");

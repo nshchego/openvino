@@ -18,7 +18,7 @@ namespace node {
 
 class Generic : public Node {
 public:
-    Generic(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Generic(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
     ~Generic() = default;
 
     void getSupportedDescriptors() override;
@@ -42,7 +42,7 @@ protected:
 
     std::vector<InferenceEngine::ILayerExecImpl::Ptr> impls;
 
-    const std::shared_ptr<ngraph::Node> ngraphOp;
+    const std::shared_ptr<ov::Node> ngraphOp;
 };
 
 }   // namespace node

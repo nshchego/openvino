@@ -277,9 +277,9 @@ void fill_output_blobs(const float* proposals, const int* roi_indices,
 }  // namespace
 
 bool GenerateProposals::isSupportedOperation
-            (const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+            (const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!ngraph::as_type_ptr<const ngraph::op::v9::GenerateProposals>(op)) {
+        if (!ov::as_type_ptr<const ov::op::v9::GenerateProposals>(op)) {
             errorMessage = "Node is not an instance of the Proposal from the operations set v0.";
             return false;
         }
@@ -289,14 +289,14 @@ bool GenerateProposals::isSupportedOperation
     return true;
 }
 
-GenerateProposals::GenerateProposals(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+GenerateProposals::GenerateProposals(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, InternalDynShapeInferFactory()) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto proposalOp = ngraph::as_type_ptr<const ngraph::op::v9::GenerateProposals>(op);
+    auto proposalOp = ov::as_type_ptr<const ov::op::v9::GenerateProposals>(op);
     auto proposalAttrs = proposalOp->get_attrs();
 
     min_size_ = proposalAttrs.min_size;
@@ -312,7 +312,7 @@ void GenerateProposals::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    auto roiNumPrecision = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
+    const auto& roiNumPrecision = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
     addSupportedPrimDesc({{LayoutType::ncsp, Precision::FP32},
                           {LayoutType::ncsp, Precision::FP32},
                           {LayoutType::ncsp, Precision::FP32},
@@ -404,7 +404,7 @@ void GenerateProposals::execute(dnnl::stream strm) {
         std::vector<float> roi_item, score_item;
         std::vector<int64_t> roi_num(batch_size);
         uint8_t* p_roi_num = reinterpret_cast<uint8_t*>(&roi_num[0]);
-        auto roi_num_type = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
+        const auto& roi_num_type = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
         const auto roi_num_item_size = roi_num_type == Precision::I32 ? sizeof(int32_t) : sizeof(int64_t);
         for (size_t n = 0; n < batch_size; ++n) {
             // input image height & width

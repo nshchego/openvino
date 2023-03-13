@@ -20,6 +20,7 @@
 #include <cpu/x64/jit_generator.hpp>
 #include "emitters/x64/jit_dnnl_emitters.hpp"
 #include "emitters/x64/jit_load_store_emitters.hpp"
+#include "utils/debug_capabilities.h"
 
 using namespace InferenceEngine;
 using namespace dnnl::impl::cpu::x64;
@@ -28,8 +29,6 @@ using namespace Xbyak;
 namespace ov {
 namespace intel_cpu {
 namespace node {
-
-#define THROW_ERROR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
 
 #if defined(OPENVINO_ARCH_X86_64)
 
@@ -164,14 +163,13 @@ private:
 
 #endif // OPENVINO_ARCH_X86_64
 
-Interaction::Interaction(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Interaction::Interaction(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    errorPrefix = "Interaction node with name '" + getName() + "'";
-    const auto interaction = std::dynamic_pointer_cast<const InteractionNode>(op);
+    const auto interaction = ov::as_type<const InteractionNode>(op.get());
     const std::vector<float>& scales = interaction->get_output_scales();
     if (!scales.empty()) {
         fqScales = scales;
@@ -344,7 +342,7 @@ void Interaction::prepareParams() {
         moveFeatureKernel->create_ker();
         moveInteractKernel->create_ker();
     } else {
-        THROW_ERROR << "cannot create jit eltwise kernel";
+        THROW_CPU_NODE_ERR << "cannot create jit eltwise kernel";
     }
 #ifdef CPU_DEBUG_CAPS
     if (prim) {
@@ -362,11 +360,10 @@ bool Interaction::isExecutable() const {
     return true;
 }
 
-bool Interaction::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
+bool Interaction::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
         std::string& errorMessage) noexcept {
     try {
-        const auto interaction = std::dynamic_pointer_cast<const InteractionNode>(op);
-        if (!interaction) {
+        if (op->get_type_info() != InteractionNode::get_type_info_static()) {
             errorMessage = "Only Interaction operation is supported";
             return false;
         }

@@ -10,25 +10,25 @@ namespace SubgraphTestsDefinitions {
 
 class AnyLayoutOnInputsAndOutputs : public ::testing::TestWithParam<ov::Shape> {
 public:
-    static std::string getTestCaseName(::testing::TestParamInfo<ov::Shape> obj) {
+    static std::string getTestCaseName(const ::testing::TestParamInfo<ov::Shape> &obj) {
         std::ostringstream result;
         result << "shape=" << obj.param;
         return result.str();
     }
 
 protected:
-    std::shared_ptr<ngraph::Function>
+    std::shared_ptr<ov::Model>
     create_test_function(const ov::Shape & shape) {
-        auto param = std::make_shared<ngraph::op::Parameter>(ov::element::f32, shape);
+        auto param = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, shape);
 
         float shift = 1.0f;
-        auto shift_node = std::make_shared<ngraph::op::Constant>(ov::element::f32, ov::Shape{1}, &shift);
+        auto shift_node = std::make_shared<ov::op::v0::Constant>(ov::element::f32, ov::Shape{1}, &shift);
 
-        auto add = std::make_shared<ngraph::op::v1::Add>(param, shift_node);
+        auto add = std::make_shared<ov::op::v1::Add>(param, shift_node);
 
-        auto result = std::make_shared<ngraph::op::Result>(add);
+        auto result = std::make_shared<ov::op::v0::Result>(add);
 
-        return std::make_shared<ngraph::Function>(ngraph::ResultVector{result}, ngraph::ParameterVector{param});
+        return std::make_shared<ov::Model>(ov::ResultVector{result}, ov::ParameterVector{param});
     }
 
     void Run() {

@@ -34,7 +34,7 @@ typedef std::tuple<
 class TopKLayerCPUTest : public testing::WithParamInterface<TopKLayerCPUTestParamsSet>,
                          virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<TopKLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<TopKLayerCPUTestParamsSet> &obj) {
         basicTopKParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::map<std::string, std::string> additionalConfig;
@@ -122,23 +122,23 @@ protected:
         std::shared_ptr<ov::op::v11::TopK> topk;
         if (staticShape) {
             auto k = std::make_shared<ov::op::v0::Constant>(ElementType::i64, ov::Shape{}, &keepK);
-            topk = std::dynamic_pointer_cast<ov::op::v11::TopK>(
+            topk = ov::as_type_ptr<ov::op::v11::TopK>(
                     std::make_shared<ov::op::v11::TopK>(params[0], k, axis, mode, sort, ElementType::i32, stable));
         } else {
             auto k = std::make_shared<ov::op::v0::Parameter>(ElementType::i64, inputDynamicShapes[1]);
             params.push_back(k);
-            topk = std::dynamic_pointer_cast<ov::op::v11::TopK>(
+            topk = ov::as_type_ptr<ov::op::v11::TopK>(
                     std::make_shared<ov::op::v11::TopK>(params[0], k, axis, mode, sort, ElementType::i32, stable));
         }
 
         topk->get_rt_info() = getCPUInfo();
 
-        ngraph::ResultVector results;
+        ov::ResultVector results;
         for (size_t i = 0; i < topk->get_output_size(); i++) {
             results.push_back(std::make_shared<ov::op::v0::Result>(topk->output(i)));
         }
 
-        function = std::make_shared<ngraph::Function>(results, params, "TopK");
+        function = std::make_shared<ov::Model>(results, params, "TopK");
     }
 
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {

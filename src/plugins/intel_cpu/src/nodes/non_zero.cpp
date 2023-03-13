@@ -4,10 +4,10 @@
 
 #include "non_zero.h"
 
-#include <nodes/common/cpu_memcpy.h>
-
+#include <cpu/platform.hpp>
 #include <ie_parallel.hpp>
-#include <ngraph/opsets/opset3.hpp>
+#include <nodes/common/cpu_memcpy.h>
+#include <openvino/op/non_zero.hpp>
 #include <utils/bfloat16.hpp>
 #include <utils/shape_inference/shape_inference_internal_dyn.hpp>
 
@@ -20,9 +20,9 @@ namespace node {
 static constexpr int blockSize = dnnl::impl::cpu::platform::get_cache_line_size() * 2;
 static constexpr int elementsStride = blockSize / sizeof(int);
 
-bool NonZero::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool NonZero::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (op->get_type_info() != ngraph::op::v3::NonZero::get_type_info_static()) {
+        if (op->get_type_info() != ov::op::v3::NonZero::get_type_info_static()) {
             errorMessage = "Node is not an instance of NonZero from the operation set v3.";
             return false;
         }
@@ -32,16 +32,14 @@ bool NonZero::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op
     return true;
 }
 
-NonZero::NonZero(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+NonZero::NonZero(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, InternalDynShapeInferFactory()) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "NonZero layer with name '" + getName() + "' ";
-    } else {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    if (op->get_output_element_type(0) != ngraph::element::i32) {
-        IE_THROW() << errorPrefix << "doesn't support demanded output precision";
+    if (op->get_output_element_type(0) != ov::element::i32) {
+        THROW_CPU_NODE_ERR << "doesn't support demanded output precision";
     }
 }
 
@@ -49,9 +47,9 @@ void NonZero::getSupportedDescriptors() {
     if (!descs.empty())
         return;
     if (getParentEdges().size() != 1)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (!getChildEdges().size())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 }
 
 void NonZero::initSupportedPrimitiveDescriptors() {

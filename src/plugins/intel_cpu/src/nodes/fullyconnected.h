@@ -4,12 +4,7 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
-#include <memory>
-#include <oneapi/dnnl/dnnl.hpp>
-#include <string>
-#include <vector>
 #include "common/dnnl_executor.h"
 
 namespace ov {
@@ -18,7 +13,7 @@ namespace node {
 
 class FullyConnected : public Node {
 public:
-    FullyConnected(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    FullyConnected(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     std::vector<dnnl::memory::format_tag> getAvailableFormatsForDims(const Shape &dims) const override;
     void getSupportedDescriptors() override;
@@ -51,7 +46,7 @@ public:
 
     bool canFuse(const NodePtr& node) const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void prepareParams() override;
     void executeDynamicImpl(dnnl::stream strm) override;
@@ -74,7 +69,6 @@ private:
 
     bool withBiases = false;
 
-    std::string errorPrefix;
     static const size_t DATA_ID = 0;
     static const size_t WEIGHTS_ID = 1;
     static const size_t BIAS_ID = 2;

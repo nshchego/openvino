@@ -17,7 +17,7 @@ protected:
 
         auto ngPrc = element::f32;
         auto inputParams = builder::makeParams(ngPrc, {{1, 3, 12, 9}});
-        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(inputParams));
+        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
 
         auto tile = ngraph::builder::makeTile(paramOuts[0], std::vector<int64_t>{1, 2, 1, 1});
 
@@ -28,7 +28,7 @@ protected:
         const auto add2 = ngraph::builder::makeEltwise(tile->output(0), const2, ngraph::helpers::EltwiseTypes::ADD);
 
         NodeVector results{add1, add2};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "TileWithTwoOutputEdges");
+        function = std::make_shared<ov::Model>(results, inputParams, "TileWithTwoOutputEdges");
     }
 };
 

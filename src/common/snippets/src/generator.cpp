@@ -3,15 +3,12 @@
 //
 
 #include "snippets/generator.hpp"
-#include "snippets/pass/assign_registers.hpp"
 #include "snippets/pass/vector_to_scalar.hpp"
-#include "snippets/pass/insert_load_store.hpp"
 #include "snippets/op/loop.hpp"
-#include "snippets/op/subgraph.hpp"
 #include "snippets/op/kernel.hpp"
 #include <snippets/itt.hpp>
 
-#include <ngraph/pass/manager.hpp>
+#include <openvino/pass/manager.hpp>
 #include <openvino/core/type.hpp>
 
 namespace ngraph {
@@ -228,31 +225,31 @@ std::shared_ptr<const TargetMachine> Generator::get_target_machine() const {
 }
 
 Generator::opRegType Generator::get_op_reg_type(const std::shared_ptr<Node>& op) const {
-    if (std::dynamic_pointer_cast<opset1::Parameter>(op) ||
-        std::dynamic_pointer_cast<opset1::Result>(op) ||
-        std::dynamic_pointer_cast<op::LoopBegin>(op) ||
-        std::dynamic_pointer_cast<op::LoopEnd>(op) ||
-        std::dynamic_pointer_cast<op::Brgemm>(op) ||
-        std::dynamic_pointer_cast<op::Buffer>(op))
+    if (ov::is_type<opset1::Parameter>(op) ||
+        ov::is_type<opset1::Result>(op) ||
+        ov::is_type<op::LoopBegin>(op) ||
+        ov::is_type<op::LoopEnd>(op) ||
+        ov::is_type<op::Brgemm>(op) ||
+        ov::is_type<op::Buffer>(op))
         return gpr2gpr;
-    else if (std::dynamic_pointer_cast<snippets::op::Load>(op) ||
-             std::dynamic_pointer_cast<snippets::op::BroadcastLoad>(op))
+    else if (ov::is_type<snippets::op::Load>(op) ||
+             ov::is_type<snippets::op::BroadcastLoad>(op))
         return gpr2vec;
-    else if (std::dynamic_pointer_cast<snippets::op::Store>(op))
+    else if (ov::is_type<snippets::op::Store>(op))
         return vec2gpr;
     else if (ov::op::util::is_unary_elementwise_arithmetic(op) ||
              ov::op::util::is_binary_elementwise_arithmetic(op) ||
              ov::op::util::is_binary_elementwise_comparison(op) ||
              ov::op::util::is_binary_elementwise_logical(op) ||
-             std::dynamic_pointer_cast<opset1::LogicalNot>(op) ||
-             std::dynamic_pointer_cast<opset1::PRelu>(op) ||
-             std::dynamic_pointer_cast<opset1::Convert>(op) ||
-             std::dynamic_pointer_cast<opset1::Select>(op) ||
-             std::dynamic_pointer_cast<op::VectorBuffer>(op) ||
-             std::dynamic_pointer_cast<op::BroadcastMove>(op) ||
-             std::dynamic_pointer_cast<op::Scalar>(op) ||
-             std::dynamic_pointer_cast<op::HorizonMax>(op) ||
-             std::dynamic_pointer_cast<op::HorizonSum>(op))
+             ov::is_type<opset1::LogicalNot>(op) ||
+             ov::is_type<opset1::PRelu>(op) ||
+             ov::is_type<opset1::Convert>(op) ||
+             ov::is_type<opset1::Select>(op) ||
+             ov::is_type<op::VectorBuffer>(op) ||
+             ov::is_type<op::BroadcastMove>(op) ||
+             ov::is_type<op::Scalar>(op) ||
+             ov::is_type<op::HorizonMax>(op) ||
+             ov::is_type<op::HorizonSum>(op))
         return vec2vec;
     else
         return get_specific_op_reg_type(op);

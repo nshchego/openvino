@@ -32,7 +32,7 @@ using fqLayerTestParamsSet = std::tuple<fqSpecificParams,
 class FakeQuantizeLayerCPUTest : public testing::WithParamInterface<fqLayerTestParamsSet>,
                                  virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<fqLayerTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<fqLayerTestParamsSet> &obj) {
         fqSpecificParams fqParams;
         inputShapes testShapes;
         Precision inPrec;

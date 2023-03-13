@@ -2,36 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include "utils/bfloat16.hpp"
-#include <selective_build.h>
-#include <ngraph/opsets/opset1.hpp>
 #include "psroi_pooling.h"
-#include <cpu/x64/jit_generator.hpp>
-#include <nodes/common/blocked_desc_creator.h>
+
+#include "ie_parallel.hpp"
+#include <openvino/op/deformable_psroi_pooling.hpp>
+#include <openvino/op/psroi_pooling.hpp>
+// #include <cpu/x64/jit_generator.hpp>
+#include "cpu/x64/cpu_isa_traits.hpp"
+#include "utils/bfloat16.hpp"
+#include <utils/ngraph_utils.hpp>
+#include "utils/debug_capabilities.h"
 
 using namespace InferenceEngine;
-using namespace dnnl;
-using namespace dnnl::impl;
-using namespace dnnl::impl::cpu::x64;
-using namespace dnnl::impl::utils;
+using namespace dnnl::impl::cpu;
+// using namespace dnnl;
+// using namespace dnnl::impl;
+// using namespace dnnl::impl::cpu::x64;
+// using namespace dnnl::impl::utils;
 
 namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (isDynamicNgraphNode(op)) {
             errorMessage = "Doesn't support op with dynamic shapes";
             return false;
         }
-        const auto psroi = std::dynamic_pointer_cast<const ngraph::opset1::PSROIPooling>(op);
-        const auto defPsroi = std::dynamic_pointer_cast<const ngraph::opset1::DeformablePSROIPooling>(op);
+        const auto psroi = ov::as_type<const ov::op::v0::PSROIPooling>(op.get());
+        const auto defPsroi = ov::as_type<const ov::op::v1::DeformablePSROIPooling>(op.get());
         if (!psroi && !defPsroi) {
             errorMessage = "Only opset1 PSROIPooling and DeformablePSROIPooling operations are supported";
             return false;
@@ -57,29 +57,27 @@ bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ngraph::Node
     return true;
 }
 
-PSROIPooling::PSROIPooling(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+PSROIPooling::PSROIPooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string(op->get_type_name()) + " node with name '" + op->get_friendly_name() + "'";
-
-    const auto psroi = std::dynamic_pointer_cast<const ngraph::opset1::PSROIPooling>(op);
-    const auto defPsroi = std::dynamic_pointer_cast<const ngraph::opset1::DeformablePSROIPooling>(op);
+    const auto psroi = ov::as_type<const ov::op::v0::PSROIPooling>(op.get());
+    const auto defPsroi = ov::as_type<const ov::op::v1::DeformablePSROIPooling>(op.get());
 
     noTrans = op->get_input_size() == 2;
     if (op->get_input_shape(0).size() != 4)
-        IE_THROW() << errorPrefix << " has first input with incorrect rank: " + std::to_string(op->get_input_shape(0).size());
+        THROW_CPU_NODE_ERR << " has first input with incorrect rank: " + std::to_string(op->get_input_shape(0).size());
     if (op->get_input_shape(1).size() != 2)
-        IE_THROW() << errorPrefix << " has second input with incorrect rank: " + std::to_string(op->get_input_shape(1).size());
+        THROW_CPU_NODE_ERR << " has second input with incorrect rank: " + std::to_string(op->get_input_shape(1).size());
     if (!noTrans && op->get_input_shape(2).size() != 4)
-        IE_THROW() << errorPrefix << " has third input with incorrect rank: " + std::to_string(op->get_input_shape(2).size());
+        THROW_CPU_NODE_ERR << " has third input with incorrect rank: " + std::to_string(op->get_input_shape(2).size());
 
     if (psroi) {
         if (psroi->get_input_size() != 2)
-            IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+            THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
         mode = psroi->get_mode();
         if (mode == "average") {
@@ -99,7 +97,7 @@ PSROIPooling::PSROIPooling(const std::shared_ptr<ngraph::Node>& op, const GraphC
 
     } else if (defPsroi) {
         if (defPsroi->get_input_size() != 2 && defPsroi->get_input_size() != 3)
-            IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+            THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
         algorithm = Algorithm::PSROIPoolingBilinearDeformable;
 
@@ -133,11 +131,11 @@ void PSROIPooling::initSupportedPrimitiveDescriptors() {
         return;
 
     impl_desc_type impl_type;
-    if (mayiuse(cpu::x64::avx512_core)) {
+    if (x64::mayiuse(x64::avx512_core)) {
         impl_type = impl_desc_type::jit_avx512;
-    } else if (mayiuse(cpu::x64::avx2)) {
+    } else if (x64::mayiuse(x64::avx2)) {
         impl_type = impl_desc_type::jit_avx2;
-    } else if (mayiuse(cpu::x64::sse41)) {
+    } else if (x64::mayiuse(x64::sse41)) {
         impl_type = impl_desc_type::jit_sse42;
     } else {
         impl_type = impl_desc_type::ref;
@@ -202,10 +200,10 @@ void PSROIPooling::unpackParams(const BlockedMemoryDesc& srcDesc, const BlockedM
     auto inBlkDims = srcDesc.getBlockDims();
     auto outBlkDims = dstDesc.getBlockDims();
     if (inBlkDims.size() != expectedInBlockDimsSize)
-        IE_THROW() << errorPrefix << " has unexpected size of blocking dims in input (given " << inBlkDims.size() << ", expected "
+        THROW_CPU_NODE_ERR << " has unexpected size of blocking dims in input (given " << inBlkDims.size() << ", expected "
                           << expectedInBlockDimsSize << ")";
     if (outBlkDims.size() != expectedOutBlockDimsSize)
-        IE_THROW() << errorPrefix << " has unexpected size of blocking dims in output (given " << outBlkDims.size() << ", expected "
+        THROW_CPU_NODE_ERR << " has unexpected size of blocking dims in output (given " << outBlkDims.size() << ", expected "
                            << expectedOutBlockDimsSize << ")";
 
     inBlockSize = (inpIsBlk ? srcDesc.getBlockDims()[4] : 1);
@@ -546,7 +544,7 @@ void PSROIPooling::execute(dnnl::stream strm) {
 
     if (!((inputPrec == Precision::BF16 && outputPrec == Precision::BF16) ||
           (inputPrec == Precision::FP32 && outputPrec == Precision::FP32))) {
-            IE_THROW() << errorPrefix + " has different precisions on input: " + inputPrec.name() + " and output: " + outputPrec.name();
+        THROW_CPU_NODE_ERR << " has different precisions on input: " << inputPrec.name() << " and output: " << outputPrec.name();
     }
 
     PSROIPoolingContext ctx = {

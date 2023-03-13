@@ -22,7 +22,7 @@ using AlignMatMulInputRanksTestParams = std::tuple<std::pair<SizeVector, SizeVec
 class AlignMatMulInputRanksTest : public testing::WithParamInterface<AlignMatMulInputRanksTestParams>, public CpuTestWithFusing,
                       virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<AlignMatMulInputRanksTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<AlignMatMulInputRanksTestParams> &obj) {
         std::pair<SizeVector, SizeVector> supportedInputShapes;
         fusingSpecificParams fusingParams;
         std::tie(supportedInputShapes, fusingParams) = obj.param;
@@ -55,7 +55,7 @@ protected:
 
         const auto ngPrec = element::f32;
         auto inputParams = builder::makeParams(ngPrec, {inShapes.first, inShapes.second});
-        const auto outputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(inputParams));
+        const auto outputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
         const auto matMul = builder::makeMatMul(outputNodes[0], outputNodes[1], false, false);
 
         selectedType = makeSelectedTypeStr(with_cpu_x86_avx512_core() ? "brgemm_avx512" : "jit_gemm", ngPrec);

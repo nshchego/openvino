@@ -49,26 +49,26 @@ public:
         const auto targetFormat = with_cpu_x86_avx512_core() ? nChw16c : nChw8c;
 
 
-        auto inputParams = ngraph::builder::makeParams(ngraph::element::f32, {inputShape, inputShape});
+        auto inputParams = ngraph::builder::makeParams(ov::element::f32, {inputShape, inputShape});
 
         auto Relu1 = std::make_shared<ngraph::opset3::Relu>(inputParams[0]);
         Relu1->get_rt_info() = CPUTestsBase::makeCPUInfo({targetFormat}, {targetFormat}, {});
         auto Relu2 = std::make_shared<ngraph::opset3::Relu>(inputParams[1]);
         Relu2->get_rt_info() = CPUTestsBase::makeCPUInfo({targetFormat}, {targetFormat}, {});
 
-        auto concat = ngraph::builder::makeConcat(ngraph::OutputVector{Relu1, Relu2}, 1);
+        auto concat = ngraph::builder::makeConcat(ov::OutputVector{Relu1, Relu2}, 1);
 
-        auto conv = ngraph::builder::makeConvolution(concat, ngraph::element::f32, kernel, stride, padBegin,
-                                                     padEnd, dilation, ngraph::op::PadType::AUTO, convOutChannels);
-        auto bias = ngraph::builder::makeConstant<float>(ngraph::element::Type_t::f32, ngraph::Shape({1, convOutChannels, 1, 1}), {}, true);
+        auto conv = ngraph::builder::makeConvolution(concat, ov::element::f32, kernel, stride, padBegin,
+                                                     padEnd, dilation, ov::op::PadType::AUTO, convOutChannels);
+        auto bias = ngraph::builder::makeConstant<float>(ov::element::Type_t::f32, ov::Shape({1, convOutChannels, 1, 1}), {}, true);
         auto convBiasAdd = std::make_shared<ngraph::opset3::Add>(conv, bias);
 
         auto sum = std::make_shared<ngraph::opset3::Add>(convBiasAdd, Relu1);
 
         auto Relu3 = std::make_shared<ngraph::opset3::Relu>(sum);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(Relu3)};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "ConcatConvSumInPlace");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(Relu3)};
+        function = std::make_shared<ov::Model>(results, inputParams, "ConcatConvSumInPlace");
         targetDevice = CommonTestUtils::DEVICE_CPU;
     }
 };

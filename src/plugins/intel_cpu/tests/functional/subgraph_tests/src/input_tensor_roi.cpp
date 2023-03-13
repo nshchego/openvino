@@ -7,7 +7,7 @@
 #include "functional_test_utils/ov_plugin_cache.hpp"
 
 using namespace ngraph;
-using namespace ngraph::op;
+using namespace ov::op;
 using namespace InferenceEngine;
 using namespace CPUTestUtils;
 
@@ -21,7 +21,7 @@ struct InputTensorROIParamType {
 
 class InputTensorROI : public ::testing::TestWithParam<InputTensorROIParamType> {
 public:
-    static std::string getTestCaseName(::testing::TestParamInfo<InputTensorROIParamType> obj) {
+    static std::string getTestCaseName(const ::testing::TestParamInfo<InputTensorROIParamType> &obj) {
         std::ostringstream result;
         result << "type=" << obj.param.type << "_";
         result << "shape=" << obj.param.shape << "_";

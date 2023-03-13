@@ -85,7 +85,7 @@ typename std::enable_if<
     std::is_convertible<decltype(std::declval<Value>()->get_type_info().is_castable(Type::get_type_info_static())),
                         bool>::value,
     bool>::type
-is_type(Value value) {
+is_type(const Value& value) {
     return value->get_type_info().is_castable(Type::get_type_info_static());
 }
 
@@ -125,5 +125,6 @@ namespace std {
 template <>
 struct OPENVINO_API hash<ov::DiscreteTypeInfo> {
     size_t operator()(const ov::DiscreteTypeInfo& k) const;
+    size_t operator()(ov::DiscreteTypeInfo& k);
 };
 }  // namespace std

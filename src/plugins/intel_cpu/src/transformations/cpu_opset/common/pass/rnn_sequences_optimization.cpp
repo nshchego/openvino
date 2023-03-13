@@ -14,7 +14,7 @@
 #include "itt.hpp"
 
 namespace {
-    int64_t getSeqAxis(const std::shared_ptr<ngraph::Node>& sequenceOp) {
+    int64_t getSeqAxis(const std::shared_ptr<ov::Node>& sequenceOp) {
         // Optimization.
         // Plug-ins support seqAxis attribute (value 1 or 0) for Seq ops, but according to the spec we don't
         // support this attribute and should insert Transpose layer before and after Seq op in TI to Sequences
@@ -30,8 +30,8 @@ namespace {
             const auto transpose_after = ngraph::as_type_ptr<ngraph::opset1::Transpose>(target_inputs.begin()->get_node()->shared_from_this());
 
             if (transpose_after && transpose_before) {
-                auto order_before = ngraph::as_type_ptr<ngraph::opset1::Constant>(transpose_before->get_input_node_shared_ptr(1));
-                auto order_after = ngraph::as_type_ptr<ngraph::opset1::Constant>(transpose_after->get_input_node_shared_ptr(1));
+                auto order_before = ngraph::as_type_ptr<ov::op::v0::Constant>(transpose_before->get_input_node_shared_ptr(1));
+                auto order_after = ngraph::as_type_ptr<ov::op::v0::Constant>(transpose_after->get_input_node_shared_ptr(1));
 
                 if (order_before && order_after) {
                     auto order_before_values = order_before->cast_vector<int64_t>();
@@ -47,17 +47,17 @@ namespace {
         return seqAxis;
     }
 
-    bool transform(const std::shared_ptr<ngraph::Node>& sequenceOp) {
+    bool transform(const std::shared_ptr<ov::Node>& sequenceOp) {
         // Detect pattern: Transpose_before -> Seq -> Transpose_after
         auto seqAxis = getSeqAxis(sequenceOp);
         if (seqAxis == 0) {
-            ngraph::Output<ngraph::Node> in_0 = sequenceOp->get_input_node_shared_ptr(0)->input_value(0);
+            ngraph::Output<ov::Node> in_0 = sequenceOp->get_input_node_shared_ptr(0)->input_value(0);
 
             auto shapeBeforeTranspose = ov::op::util::make_try_fold<ngraph::opset1::ShapeOf>(in_0);
             auto newInShape = ov::op::util::make_try_fold<ngraph::opset8::Gather>(shapeBeforeTranspose,
-                ngraph::opset1::Constant::create(ngraph::element::i32, { 3 }, { 1, 0, 2 }),
-                ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
-            auto reshape1 = std::make_shared<ngraph::opset1::Reshape>(in_0, newInShape, false);
+                ov::op::v0::Constant::create(ov::element::i32, { 3 }, { 1, 0, 2 }),
+                ov::op::v0::Constant::create(ov::element::i32, {}, { 0 }));
+            auto reshape1 = std::make_shared<ov::op::v1::Reshape>(in_0, newInShape, false);
             ngraph::copy_runtime_info(sequenceOp->get_input_node_shared_ptr(0), reshape1);
             ngraph::replace_node(sequenceOp->get_input_node_shared_ptr(0), reshape1);
 
@@ -68,10 +68,10 @@ namespace {
 
             auto lstmOutShape = ov::op::util::make_try_fold<ngraph::opset1::ShapeOf>(sequenceOp->output(0));
             auto newOutShape = ov::op::util::make_try_fold<ngraph::opset8::Gather>(lstmOutShape,
-                ngraph::opset1::Constant::create(ngraph::element::i32, { 4 }, { 2, 1, 0, 3 }),
-                ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
+                ov::op::v0::Constant::create(ov::element::i32, { 4 }, { 2, 1, 0, 3 }),
+                ov::op::v0::Constant::create(ov::element::i32, {}, { 0 }));
 
-            auto reshape2 = std::make_shared<ngraph::opset1::Reshape>(sequenceOp->output(0), newOutShape, false);
+            auto reshape2 = std::make_shared<ov::op::v1::Reshape>(sequenceOp->output(0), newOutShape, false);
             reshape2->set_friendly_name(transposeAfter->get_friendly_name());
             ngraph::copy_runtime_info(transposeAfter, reshape2);
             ngraph::replace_node(transposeAfter, reshape2);
@@ -128,7 +128,7 @@ ov::intel_cpu::OptimizeLSTMSequenceTransposes::OptimizeLSTMSequenceTransposes() 
     auto lstmSequenceNgraph = ngraph::pattern::wrap_type<ngraph::opset1::LSTMSequence, ngraph::opset5::LSTMSequence>();
 
     ngraph::matcher_pass_callback callback = [](ngraph::pattern::Matcher &m) {
-        auto checkSequence = [](const std::shared_ptr<ngraph::Node>& node) {
+        auto checkSequence = [](const std::shared_ptr<ov::Node>& node) {
             if (auto lstm5 = ngraph::as_type_ptr<ngraph::opset5::LSTMSequence>(node)) {
                 return lstm5->get_direction() != ngraph::op::RecurrentSequenceDirection::BIDIRECTIONAL;
             } else if (auto lstm1 = ngraph::as_type_ptr<ngraph::opset1::LSTMSequence>(node)) {
@@ -138,7 +138,7 @@ ov::intel_cpu::OptimizeLSTMSequenceTransposes::OptimizeLSTMSequenceTransposes() 
             }
         };
 
-        std::shared_ptr<ngraph::Node> lstmSequence = m.get_match_root();
+        std::shared_ptr<ov::Node> lstmSequence = m.get_match_root();
         return checkSequence(lstmSequence) ? transform(lstmSequence) : false;
     };
 

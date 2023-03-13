@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "shared_test_classes/base/ov_subgraph.hpp"
-#include "ngraph_functions/builders.hpp"
-#include "test_utils/cpu_test_utils.hpp"
 #include <common_test_utils/ov_tensor_utils.hpp>
+#include "shared_test_classes/base/ov_subgraph.hpp"
 #include "test_utils/fusing_test_utils.hpp"
 
 using namespace CPUTestUtils;
@@ -19,8 +17,6 @@ typedef std::tuple<
         bool,                           // Keep dims
         ngraph::helpers::ReductionType, // Reduce operation type
         ElementType,                    // Net precision
-        ElementType,                    // Input precision
-        ElementType,                    // Output precision
         std::vector<InputShape>         // Input shapes
 > basicReduceParams;
 
@@ -32,7 +28,7 @@ typedef std::tuple<
 class ReduceCPULayerTest : public testing::WithParamInterface<ReduceLayerCPUTestParamSet>,
                            virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ReduceLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ReduceLayerCPUTestParamSet> &obj) {
         basicReduceParams basicParams;
         CPUSpecificParams cpuParams;
         fusingSpecificParams fusingParams;
@@ -42,10 +38,10 @@ public:
         CommonTestUtils::OpType opType;
         bool keepDims;
         ngraph::helpers::ReductionType reductionType;
-        ElementType netPrecision, inPrc, outPrc;
+        ElementType netPrecision;
         std::vector<InputShape> inputShapes;
 
-        std::tie(axes, opType, keepDims, reductionType, netPrecision, inPrc, outPrc, inputShapes) = basicParams;
+        std::tie(axes, opType, keepDims, reductionType, netPrecision, inputShapes) = basicParams;
 
         std::ostringstream result;
         result << "IS=(";
@@ -66,8 +62,6 @@ public:
         else
             result << "KeepDims=false_";
         result << "netPRC=" << netPrecision << "_";
-        result << "inPRC=" << inPrc << "_";
-        result << "outPRC=" << outPrc << "_";
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
         result << CpuTestWithFusing::getTestCaseName(fusingParams);
@@ -89,17 +83,15 @@ protected:
         std::vector<int> axes;
         CommonTestUtils::OpType opType;
         bool keepDims;
-        ElementType inPrc, outPrc;
         std::vector<InputShape> inputShapes;
 
-        std::tie(axes, opType, keepDims, reductionType, netPrecision, inPrc, outPrc, inputShapes) = basicParams;
-        inPrc = outPrc = netPrecision;
+        std::tie(axes, opType, keepDims, reductionType, netPrecision, inputShapes) = basicParams;
 
         init_input_shapes(inputShapes);
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
         auto paramOuts = ngraph::helpers::convert2OutputVector(
-                ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+                ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
 
         std::vector<size_t> shapeAxes;
         switch (opType) {
@@ -113,13 +105,14 @@ protected:
             default:
                 FAIL() << "Reduce op doesn't support operation type: " << opType;
         }
-        auto reductionAxesNode = std::dynamic_pointer_cast<ngraph::Node>(
-                std::make_shared<ngraph::opset3::Constant>(ngraph::element::Type_t::i64, ngraph::Shape(shapeAxes), axes));
+
+        std::shared_ptr<ov::Node> reductionAxesNode =
+                std::make_shared<ov::op::v0::Constant>(ElementType::i64, ov::Shape(shapeAxes), axes);
 
         const auto reduce = ngraph::builder::makeReduce(paramOuts[0], reductionAxesNode, keepDims, reductionType);
 
         selectedType = getPrimitiveType() + "_" +
-                       (inPrc == ElementType::boolean ? "I8" : InferenceEngine::details::convertPrecision(inPrc).name());
+                       (netPrecision == ElementType::boolean ? "I8" : InferenceEngine::details::convertPrecision(netPrecision).name());
 
         // hybrid layouts
         if (inFmts.size() != 0 && outFmts.size() == 0) {
@@ -146,7 +139,7 @@ protected:
         function = makeNgraphFunction(netPrecision, params, reduce, "Reduce");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {
@@ -364,8 +357,6 @@ const auto params_OneAxis = testing::Combine(
             testing::ValuesIn(keepDims),
             testing::ValuesIn(reductionTypes),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::Values(emptyCPUSpec),
         testing::Values(emptyFusingSpec));
@@ -377,8 +368,6 @@ const auto params_MultiAxis_4D = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionTypes),
                 testing::ValuesIn(inpOutPrc),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D)),
         testing::Values(emptyFusingSpec));
@@ -390,8 +379,6 @@ const auto params_MultiAxis_5D = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionTypes),
                 testing::ValuesIn(inpOutPrc),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_5D)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D)),
         testing::Values(emptyFusingSpec));
@@ -404,8 +391,6 @@ const auto params_MultiAxis_4D_Hybrid = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionTypes),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_4D)),
         testing::Values(emptyFusingSpec));
@@ -417,8 +402,6 @@ const auto params_MultiAxis_5D_Hybrid = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionTypes),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes_5D)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_5D)),
         testing::Values(emptyFusingSpec));
@@ -431,8 +414,6 @@ const auto params_MultiAxis_6D = testing::Combine(
                 testing::ValuesIn(keepDims),
                 testing::ValuesIn(reductionTypes),
                 testing::ValuesIn(inpOutPrc),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_6D)),
         testing::Values(emptyCPUSpec),
         testing::Values(emptyFusingSpec));
@@ -444,8 +425,6 @@ const auto params_Int32 = testing::Combine(
             testing::ValuesIn(keepDims),
             testing::ValuesIn(reductionTypesInt32),
             testing::Values(ElementType::i32),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes_Int32)),
         testing::Values(emptyCPUSpec),
         testing::Values(emptyFusingSpec));
@@ -457,8 +436,6 @@ const auto params_NHWC_SmallChannel = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionTypes),
                 testing::ValuesIn(inpOutPrc),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_SmallChannel)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_NHWC_4D)),
         testing::Values(emptyFusingSpec));
@@ -529,8 +506,6 @@ const auto params_OneAxis_Logical = testing::Combine(
             testing::ValuesIn(keepDims),
             testing::ValuesIn(reductionLogicalTypes),
             testing::Values(ElementType::boolean),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::Values(emptyCPUSpec),
         testing::Values(emptyFusingSpec));
@@ -542,8 +517,6 @@ const auto params_MultiAxis_4D_Logical = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionLogicalTypes),
                 testing::Values(ElementType::boolean),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D)),
         testing::Values(emptyFusingSpec));
@@ -555,8 +528,6 @@ const auto params_MultiAxis_5D_Logical = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionLogicalTypes),
                 testing::Values(ElementType::boolean),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_5D)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D)),
         testing::Values(emptyFusingSpec));
@@ -569,8 +540,6 @@ const auto params_MultiAxis_4D_Hybrid_Logical = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionLogicalTypes),
             testing::Values(ElementType::boolean),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_4D)),
         testing::Values(emptyFusingSpec));
@@ -582,8 +551,6 @@ const auto params_MultiAxis_5D_Hybrid_Logical = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionLogicalTypes),
             testing::Values(ElementType::boolean),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes_5D)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_5D)),
         testing::Values(emptyFusingSpec));
@@ -596,8 +563,6 @@ const auto params_MultiAxis_6D_Logical = testing::Combine(
                 testing::ValuesIn(keepDims),
                 testing::ValuesIn(reductionLogicalTypes),
                 testing::Values(ElementType::boolean),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_6D)),
         testing::Values(emptyCPUSpec),
         testing::Values(emptyFusingSpec));
@@ -655,8 +620,6 @@ const auto params_OneAxis_fusing = testing::Combine(
             testing::Values(true),
             testing::ValuesIn(reductionTypesFusing),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::Values(emptyCPUSpec),
         testing::ValuesIn(fusingParamsSet));
@@ -668,8 +631,6 @@ const auto params_MultiAxis_4D_fusing = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionTypesFusing),
                 testing::ValuesIn(inpOutPrc),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D)),
         testing::ValuesIn(fusingParamsSet));
@@ -681,8 +642,6 @@ const auto params_MultiAxis_5D_fusing = testing::Combine(
                 testing::Values(true),
                 testing::ValuesIn(reductionTypesFusing),
                 testing::ValuesIn(inpOutPrc),
-                testing::Values(ElementType::undefined),
-                testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_5D)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D)),
         testing::ValuesIn(fusingParamsSet));
@@ -716,8 +675,6 @@ const auto params_OneAxis_fusing_KeepNoDims = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionTypesFusing),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::Values(emptyCPUSpec),
         testing::ValuesIn(fusingParamsSet_KeepNoDims));
@@ -729,8 +686,6 @@ const auto params_MultiAxis_4D_Hybrid_fusing_KeepNoDims = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionTypesFusing),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_4D)),
         testing::ValuesIn(fusingParamsSet_KeepNoDims));
@@ -742,8 +697,6 @@ const auto params_MultiAxis_5D_Hybrid_fusing_KeepNoDims = testing::Combine(
             testing::Values(false),
             testing::ValuesIn(reductionTypesFusing),
             testing::ValuesIn(inpOutPrc),
-            testing::Values(ElementType::undefined),
-            testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes_5D)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_5D)),
         testing::ValuesIn(fusingParamsSet_KeepNoDims));

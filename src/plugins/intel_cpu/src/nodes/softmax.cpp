@@ -4,13 +4,9 @@
 
 #include "softmax.h"
 
-#include <string>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
-#include <memory_desc/cpu_memory_desc_utils.h>
-#include <ngraph/opsets/opset1.hpp>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
+#include <openvino/op/softmax.hpp>
 #include <common/primitive_hashing_utils.hpp>
+#include "utils/debug_capabilities.h"
 #include <utils/shape_inference/shape_inference_pass_through.hpp>
 
 using namespace dnnl;
@@ -55,9 +51,9 @@ bool SoftmaxKey::operator==(const SoftmaxKey& rhs) const {
 
 }  // namespace
 
-bool SoftMax::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool SoftMax::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!std::dynamic_pointer_cast<const ngraph::opset1::Softmax>(op)) {
+        if (op->get_type_info() != op::v1::Softmax::get_type_info_static()) {
             errorMessage = "Only opset1 Softmax operation is supported";
             return false;
         }
@@ -67,20 +63,20 @@ bool SoftMax::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op
     return true;
 }
 
-SoftMax::SoftMax(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+SoftMax::SoftMax(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, PassThroughShapeInferFactory()) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    axis = ngraph::as_type_ptr<ngraph::op::v1::Softmax>(op)->get_axis();
+    axis = ov::as_type_ptr<ov::op::v1::Softmax>(op)->get_axis();
 }
 
 void SoftMax::getSupportedDescriptors() {
     if (descs.size())
         return;
 
-    InferenceEngine::Precision precision = getOriginalInputPrecisionAtPort(0);
+    auto precision = getOriginalInputPrecisionAtPort(0);
     if (precision != InferenceEngine::Precision::FP32 && precision != InferenceEngine::Precision::BF16)
         precision = InferenceEngine::Precision::FP32;
     auto inputDataType = DnnlExtensionUtils::IEPrecisionToDataType(precision);

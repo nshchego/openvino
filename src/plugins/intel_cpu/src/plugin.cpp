@@ -750,7 +750,7 @@ QueryNetworkResult Engine::QueryNetwork(const CNNNetwork& network, const std::ma
                                            transformation.UpToCpuSpecificOpSet();
                                            transformation.CpuSpecificOpSet();
                                        },
-                                       [&](const std::shared_ptr<ngraph::Node>& op) {
+                                       [&](const std::shared_ptr<ov::Node>& op) {
                                            std::unique_ptr<Node> ptr;
                                            try {
                                                ptr.reset(Node::factory().create(op, context));

@@ -3,13 +3,12 @@
 //
 
 #include <common_test_utils/ov_tensor_utils.hpp>
-#include "ngraph_functions/builders.hpp"
+//#include "ngraph_functions/builders.hpp"
 #include "shared_test_classes/base/ov_subgraph.hpp"
 #include "test_utils/cpu_test_utils.hpp"
 
 using namespace InferenceEngine;
 using namespace CPUTestUtils;
-using namespace ngraph::opset3;
 using namespace ov::test;
 
 namespace CPULayerTestsDefinitions {
@@ -55,7 +54,7 @@ public:
         return result.str();
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
 
@@ -91,13 +90,13 @@ protected:
         std::tie(dataShape, bucketsShape, with_right_bound, inDataPrc, inBucketsPrc, netPrc) = this->GetParam();
         init_input_shapes({dataShape, bucketsShape});
 
-        auto data = std::make_shared<ngraph::op::Parameter>(inDataPrc, inputDynamicShapes[0]);
+        auto data = std::make_shared<ov::op::v0::Parameter>(inDataPrc, inputDynamicShapes[0]);
         data->set_friendly_name("a_data");
-        auto buckets = std::make_shared<ngraph::op::Parameter>(inBucketsPrc, inputDynamicShapes[1]);
+        auto buckets = std::make_shared<ov::op::v0::Parameter>(inBucketsPrc, inputDynamicShapes[1]);
         buckets->set_friendly_name("b_buckets");
-        auto bucketize = std::make_shared<ngraph::op::v3::Bucketize>(data, buckets, netPrc, with_right_bound);
-        function = std::make_shared<ngraph::Function>(std::make_shared<ngraph::opset1::Result>(bucketize),
-                                                      ngraph::ParameterVector{data, buckets},
+        auto bucketize = std::make_shared<ov::op::v3::Bucketize>(data, buckets, netPrc, with_right_bound);
+        function = std::make_shared<ov::Model>(std::make_shared<ov::op::v0::Result>(bucketize),
+                                                      ov::ParameterVector{data, buckets},
                                                       "Bucketize");
     }
 };

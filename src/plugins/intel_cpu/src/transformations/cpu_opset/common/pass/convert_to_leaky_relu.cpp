@@ -14,15 +14,15 @@
 ov::intel_cpu::ConvertToLeakyRelu::ConvertToLeakyRelu() {
     MATCHER_SCOPE(ConvertToLeakyRelu);
     auto input = ngraph::pattern::any_input();
-    auto slope_constant = ngraph::pattern::wrap_type<ngraph::opset1::Constant>();
+    auto slope_constant = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
     auto prelu = ngraph::pattern::wrap_type<ngraph::opset1::PRelu>({ input, slope_constant });
 
     ngraph::matcher_pass_callback callback = [](ngraph::pattern::Matcher& m) {
-        auto prelu = std::dynamic_pointer_cast<ngraph::opset1::PRelu>(m.get_match_root());
+        auto prelu = ov::as_type_ptr<ngraph::opset1::PRelu>(m.get_match_root());
         if (!prelu) {
             return false;
         }
-        auto slopeNode = std::dynamic_pointer_cast<ngraph::opset1::Constant>(prelu->get_input_node_shared_ptr(1));
+        auto slopeNode = ov::as_type<op::v0::Constant>(prelu->get_input_node_ptr(1));
         if (slopeNode != nullptr && ngraph::shape_size(slopeNode->get_shape()) == 1) {
             const float slope = slopeNode->cast_vector<float>()[0];
             const auto leakyRelu = std::make_shared<ov::intel_cpu::LeakyReluNode>(prelu->input(0).get_source_output(), slope,

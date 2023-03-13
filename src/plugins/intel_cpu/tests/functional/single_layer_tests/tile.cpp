@@ -25,7 +25,7 @@ typedef std::tuple<
 class TileLayerCPUTest : public testing::WithParamInterface<TileLayerCPUTestParamsSet>,
                          virtual public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<TileLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<TileLayerCPUTestParamsSet> &obj) {
         TileLayerTestParamsSet basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -110,7 +110,7 @@ protected:
         function = makeNgraphFunction(netPrecision, functionParams, tileNode, "CPUTile");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (size_t i = 0lu; i < funcInputs.size(); i++) {

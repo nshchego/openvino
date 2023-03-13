@@ -16,7 +16,7 @@ namespace decompositionInSubgraph {
 const std::vector<TestValues> testValuesDecompositionScalars = {
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{}, {}, {}, {}},
@@ -25,14 +25,14 @@ const std::vector<TestValues> testValuesDecompositionScalars = {
 const std::vector<TestValues> testValuesDecompositionPerChannel = {
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{1, 3, 1, 1}, {1, 3, 1, 1}, {1, 3, 1, 1}, {1, 3, 1, 1}},
     },
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{1, 3, 1, 1}, {1, 3, 1, 1}, {}, {}},
@@ -41,7 +41,7 @@ const std::vector<TestValues> testValuesDecompositionPerChannel = {
 
 std::vector<std::pair<std::shared_ptr<Node>, std::pair<std::string, std::string> >> operations = {
     {std::make_shared<opset1::Abs>(), {"Subgraph", "Abs,fakeQuantize"}},
-    {std::make_shared<ngraph::op::v4::Swish>(), {"Subgraph", "Swish,fakeQuantize"}},
+    {std::make_shared<ov::op::v4::Swish>(), {"Subgraph", "Swish,fakeQuantize"}},
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -83,28 +83,28 @@ namespace legacyFuse {
 const std::vector<TestValues> testValuesLegacyFuse = {
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{1, 3, 1, 1}, {1, 3, 1, 1}, {}, {}}
     },
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{}, {}, {1, 3, 1, 1}, {1, 3, 1, 1}}
     },
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{}, {}, {}, {}}
     },
     {
         ov::element::f32,
-        ngraph::Shape{1, 3, 16, 16},
+        ov::Shape{1, 3, 16, 16},
         ov::element::f32,
         1.f,
         {{1, 3, 1, 1}, {1, 3, 1, 1}, {1, 3, 1, 1}, {1, 3, 1, 1}}

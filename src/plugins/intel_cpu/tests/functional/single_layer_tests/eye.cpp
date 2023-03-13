@@ -34,7 +34,7 @@ using EyeLayerCPUTestParamsSet = std::tuple<
 class EyeLayerCPUTest : public testing::WithParamInterface<EyeLayerCPUTestParamsSet>,
                             virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<EyeLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<EyeLayerCPUTestParamsSet> &obj) {
         CPULayerTestsDefinitions::EyeLayerTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -83,8 +83,8 @@ protected:
         function = createFunction();
     }
 
-    std::shared_ptr<ngraph::Function> createFunction() {
-        auto inputParams = ngraph::builder::makeDynamicParams(ngraph::element::i32, inputDynamicShapes);
+    std::shared_ptr<ov::Model> createFunction() {
+        auto inputParams = ngraph::builder::makeDynamicParams(ov::element::i32, inputDynamicShapes);
         auto rowsPar = inputParams[0];
         rowsPar->set_friendly_name("rows");
         auto colsPar = inputParams[1];
@@ -94,13 +94,13 @@ protected:
         if (inputParams.size() == 4) {
             auto batchShapePar = inputParams[3];
             batchShapePar->set_friendly_name("batchShape");
-            auto eyelikeBatchShape = std::make_shared<ngraph::op::v9::Eye>(rowsPar, colsPar, diagPar, batchShapePar, ngraph::element::i32);
+            auto eyelikeBatchShape = std::make_shared<ov::op::v9::Eye>(rowsPar, colsPar, diagPar, batchShapePar, ov::element::i32);
             eyelikeBatchShape->get_rt_info() = getCPUInfo();
-            return makeNgraphFunction(ngraph::element::i32, inputParams, eyelikeBatchShape, "Eye");
+            return makeNgraphFunction(ov::element::i32, inputParams, eyelikeBatchShape, "Eye");
         } else {
-            auto eyelikePure = std::make_shared<ngraph::op::v9::Eye>(rowsPar, colsPar, diagPar, ngraph::element::i32);
+            auto eyelikePure = std::make_shared<ov::op::v9::Eye>(rowsPar, colsPar, diagPar, ov::element::i32);
             eyelikePure->get_rt_info() = getCPUInfo();
-            return makeNgraphFunction(ngraph::element::i32, inputParams, eyelikePure, "Eye");
+            return makeNgraphFunction(ov::element::i32, inputParams, eyelikePure, "Eye");
         }
     }
 

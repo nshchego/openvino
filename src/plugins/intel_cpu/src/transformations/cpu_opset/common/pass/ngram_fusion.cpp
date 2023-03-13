@@ -47,7 +47,7 @@ ov::intel_cpu::NgramFusion::NgramFusion() {
             } else if (out_it == pattern_map.end()) {
                 return false;
             }
-            const auto constant = ov::as_type_ptr<ov::opset1::Constant>(out_it->second.get_node_shared_ptr());
+            const auto constant = ov::as_type_ptr<op::v0::Constant>(out_it->second.get_node_shared_ptr());
             return constant != nullptr && ov::op::util::constantIsEqualTo(constant, expected_bias);
         };
 

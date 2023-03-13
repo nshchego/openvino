@@ -114,11 +114,11 @@ std::map<std::string, std::string> extract_node_metadata(const NodePtr &node) {
 }  // namespace
 
 std::shared_ptr<ngraph::Function> dump_graph_as_ie_ngraph_net(const Graph &graph) {
-    std::map<NodePtr, std::shared_ptr<ngraph::Node> > node2layer;
+    std::map<NodePtr, std::shared_ptr<ov::Node> > node2layer;
 
     ngraph::ResultVector results;
     ngraph::ParameterVector params;
-    ngraph::NodeVector to_hold;
+    ov::NodeVector to_hold;
 
     auto get_inputs = [&] (const NodePtr & node) {
         auto pr_edges = node->getParentEdges();
@@ -162,10 +162,10 @@ std::shared_ptr<ngraph::Function> dump_graph_as_ie_ngraph_net(const Graph &graph
         }
 
         auto meta_data = extract_node_metadata(node);
-        std::shared_ptr<ngraph::Node> return_node;
+        std::shared_ptr<ov::Node> return_node;
         if (is_input) {
             auto& desc = node->getChildEdgeAt(0)->getMemory().getDesc();
-            auto param = std::make_shared<ngraph::op::Parameter>(details::convertPrecision(desc.getPrecision()), desc.getShape().toPartialShape());
+            auto param = std::make_shared<ov::op::v0::Parameter>(details::convertPrecision(desc.getPrecision()), desc.getShape().toPartialShape());
             return_node = param;
             params.push_back(param);
         } else if (is_output) {
@@ -192,7 +192,7 @@ std::shared_ptr<ngraph::Function> dump_graph_as_ie_ngraph_net(const Graph &graph
         return return_node;
     };
 
-    ngraph::NodeVector nodes;
+    ov::NodeVector nodes;
     nodes.reserve(graph.graphNodes.size());
     for (auto &node : graph.graphNodes) {  // important: graph.graphNodes are in topological order
         nodes.emplace_back(create_ngraph_node(node));

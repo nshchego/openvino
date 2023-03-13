@@ -22,7 +22,7 @@ typedef std::tuple<
     > DefConvSpecificParams;
 
 typedef std::tuple<
-    ngraph::op::PadType,     // pad. type
+    ov::op::PadType,     // pad. type
     std::vector<ptrdiff_t>,  // pad. begin
     std::vector<ptrdiff_t>,  // pad. end
     std::vector<size_t>,     // strides
@@ -45,7 +45,7 @@ class DefConvLayerCPUTest : public testing::WithParamInterface<DefConvLayerCPUTe
         virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
     OffsetType offsetType;
-    static std::string getTestCaseName(testing::TestParamInfo<DefConvLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<DefConvLayerCPUTestParamsSet> &obj) {
         CPULayerTestsDefinitions::DefConvSpecificParams dcSpecificParams;
         std::vector<InputShape> inputShape;
         InferenceEngine::Precision netPrecision;
@@ -56,7 +56,7 @@ public:
         std::string td;
         std::tie(addSpParams, inputShape, dcSpecificParams, netPrecision, td) = basicParamsSet;
 
-        ngraph::op::PadType padType;
+        ov::op::PadType padType;
         InferenceEngine::SizeVector stride, dilation;
         std::vector<ptrdiff_t> padBegin, padEnd;
         std::tie(padType, padBegin, padEnd, stride, dilation) = addSpParams;
@@ -94,7 +94,7 @@ public:
         return result.str();
     }
 protected:
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         auto inShape = targetInputStaticShapes[0];
@@ -143,7 +143,7 @@ protected:
         std::tie(addSpParams, inputShape, dcSpecificParams, netPrecision, targetDevice) = basicParamsSet;
         init_input_shapes(inputShape);
 
-        ngraph::op::PadType padType;
+        ov::op::PadType padType;
         InferenceEngine::SizeVector stride, dilation;
         std::vector<ptrdiff_t> padBegin, padEnd;
         std::tie(padType, padBegin, padEnd, stride, dilation) = addSpParams;
@@ -164,18 +164,18 @@ protected:
         offset_vals->set_friendly_name("b_offset_vals");
         auto filter_vals = inputParams[2];
         filter_vals->set_friendly_name("c_filter_vals");
-        ngraph::ParameterVector parameters{data, offset_vals, filter_vals};
-        std::shared_ptr<ngraph::Node> deformable_conv;
+        ov::ParameterVector parameters{data, offset_vals, filter_vals};
+        std::shared_ptr<ov::Node> deformable_conv;
         if (withModulation) {
             auto modulation_scalars = inputParams[3];
             modulation_scalars->set_friendly_name("c_modulation_scalars");
 
-            deformable_conv = std::make_shared<ngraph::op::v8::DeformableConvolution>(data, offset_vals, filter_vals, modulation_scalars, stride, padBegin,
+            deformable_conv = std::make_shared<ov::op::v8::DeformableConvolution>(data, offset_vals, filter_vals, modulation_scalars, stride, padBegin,
                                                                                       padEnd, dilation, padType, groups, deformableGroups,
                                                                                       withBilinearInterpolationPad);
             parameters.push_back(modulation_scalars);
         } else {
-            deformable_conv = std::make_shared<ngraph::op::v8::DeformableConvolution>(data, offset_vals, filter_vals, stride, padBegin, padEnd, dilation,
+            deformable_conv = std::make_shared<ov::op::v8::DeformableConvolution>(data, offset_vals, filter_vals, stride, padBegin, padEnd, dilation,
                                                                                       padType, groups, deformableGroups, withBilinearInterpolationPad);
         }
 
@@ -243,9 +243,9 @@ const auto defConvSpecificParams = ::testing::Combine(
     })  // offset type
 );
 
-std::vector<ngraph::op::PadType> padTypes = {
-    ngraph::op::PadType::EXPLICIT,
-    ngraph::op::PadType::VALID
+std::vector<ov::op::PadType> padTypes = {
+    ov::op::PadType::EXPLICIT,
+    ov::op::PadType::VALID
 };
 std::vector<std::vector<size_t>> getCartProduct(const std::vector<std::vector<size_t>> &v) {
     int outSize = 1;
@@ -422,9 +422,9 @@ const std::vector<std::vector<size_t>> autoPadSpatParams = {
     {2, 2} // ker. spat. shape
 };
 
-std::vector<ngraph::op::PadType> padTypesAutoPad = {
-    ngraph::op::PadType::SAME_LOWER,
-    ngraph::op::PadType::SAME_UPPER
+std::vector<ov::op::PadType> padTypesAutoPad = {
+    ov::op::PadType::SAME_LOWER,
+    ov::op::PadType::SAME_UPPER
 };
 
 const auto autoPadAddSpParams = ::testing::Combine(

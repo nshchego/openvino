@@ -54,7 +54,7 @@ using shapeOpsParams = std::tuple<
 
 class ShapeOpsCPUTest : public testing::WithParamInterface<shapeOpsParams>, virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<shapeOpsParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<shapeOpsParams> &obj) {
         inputDescription inpDesc;
         ngraph::helpers::InputLayerType secondType;
         shapeNodeType nodeType;
@@ -162,19 +162,19 @@ protected:
         auto inputs = ngraph::builder::makeDynamicParams(ngPrc, {inputDynamicShapes.front()});
         auto dataInput = inputs.front();
         dataInput->set_friendly_name("param_1");
-        std::shared_ptr<ngraph::Node> secondaryInput;
+        std::shared_ptr<ov::Node> secondaryInput;
         if (secondType == ngraph::helpers::InputLayerType::PARAMETER) {
             secondaryInput = ngraph::builder::makeDynamicParams(secondInPrc, {inputDynamicShapes.back()}).front();
             secondaryInput->set_friendly_name("param_2");
-            inputs.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(secondaryInput));
+            inputs.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(secondaryInput));
         } else {
             secondaryInput = ngraph::builder::makeConstant(secondInPrc, {inpDesc.data[0].size()}, inpDesc.data[0]);
         }
 
-        std::shared_ptr<ngraph::Node> shapeOps;
+        std::shared_ptr<ov::Node> shapeOps;
         switch (nodeType) {
             case shapeNodeType::Reshape: {
-                shapeOps = std::make_shared<ngraph::opset1::Reshape>(dataInput, secondaryInput, specialZero);
+                shapeOps = std::make_shared<op::v1::Reshape>(dataInput, secondaryInput, specialZero);
                 break;
             }
             case shapeNodeType::Squeeze: {
@@ -187,7 +187,7 @@ protected:
             }
             case shapeNodeType::ReshapeWithNonZero: {
                 auto nonZero = std::make_shared<ngraph::opset3::NonZero>(dataInput);
-                shapeOps = std::make_shared<ngraph::opset1::Reshape>(nonZero, secondaryInput, specialZero);
+                shapeOps = std::make_shared<op::v1::Reshape>(nonZero, secondaryInput, specialZero);
                 break;
             }
         }
@@ -211,7 +211,7 @@ namespace reshapeTest {
 const std::vector<ov::element::Type_t> secondInPrcs{ov::element::Type_t::i64, ov::element::Type_t::i32};
 
 inputDescription noBounds{{{-1, -1, -1, -1},
-                           {ngraph::Shape{2, 5, 7, 3}, ngraph::Shape{10, 6, 10, 5}, ngraph::Shape{10, 6, 10, 5}, ngraph::Shape{1, 2, 5, 5}}},
+                           {ov::Shape{2, 5, 7, 3}, ov::Shape{10, 6, 10, 5}, ov::Shape{10, 6, 10, 5}, ov::Shape{1, 2, 5, 5}}},
                            {std::vector<int>{1, -1, 0}, std::vector<int>{-1, 60, 2}, std::vector<int>{10, 30, 10}, std::vector<int>{5, 10, -1}}};
 
 const auto params = ::testing::Combine(::testing::Values(noBounds),
@@ -224,7 +224,7 @@ const auto params = ::testing::Combine(::testing::Values(noBounds),
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_dynamic, ShapeOpsCPUTest, params, ShapeOpsCPUTest::getTestCaseName);
 
 inputDescription noBounds_const{{{{1, 10}, {2, 6}, {1, 15}, {3, 11}},
-                                 {ngraph::Shape{2, 5, 7, 3}, ngraph::Shape{10, 6, 10, 5}, ngraph::Shape{1, 2, 5, 5}}},
+                                 {ov::Shape{2, 5, 7, 3}, ov::Shape{10, 6, 10, 5}, ov::Shape{1, 2, 5, 5}}},
                                  {std::vector<int>{2, -1, 0}}};
 
 const auto params_const = ::testing::Combine(::testing::Values(noBounds_const),
@@ -237,7 +237,7 @@ const auto params_const = ::testing::Combine(::testing::Values(noBounds_const),
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_dynamic_const, ShapeOpsCPUTest, params_const, ShapeOpsCPUTest::getTestCaseName);
 
 inputDescription shape_dynBatch{{{{1, 10}, 5, 7, 3},
-                                 {ngraph::Shape{2, 5, 7, 3}, ngraph::Shape{10, 5, 7, 3}, ngraph::Shape{1, 5, 7, 3}}},
+                                 {ov::Shape{2, 5, 7, 3}, ov::Shape{10, 5, 7, 3}, ov::Shape{1, 5, 7, 3}}},
                                  {std::vector<int>{-1, 15, 7}}};
 
 const auto params_dynBatch = ::testing::Combine(::testing::Values(shape_dynBatch),
@@ -285,10 +285,10 @@ namespace squeezeTest {
 const std::vector<ov::element::Type_t> secondInPrcs{ov::element::Type_t::i64, ov::element::Type_t::i32};
 inputDescription noBounds{{{-1, -1, -1, -1, -1, -1},
                            {
-                                ngraph::Shape{2, 5, 1, 7, 3, 1},
-                                ngraph::Shape{10, 1, 1, 6, 10, 5},
-                                ngraph::Shape{10, 6, 10, 5, 1, 1},
-                                ngraph::Shape{1, 1, 5, 1, 5}
+                                ov::Shape{2, 5, 1, 7, 3, 1},
+                                ov::Shape{10, 1, 1, 6, 10, 5},
+                                ov::Shape{10, 6, 10, 5, 1, 1},
+                                ov::Shape{1, 1, 5, 1, 5}
                            }},
                            {std::vector<int>{2, 5}, std::vector<int>{1, 2}, std::vector<int>{4, 5}, std::vector<int>{0, 1}}};
 
@@ -304,7 +304,7 @@ const auto params = ::testing::Combine(::testing::Values(noBounds),
 // INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_dynamic, ShapeOpsCPUTest, params, ShapeOpsCPUTest::getTestCaseName);
 
 inputDescription noBounds_const{{{{1, 10}, {1, 15}, {2, 6}, {1, 15}, {3, 11}, {1, 15}},
-                                 {ngraph::Shape{2, 1, 5, 7, 3, 1}, ngraph::Shape{10, 1, 6, 10, 5, 1}, ngraph::Shape{1, 1, 2, 5, 5, 1}}},
+                                 {ov::Shape{2, 1, 5, 7, 3, 1}, ov::Shape{10, 1, 6, 10, 5, 1}, ov::Shape{1, 1, 2, 5, 5, 1}}},
                                  {std::vector<int>{1, 5}}};
 
 const auto params_const = ::testing::Combine(::testing::Values(noBounds_const),
@@ -321,7 +321,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_dynamic_const, ShapeOpsCPUTest, p
 namespace unsqueezeTest {
 const std::vector<ov::element::Type_t> secondInPrcs{ov::element::Type_t::i64, ov::element::Type_t::i32};
 inputDescription noBounds{{{-1, -1, -1, -1},
-                           {ngraph::Shape{2, 5, 7, 3}, ngraph::Shape{10, 6, 10, 5}, ngraph::Shape{10, 6, 10, 5}, ngraph::Shape{5, 1, 5}}},
+                           {ov::Shape{2, 5, 7, 3}, ov::Shape{10, 6, 10, 5}, ov::Shape{10, 6, 10, 5}, ov::Shape{5, 1, 5}}},
                            {std::vector<int>{2, 5}, std::vector<int>{1, 2}, std::vector<int>{4, 5}, std::vector<int>{0, 1}}};
 
 const auto params = ::testing::Combine(::testing::Values(noBounds),
@@ -336,7 +336,7 @@ const auto params = ::testing::Combine(::testing::Values(noBounds),
 // INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_dynamic, ShapeOpsCPUTest, params, ShapeOpsCPUTest::getTestCaseName);
 
 inputDescription noBounds_const{{{{1, 10}, {1, 15}, {2, 20}, {3, 7}},
-                                 {ngraph::Shape{2, 5, 7, 3}, ngraph::Shape{10, 6, 10, 5}, ngraph::Shape{1, 2, 5, 5}}},
+                                 {ov::Shape{2, 5, 7, 3}, ov::Shape{10, 6, 10, 5}, ov::Shape{1, 2, 5, 5}}},
                                  {std::vector<int>{1, 3}}};
 
 const auto params_const = ::testing::Combine(::testing::Values(noBounds_const),

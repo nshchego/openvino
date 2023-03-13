@@ -24,7 +24,7 @@ using commonConvParams =  std::tuple<
     std::vector<ptrdiff_t>,         // Pad end
     InferenceEngine::SizeVector,    // Dilation
     size_t,                         // Num out channels
-    ngraph::op::PadType,            // Padding type
+    ov::op::PadType,            // Padding type
     size_t                          // Number of groups
 >;
 
@@ -38,7 +38,7 @@ using convConcatCPUParams = std::tuple<
 
 class ConvConcatSubgraphTest : public testing::WithParamInterface<convConcatCPUParams>, public CPUTestsBase, virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<convConcatCPUParams> obj);
+    static std::string getTestCaseName(const testing::TestParamInfo<convConcatCPUParams> &obj);
 
 protected:
     void SetUp() override;

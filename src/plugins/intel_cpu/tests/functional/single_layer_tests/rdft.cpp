@@ -3,7 +3,7 @@
 //
 
 #include "shared_test_classes/base/ov_subgraph.hpp"
-#include "ngraph_functions/builders.hpp"
+//#include "ngraph_functions/builders.hpp"
 #include "test_utils/cpu_test_utils.hpp"
 #include <common_test_utils/ov_tensor_utils.hpp>
 #include <openvino/opsets/opset9.hpp>
@@ -27,7 +27,7 @@ using RDFTTestCPUParams = std::tuple<std::vector<InputShape>,
 class RDFTTestCPU : public testing::WithParamInterface<std::tuple<element::Type, RDFTTestCPUParams>>,
                            virtual public test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<std::tuple<element::Type, RDFTTestCPUParams>> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<std::tuple<element::Type, RDFTTestCPUParams>> &obj) {
         element::Type precision;
         RDFTTestCPUParams params;
         std::vector<InputShape> shapes;

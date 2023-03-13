@@ -4,22 +4,18 @@
 
 #include "topk.h"
 
-#include <string>
-#include <vector>
-#include <set>
 #include <onednn/dnnl.h>
 #include <dnnl_extension_utils.h>
 #include "emitters/x64/jit_load_store_emitters.hpp"
 #include "ie_parallel.hpp"
-#include <ngraph/op/topk.hpp>
-#include <ie_ngraph_utils.hpp>
 #include <algorithm>
 
 #include <cpu/x64/jit_generator.hpp>
 #include <cpu/x64/jit_uni_eltwise.hpp>
 #include "common/cpu_memcpy.h"
 
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/topk.hpp>
+#include <utils/ngraph_utils.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -1801,8 +1797,7 @@ bool TopK::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
 
         auto topKOp = ov::as_type_ptr<const ov::op::util::TopKBase>(op);
         if (!isDynamicNgraphNode(op)) {
-            auto topKConst = std::dynamic_pointer_cast<const ov::op::v0::Constant>(topKOp->get_input_node_shared_ptr(TOPK_K));
-            if (!topKConst) {
+            if (topKOp->get_input_node_shared_ptr(TOPK_K)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
                 errorMessage = "Second tensor is not constant in static shape mode";
                 return false;
             }
@@ -1825,12 +1820,10 @@ bool TopK::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
     return true;
 }
 
-TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, PortMask(TOPK_K))) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "TopK layer with name '" + getName() + "'";
-
         auto topKOp = ov::as_type_ptr<const ov::op::util::TopKBase>(op);
 
         auto in_dims = topKOp->get_input_partial_shape(TOPK_DATA);
@@ -1839,9 +1832,8 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context
         auto in_dims_size = in_dims.size();
 
         if (!isDynamicNgraphNode(op)) {
-            auto topKConst = std::dynamic_pointer_cast<const ov::op::v0::Constant>(topKOp->get_input_node_shared_ptr(TOPK_K));
-            if (!topKConst) {
-                IE_THROW() << errorPrefix <<  "gets non-constant second tensor in static shape mode!";
+            if (topKOp->get_input_node_shared_ptr(TOPK_K)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+                THROW_CPU_NODE_ERR <<  "gets non-constant second tensor in static shape mode!";
             }
         }
 
@@ -1851,7 +1843,7 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context
 
         stable = false;
         if (!sort_index) {
-            const auto topKOpV11 = ngraph::as_type_ptr<const ov::op::v11::TopK>(op);
+            const auto topKOpV11 = ov::as_type_ptr<const ov::op::v11::TopK>(op);
             if (topKOpV11) {
                 stable = topKOpV11->get_stable();
             }
@@ -1863,21 +1855,21 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context
         vec_idx_block.clear();
 
         if (inputShapes.size() != 2 || outputShapes.size() < 2)
-            IE_THROW() << errorPrefix << " gets incorrect number of input/output edges!";
+            THROW_CPU_NODE_ERR << " gets incorrect number of input/output edges!";
 
         if (getInputShapeAtPort(TOPK_DATA).getRank() != getOutputShapeAtPort(TOPK_DATA).getRank())
-            IE_THROW() << errorPrefix << " gets incorrect number of input/output dimensions!";
+            THROW_CPU_NODE_ERR << " gets incorrect number of input/output dimensions!";
 
         if (getInputShapeAtPort(TOPK_K).getRank() != 1)
-            IE_THROW() << errorPrefix << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
+            THROW_CPU_NODE_ERR << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
 
         if (out_dims != out_idx_dims)
-            IE_THROW() << errorPrefix << " gets incorrect output tensor dimension sizes!";
+            THROW_CPU_NODE_ERR << " gets incorrect output tensor dimension sizes!";
 
         if (axis < 0)
             axis += in_dims_size;
         if (axis < 0 || axis >= static_cast<int>(in_dims_size))
-            IE_THROW() << errorPrefix << " gets incorrect input parameters dimensions and axis number!";
+            THROW_CPU_NODE_ERR << " gets incorrect input parameters dimensions and axis number!";
     } else {
         IE_THROW(NotImplemented) << errorMessage;
     }
@@ -1916,7 +1908,7 @@ void TopK::initSupportedPrimitiveDescriptors() {
 
     Precision dataPrecision = getOriginalOutputPrecisionAtPort(TOPK_DATA);
     if (dataPrecision == Precision::BF16 && !mayiuse(avx512_core))
-        IE_THROW() << errorPrefix << " gets incorrect isa for BF16! AVX512 must be supported!";
+        THROW_CPU_NODE_ERR << " gets incorrect isa for BF16! AVX512 must be supported!";
     bool precisionSupported = std::find(std::begin(supportedPrecision), std::end(supportedPrecision), dataPrecision)
                                      != std::end(supportedPrecision);
     if (!precisionSupported) {
@@ -1984,11 +1976,11 @@ void TopK::prepareParams() {
     auto &dstMemPtr = getChildEdgeAt(TOPK_DATA)->getMemoryPtr();
     auto &srcMemPtr = getParentEdgeAt(TOPK_DATA)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocated destination memory.";
+        THROW_CPU_NODE_ERR << " has not allocated destination memory.";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocate input memory.";
+        THROW_CPU_NODE_ERR << " has not allocate input memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << errorPrefix << " has nullable preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << " has nullable preferable primitive descriptor";
 
     src_dims = srcMemPtr->getDesc().getShape().getDims();
     dst_dims = dstMemPtr->getDesc().getShape().getDims();
@@ -1996,7 +1988,7 @@ void TopK::prepareParams() {
     if (isDynamicNode()) {
         const int src_k = reinterpret_cast<int *>(getParentEdgeAt(TOPK_K)->getMemoryPtr()->GetPtr())[0];
         if (src_k > src_dims[axis])
-            IE_THROW() << errorPrefix << " gets top_k out of range!";
+            THROW_CPU_NODE_ERR << " gets top_k out of range!";
         if (top_k != src_k) {
             top_k = src_k;
         }
@@ -2154,7 +2146,7 @@ void TopK::execute(dnnl::stream strm) {
             auto out_idx_ptr = reinterpret_cast<int32_t *>(dst_idx);
             topk_ref(in_ptr, out_ptr, out_idx_ptr);
         } else {
-            IE_THROW() << errorPrefix <<  "only support plain layout on machine w/o sse42.";
+            THROW_CPU_NODE_ERR <<  "only support plain layout on machine w/o sse42.";
         }
     }
 }

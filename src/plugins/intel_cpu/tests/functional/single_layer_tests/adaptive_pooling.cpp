@@ -37,7 +37,7 @@ using AdaPoolLayerCPUTestParamsSet = std::tuple<
 class AdaPoolLayerCPUTest : public testing::WithParamInterface<AdaPoolLayerCPUTestParamsSet>,
                             virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<AdaPoolLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<AdaPoolLayerCPUTestParamsSet> &obj) {
         CPULayerTestsDefinitions::AdaPoolLayerTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -101,26 +101,26 @@ protected:
         }
     }
 
-    std::shared_ptr<ngraph::Function> createFunction(bool secondInputConst) {
-        auto params = ngraph::builder::makeDynamicParams(ngraph::element::f32, { inputDynamicShapes[0] });
+    std::shared_ptr<ov::Model> createFunction(bool secondInputConst) {
+        auto params = ngraph::builder::makeDynamicParams(ov::element::f32, { inputDynamicShapes[0] });
         params.front()->set_friendly_name("ParamsInput");
         std::shared_ptr<ov::Node> secondInput;
         if (secondInputConst) {
-            secondInput = ngraph::op::Constant::create(ngraph::element::i32, ngraph::Shape{pooledVector.size()}, pooledVector);
+            secondInput = ov::op::v0::Constant::create(ov::element::i32, ov::Shape{pooledVector.size()}, pooledVector);
         } else {
-            auto pooledParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i32, ngraph::Shape{pooledVector.size()});
+            auto pooledParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i32, ov::Shape{pooledVector.size()});
             pooledParam->set_friendly_name("ParamSecondInput");
             params.push_back(pooledParam);
             secondInput = pooledParam;
         }
 
-        auto adapoolMax = std::make_shared<ngraph::opset8::AdaptiveMaxPool>(params[0], secondInput, ngraph::element::i32);
+        auto adapoolMax = std::make_shared<ngraph::opset8::AdaptiveMaxPool>(params[0], secondInput, ov::element::i32);
         adapoolMax->get_rt_info() = getCPUInfo();
         auto adapoolAvg = std::make_shared<ngraph::opset8::AdaptiveAvgPool>(params[0], secondInput);
         adapoolAvg->get_rt_info() = getCPUInfo();
 
-        auto function = (mode == "max" ? std::make_shared<ngraph::Function>(adapoolMax->outputs(), params, "AdaPoolMax") :
-                    std::make_shared<ngraph::Function>(adapoolAvg->outputs(), params, "AdaPoolAvg"));
+        auto function = (mode == "max" ? std::make_shared<ov::Model>(adapoolMax->outputs(), params, "AdaPoolMax") :
+                    std::make_shared<ov::Model>(adapoolAvg->outputs(), params, "AdaPoolAvg"));
         return function;
     }
 

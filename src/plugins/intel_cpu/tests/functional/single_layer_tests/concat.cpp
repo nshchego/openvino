@@ -21,7 +21,7 @@ typedef std::tuple<
 class ConcatLayerCPUTest : public testing::WithParamInterface<concatCPUTestParams>,
                            virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<concatCPUTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<concatCPUTestParams> &obj) {
         int axis;
         std::vector<InputShape> inputShapes;
         ElementType netPrecision;
@@ -80,7 +80,7 @@ protected:
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
         auto paramOuts = ngraph::helpers::convert2OutputVector(
-                ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+                ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         auto concat = std::make_shared<ngraph::opset1::Concat>(paramOuts, axis);
 
         function = makeNgraphFunction(netPrecision, params, concat, "ConcatCPU");

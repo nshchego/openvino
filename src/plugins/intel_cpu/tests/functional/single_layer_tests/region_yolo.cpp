@@ -34,7 +34,7 @@ using regionYoloParamsTuple = std::tuple<
 class RegionYoloCPULayerTest : public testing::WithParamInterface<regionYoloParamsTuple>,
                                virtual public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<regionYoloParamsTuple> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<regionYoloParamsTuple> &obj) {
         InputShape inputShape;
         regionYoloAttributes attributes;
         std::vector<int64_t> mask;
@@ -81,7 +81,7 @@ protected:
         selectedType = getPrimitiveType() + "_" + InferenceEngine::details::convertPrecision(inPrc).name();
         auto paramRegionYolo = ngraph::builder::makeDynamicParams(inPrc, inputDynamicShapes);
 
-        const auto region_yolo = std::make_shared<ngraph::op::v0::RegionYolo>(paramRegionYolo[0],
+        const auto region_yolo = std::make_shared<ov::op::v0::RegionYolo>(paramRegionYolo[0],
                                                                               attributes.coordinates, attributes.classes, attributes.num_regions,
                                                                               attributes.do_softmax, mask, attributes.start_axis, attributes.end_axis);
 
@@ -101,11 +101,11 @@ const std::map<std::string, std::string> additional_config;
 
 /* *======================* Static Shapes *======================* */
 
-const std::vector<ngraph::Shape> inShapes_caffe = {
+const std::vector<ov::Shape> inShapes_caffe = {
         {1, 125, 13, 13}
 };
 
-const std::vector<ngraph::Shape> inShapes_mxnet = {
+const std::vector<ov::Shape> inShapes_mxnet = {
         {1, 75, 52, 52},
         {1, 75, 32, 32},
         {1, 75, 26, 26},
@@ -117,7 +117,7 @@ const std::vector<ngraph::Shape> inShapes_mxnet = {
         {1, 303, 28, 28},
 };
 
-const std::vector<ngraph::Shape> inShapes_v3 = {
+const std::vector<ov::Shape> inShapes_v3 = {
         {1, 255, 52, 52},
         {1, 255, 26, 26},
         {1, 255, 13, 13}

@@ -3,16 +3,12 @@
 //
 
 #include "pad.h"
-#include <string>
-#include <cmath>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
-#include <limits>
+
 #include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
+#include <openvino/op/constant.hpp>
+#include <openvino/op/pad.hpp>
 #include "utils/bfloat16.hpp"
-#include <selective_build.h>
-#include <ngraph/opsets/opset1.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -22,9 +18,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool Pad::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Pad::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        auto pad = ov::as_type_ptr<const ngraph::opset1::Pad>(op);
+        auto pad = ov::as_type_ptr<const op::v1::Pad>(op);
         if (!pad) {
             errorMessage = "Only opset1 Pad operation is supported";
             return false;
@@ -32,11 +28,11 @@ bool Pad::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, st
 
         const auto pad_mode = pad->get_pad_mode();
         if (!one_of(pad_mode,
-                    ngraph::op::PadMode::CONSTANT,
-                    ngraph::op::PadMode::EDGE,
-                    ngraph::op::PadMode::REFLECT,
-                    ngraph::op::PadMode::SYMMETRIC)) {
-            errorMessage = "Has unsupported pad_mode: " + ngraph::as_string(pad_mode);
+                    ov::op::PadMode::CONSTANT,
+                    ov::op::PadMode::EDGE,
+                    ov::op::PadMode::REFLECT,
+                    ov::op::PadMode::SYMMETRIC)) {
+            errorMessage = "Has unsupported pad_mode: " + ov::as_string(pad_mode);
             return false;
         }
     } catch (...) {
@@ -45,26 +41,26 @@ bool Pad::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, st
     return true;
 }
 
-Pad::Pad(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Pad::Pad(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, PortMask(PADS_BEGIN_ID, PADS_END_ID))) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    errorPrefix = NameFromType(getType()) + " node with name '" + getName() + "' ";
+    errorPrefix = getTypeStr() + " node with name '" + getName() + "' ";
     if (inputShapes.size() != 3 && inputShapes.size() != 4)
-        IE_THROW() << errorPrefix << " has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges";
     if (outputShapes.size() != 1)
-        IE_THROW() << errorPrefix << "Incorrect number of output edges";
+        THROW_CPU_NODE_ERR << "Incorrect number of output edges";
 
     const size_t srcDimsRank = inputShapes[DATA_ID].getRank();
     const size_t dstDimsRank = outputShapes[DATA_ID].getRank();
     if (srcDimsRank != dstDimsRank)
-        IE_THROW() << errorPrefix << "has incorrect number of input/output dimensions!";
+        THROW_CPU_NODE_ERR << "has incorrect number of input/output dimensions!";
 
-    auto pad = ov::as_type_ptr<const ngraph::opset1::Pad>(op);
+    auto pad = ov::as_type_ptr<const ov::op::v1::Pad>(op);
     if (!pad) {
-        IE_THROW() << errorPrefix << "couldn't be casted to op of opset1";
+        THROW_CPU_NODE_ERR << "couldn't be casted to op of opset1";
     }
 
     shapeHasDataDependency = !ov::is_type<ov::op::v0::Constant>(op->get_input_node_shared_ptr(PADS_BEGIN_ID)) ||
@@ -74,14 +70,14 @@ Pad::Pad(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr conte
         if (type < PADS_BEGIN_ID)
             return;
 
-        const auto constNode = ov::as_type_ptr<const ngraph::opset1::Constant>(op->get_input_node_shared_ptr(type));
+        const auto constNode = ov::as_type_ptr<const ov::op::v0::Constant>(op->get_input_node_shared_ptr(type));
         if (constNode) {
             auto pad_data = constNode->cast_vector<int32_t>();
             for (const auto& value : pad_data) {
                 parameter.push_back(value);
             }
             if (parameter.size() != srcDimsRank)
-                IE_THROW() << errorPrefix << "has incorrect number of input/output dimensions!";
+                THROW_CPU_NODE_ERR << "has incorrect number of input/output dimensions!";
         }
     };
 
@@ -90,25 +86,25 @@ Pad::Pad(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr conte
 
     const auto pad_mode = pad->get_pad_mode();
     isPadValueSpecified = pad->get_input_size() == 4;
-    if (pad_mode == ngraph::op::PadMode::CONSTANT) {
+    if (pad_mode == ov::op::PadMode::CONSTANT) {
         attrs.padMode = CONSTANT;
         if (isPadValueSpecified && op->get_input_node_shared_ptr(PAD_VALUE_ID)->get_type_info() ==
                                        ov::op::v0::Constant::get_type_info_static()) {
             if (!ngraph::is_scalar(pad->get_input_shape(PAD_VALUE_ID)))
-                IE_THROW() << errorPrefix << "has non scalar 'pad_value' input";
+                THROW_CPU_NODE_ERR << "has non scalar 'pad_value' input";
             attrs.padValue =
-                ov::as_type_ptr<const ngraph::opset1::Constant>(pad->get_input_node_shared_ptr(PAD_VALUE_ID))
+                ov::as_type_ptr<const ov::op::v0::Constant>(pad->get_input_node_shared_ptr(PAD_VALUE_ID))
                     ->cast_vector<float>()[0];
             attrs.constPadValue = true;
         }
-    } else if (pad_mode == ngraph::op::PadMode::EDGE) {
+    } else if (pad_mode == ov::op::PadMode::EDGE) {
         attrs.padMode = EDGE;
-    } else if (pad_mode == ngraph::op::PadMode::REFLECT) {
+    } else if (pad_mode == ov::op::PadMode::REFLECT) {
         attrs.padMode = REFLECT;
-    } else if (pad_mode == ngraph::op::PadMode::SYMMETRIC) {
+    } else if (pad_mode == ov::op::PadMode::SYMMETRIC) {
         attrs.padMode = SYMMETRIC;
     } else {
-        IE_THROW() << errorPrefix << "has unsupported pad_mode: " + ngraph::as_string(pad_mode);
+        THROW_CPU_NODE_ERR << "has unsupported pad_mode: " + ov::as_string(pad_mode);
     }
 }
 
@@ -391,7 +387,7 @@ void Pad::PadExecutor::exec(MemoryPtr& srcMemPtr, MemoryPtr& dstMemPtr) {
 
 void Pad::execute(dnnl::stream strm) {
     if (!execPtr)
-        IE_THROW() << errorPrefix << "has not compiled executor.";
+        THROW_CPU_NODE_ERR << "has not compiled executor.";
 
     execPtr->exec(getParentEdgeAt(0)->getMemoryPtr(), getChildEdgeAt(0)->getMemoryPtr());
 }

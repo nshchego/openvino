@@ -24,7 +24,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
     auto matmulPattern = ngraph::pattern::wrap_type<ngraph::op::MatMul>(twoInputs);
 
     ngraph::matcher_pass_callback callback = [this](ngraph::pattern::Matcher& m) {
-        auto matmul = std::dynamic_pointer_cast<ngraph::op::MatMul> (m.get_match_root());
+        auto matmul = ov::as_type_ptr<ngraph::op::MatMul>(m.get_match_root());
 
         if (!matmul || transformation_callback(matmul))
             return false;
@@ -44,7 +44,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
             input0shape.size() != 1)
             return false; // nothing to do
 
-        auto getUnsqueeze = [&](const ngraph::Output<ngraph::Node>& nodeFrom, const ngraph::Output<ngraph::Node>& nodeTo) {
+        auto getUnsqueeze = [&](const ngraph::Output<ov::Node>& nodeFrom, const ngraph::Output<ov::Node>& nodeTo) {
             auto rankFrom = nodeFrom.get_partial_shape().size();
             auto rankTo = nodeTo.get_partial_shape().size();
 
@@ -57,7 +57,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
 
             auto unsqueeze = std::make_shared<ngraph::opset1::Unsqueeze>(
                 nodeFrom,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{unsqueeze_axes.size()}, unsqueeze_axes));
+                ov::op::v0::Constant::create(ov::element::i64, ngraph::Shape{unsqueeze_axes.size()}, unsqueeze_axes));
 
             unsqueeze->set_friendly_name(nodeFrom.get_node()->get_friendly_name() + "/Unsqueeze");
 
@@ -65,7 +65,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
         };
 
         auto matmul_new_inputs = matmul->input_values();
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
         if (input0shape.size() == 1 && input1shape.size() == 1) {
             // If the input is 1D tensor, it is unsqueezed to 2D tensor (row vector)
@@ -75,10 +75,10 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
             //                       to the right of the shape {S} -> {S, 1}
             const auto unsqueezeInput0 = std::make_shared<ngraph::opset1::Unsqueeze>(
                 input0,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{1}, {0}));
+                ov::op::v0::Constant::create(ov::element::i64, ngraph::Shape{1}, {0}));
             const auto unsqueezeInput1 = std::make_shared<ngraph::opset1::Unsqueeze>(
                 input1,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{1}, {1}));
+                ov::op::v0::Constant::create(ov::element::i64, ngraph::Shape{1}, {1}));
 
             matmul_new_inputs[0] = unsqueezeInput0;
             new_ops.push_back(unsqueezeInput0);
@@ -88,14 +88,14 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
             matmul->set_transpose_a(false);
             matmul->set_transpose_b(false);
         } else if (input0shape.size() < input1shape.size()) {
-            std::shared_ptr<ngraph::Node> unsqueezeInput0 = getUnsqueeze(input0, input1);
+            std::shared_ptr<ov::Node> unsqueezeInput0 = getUnsqueeze(input0, input1);
             matmul_new_inputs[0] = unsqueezeInput0;
             new_ops.push_back(unsqueezeInput0);
 
             if (input0shape.size() == 1)
                 matmul->set_transpose_a(false);
         } else if (input0shape.size() > input1shape.size()) {
-            std::shared_ptr<ngraph::Node> unsqueezeInput1 = getUnsqueeze(input1, input0);
+            std::shared_ptr<ov::Node> unsqueezeInput1 = getUnsqueeze(input1, input0);
             matmul_new_inputs[1] = unsqueezeInput1;
             new_ops.push_back(unsqueezeInput1);
 
@@ -103,7 +103,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
                 matmul->set_transpose_b(false);
         }
 
-        std::shared_ptr<ngraph::Node> matmul_new = matmul->clone_with_new_inputs(matmul_new_inputs);
+        std::shared_ptr<ov::Node> matmul_new = matmul->clone_with_new_inputs(matmul_new_inputs);
         new_ops.push_back(matmul_new);
 
         if (matmul_new->get_output_partial_shape(0) != output_shape) {
@@ -116,9 +116,9 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
                 squeeze_axis = new_out_shape_size - 2;
             else if (input1shape.size() == 1)
                 squeeze_axis = new_out_shape_size - 1;
-            std::shared_ptr<ngraph::Node> squeeze_output = std::make_shared<ngraph::op::v0::Squeeze>(
+            std::shared_ptr<ov::Node> squeeze_output = std::make_shared<ngraph::op::v0::Squeeze>(
                 matmul_new,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{1}, {squeeze_axis}));
+                ov::op::v0::Constant::create(ov::element::i64, ngraph::Shape{1}, {squeeze_axis}));
 
             new_ops.push_back(squeeze_output);
             matmul_new->set_friendly_name(matmul->get_friendly_name() + "/MM");

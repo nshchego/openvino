@@ -23,7 +23,7 @@ using convertLayerTestParamsSet = std::tuple<InputShape,  // input shapes
 class ConvertCPULayerTest : public testing::WithParamInterface<convertLayerTestParamsSet>,
                             virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<convertLayerTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<convertLayerTestParamsSet> &obj) {
         InputShape inputShape;
         InferenceEngine::Precision inPrc, outPrc;
         CPUSpecificParams cpuParams;
@@ -66,7 +66,7 @@ protected:
         selectedType = makeSelectedTypeStr(primitive, InferenceEngine::details::convertPrecision(exec_type_precision));
 
         for (size_t i = 0; i < shapes.second.size(); i++) {
-            targetStaticShapes.push_back(std::vector<ngraph::Shape>{shapes.second[i]});
+            targetStaticShapes.push_back(std::vector<ov::Shape>{shapes.second[i]});
         }
 
         inputDynamicShapes.push_back(shapes.first);
@@ -79,7 +79,7 @@ protected:
         function = makeNgraphFunction(ngPrc, params, conversion, "ConversionCPU");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         if (outPrc != Precision::BOOL) {
             SubgraphBaseTest::generate_inputs(targetInputStaticShapes);
             return;

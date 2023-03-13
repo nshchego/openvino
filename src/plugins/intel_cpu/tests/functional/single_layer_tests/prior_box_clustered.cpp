@@ -56,7 +56,7 @@ public:
                  imageShapes,
                  targetDevice) = obj.param;
 
-        ngraph::op::PriorBoxClusteredAttrs attributes;
+        ov::op::v0::PriorBoxClustered::Attributes attributes;
         std::tie(
             attributes.widths,
             attributes.heights,
@@ -113,7 +113,7 @@ protected:
 
         init_input_shapes({ inputShapes, imageShapes });
 
-        ngraph::op::PriorBoxClusteredAttrs attributes;
+        ov::op::v0::PriorBoxClustered::Attributes attributes;
         std::tie(
             attributes.widths,
             attributes.heights,
@@ -126,15 +126,15 @@ protected:
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, { inputShapes.first, imageShapes.first });
 
-        auto shape_of_1 = std::make_shared<ngraph::opset3::ShapeOf>(params[0]);
-        auto shape_of_2 = std::make_shared<ngraph::opset3::ShapeOf>(params[1]);
-        auto priorBoxClustered = std::make_shared<ngraph::op::PriorBoxClustered>(
+        auto shape_of_1 = std::make_shared<ov::op::v3::ShapeOf>(params[0]);
+        auto shape_of_2 = std::make_shared<ov::op::v3::ShapeOf>(params[1]);
+        auto priorBoxClustered = std::make_shared<ov::op::v0::PriorBoxClustered>(
                 shape_of_1,
                 shape_of_2,
                 attributes);
 
-        ngraph::ResultVector results{ std::make_shared<ngraph::opset1::Result>(priorBoxClustered) };
-        function = std::make_shared<ngraph::Function>(results, params, "priorBoxClustered");
+        ov::ResultVector results{ std::make_shared<ov::op::v0::Result>(priorBoxClustered) };
+        function = std::make_shared<ov::Model>(results, params, "priorBoxClustered");
     }
 };
 

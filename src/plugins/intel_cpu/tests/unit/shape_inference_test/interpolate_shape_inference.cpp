@@ -77,7 +77,7 @@ TEST(StaticShapeInferenceTest, InterpolateV4Test) {
     float scales_val[] = {2.0, 0.5};
     int32_t axes_val[] = {2, 3};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
-    constant_data[1] = std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, Shape{2}, sizes_val);
+    constant_data[1] = std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, Shape{2}, sizes_val);
     constant_data[2] = std::make_shared<ngraph::runtime::HostTensor>(element::f32, Shape{2}, scales_val);
     constant_data[3] = std::make_shared<ngraph::runtime::HostTensor>(element::i32, Shape{2}, axes_val);
 
@@ -110,7 +110,7 @@ TEST(StaticShapeInferenceTest, InterpolateV4MissingConstantTest) {
     int32_t sizes_val[] = {24, 160};
     float scales_val[] = {2.0, 0.5};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
-    constant_data[1] = std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, Shape{2}, sizes_val);
+    constant_data[1] = std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, Shape{2}, sizes_val);
     constant_data[2] = std::make_shared<ngraph::runtime::HostTensor>(element::f32, Shape{2}, scales_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{1, 2, 48, 80},
@@ -128,7 +128,7 @@ TEST(StaticShapeInferenceTest, InterpolateV0Test) {
 
     int32_t sizes_val[] = {15, 30};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
-    constant_data[1] = std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, Shape{2}, sizes_val);
+    constant_data[1] = std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, Shape{2}, sizes_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{2, 2, 33, 65}, StaticShape{2}},
                              static_output_shapes = {StaticShape{}};

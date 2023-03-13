@@ -4,26 +4,26 @@
 
 #include "reduce.h"
 
-#include "fake_quantize.h"
 #include "eltwise.h"
-#include <string>
-#include <vector>
-#include <set>
-#include <onednn/dnnl.h>
-#include <dnnl_extension_utils.h>
-#include "utils/bfloat16.hpp"
-#include "emitters/x64/jit_bf16_emitters.hpp"
+#include "fake_quantize.h"
 #include "ie_parallel.hpp"
-#include <algorithm>
+#include "utils/bfloat16.hpp"
 
-#include <cpu/x64/jit_generator.hpp>
-#include <cpu/x64/jit_uni_eltwise.hpp>
+#include "emitters/x64/jit_bf16_emitters.hpp"
 #include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
-#include <ngraph/opsets/opset1.hpp>
-#include <ngraph/opsets/opset4.hpp>
-#include <common/primitive_hashing_utils.hpp>
+
+#include <openvino/op/constant.hpp>
+#include <openvino/op/reduce_l1.hpp>
+#include <openvino/op/reduce_l2.hpp>
+#include <openvino/op/reduce_logical_and.hpp>
+#include <openvino/op/reduce_logical_or.hpp>
+#include <openvino/op/reduce_max.hpp>
+#include <openvino/op/reduce_mean.hpp>
+#include <openvino/op/reduce_min.hpp>
+#include <openvino/op/reduce_prod.hpp>
+#include <openvino/op/reduce_sum.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -1677,63 +1677,48 @@ private:
 
 #endif // OPENVINO_ARCH_X86_64
 
-const std::map<const ngraph::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ngraph::Node>&, Reduce&)>> Reduce::initializers = {
-    {ngraph::opset4::ReduceL1::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+const std::map<const ngraph::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ov::Node>&, Reduce&)>> Reduce::initializers = {
+    {op::v4::ReduceL1::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceL1;
     }},
-    {ngraph::opset4::ReduceL2::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v4::ReduceL2::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceL2;
     }},
-    {ngraph::opset1::ReduceLogicalAnd::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceLogicalAnd::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceAnd;
     }},
-    {ngraph::opset1::ReduceLogicalOr::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceLogicalOr::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceOr;
     }},
-    {ngraph::opset1::ReduceMax::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceMax::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceMax;
     }},
-    {ngraph::opset1::ReduceMean::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceMean::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceMean;
     }},
-    {ngraph::opset1::ReduceMin::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceMin::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceMin;
     }},
-    {ngraph::opset1::ReduceProd::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceProd::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceProd;
     }},
-    {ngraph::opset1::ReduceSum::get_type_info_static(), [](const std::shared_ptr<ngraph::Node>& op, Reduce& node) {
+    {op::v1::ReduceSum::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceSum;
     }}
 };
 
-bool Reduce::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Reduce::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (std::dynamic_pointer_cast<const ngraph::op::util::ArithmeticReductionKeepDims>(op) == nullptr &&
-                std::dynamic_pointer_cast<const ngraph::op::util::LogicalReductionKeepDims>(op) == nullptr) {
+        if (!is_type<op::util::ArithmeticReductionKeepDims>(op) && !is_type<op::util::LogicalReductionKeepDims>(op)) {
             errorMessage = "Reduce node with name " + op->get_friendly_name() + " is not derived from ArithmeticReductionKeepDims or LogicalReductionKeepDims";
             return false;
         }
-        if (const auto reduce = std::dynamic_pointer_cast<const ngraph::op::util::ArithmeticReductionKeepDims>(op)) {
-            auto reduceConst = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(reduce->get_input_node_shared_ptr(REDUCE_INDEXES));
-            if (!reduceConst) {
-                errorMessage = "Second tensor is not constant";
-                return false;
-            }
-        }
-        if (const auto reduce = std::dynamic_pointer_cast<const ngraph::op::util::LogicalReductionKeepDims>(op)) {
-            auto reduceConst = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(reduce->get_input_node_shared_ptr(REDUCE_INDEXES));
-            if (!reduceConst) {
-                errorMessage = "Second tensor is not constant";
-                return false;
-            }
+        if (op->get_input_node_ptr(REDUCE_INDEXES)->get_type_info() != op::v0::Constant::get_type_info_static()) {
+            errorMessage = "Only const 'reduce_indexes' input is supported.";
+            return false;
         }
         if (initializers.find(op->get_type_info()) == initializers.end()) {
             errorMessage = "Doesn't support Reduce algorithm: " +  std::string(op->get_type_info().name);
-            return false;
-        }
-        if (std::dynamic_pointer_cast<ngraph::opset1::Constant>(op->get_input_node_shared_ptr(REDUCE_INDEXES)) == nullptr) {
-            errorMessage = "Only const 'reduce_indexes' input is supported";
             return false;
         }
     } catch (...) {
@@ -1742,30 +1727,29 @@ bool Reduce::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
     return true;
 }
 
-Reduce::Reduce(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Reduce::Reduce(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, PortMask(REDUCE_INDEXES))) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "Reduce node with name '" + getName() + "'";
-        initializers.at(op->get_type_info())(op, *this);
-        if (const auto reduce = std::dynamic_pointer_cast<ngraph::op::util::ArithmeticReductionKeepDims>(op)) {
-            keep_dims = reduce->get_keep_dims();
-            auto reduceConst = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(reduce->get_input_node_shared_ptr(REDUCE_INDEXES));
-            if (!reduceConst)
-                IE_THROW() << errorPrefix << " second tensor is not constant!";
-            raw_axes = reduceConst->cast_vector<int>();
-        } else if (const auto reduce = std::dynamic_pointer_cast<ngraph::op::util::LogicalReductionKeepDims>(op)) {
-            keep_dims = reduce->get_keep_dims();
-            auto reduceConst = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(reduce->get_input_node_shared_ptr(REDUCE_INDEXES));
-            if (!reduceConst)
-                IE_THROW() << errorPrefix << " second tensor is not constant!";
-            raw_axes = reduceConst->cast_vector<int>();
-        }
-        vec_reduceDH_prc.clear();
-        setJITBeyond5D();
-    } else {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
+
+    initializers.at(op->get_type_info())(op, *this);
+    if (auto reduce = ov::as_type<op::util::ArithmeticReductionKeepDims>(op.get())) {
+        keep_dims = reduce->get_keep_dims();
+        auto reduceConst = ov::as_type<const op::v0::Constant>(reduce->get_input_node_ptr(REDUCE_INDEXES));
+        if (!reduceConst)
+            THROW_CPU_NODE_ERR << " second tensor is not constant!";
+        raw_axes = reduceConst->cast_vector<int>();
+    } else if (auto reduce = ov::as_type<op::util::LogicalReductionKeepDims>(op.get())) {
+        keep_dims = reduce->get_keep_dims();
+        auto reduceConst = ov::as_type<const op::v0::Constant>(reduce->get_input_node_ptr(REDUCE_INDEXES));
+        if (!reduceConst)
+            THROW_CPU_NODE_ERR << " second tensor is not constant!";
+        raw_axes = reduceConst->cast_vector<int>();
+    }
+    vec_reduceDH_prc.clear();
+    setJITBeyond5D();
 }
 
 void Reduce::getSupportedDescriptors() {
@@ -1773,23 +1757,23 @@ void Reduce::getSupportedDescriptors() {
         return;
 
     if (getParentEdges().size() != 2)
-        IE_THROW() << errorPrefix << " gets incorrect number of input edges!";
+        THROW_CPU_NODE_ERR << " gets incorrect number of input edges!";
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << " gets incorrect number of output edges!";
+        THROW_CPU_NODE_ERR << " gets incorrect number of output edges!";
 
     if (getInputShapeAtPort(REDUCE_INDEXES).getRank() != 1) {
-        IE_THROW() << errorPrefix << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
+        THROW_CPU_NODE_ERR << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
     }
 
     if (keep_dims) {
         if (getInputShapeAtPort(REDUCE_DATA).getRank() != getOutputShapeAtPort(0).getRank())
-            IE_THROW() << errorPrefix << " gets incorrect number of input/output dimensions!";
+            THROW_CPU_NODE_ERR << " gets incorrect number of input/output dimensions!";
     } else {
         // In fact, after the Reduce operation, the shape must be a scalar if the previous one was 1d.
         // But for now, 0d tensor (scalar) is emulated as 1d tensor. Skip checking in such cases.
         bool is_emulated_0d_as_1d = getInputShapeAtPort(REDUCE_DATA).getRank() == 1 && getOutputShapeAtPort(0).getRank() == 1;
         if (getInputShapeAtPort(REDUCE_DATA).getRank() <= getOutputShapeAtPort(0).getRank() && !is_emulated_0d_as_1d)
-            IE_THROW() << errorPrefix << "gets incorrect number of input/output dimensions!";
+            THROW_CPU_NODE_ERR << "gets incorrect number of input/output dimensions!";
     }
 }
 
@@ -1976,7 +1960,7 @@ void Reduce::prepareParams() {
         auto cache = context->getParamsCache();
         auto result = cache->getOrCreate(key, builder);
         if (!result.first) {
-            IE_THROW() << errorPrefix << " has not found jit_uni_reduce_post_kernel_f32.";
+            THROW_CPU_NODE_ERR << " has not found jit_uni_reduce_post_kernel_f32.";
         }
 
         reduce_post_kernel = result.first;
@@ -1995,11 +1979,11 @@ void Reduce::createPrimitive() {
     auto &dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     auto &srcMemPtr = getParentEdgeAt(REDUCE_DATA)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocated destination memory.";
+        THROW_CPU_NODE_ERR << " has not allocated destination memory.";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " has not allocate input memory.";
+        THROW_CPU_NODE_ERR << " has not allocate input memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        IE_THROW() << errorPrefix << " has nullable preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << " has nullable preferable primitive descriptor";
 
     if (srcMemPtr->getDesc().hasLayoutType(LayoutType::ncsp)) {
         layout = ReduceLayoutType::reduce_ncsp;
@@ -2103,7 +2087,7 @@ void Reduce::execute(dnnl::stream strm) {
             auto out_ptr = reinterpret_cast<float *>(dst_data);
             reduce_ref(in_ptr, out_ptr);
         } else {
-            IE_THROW() << errorPrefix << " supports only plain layout on machine w/o sse42.";
+            THROW_CPU_NODE_ERR << " supports only plain layout on machine w/o sse42.";
         }
     }
 }
@@ -2730,7 +2714,7 @@ inline void Reduce::init_dst_data(uint8_t *out_ptr, size_t dst_size) {
             }
             break;
         default:
-            IE_THROW() << errorPrefix << " gets unsupported reduce mode.";
+            THROW_CPU_NODE_ERR << " gets unsupported reduce mode.";
     }
 }
 
@@ -2768,7 +2752,7 @@ inline void Reduce::calc_process_dst_dims(std::vector<int> &reduce_axes, const S
         if (axis < 0)
             axis += src_dims.size();
         if (static_cast<size_t>(axis) > src_dims.size())
-            IE_THROW() << errorPrefix << " exceeds data tensor dimension on index to reduce";
+            THROW_CPU_NODE_ERR << " exceeds data tensor dimension on index to reduce";
         axes.insert(static_cast<size_t>(axis));
     }
     for (size_t i = 0; i < src_dims.size(); i++) {
@@ -2791,11 +2775,11 @@ inline void Reduce::calc_process_dst_dims(std::vector<int> &reduce_axes, const S
     if (jit_mode && jit_beyond_5D) {
         if (std::accumulate(out_dims.begin(), out_dims.end(), size_t(1), std::multiplies<size_t>()) !=
             std::accumulate(dst_dims.begin(), dst_dims.end(), size_t(1), std::multiplies<size_t>()))
-            IE_THROW() << errorPrefix << "gets incorrect number of output dimensions!";
+            THROW_CPU_NODE_ERR << "gets incorrect number of output dimensions!";
     } else {
         for (size_t i = 0; i < std::min(out_dims.size(), dst_dims.size()); i++) {
             if (out_dims[i] != dst_dims[i])
-                IE_THROW() << errorPrefix << "gets incorrect number of output dimensions!";
+                THROW_CPU_NODE_ERR << "gets incorrect number of output dimensions!";
         }
     }
 }
@@ -2899,7 +2883,7 @@ inline void Reduce::reduce_ref(const float *in_ptr, float *out_ptr) {
             reduce_ref_process(in_ptr, out_ptr, 0, [](float old, float y)->float { return old + y * y; });
             break;
     default:
-        IE_THROW() << errorPrefix << "gets unsupported reduce mode.";
+        THROW_CPU_NODE_ERR << "gets unsupported reduce mode.";
     }
 }
 
@@ -2986,7 +2970,7 @@ inline void Reduce::reduce_ref_map(float *out_ptr, size_t work_amount_dst, size_
             });
             break;
         default:
-            IE_THROW() << errorPrefix << "gets unsupported reduce mode.";
+            THROW_CPU_NODE_ERR << "gets unsupported reduce mode.";
     }
 }
 

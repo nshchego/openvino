@@ -2,15 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include "ie_parallel.hpp"
 #include "gather_elements.h"
-#include <ngraph/opsets/opset1.hpp>
-#include <precision_utils.h>
-#include <utils/general_utils.h>
-#include "common/cpu_memcpy.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/gather_elements.hpp>
 
 using namespace InferenceEngine;
 
@@ -32,7 +27,7 @@ bool GatherElements::isSupportedOperation(const std::shared_ptr<const ov::Node>&
     return true;
 }
 
-GatherElements::GatherElements(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+GatherElements::GatherElements(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
@@ -76,7 +71,7 @@ void GatherElements::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inDataPrecision = getOriginalInputPrecisionAtPort(dataIndex_);
+    const auto& inDataPrecision = getOriginalInputPrecisionAtPort(dataIndex_);
     if (!one_of(inDataPrecision.size(),
                 sizeof(PrecisionTrait<Precision::I32>::value_type),
                 sizeof(PrecisionTrait<Precision::I16>::value_type),
@@ -84,7 +79,7 @@ void GatherElements::initSupportedPrimitiveDescriptors() {
         IE_THROW() << errorPrefix_ << " has unsupported 'inputData' input precision: " << inDataPrecision;
     }
 
-    Precision indicesPrecision = getOriginalInputPrecisionAtPort(indicesIndex_);
+    const auto& indicesPrecision = getOriginalInputPrecisionAtPort(indicesIndex_);
     if (!one_of(indicesPrecision, Precision::I32, Precision::I64)) {
         IE_THROW() << errorPrefix_ << " has unsupported 'indices' input precision: " << indicesPrecision;
     }

@@ -14,9 +14,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool CTCLoss::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool CTCLoss::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto ctcLossOp = ngraph::as_type_ptr<const ngraph::op::v4::CTCLoss>(op);
+        const auto ctcLossOp = ov::as_type_ptr<const ov::op::v4::CTCLoss>(op);
         if (!ctcLossOp) {
             errorMessage = "Node is not an instance of the CTCLoss operation from operation set v4.";
             return false;
@@ -27,19 +27,17 @@ bool CTCLoss::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op
     return true;
 }
 
-CTCLoss::CTCLoss(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+CTCLoss::CTCLoss(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string("CTCLoss layer with name '") + op->get_friendly_name() + "'";
-
     if (getOriginalInputsNumber() != 4 && getOriginalInputsNumber() != 5)
-        IE_THROW() << errorPrefix << " has invalid inputs number.";
+        THROW_CPU_NODE_ERR << " has invalid inputs number.";
 
-    auto ctcLossOp = ngraph::as_type_ptr<const ngraph::op::v4::CTCLoss>(op);
+    auto ctcLossOp = ov::as_type_ptr<const ov::op::v4::CTCLoss>(op);
     ctcMergeRepeated = ctcLossOp->get_ctc_merge_repeated();
     preprocessCollapseRepeated = ctcLossOp->get_preprocess_collapse_repeated();
     unique = ctcLossOp->get_unique();
@@ -96,7 +94,7 @@ void CTCLoss::execute(dnnl::stream strm) {
 
         for (size_t b = start; b < end; b++) {
             if (logitsLength[b] < 0 || labelsLength[b] < 0 || logitsLength[b] > maxTime || labelsLength[b] > logitsLength[b]) {
-                errorMsgB[ithr] = errorPrefix + ". Logit length cannot be greater than max sequence length. "
+                errorMsgB[ithr] = getTypeStr() + " node with name '" + getName() + "' " + ". Logit length cannot be greater than max sequence length. "
                                   + "Label length cannot be greater than a logit length"
                                   + " and both cannot be negative.\nMaxSeqLen: "
                                   + std::to_string(maxTime) + "; Logit len: " + std::to_string(logitsLength[b])

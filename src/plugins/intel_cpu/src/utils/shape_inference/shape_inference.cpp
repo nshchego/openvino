@@ -202,7 +202,7 @@ public:
         ngraph::OutputVector new_inputs;
         auto op = node.get();
         for (size_t i = 0; i < op->get_input_size(); ++i) {
-            if (dynamic_cast<ov::opset1::Constant*>(op->get_input_node_ptr(i))) {
+            if (dynamic_cast<op::v0::Constant*>(op->get_input_node_ptr(i))) {
                 new_inputs.push_back(op->get_input_node_ptr(i)->clone_with_new_inputs(ov::OutputVector{}));
             } else {
                 new_inputs.push_back(std::make_shared<ov::opset1::Parameter>(op->get_input_element_type(i),
@@ -225,8 +225,8 @@ public:
             ngraph::OutputVector new_inputs;
             for (size_t i = 0; i < op->get_input_size(); ++i) {
                 if (constant_data.count(i)) {
-                    new_inputs.push_back(std::make_shared<ov::opset1::Constant>(constant_data.at(i)));
-                } else if (dynamic_cast<ov::opset1::Constant*>(op->get_input_node_ptr(i))) {
+                    new_inputs.push_back(std::make_shared<op::v0::Constant>(constant_data.at(i)));
+                } else if (dynamic_cast<op::v0::Constant*>(op->get_input_node_ptr(i))) {
                     new_inputs.push_back(op->get_input_node_ptr(i)->clone_with_new_inputs(ov::OutputVector{}));
                 } else {
                     new_inputs.push_back(std::make_shared<ov::opset1::Parameter>(op->get_input_element_type(i),

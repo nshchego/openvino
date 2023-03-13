@@ -22,7 +22,7 @@ using ReshapeFcParams = std::tuple<ReshapeFcSpecParams,
 
 class ReshapeFcCPUTest : public testing::WithParamInterface<ReshapeFcParams>, virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ReshapeFcParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ReshapeFcParams> &obj) {
         std::vector<InputShape> shapes;
         std::vector<int> data;
         ElementType prc;
@@ -83,7 +83,7 @@ protected:
 
         auto params = ngraph::builder::makeDynamicParams(prc, {inputDynamicShapes.front()});
         auto reshapeData = ngraph::builder::makeConstant(ElementType::i32, {data.size()}, data);
-        auto reshape = std::make_shared<ngraph::opset1::Reshape>(params[0], reshapeData, true);
+        auto reshape = std::make_shared<ov::op::v1::Reshape>(params[0], reshapeData, true);
 
         auto weight = ngraph::builder::makeDynamicInputLayer(prc, ngraph::helpers::InputLayerType::CONSTANT, inputDynamicShapes.back());
         auto matMul = ngraph::builder::makeMatMul(reshape, weight, false, false);

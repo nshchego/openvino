@@ -37,7 +37,7 @@ protected:
 
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
         auto params = ngraph::builder::makeParams(ngPrc, {{1, 512, 32}, {1, 128, 32}});
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
 
         auto FQ = ngraph::builder::makeFakeQuantize(paramOuts[1], ngPrc, 256, {}, {-2.8215785026550293}, {2.799535036087036},
                                                       {-2.8215785026550293}, {2.799535036087036});
@@ -53,7 +53,7 @@ protected:
         auto FQ_2 = ngraph::builder::makeFakeQuantize(Const, ngPrc, 255, {128, 1, 1}, {-0.56387859582901}, {0.56387859582901},
                                                       {-0.56387859582901}, {0.56387859582901});
 
-        auto Conv = std::make_shared<ngraph::opset1::Convolution>(FQ_1, FQ_2, Strides{1}, CoordinateDiff{0}, CoordinateDiff{0}, Strides{1});
+        auto Conv = std::make_shared<ov::op::v1::Convolution>(FQ_1, FQ_2, Strides{1}, CoordinateDiff{0}, CoordinateDiff{0}, Strides{1});
 
         auto Add = ngraph::builder::makeEltwise(Add_0, Conv, EltwiseTypes::ADD);
 
@@ -64,12 +64,12 @@ protected:
         auto FQ_22 = ngraph::builder::makeFakeQuantize(Const_, ngPrc, 255, {128, 1, 1}, {-0.325547456741333}, {0.325547456741333},
                                                       {-0.325547456741333}, {0.325547456741333});
 
-        auto Conv2 = std::make_shared<ngraph::opset1::Convolution>(FQ_11, FQ_22, Strides{1}, CoordinateDiff{0}, CoordinateDiff{0}, Strides{1});
+        auto Conv2 = std::make_shared<ov::op::v1::Convolution>(FQ_11, FQ_22, Strides{1}, CoordinateDiff{0}, CoordinateDiff{0}, Strides{1});
         auto Add2 = ngraph::builder::makeEltwise(Add, Conv2, EltwiseTypes::ADD);
         auto relu3 = ngraph::builder::makeActivation(Add2, ngPrc, ngraph::helpers::ActivationTypes::Relu);
 
-        auto result = std::make_shared<ngraph::opset1::Result>(relu3);
-        function = std::make_shared<ngraph::Function>(result, params, "SimpleNet");
+        auto result = std::make_shared<ov::op::v0::Result>(relu3);
+        function = std::make_shared<ov::Model>(result, params, "SimpleNet");
     }
 };
 

@@ -38,6 +38,28 @@ inline std::string vec2str(const std::vector<vecElementType>& vec) {
     }
     return std::string("()");
 }
+
+template <typename vecElementType>
+inline char* vec2char(const std::vector<vecElementType>& vec) {
+    char result[50];
+    if (vec.size() == 1) {
+        snprintf(result, sizeof(result), "(%lu)", vec[0]);
+    } else if (vec.size() == 2) {
+        snprintf(result, sizeof(result), "(%lu.%lu)", vec[0], vec[1]);
+    } else if (vec.size() == 3) {
+        snprintf(result, sizeof(result), "(%lu.%lu.%lu)", vec[0], vec[1], vec[2]);
+    } else if (vec.size() == 4) {
+        snprintf(result, sizeof(result), "(%lu.%lu.%lu.%lu)", vec[0], vec[1], vec[2], vec[3]);
+    } else if (vec.size() == 5) {
+        snprintf(result, sizeof(result), "(%lu.%lu.%lu.%lu.%lu)", vec[0], vec[1], vec[2], vec[3], vec[4]);
+    } else if (vec.size() > 5) {
+        std::ostringstream ostrm;
+        std::copy(vec.begin(), vec.end() - 1, std::ostream_iterator<vecElementType>(ostrm, "."));
+        snprintf(result, sizeof(result), "(%s)", ostrm.str().c_str());
+    }
+    return result;
+}
+
 inline void replaceSubstringInString(std::string& str, const std::string& from, const std::string& to) {
     size_t pos;
     while ((pos = str.find(from)) != std::string::npos) {

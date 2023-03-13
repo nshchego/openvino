@@ -12,10 +12,10 @@
 
 ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
     MATCHER_SCOPE(ConvertBroadcastToTiles);
-    auto broadcast = ngraph::pattern::wrap_type<ngraph::opset1::Broadcast>();
+    auto broadcast = ngraph::pattern::wrap_type<op::v1::Broadcast>();
 
     ngraph::matcher_pass_callback callback = [this](ngraph::pattern::Matcher& m) {
-        auto broadcast = std::dynamic_pointer_cast<ngraph::opset1::Broadcast>(m.get_match_root());
+        auto broadcast = ov::as_type_ptr<op::v1::Broadcast>(m.get_match_root());
 
         if (!broadcast) {
             return false;
@@ -26,8 +26,8 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
             return false;
         }
 
-        auto shape_node = std::dynamic_pointer_cast<ngraph::opset1::Constant>(broadcast->input_value(1).get_node_shared_ptr());
-        auto axes_node = std::dynamic_pointer_cast<ngraph::opset1::Constant>(broadcast->input_value(2).get_node_shared_ptr());
+        auto shape_node = ov::as_type<op::v0::Constant>(broadcast->input_value(1).get_node());
+        auto axes_node = ov::as_type<op::v0::Constant>(broadcast->input_value(2).get_node());
         if (!shape_node || !axes_node) return false;
 
         auto output_shape = shape_node->cast_vector<int64_t>();
@@ -37,7 +37,7 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
 
         auto last_node = data_node;
 
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
         // In case if input_shape and output_shape differ we insert Reshape to align shapes
         if (input_shape.size() != dims_count) {
@@ -60,8 +60,8 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
             } else {
                 return false;
             }
-            auto shape_const = std::make_shared<ngraph::opset1::Constant>(ngraph::element::i64, ngraph::Shape{shape.size()}, shape);
-            auto reshape = std::make_shared<ngraph::opset1::Reshape>(data_node, shape_const, true);
+            auto shape_const = std::make_shared<ov::op::v0::Constant>(ov::element::i64, ngraph::Shape{shape.size()}, shape);
+            auto reshape = std::make_shared<op::v1::Reshape>(data_node, shape_const, true);
             new_ops.push_back(reshape);
             last_node = reshape;
             input_shape = shape;
@@ -84,8 +84,8 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
             ++input_shape_it;
         }
 
-        auto const_node = std::make_shared<ngraph::opset1::Constant>(ngraph::element::i64, ngraph::Shape{dims_count}, dims);
-        auto tile = register_new_node<ngraph::opset1::Tile>(last_node, const_node);
+        auto const_node = std::make_shared<ov::op::v0::Constant>(ov::element::i64, ngraph::Shape{dims_count}, dims);
+        auto tile = register_new_node<ov::op::v0::Tile>(last_node, const_node);
         new_ops.push_back(tile);
         tile->set_friendly_name(broadcast->get_friendly_name());
 

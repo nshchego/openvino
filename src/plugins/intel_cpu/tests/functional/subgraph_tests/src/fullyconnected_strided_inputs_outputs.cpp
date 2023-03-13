@@ -19,7 +19,7 @@ class FullyConnectedStridedInputsOutputsTest : public testing::WithParamInterfac
                                        public CPUTestsBase,
                                        virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<FullyConnectedStridedInputsOutputsTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<FullyConnectedStridedInputsOutputsTestParams> &obj) {
         Precision netPrecision;
         size_t rank;
         std::tie(netPrecision, rank) = obj.param;
@@ -48,7 +48,7 @@ protected:
 
         auto params = builder::makeParams(ngPrec, {splitShape});
 
-        const auto splitOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(params));
+        const auto splitOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         const auto splitAxis = rank == 3 ? 1 : 0;
         const auto split = builder::makeSplit(splitOutputNodes[0], ngPrec, 2 /* splits */, splitAxis);
 

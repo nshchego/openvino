@@ -44,7 +44,7 @@ struct jit_uni_extract_image_patches_kernel {
 
 class ExtractImagePatches : public Node {
 public:
-    ExtractImagePatches(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    ExtractImagePatches(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -54,7 +54,7 @@ public:
     void executeDynamicImpl(dnnl::stream strm) override;
     void prepareParams() override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     enum class ExtImgPatcherPadType {
         VALID,
         SAME_LOWER,
@@ -67,8 +67,6 @@ private:
     std::vector<size_t> _rates;
     static const std::set<size_t> _supported_precisions_sizes;
     ExtImgPatcherPadType _auto_pad;
-
-    std::string errorPrefix;
 
     struct ExtractImagePatchesExecutor {
         ExtractImagePatchesExecutor() = default;

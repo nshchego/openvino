@@ -18,7 +18,7 @@ using Conv3dReshapeTestParams = std::tuple<nodeType,
 class Conv3dReshapeTest : public testing::WithParamInterface<Conv3dReshapeTestParams>,
                           virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<Conv3dReshapeTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<Conv3dReshapeTestParams> &obj) {
         nodeType conv;
         size_t numOut;
         std::tie(conv, numOut) = obj.param;
@@ -42,7 +42,7 @@ protected:
         cpuNodeType = nodeType2PluginType(convType);
 
         auto inputParams = builder::makeParams(element::f32, {Shape{1, 1024, 64}});
-        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(inputParams));
+        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
 
         std::shared_ptr<Node> conv;
         const std::vector<size_t> kernelSize = {1};
@@ -74,7 +74,7 @@ protected:
             results.push_back(std::make_shared<opset5::Result>(mockNode));
         }
 
-        function = std::make_shared<ngraph::Function>(results, inputParams, "Conv3dReshape");
+        function = std::make_shared<ov::Model>(results, inputParams, "Conv3dReshape");
     }
 };
 

@@ -38,7 +38,7 @@ const auto groupConvBackpropData1DParams_ExplicitPadding = ::testing::Combine(
         ::testing::ValuesIn(dilations1D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -50,7 +50,7 @@ const auto groupConvBackpropData1DParams_AutoPadValid = ::testing::Combine(
         ::testing::ValuesIn(dilations1D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::VALID),
+        ::testing::Values(ov::op::PadType::VALID),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -97,7 +97,7 @@ const auto groupConvBackpropData2DParams_ExplicitPadding = ::testing::Combine(
         ::testing::ValuesIn(dilations2D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 const auto groupConvBackpropData2DParams_AutoPadValid = ::testing::Combine(
@@ -108,7 +108,7 @@ const auto groupConvBackpropData2DParams_AutoPadValid = ::testing::Combine(
         ::testing::ValuesIn(dilations2D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::VALID),
+        ::testing::Values(ov::op::PadType::VALID),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -165,7 +165,7 @@ const auto conv2DParams_ExplicitPadding_output_padding = ::testing::Combine(
         ::testing::ValuesIn(dilations2D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::ValuesIn(outputPadding2D)
 );
 const auto conv2DParams_AutoPadValid_output_padding = ::testing::Combine(
@@ -176,7 +176,7 @@ const auto conv2DParams_AutoPadValid_output_padding = ::testing::Combine(
         ::testing::ValuesIn(dilations2D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::VALID),
+        ::testing::Values(ov::op::PadType::VALID),
         ::testing::ValuesIn(outputPadding2D)
 );
 
@@ -223,7 +223,7 @@ const auto groupConvBackpropData3DParams_ExplicitPadding = ::testing::Combine(
         ::testing::ValuesIn(dilations3D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 const auto groupConvBackpropData3DParams_AutoPadValid = ::testing::Combine(
@@ -234,7 +234,7 @@ const auto groupConvBackpropData3DParams_AutoPadValid = ::testing::Combine(
         ::testing::ValuesIn(dilations3D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::VALID),
+        ::testing::Values(ov::op::PadType::VALID),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -291,7 +291,7 @@ const auto conv3DParams_ExplicitPadding_output_padding = ::testing::Combine(
         ::testing::ValuesIn(dilations3D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::ValuesIn(outputPadding3D)
 );
 const auto conv3DParams_AutoPadValid_output_padding = ::testing::Combine(
@@ -302,7 +302,7 @@ const auto conv3DParams_AutoPadValid_output_padding = ::testing::Combine(
         ::testing::ValuesIn(dilations3D),
         ::testing::ValuesIn(numOutChannels),
         ::testing::ValuesIn(numGroups),
-        ::testing::Values(ngraph::op::PadType::VALID),
+        ::testing::Values(ov::op::PadType::VALID),
         ::testing::ValuesIn(outputPadding3D)
 );
 

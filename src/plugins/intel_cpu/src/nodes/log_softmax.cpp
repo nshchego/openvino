@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-
-#include <ngraph/opsets/opset5.hpp>
-#include "ie_parallel.hpp"
 #include "log_softmax.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/log_softmax.hpp>
 
 using namespace InferenceEngine;
 
@@ -14,10 +13,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool LogSoftmax::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool LogSoftmax::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto logSoftMax = std::dynamic_pointer_cast<const ngraph::opset5::LogSoftmax>(op);
-        if (!logSoftMax) {
+        if (op->get_type_info() != ov::op::v5::LogSoftmax::get_type_info_static()) {
             errorMessage = "Only opset5 LogSoftmax operation is supported";
             return false;
         }
@@ -27,21 +25,20 @@ bool LogSoftmax::isSupportedOperation(const std::shared_ptr<const ngraph::Node>&
     return true;
 }
 
-LogSoftmax::LogSoftmax(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+LogSoftmax::LogSoftmax(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "LogSoftmax layer with name '" + op->get_friendly_name() + "'";
-    const auto logSoftMax = std::dynamic_pointer_cast<const ngraph::opset5::LogSoftmax>(op);
+    auto logSoftMax = ov::as_type<const ov::op::v5::LogSoftmax>(op.get());
     if (logSoftMax == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of LogSoftmax from opset5.";
 
     if (inputShapes.size() != 1 || outputShapes.size() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
     auto dimsSize = getInputShapeAtPort(0).getDims().size();
     if (dimsSize == 0)
@@ -51,7 +48,7 @@ LogSoftmax::LogSoftmax(const std::shared_ptr<ngraph::Node>& op, const GraphConte
         axis += dimsSize;
 
     if (dimsSize < static_cast<size_t>((size_t)(1) + axis))
-        IE_THROW() << errorPrefix << " has incorrect input parameters dimensions and axis number!";
+        THROW_CPU_NODE_ERR << " has incorrect input parameters dimensions and axis number!";
 }
 
 void LogSoftmax::initSupportedPrimitiveDescriptors() {

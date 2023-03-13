@@ -4,11 +4,7 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
-#include <string>
-#include <memory>
-#include <vector>
 
 namespace ov {
 namespace intel_cpu {
@@ -17,7 +13,7 @@ namespace node {
 class EmbeddingBagSum {
 public:
     EmbeddingBagSum(
-            const std::shared_ptr<ngraph::Node>&,
+            const std::shared_ptr<ov::Node>&,
             size_t requiredInputsNum,
             size_t indicesIdx,
             size_t perSampleWeightsIdx,

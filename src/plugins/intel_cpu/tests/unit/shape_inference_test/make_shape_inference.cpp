@@ -30,7 +30,7 @@ TEST(StaticShapeInferenceTest, MakeShapeInference) {
     auto matMul = matMulRelaxed->clone_with_new_inputs({inp1, inp2});
 
     ngraph::ResultVector results;
-    results.push_back(std::make_shared<ngraph::opset1::Result>(matMul->output(0)));
+    results.push_back(std::make_shared<op::v0::Result>(matMul->output(0)));
 
     auto function = std::make_shared<ngraph::Function>(results, ngraph::ParameterVector{inp1, inp2}, "testFunction");
     std::atomic_flag wrongPrcFlag;

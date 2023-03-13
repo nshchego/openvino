@@ -4,19 +4,10 @@
 
 #include "priorbox.h"
 
-#include <algorithm>
-#include <cmath>
-#include <memory>
-#include <vector>
-
 #include <ie_parallel.hpp>
-#include <dnnl_types.h>
-#include <ngraph/ngraph.hpp>
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/prior_box.hpp>
 
 using namespace InferenceEngine;
-
-#define THROW_ERROR IE_THROW() << "PriorBox layer with name '" << getName() << "': "
 
 namespace ov {
 namespace intel_cpu {
@@ -50,14 +41,14 @@ private:
 
 class PriorBoxShapeInferFactory : public ShapeInferFactory {
 public:
-    explicit PriorBoxShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    explicit PriorBoxShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
-        auto priorBox = ov::as_type_ptr<const ngraph::opset1::PriorBox>(m_op);
+        auto priorBox = ov::as_type_ptr<const op::v0::PriorBox>(m_op);
         if (!priorBox) {
             IE_THROW() << "Unexpected op type in PriorBox shape inference factory: " << m_op->get_type_name();
         }
         const auto& attrs = priorBox->get_attrs();
-        auto number_of_priors = ngraph::opset1::PriorBox::number_of_priors(attrs);
+        auto number_of_priors = op::v0::PriorBox::number_of_priors(attrs);
         return std::make_shared<PriorBoxShapeInfer>(number_of_priors);
     }
 
@@ -75,10 +66,9 @@ float clip_less(float x, float threshold) {
 
 }   // namespace
 
-bool PriorBox::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool PriorBox::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto priorBox = std::dynamic_pointer_cast<const ngraph::opset1::PriorBox>(op);
-        if (!priorBox) {
+        if (!one_of(op->get_type_info(), op::v0::PriorBox::get_type_info_static())) {
             errorMessage = "Only opset1 PriorBox operation is supported";
             return false;
         }
@@ -88,15 +78,15 @@ bool PriorBox::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
     return true;
 }
 
-PriorBox::PriorBox(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
-    : Node(op, context, PriorBoxShapeInferFactory(op)) {
+PriorBox::PriorBox(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
+        : Node(op, context, PriorBoxShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto priorBox = std::dynamic_pointer_cast<const ngraph::opset1::PriorBox>(op);
-    const ngraph::opset1::PriorBox::Attributes& attrs = priorBox->get_attrs();
+    auto priorBox = ov::as_type<const op::v0::PriorBox>(op.get());
+    const auto& attrs = priorBox->get_attrs();
     offset = attrs.offset;
     step = attrs.step;
     min_size = attrs.min_size;
@@ -114,7 +104,7 @@ PriorBox::PriorBox(const std::shared_ptr<ngraph::Node>& op, const GraphContext::
         exist = false;
 
         if (std::fabs(aspect_ratio_item) < std::numeric_limits<float>::epsilon()) {
-            THROW_ERROR << "Aspect_ratio param can't be equal to zero";
+            THROW_CPU_NODE_ERR << "Aspect_ratio param can't be equal to zero";
         }
 
         for (float _aspect_ratio : aspect_ratio) {
@@ -134,12 +124,12 @@ PriorBox::PriorBox(const std::shared_ptr<ngraph::Node>& op, const GraphContext::
         }
     }
 
-    number_of_priors = ngraph::opset1::PriorBox::number_of_priors(attrs);
+    number_of_priors = op::v0::PriorBox::number_of_priors(attrs);
 
     if (attrs.variance.size() == 1 || attrs.variance.size() == 4) {
         for (float i : attrs.variance) {
             if (i < 0) {
-                THROW_ERROR << "Variance must be > 0.";
+                THROW_CPU_NODE_ERR << "Variance must be > 0.";
             }
 
             variance.push_back(i);
@@ -147,7 +137,7 @@ PriorBox::PriorBox(const std::shared_ptr<ngraph::Node>& op, const GraphContext::
     } else if (attrs.variance.empty()) {
         variance.push_back(0.1f);
     } else {
-        THROW_ERROR << "Wrong number of variance values. Not less than 1 and more than 4 variance values.";
+        THROW_CPU_NODE_ERR << "Wrong number of variance values. Not less than 1 and more than 4 variance values.";
     }
 }
 

@@ -3,12 +3,12 @@
 //
 
 #include "eye.h"
-#include <ie_ngraph_utils.hpp>
-#include <utils/bfloat16.hpp>
+
 #include <ie_parallel.hpp>
+#include <utils/bfloat16.hpp>
 #include <utils/shape_inference/shape_inference_ngraph.hpp>
 
-#define THROW_ERROR IE_THROW() << NameFromType(getType()) << " node with name '" << getName() << "' "
+#include <openvino/op/eye.hpp>
 
 using namespace InferenceEngine;
 
@@ -20,7 +20,7 @@ using namespace InferenceEngine::details;
 
 bool Eye::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (op->get_type_info() != ngraph::op::v9::Eye::get_type_info_static()) {
+        if (op->get_type_info() != ov::op::v9::Eye::get_type_info_static()) {
             errorMessage = "Node is not an instance of Eye form the operation set v9.";
             return false;
         }
@@ -33,7 +33,7 @@ bool Eye::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::s
 namespace {
 class EyeShapeInferFactory : public ShapeInferFactory {
 public:
-    EyeShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    EyeShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         IShapeInfer::port_mask_t port_mask = EMPTY_PORT_MASK;
         if (m_op->get_input_size() == 4) {
@@ -48,16 +48,16 @@ private:
 };
 } // namespace
 
-Eye::Eye(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context) : Node(op, context, EyeShapeInferFactory(op)) {
+Eye::Eye(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) : Node(op, context, EyeShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
             IE_THROW(NotImplemented) << errorMessage;
     }
     outType = op->get_output_element_type(0);
     withBatchShape = (op->get_input_size() == 4);
-    if (!one_of(outType, ngraph::element::f32, ngraph::element::bf16,
-        ngraph::element::i32, ngraph::element::i8, ngraph::element::u8)) {
-        THROW_ERROR << errorPrefix << "doesn't support demanded output precision";
+    if (!one_of(outType, ov::element::f32, ov::element::bf16,
+        ov::element::i32, ov::element::i8, ov::element::u8)) {
+        THROW_CPU_NODE_ERR << "doesn't support demanded output precision";
     }
 }
 
@@ -65,9 +65,9 @@ void Eye::getSupportedDescriptors() {
     if (!descs.empty())
         return;
     if (!one_of(getParentEdges().size(), 3u, 4u))
-        THROW_ERROR << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (getChildEdges().empty())
-        THROW_ERROR << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 }
 
 template<typename T>
@@ -109,7 +109,7 @@ void Eye::executeSpecified() {
     const int64_t shift = getDiagIndex();
     auto outPtr = getChildEdgeAt(0)->getMemoryPtr();
     if (!outPtr || !outPtr ->isAllocated())
-            THROW_ERROR << errorPrefix << "Destination memory didn't allocate.";
+            THROW_CPU_NODE_ERR << "Destination memory didn't allocate.";
     T *dst = reinterpret_cast<T *>(outPtr->GetPtr());
 
     const size_t batchVolume = getBatchVolume(getBatchShape());

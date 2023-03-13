@@ -71,7 +71,7 @@ Graph::~Graph() {
 }
 
 template<typename NET>
-void Graph::CreateGraph(NET &net, const GraphContext::CPtr ctx) {
+void Graph::CreateGraph(NET &net, const GraphContext::CPtr& ctx) {
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "CreateGraph");
 
     if (IsReady())
@@ -88,7 +88,7 @@ void Graph::CreateGraph(NET &net, const GraphContext::CPtr ctx) {
 
 void Graph::CreateGraph(const std::vector<NodePtr> &graphNodes,
                               const std::vector<EdgePtr> &graphEdges,
-                              const GraphContext::CPtr ctx,
+                              const GraphContext::CPtr& ctx,
                               std::string name) {
     if (IsReady())
         ForgetGraphData();
@@ -114,8 +114,8 @@ void Graph::CreateGraph(const std::vector<NodePtr> &graphNodes,
     CPU_DEBUG_CAP_ENABLE(serialize(*this));
 }
 
-template void Graph::CreateGraph(const std::shared_ptr<const ngraph::Function>&, const GraphContext::CPtr);
-template void Graph::CreateGraph(const CNNNetwork&, const GraphContext::CPtr);
+template void Graph::CreateGraph(const std::shared_ptr<const ngraph::Function>&, const GraphContext::CPtr&);
+template void Graph::CreateGraph(const CNNNetwork&, const GraphContext::CPtr&);
 
 void Graph::Replicate(const std::shared_ptr<const ov::Model> &subgraph) {
     this->_name = "subgraph";
@@ -126,9 +126,9 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model> &subgraph) {
 
     // nodes which has no consumers (output or just unused). But doesn't marked as graph output.
     // Will be stored as fake output separately.
-    std::deque<ngraph::Output<ngraph::Node>> unusedOutputs;
+    std::deque<ngraph::Output<ov::Node>> unusedOutputs;
 
-    auto getParentOutputPort = [](const std::shared_ptr<ngraph::Node> childOp, const std::shared_ptr<ngraph::Node> parentOp,
+    auto getParentOutputPort = [](const std::shared_ptr<ov::Node> childOp, const std::shared_ptr<ov::Node> parentOp,
                                   const size_t childInputPort) -> int {
         for (size_t parentPort = 0; parentPort < parentOp->get_output_size(); parentPort++) {
             if (childOp->input(childInputPort).get_tensor_ptr() == parentOp->output(parentPort).get_tensor_ptr()) {
@@ -144,7 +144,7 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model> &subgraph) {
 
         graphNodes.push_back(node);
 
-        if (op->get_type_info() == ngraph::op::v0::Parameter::get_type_info_static()) {
+        if (op->get_type_info() == ov::op::v0::Parameter::get_type_info_static()) {
             inputNodesMap[node->getName()] = node;
         }
 
@@ -212,11 +212,11 @@ void Graph::Replicate(const CNNNetwork &network) {
 
     auto orderedOps = func->get_ordered_ops();
 
-    // TODO [NM]: unordered_map is preferred from performance perspective. Needs hash for ngraph::Node
-    std::map<std::shared_ptr<ngraph::Node>, NodePtr> op2node;
-    std::deque<ngraph::Output<ngraph::Node>> unusedOutputs;  // nodes which has no consumers (output or just unused)
+    // TODO [NM]: unordered_map is preferred from performance perspective. Needs hash for ov::Node
+    std::map<std::shared_ptr<ov::Node>, NodePtr> op2node;
+    std::deque<ngraph::Output<ov::Node>> unusedOutputs;  // nodes which has no consumers (output or just unused)
 
-    auto getParentOutputPort = [](const std::shared_ptr<ngraph::Node> childOp, const std::shared_ptr<ngraph::Node> parentOp,
+    auto getParentOutputPort = [](const std::shared_ptr<ov::Node> childOp, const std::shared_ptr<ov::Node> parentOp,
                                   const size_t childInputPort) -> int {
         for (size_t parentPort = 0; parentPort < parentOp->get_output_size(); parentPort++) {
             if (childOp->input(childInputPort).get_tensor_ptr() == parentOp->output(parentPort).get_tensor_ptr()) {
@@ -235,7 +235,7 @@ void Graph::Replicate(const CNNNetwork &network) {
 
         graphNodes.push_back(node);
 
-        if (op->get_type_info() == ngraph::op::v0::Parameter::get_type_info_static()) {
+        if (op->get_type_info() == ov::op::v0::Parameter::get_type_info_static()) {
             const auto inInfo = inputsInfo.find(node->getName());
             if (inInfo != inputsInfo.end()) {
                 inputNodesMap[node->getName()] = node;

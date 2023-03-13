@@ -16,7 +16,7 @@ using ConvPoolActivTestParams = fusingSpecificParams;
 class ConvPoolActivTest : public testing::WithParamInterface<ConvPoolActivTestParams>, public CpuTestWithFusing,
                           virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ConvPoolActivTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ConvPoolActivTestParams> &obj) {
         fusingSpecificParams fusingParams = obj.param;
 
         std::ostringstream result;
@@ -33,7 +33,7 @@ protected:
         std::tie(postOpMgrPtr, fusedOps) = fusingParams;
 
         auto inputParams = builder::makeParams(element::f32, {Shape{1, 3, 40, 40}});
-        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(inputParams));
+        auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
 
         std::shared_ptr<Node> conv;
         {
@@ -54,7 +54,7 @@ protected:
             const std::vector<size_t> padEnd = {0, 0};
             const op::PadType paddingType = op::PadType::EXPLICIT;
             ngraph::helpers::PoolingTypes poolType = ngraph::helpers::PoolingTypes::MAX;
-            ngraph::op::RoundingType roundingType = ngraph::op::RoundingType::CEIL;
+            ov::op::RoundingType roundingType = ov::op::RoundingType::CEIL;
             pooling = builder::makePooling(conv, strides, padBegin, padEnd, kernelSize, roundingType, paddingType, false, poolType);
         }
 

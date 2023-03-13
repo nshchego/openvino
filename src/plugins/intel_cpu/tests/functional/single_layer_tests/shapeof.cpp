@@ -28,7 +28,7 @@ typedef std::tuple<
 class ShapeOfLayerCPUTest : public testing::WithParamInterface<ShapeOfLayerCPUTestParamsSet>,
                             virtual public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ShapeOfLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ShapeOfLayerCPUTestParamsSet> &obj) {
         CPULayerTestsDefinitions::ShapeOfLayerTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -69,8 +69,8 @@ protected:
         selectedType = makeSelectedTypeStr("ref", inType);
 
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::opset3::Parameter>(params));
-        auto shapeOf = std::make_shared<ngraph::opset3::ShapeOf>(paramOuts[0], ngraph::element::i32);
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
+        auto shapeOf = std::make_shared<ov::op::v3::ShapeOf>(paramOuts[0], ov::element::i32);
 
         function = makeNgraphFunction(netPrecision, params, shapeOf, "ShapeOf");
     }

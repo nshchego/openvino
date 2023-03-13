@@ -11,7 +11,7 @@ using namespace CPUTestUtils;
 
 namespace SubgraphTestsDefinitions {
 
-std::string FuseTransposeAndReorderTest::getTestCaseName(testing::TestParamInfo<FuseTransposeAndReorderParams> obj) {
+std::string FuseTransposeAndReorderTest::getTestCaseName(const testing::TestParamInfo<FuseTransposeAndReorderParams> &obj) {
     std::ostringstream result;
     SizeVector inputShape;
     Precision inPrec;
@@ -82,12 +82,12 @@ void FuseTransposeAndReorderTest::CreateGraph() {
     auto order = inputShape.size() == 5 ? std::vector<int64_t>{0, 2, 3, 4, 1} : std::vector<int64_t>{0, 2, 3, 1};
     auto memFmt = inputShape.size() == 5 ? ndhwc : nhwc;
 
-    auto constOrder = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, order);
+    auto constOrder = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, order);
     auto transpose = std::make_shared<ngraph::opset5::Transpose>(params[0], constOrder);
     transpose->get_rt_info() = makeCPUInfo({memFmt}, {memFmt}, {});
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(transpose)};
-    function = std::make_shared<ngraph::Function>(results, params, "TransposeReorder");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(transpose)};
+    function = std::make_shared<ov::Model>(results, params, "TransposeReorder");
 }
 
 TEST_P(FuseTransposeAndReorderTest, CompareWithRefs) {
@@ -140,28 +140,28 @@ void FuseTransposeAndReorderTest1::CreateGraph() {
 
     auto order = inputShape.size() == 5 ? std::vector<int64_t>{0, 2, 3, 4, 1} : std::vector<int64_t>{0, 2, 3, 1};
 
-    auto constOrder1 = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, order);
+    auto constOrder1 = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, order);
     auto transpose1 = std::make_shared<ngraph::opset5::Transpose>(params[0], constOrder1);
     auto memFmt1 = inputShape.size() == 5 ? ndhwc : nhwc;
     transpose1->get_rt_info() = makeCPUInfo({memFmt1}, {memFmt1}, {});
 
-    auto constOrder2 = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, order);
+    auto constOrder2 = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, order);
     auto transpose2 = std::make_shared<ngraph::opset5::Transpose>(transpose1, constOrder2);
     auto memFmt2 = inputShape.size() == 5 ? ndhwc : nhwc;
     transpose2->get_rt_info() = makeCPUInfo({memFmt2}, {memFmt2}, {});
 
-    auto constOrder3 = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, order);
+    auto constOrder3 = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, order);
     auto transpose3 = std::make_shared<ngraph::opset5::Transpose>(transpose2, constOrder3);
     auto memFmt3 = inputShape.size() == 5 ? ncdhw : nchw;
     transpose3->get_rt_info() = makeCPUInfo({memFmt3}, {memFmt3}, {});
 
-    auto shape = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, transpose3->get_output_shape(0));
+    auto shape = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, transpose3->get_output_shape(0));
     auto reshape = std::make_shared<ngraph::opset5::Reshape>(transpose1, shape, false);
 
     auto concat = ngraph::builder::makeConcat({transpose3, reshape}, 1);
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(concat)};
-    function = std::make_shared<ngraph::Function>(results, params, "Transpose_TransposeReorderTranspose_Reshape_Concat");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(concat)};
+    function = std::make_shared<ov::Model>(results, params, "Transpose_TransposeReorderTranspose_Reshape_Concat");
 }
 
 // Test disabled temporarily, it conflicts with TransposeFuse transformation in common optimizations step
@@ -208,12 +208,12 @@ void FuseTransposeAndReorderTest2::CreateGraph() {
 
     auto order = inputShape.size() == 5 ? std::vector<int64_t>{0, 4, 1, 2, 3} : std::vector<int64_t>{0, 3, 1, 2};
 
-    auto constOrder1 = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, order);
+    auto constOrder1 = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, order);
     auto transpose1 = std::make_shared<ngraph::opset5::Transpose>(params[0], constOrder1);
     auto memFmt1 = inputShape.size() == 5 ? ndhwc : nhwc;
     transpose1->get_rt_info() = makeCPUInfo({memFmt1}, {memFmt1}, {});
 
-    auto constOrder2 = ngraph::builder::makeConstant(ngraph::element::i64, {inputShape.size()}, order);
+    auto constOrder2 = ngraph::builder::makeConstant(ov::element::i64, {inputShape.size()}, order);
     auto transpose2 = std::make_shared<ngraph::opset5::Transpose>(params[1], constOrder2);
     auto memFmt2 = inputShape.size() == 5 ? ncdhw : nchw;
     transpose2->get_rt_info() = makeCPUInfo({memFmt2}, {memFmt2}, {});
@@ -221,8 +221,8 @@ void FuseTransposeAndReorderTest2::CreateGraph() {
     auto concat = ngraph::builder::makeConcat({transpose1, transpose2}, 1);
     concat->get_rt_info() = makeCPUInfo({memFmt1, memFmt1}, {memFmt1}, {});
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(concat)};
-    function = std::make_shared<ngraph::Function>(results, params, "Transpose_Transpose_Concat");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(concat)};
+    function = std::make_shared<ov::Model>(results, params, "Transpose_Transpose_Concat");
 }
 
 TEST_P(FuseTransposeAndReorderTest2, CompareWithRefs) {
@@ -253,7 +253,7 @@ void FuseTransposeAndReorderTest3::CreateGraph() {
     auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(inPrec);
 
     auto memFmt = nhwc;
-    ngraph::op::PadType padType = ngraph::op::PadType::SAME_UPPER;
+    ov::op::PadType padType = ov::op::PadType::SAME_UPPER;
     InferenceEngine::SizeVector kernel{3, 3}, stride{1, 1}, dilation{1, 1};
     std::vector<ptrdiff_t> padBegin{0, 0}, padEnd{0, 0};
     size_t convOutChannels = 32;
@@ -265,17 +265,17 @@ void FuseTransposeAndReorderTest3::CreateGraph() {
                                                             padEnd, dilation, padType, convOutChannels);
     convolutionNode->get_rt_info() = makeCPUInfo({memFmt}, {memFmt}, {});
 
-    auto sndAddIn = std::make_shared<ngraph::opset1::Parameter>(ngPrc, convolutionNode->get_output_shape(0));
+    auto sndAddIn = std::make_shared<ov::op::v0::Parameter>(ngPrc, convolutionNode->get_output_shape(0));
     params.push_back(sndAddIn);
-    auto add = std::make_shared<ngraph::opset1::Add>(convolutionNode->output(0), sndAddIn);
+    auto add = std::make_shared<ov::op::v1::Add>(convolutionNode->output(0), sndAddIn);
 
     auto order = std::vector<int64_t>{0, 2, 3, 1};
-    auto constOrder = ngraph::builder::makeConstant(ngraph::element::i64, {order.size()}, order);
+    auto constOrder = ngraph::builder::makeConstant(ov::element::i64, {order.size()}, order);
     auto transpose = std::make_shared<ngraph::opset5::Transpose>(add, constOrder);
     transpose->get_rt_info() = makeCPUInfo({memFmt}, {memFmt}, {});
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(transpose)};
-    function = std::make_shared<ngraph::Function>(results, params, "TransposeReorder");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(transpose)};
+    function = std::make_shared<ov::Model>(results, params, "TransposeReorder");
 }
 
 TEST_P(FuseTransposeAndReorderTest3, CompareWithRefs) {
@@ -322,11 +322,11 @@ void FuseTransposeAndReorderTest4::CreateGraph() {
     const auto transposeOrder = ov::opset8::Constant::create(ov::element::i32, {4}, {0, 3, 1, 2});
     const auto transpose1 = std::make_shared<ov::opset8::Transpose>(relu, transposeOrder);
     const auto conv1 = ngraph::builder::makeConvolution(transpose1, ngPrc, kernel, stride, padBegin,
-                                                    padEnd, dilation, ngraph::op::PadType::AUTO, convOutChannels);
+                                                    padEnd, dilation, ov::op::PadType::AUTO, convOutChannels);
     conv1->get_rt_info() = makeCPUInfo({memFmt}, {memFmt}, {});
     const auto transpose2 = std::make_shared<ov::opset8::Transpose>(relu, transposeOrder);
     const auto conv2 = ngraph::builder::makeConvolution(transpose2, ngPrc, kernel, stride, padBegin,
-                                                    padEnd, dilation, ngraph::op::PadType::AUTO, convOutChannels);
+                                                    padEnd, dilation, ov::op::PadType::AUTO, convOutChannels);
     conv2->get_rt_info() = makeCPUInfo({memFmt}, {memFmt}, {});
     const auto add = std::make_shared<ov::opset8::Add>(conv1, conv2);
 

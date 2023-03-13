@@ -3,84 +3,30 @@
 //
 
 #include "node.h"
-#include "edge.h"
-#include "extension_mngr.h"
-#include "itt.h"
 
-#include "caseless.hpp"
-#include <memory>
-#include <oneapi/dnnl/dnnl.hpp>
-#include <vector>
-#include <string>
-#include <limits>
-#include <cstdint>
-#include <unordered_map>
-
-#include "nodes/concat.h"
-#include "nodes/conv.h"
-#include "nodes/deconv.h"
-#include "nodes/eltwise.h"
-#include "nodes/matmul.h"
-#include "nodes/fullyconnected.h"
-#include "nodes/generic.h"
-#include "nodes/if.h"
-#include "nodes/input.h"
-#include "nodes/lrn.h"
-#include "nodes/pooling.h"
-#include "nodes/reorder.h"
-#include "nodes/reshape.h"
-#include "nodes/softmax.h"
-#include "nodes/tile.h"
-#include "nodes/split.h"
-#include "nodes/pad.h"
-#include "nodes/transpose.h"
-#include "nodes/memory.hpp"
-#include "nodes/mvn.h"
-#include "nodes/normalize.h"
-#include "nodes/reduce.h"
-#include "nodes/tensoriterator.h"
-#include "nodes/scatter_update.h"
-#include "nodes/interpolate.h"
-#include "nodes/depth_to_space.h"
-#include "nodes/space_to_depth.h"
-#include "nodes/strided_slice.h"
-#include "nodes/shuffle_channels.h"
-#include "nodes/reference.h"
-#include "nodes/fake_quantize.h"
-#include "dnnl_extension_utils.h"
-
-#include "nodes/common/cpu_memcpy.h"
-#include "utils/rt_info/memory_formats_attribute.hpp"
-#include <ngraph/opsets/opset1.hpp>
-
-#include <dnnl_types.h>
-#include <dnnl_debug.h>
-#include <ie_ngraph_utils.hpp>
-#include "utils/general_utils.h"
-#include "utils/cpu_utils.hpp"
-#include "utils/verbose.h"
 #include "nodes/common/cpu_convert.h"
-#include "memory_desc/cpu_memory_desc_utils.h"
-#include "memory_desc/dnnl_blocked_memory_desc.h"
-#include <common/primitive_desc.hpp>
-#include <common/primitive_desc_iface.hpp>
+#include "nodes/eltwise.h"
+#include "nodes/input.h"
+#include "nodes/reference.h"
+#include "nodes/reorder.h"
+#include <ie_ngraph_utils.hpp>
+#include "utils/cpu_utils.hpp"
+#include "utils/ngraph_utils.hpp"
+#include "utils/debug_capabilities.h"
+#include "utils/rt_info/memory_formats_attribute.hpp"
 
 using namespace dnnl;
-using namespace openvino;
-using namespace ov::intel_cpu::node;
+using namespace InferenceEngine;
+using namespace ov::intel_cpu;
 
-using namespace InferenceEngine::details;
-
-namespace ov {
-namespace intel_cpu {
 
 Node::NodesFactory & Node::factory() {
     static NodesFactory factoryInstance;
     return factoryInstance;
 }
 
-Node::Node(const std::shared_ptr<ngraph::Node>& op,
-           const GraphContext::CPtr ctx,
+Node::Node(const std::shared_ptr<ov::Node>& op,
+           const GraphContext::CPtr& ctx,
            const ShapeInferFactory& shapeInferFactory)
     : selectedPrimitiveDescriptorIndex(-1),
       permanent(false),
@@ -94,7 +40,6 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
       profiling(op->get_friendly_name()) {
     algorithm = Algorithm::Default;
     fusingPort = -1;
-    const std::string errorPrefix = "Ngraph operation " + std::string(op->get_type_name()) + " with name " + op->get_friendly_name();
 
     for (size_t i = 0; i < op->get_input_size(); i++) {
         const auto &shape = op->get_input_partial_shape(i);
@@ -107,7 +52,7 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
         originalInputPrecisions.emplace_back(details::convertPrecision(op->get_input_element_type(i)));
     }
 
-    if (typeStr != "Result" && typeStr != "Assign") {
+    if (type != Type::Output && type != Type::MemoryOutput) {
         if (op->get_output_size() == 0) {
             IE_THROW() << "Node with type '" << typeStr << "' and name '" << name << "' does not have any outputs.";
         }
@@ -181,7 +126,7 @@ Node::Node(const std::shared_ptr<ngraph::Node>& op,
     }
 }
 
-Node::Node(const std::string& type, const std::string& name, const GraphContext::CPtr ctx)
+Node::Node(const std::string& type, const std::string& name, const GraphContext::CPtr& ctx)
     : selectedPrimitiveDescriptorIndex(-1),
       permanent(false),
       temporary(false),
@@ -470,13 +415,13 @@ std::string Node::getPrimitiveDescriptorType() {
     // it is mixed precision.
     if (selectedPrimitiveDesc) {
         if (!selectedPrimitiveDesc->getConfig().inConfs.empty()) {
-            if (selectedPrimitiveDesc->getConfig().inConfs[0].getMemDesc()->getPrecision() != InferenceEngine::Precision::U8) {
+            if (selectedPrimitiveDesc->getConfig().inConfs[0].getMemDesc()->getPrecision() != Precision::U8) {
                 str_type += "_" + std::string(selectedPrimitiveDesc->getConfig().inConfs[0].getMemDesc()->getPrecision().name());
             } else {
                 str_type += "_I8";
             }
         } else {
-            if (selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision() != InferenceEngine::Precision::U8) {
+            if (selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision() != Precision::U8) {
                 str_type += "_" + std::string(selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision().name());
             } else {
                 str_type += "_I8";
@@ -1175,7 +1120,7 @@ bool Node::isFusedWith(Type fusedNodeType) const {
     return false;
 }
 
-InferenceEngine::Layout Node::getWeightsLayoutByDims(SizeVector dims, bool isGrouped) {
+InferenceEngine::Layout Node::getWeightsLayoutByDims(InferenceEngine::SizeVector dims, bool isGrouped) {
     switch (dims.size()) {
         case 0:
             return InferenceEngine::Layout::SCALAR;
@@ -1204,8 +1149,8 @@ void Node::appendPostOps(dnnl::post_ops& ops, const VectorDims &postOpDims, std:
     IE_THROW() << "Fusing of " << NameFromType(this->getType()) << " operation is not implemented";
 }
 
-std::vector<InferenceEngine::Precision> Node::getInputPrecisions() const {
-    std::vector<InferenceEngine::Precision> inputPrecisions;
+std::vector<Precision> Node::getInputPrecisions() const {
+    std::vector<Precision> inputPrecisions;
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         auto parentEdge = getParentEdgeAt(i);
         if (parentEdge && parentEdge->getStatus() == Edge::Status::Validated) {
@@ -1215,8 +1160,8 @@ std::vector<InferenceEngine::Precision> Node::getInputPrecisions() const {
     return inputPrecisions;
 }
 
-std::vector<InferenceEngine::Precision> Node::getOutputPrecisions() const {
-    std::vector<InferenceEngine::Precision> outputPrecisions;
+std::vector<Precision> Node::getOutputPrecisions() const {
+    std::vector<Precision> outputPrecisions;
     for (size_t i = 0; i < getChildEdges().size(); i++) {
         auto childEdge = getChildEdgeAt(i);
         if (childEdge && childEdge->getStatus() == Edge::Status::Validated) {
@@ -1226,10 +1171,10 @@ std::vector<InferenceEngine::Precision> Node::getOutputPrecisions() const {
     return outputPrecisions;
 }
 
-InferenceEngine::Precision Node::getRuntimePrecision() const {
+Precision Node::getRuntimePrecision() const {
     // Base implementation consider precision only on data path and
     // assumes it is placed on 0-th port (which is true for almost all layers)
-    InferenceEngine::Precision runtimePrecision = Precision::UNSPECIFIED;
+    Precision runtimePrecision = Precision::UNSPECIFIED;
     auto inputPrecisions = getInputPrecisions();
     if (!inputPrecisions.empty()) {
         runtimePrecision = inputPrecisions[0];
@@ -1243,7 +1188,7 @@ InferenceEngine::Precision Node::getRuntimePrecision() const {
     return runtimePrecision;
 }
 
-Node* Node::NodesFactory::create(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) {
+Node* Node::NodesFactory::create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) {
     // getExceptionDescWithoutStatus removes redundant information from the exception message. For instance, the NotImplemented
     // exception is generated in the form: full_path_to_src_file:line_number [ NOT_IMPLEMENTED ] reason.
     // An example for gather node:
@@ -1286,7 +1231,7 @@ Node* Node::NodesFactory::create(const std::shared_ptr<ngraph::Node>& op, const 
 
     if (newNode == nullptr) {
         try {
-            std::unique_ptr<Node> ol(new Reference(op, context, errorMessage));
+            std::unique_ptr<Node> ol(new node::Reference(op, context, errorMessage));
             if (ol != nullptr && ol->created(context->getExtensionManager()))
                 newNode = ol.release();
         } catch (const InferenceEngine::Exception& ex) {
@@ -1347,7 +1292,7 @@ bool Node::canBePerformedAsScaleShift(const Node *parentNode) const {
 
     const auto isConvertablePowerStatic = [&]() {
         if (getAlgorithm() == Algorithm::EltwisePowerStatic) {
-            const auto eltwise = dynamic_cast<const Eltwise *>(this);
+            const auto eltwise = dynamic_cast<const node::Eltwise *>(this);
             if (!eltwise) {
                 IE_THROW() << "Cannot cast " << getName() << " to Eltwise";
             }
@@ -1400,7 +1345,7 @@ std::pair<std::vector<float>, std::vector<float>> Node::getScalesAndShifts(const
         fillValuesFrom(getParentEdgesAtPort(1)[0]->getParent(), scales);
         fillValuesFrom(getParentEdgesAtPort(2)[0]->getParent(), shifts);
     } else if (one_of(getAlgorithm(), Algorithm::EltwisePowerStatic)) {
-        const auto power = dynamic_cast<const Eltwise *>(this);
+        const auto power = dynamic_cast<const node::Eltwise *>(this);
         if (!power) {
             IE_THROW() << "Cannot cast " << getName() << " to Eltwise";
         }
@@ -1597,7 +1542,7 @@ void Node::addSupportedPrimDesc(const std::vector<PortConfigurator>& inPortConfi
                                 const std::vector<PortConfigurator>& outPortConfigs,
                                 impl_desc_type implType) {
     auto fill_port = [] (const PortConfigurator& portConfigurator, const Shape& shape,
-                         InferenceEngine::Precision prc, std::vector<PortConfig>& port) -> bool {
+                         Precision prc, std::vector<PortConfig>& port) -> bool {
         // In order to simplify particular node initialization logic we just don't add config in case target shape is not supported by blockedDescCreator.
         // This should be suitable for major of scenarios since almost all nodes add `ncsp` blockedDescCreator which supports any shape rank.
         if (shape.getRank() < portConfigurator.blockedDescCreator->getMinimalRank())
@@ -1616,14 +1561,14 @@ void Node::addSupportedPrimDesc(const std::vector<PortConfigurator>& inPortConfi
     NodeConfig config;
     for (size_t i = 0; i < inPortConfigs.size(); i++) {
         auto shape = inPortConfigs[i].shape.getRank() == 0 ? getInputShapeAtPort(i) : inPortConfigs[i].shape;
-        auto prc = inPortConfigs[i].prc == InferenceEngine::Precision::UNSPECIFIED ? getOriginalInputPrecisionAtPort(i) : inPortConfigs[i].prc;
+        auto prc = inPortConfigs[i].prc == Precision::UNSPECIFIED ? getOriginalInputPrecisionAtPort(i) : inPortConfigs[i].prc;
         if (!fill_port(inPortConfigs[i], shape, prc, config.inConfs))
             return;
     }
 
     for (size_t i = 0; i < outPortConfigs.size(); i++) {
         auto dims = outPortConfigs[i].shape.getRank() == 0 ? getOutputShapeAtPort(i) : outPortConfigs[i].shape;
-        auto prc = outPortConfigs[i].prc == InferenceEngine::Precision::UNSPECIFIED ? getOriginalOutputPrecisionAtPort(i) : outPortConfigs[i].prc;
+        auto prc = outPortConfigs[i].prc == Precision::UNSPECIFIED ? getOriginalOutputPrecisionAtPort(i) : outPortConfigs[i].prc;
         if (!fill_port(outPortConfigs[i], dims, prc, config.outConfs))
             return;
     }
@@ -1644,6 +1589,3 @@ void Node::initializeDQScales(const float* scaleData, const size_t scaleSize) {
     if (scalePerTensor)
         DQScales.resize(1);
 }
-
-}   // namespace intel_cpu
-}   // namespace ov

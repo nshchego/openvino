@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-
-#include <ngraph/op/proposal.hpp>
-#include "ie_parallel.hpp"
 #include "proposal.h"
+#include <openvino/op/proposal.hpp>
 
 using namespace InferenceEngine;
 
@@ -74,15 +70,14 @@ static std::vector<float> generate_anchors(proposal_conf &conf) {
     return anchors;
 }
 
-bool Proposal::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Proposal::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto proposal0Op = ngraph::as_type_ptr<const ngraph::op::v0::Proposal>(op);
-        const auto proposal4Op = ngraph::as_type_ptr<const ngraph::op::v4::Proposal>(op);
-        if (!proposal0Op && !proposal4Op) {
+        if (!one_of(op->get_type_info(), op::v0::Proposal::get_type_info_static(),
+                                         op::v4::Proposal::get_type_info_static())) {
             errorMessage = "Node is not an instance of the Proposal from the operations set v0 or v4.";
             return false;
         }
-        auto proposalOp = std::dynamic_pointer_cast<const ngraph::op::v0::Proposal>(op);
+        auto proposalOp = as_type<const op::v0::Proposal>(op.get());
         if (proposalOp->get_attrs().framework != "tensorflow" && !proposalOp->get_attrs().framework.empty()) {
             errorMessage = "Unsupported framework attribute: " + proposalOp->get_attrs().framework;
             return false;
@@ -93,14 +88,14 @@ bool Proposal::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
     return true;
 }
 
-Proposal::Proposal(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Proposal::Proposal(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto proposalOp = std::dynamic_pointer_cast<const ngraph::op::v0::Proposal>(op);
+    auto proposalOp = as_type<const op::v0::Proposal>(op.get());
     auto proposalAttrs = proposalOp->get_attrs();
 
     conf.feat_stride_ = proposalAttrs.feat_stride;

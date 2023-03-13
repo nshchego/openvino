@@ -15,7 +15,7 @@ ov::intel_cpu::ConvertGroupConvolution::ConvertGroupConvolution() {
 
     ngraph::matcher_pass_callback callback = [](ngraph::pattern::Matcher& m) {
         enum Inputs {Data, Weights};
-        auto gconv = std::dynamic_pointer_cast<opset8::GroupConvolution>(m.get_match_root());
+        auto gconv = ov::as_type<opset8::GroupConvolution>(m.get_match_root());
         if (!gconv) {
             return false;
         }
@@ -27,21 +27,21 @@ ov::intel_cpu::ConvertGroupConvolution::ConvertGroupConvolution() {
             return false;
         }
 
-        ngraph::NodeVector replace_nodes;
+        ov::NodeVector replace_nodes;
         auto split_weights = std::make_shared<ov::opset1::Split>(gconv->input_value(Inputs::Weights),
-                                                                 ov::opset8::Constant::create<int64_t>(ngraph::element::i64, ngraph::Shape{}, {0}),
+                                                                 ov::opset8::Constant::create<int64_t>(ov::element::i64, ngraph::Shape{}, {0}),
                                                                  groups);
         replace_nodes.push_back(split_weights);
 
-        auto axis  = ov::opset8::Constant::create<int64_t>(ngraph::element::i64, ngraph::Shape{}, {1});
+        auto axis  = ov::opset8::Constant::create<int64_t>(ov::element::i64, ngraph::Shape{}, {1});
         auto split = std::make_shared<ov::opset1::Split>(gconv->input_value(Inputs::Data), axis, groups);
         replace_nodes.push_back(split);
 
-        ngraph::NodeVector concat_inputs;
+        ov::NodeVector concat_inputs;
         for (size_t g = 0; g < groups; g++) {
             auto out = split->output(g);
             auto filter = std::make_shared<ov::opset1::Squeeze>(split_weights->output(g),
-                                                                ov::opset8::Constant::create<int64_t>(ngraph::element::i64, ngraph::Shape{}, {0}));
+                                                                ov::opset8::Constant::create<int64_t>(ov::element::i64, ngraph::Shape{}, {0}));
             auto conv = std::make_shared<ov::opset8::Convolution>(out,
                                                                   filter,
                                                                   gconv->get_strides(),

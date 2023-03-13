@@ -38,7 +38,7 @@ class ROIPoolingCPULayerTest : public testing::WithParamInterface<ROIPoolingCPUT
                                public ov::test::SubgraphBaseTest,
                                public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ROIPoolingCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ROIPoolingCPUTestParamsSet> &obj) {
         roiPoolingParams basicParamsSet;
         CPUSpecificParams cpuParams;
         ProposalGenerationMode propMode;
@@ -103,7 +103,7 @@ public:
     }
 
 protected:
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         const ProposalGenerationMode propMode = std::get<2>(this->GetParam());
         const float spatial_scale = std::get<2>(std::get<0>(this->GetParam()));
         const ngraph::helpers::ROIPoolingTypes pool_method = std::get<3>(std::get<0>(this->GetParam()));
@@ -128,7 +128,7 @@ protected:
                     // and as result excess of right limit for proposal value if the border case (current_h == pooled_h - 1)
                     // will not be handled explicitly
                     switch (funcInput.get_element_type()) {
-                    case ngraph::element::f32: {
+                    case ov::element::f32: {
                         auto* dataPtr = tensor.data<float>();
                         for (size_t i = 0; i < tensor.get_size(); i += 5) {
                             dataPtr[i] = 0;
@@ -139,7 +139,7 @@ protected:
                         }
                         break;
                     }
-                    case ngraph::element::bf16: {
+                    case ov::element::bf16: {
                         auto* dataPtr = tensor.data<std::int16_t>();
                         for (size_t i = 0; i < tensor.get_size(); i += 5) {
                             dataPtr[i] = static_cast<std::int16_t>(ngraph::float16(0.f).to_bits());
@@ -155,11 +155,11 @@ protected:
                     }
                 } else {
                     switch (funcInput.get_element_type()) {
-                    case ngraph::element::f32: {
+                    case ov::element::f32: {
                         CommonTestUtils::fill_data_roi<InferenceEngine::Precision::FP32>(tensor, feat_map_shape[0] - 1, height, width, 1.f, is_roi_max_mode);
                         break;
                     }
-                    case ngraph::element::bf16: {
+                    case ov::element::bf16: {
                         CommonTestUtils::fill_data_roi<InferenceEngine::Precision::BF16>(tensor, feat_map_shape[0] - 1, height, width, 1.f, is_roi_max_mode);
                         break;
                     }
@@ -207,10 +207,10 @@ protected:
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
         auto params = ngraph::builder::makeDynamicParams(ngPrc, inputDynamicShapes);
         auto paramOuts = ngraph::helpers::convert2OutputVector(
-            ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+            ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
 
         auto roi_pooling = ngraph::builder::makeROIPooling(paramOuts[0], paramOuts[1], poolShape, spatial_scale, pool_method);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(roi_pooling)};
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(roi_pooling)};
 
         function = makeNgraphFunction(ngPrc, params, roi_pooling, "ROIPooling");
         functionRefs = ngraph::clone_function(*function);

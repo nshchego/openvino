@@ -28,7 +28,7 @@ typedef std::tuple<
 class NonZeroLayerCPUTest : public testing::WithParamInterface<NonZeroLayerCPUTestParamsSet>,
                           virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<NonZeroLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<NonZeroLayerCPUTestParamsSet> &obj) {
         NonZeroLayerTestParams basicParamsSet;
         std::pair<size_t, size_t> genData;
         CPUSpecificParams cpuParams;
@@ -196,7 +196,7 @@ std::vector<InputShape> inShapesDynamic = {
             }
         }
 };
-std::vector<ngraph::Shape> inShapesStatic = {
+std::vector<ov::Shape> inShapesStatic = {
         { 100 },
         { 4, 100 },
         { 4, 2, 100 },

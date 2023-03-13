@@ -105,10 +105,10 @@ bool canBePerformedAsScaleShift(const std::shared_ptr<const Node> &node, const i
 
     // Prelu and MulAdd are still ignored
     // isConvertablePowerStatic() is ignored
-    return (ov::is_type<ngraph::opset1::Add>(node) ||
-            ov::is_type<ngraph::opset1::Multiply>(node) ||
-            ov::is_type<ngraph::opset1::Subtract>(node) ||
-            ov::is_type<ngraph::opset1::Divide>(node)) &&
+    return (ov::is_type<op::v1::Add>(node) ||
+            ov::is_type<op::v1::Multiply>(node) ||
+            ov::is_type<op::v1::Subtract>(node) ||
+            ov::is_type<op::v1::Divide>(node)) &&
            isBroadcastableToDataInput();
 }
 
@@ -276,7 +276,7 @@ bool isSuitableChildForFusingMatMul(const std::shared_ptr<const Node> &node, con
         return false;
 
     // Matmul / FC bias fusion
-    if (ov::is_type<ngraph::opset1::Add>(node) &&
+    if (ov::is_type<op::v1::Add>(node) &&
         bias_shape.is_static() && matmul_shape.rbegin()->is_static() &&
         bias_shape.rbegin()->get_length() == matmul_shape.rbegin()->get_length() &&
         bias_shape.rbegin()->get_length() == shape_size(bias_shape.get_shape())) {
@@ -437,7 +437,7 @@ bool isSuitableConvert(const std::shared_ptr<const Node>& node) {
         return findResult;
     };
     // 1. check Parameter->Convert 2. check Convert->Result
-    if (ov::is_type<ngraph::op::Parameter>(node->get_input_node_ptr(0))) {
+    if (ov::is_type<ov::op::v0::Parameter>(node->get_input_node_ptr(0))) {
         auto inPrc = node->get_input_element_type(0);
         auto outPrc = node->get_output_element_type(0);
         return inPrc == element::bf16 && outPrc == element::f32;
@@ -465,11 +465,11 @@ bool SnippetsMarkSkipped::run_on_model(const std::shared_ptr<ov::Model> &m) {
             SetNodeFusingType(node, NodeFusingType::FusedWithBinaryConvolution);
             channelAxis = DEFAULT_AXIS;
         } else if (isSuitableReduceParent(node)) {
-            const auto reduce = std::dynamic_pointer_cast<const ngraph::op::util::ArithmeticReductionKeepDims>(node);
+            const auto reduce = ov::as_type<const ngraph::op::util::ArithmeticReductionKeepDims>(node.get());
             channelAxis = getChannelAxis(reduce->get_reduction_axes(), reduce->get_keep_dims());
             SetNodeFusingType(node, NodeFusingType::FusedWithReduce);
         } else if (isSuitableMiscParent(node)) {
-            if (const auto reduce = std::dynamic_pointer_cast<const ngraph::op::util::ArithmeticReductionKeepDims>(node)) {
+            if (const auto reduce = ov::as_type<const ngraph::op::util::ArithmeticReductionKeepDims>(node.get())) {
                 channelAxis = getChannelAxis(reduce->get_reduction_axes(), reduce->get_keep_dims());
             } else {
                 channelAxis = DEFAULT_AXIS;

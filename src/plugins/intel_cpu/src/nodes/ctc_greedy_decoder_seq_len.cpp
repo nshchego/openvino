@@ -15,9 +15,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool CTCGreedyDecoderSeqLen::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool CTCGreedyDecoderSeqLen::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto greedyDecOp = ngraph::as_type_ptr<const ngraph::op::v6::CTCGreedyDecoderSeqLen>(op);
+        const auto greedyDecOp = ov::as_type_ptr<const ov::op::v6::CTCGreedyDecoderSeqLen>(op);
         if (!greedyDecOp) {
             errorMessage = "Node is not an instance of the CTCGreedyDecoderSeqLen operation from operation set v6.";
             return false;
@@ -28,7 +28,7 @@ bool CTCGreedyDecoderSeqLen::isSupportedOperation(const std::shared_ptr<const ng
     return true;
 }
 
-CTCGreedyDecoderSeqLen::CTCGreedyDecoderSeqLen(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+CTCGreedyDecoderSeqLen::CTCGreedyDecoderSeqLen(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
@@ -37,16 +37,16 @@ CTCGreedyDecoderSeqLen::CTCGreedyDecoderSeqLen(const std::shared_ptr<ngraph::Nod
 
     errorPrefix = "CTCGreedyDecoderSeqLen layer with name '" + op->get_friendly_name() + "' ";
     if (getOriginalInputsNumber() < 2 || getOriginalInputsNumber() > 3)
-        IE_THROW() << errorPrefix << "has invalid number of input edges: " << getOriginalInputsNumber();
+        THROW_CPU_NODE_ERR << "has invalid number of input edges: " << getOriginalInputsNumber();
     if (getOriginalOutputsNumber() != 2)
-        IE_THROW() << errorPrefix << "has invalid number of outputs edges: " << getOriginalOutputsNumber();
+        THROW_CPU_NODE_ERR << "has invalid number of outputs edges: " << getOriginalOutputsNumber();
 
     const auto& dataDims = getInputShapeAtPort(DATA_INDEX).getDims();
     const auto& seqDims = getInputShapeAtPort(SEQUENCE_LENGTH_INDEX).getDims();
     if (!dimsEqualWeak(dataDims[0], seqDims[0]))
-        IE_THROW() << errorPrefix << "has invalid input shapes.";
+        THROW_CPU_NODE_ERR << "has invalid input shapes.";
 
-    auto greedyDecOp = ngraph::as_type_ptr<const ngraph::op::v6::CTCGreedyDecoderSeqLen>(op);
+    auto greedyDecOp = ov::as_type_ptr<const ov::op::v6::CTCGreedyDecoderSeqLen>(op);
     mergeRepeated = greedyDecOp->get_merge_repeated();
 }
 
@@ -54,13 +54,13 @@ void CTCGreedyDecoderSeqLen::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inDataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
+    const auto& inDataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
     if (inDataPrecision != Precision::FP32 && inDataPrecision != Precision::BF16)
-        IE_THROW() << errorPrefix << "has unsupported 'data' input precision: " << inDataPrecision;
+        THROW_CPU_NODE_ERR << "has unsupported 'data' input precision: " << inDataPrecision;
 
-    Precision seqLenPrecision = getOriginalInputPrecisionAtPort(SEQUENCE_LENGTH_INDEX);
+    const auto& seqLenPrecision = getOriginalInputPrecisionAtPort(SEQUENCE_LENGTH_INDEX);
     if (seqLenPrecision != Precision::I32 && seqLenPrecision != Precision::I64)
-        IE_THROW() << errorPrefix << "has unsupported 'sequence_length' input precision: " << seqLenPrecision;
+        THROW_CPU_NODE_ERR << "has unsupported 'sequence_length' input precision: " << seqLenPrecision;
 
     std::vector<PortConfigurator> inDataConf;
     inDataConf.reserve(inputShapes.size());

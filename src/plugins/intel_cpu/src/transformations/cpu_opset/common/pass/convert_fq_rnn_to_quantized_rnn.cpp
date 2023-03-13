@@ -24,9 +24,9 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
 
     auto X_m = ngraph::pattern::any_input();
     auto convert_X = ngraph::pattern::wrap_type<ngraph::opset9::Convert>({X_m});
-    auto input_shift_X = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
-    auto subtract_X = ngraph::pattern::wrap_type<ngraph::opset9::Subtract>({convert_X, input_shift_X});
-    auto input_scale_X = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto input_shift_X = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
+    auto subtract_X = ngraph::pattern::wrap_type<ov::op::v1::Subtract>({convert_X, input_shift_X});
+    auto input_scale_X = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
 
     auto deq_X = std::make_shared<ngraph::pattern::op::Or>(
         OutputVector{
@@ -36,9 +36,9 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
 
     auto H_m = ngraph::pattern::any_input();
     auto convert_H = ngraph::pattern::wrap_type<ngraph::opset9::Convert>({H_m});
-    auto input_shift_H = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
-    auto subtract_H = ngraph::pattern::wrap_type<ngraph::opset9::Subtract>({convert_H, input_shift_H});
-    auto input_scale_H = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto input_shift_H = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
+    auto subtract_H = ngraph::pattern::wrap_type<ov::op::v1::Subtract>({convert_H, input_shift_H});
+    auto input_scale_H = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
 
     auto deq_H = std::make_shared<ngraph::pattern::op::Or>(
         OutputVector{
@@ -46,7 +46,7 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
             ngraph::pattern::wrap_type<ngraph::opset9::Multiply>({subtract_H, input_scale_H}),
         });
 
-    auto H_as_const = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto H_as_const = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
     auto H_in = std::make_shared<ngraph::pattern::op::Or>(
         OutputVector {
             deq_H,
@@ -56,17 +56,17 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
     auto cell_state_m = ngraph::pattern::any_input(); // for LSTM
     auto sequence_length_m = ngraph::pattern::any_input(); // for Sequences
 
-    auto W_m = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto W_m = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
     auto convert_W = ngraph::pattern::wrap_type<ngraph::opset9::Convert>({W_m});
-    auto weights_scale_W = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto weights_scale_W = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
     auto deq_W = ngraph::pattern::wrap_type<ngraph::opset9::Multiply>({convert_W, weights_scale_W});
 
-    auto R_m = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto R_m = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
     auto convert_R = ngraph::pattern::wrap_type<ngraph::opset9::Convert>({R_m});
-    auto weights_scale_R = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    auto weights_scale_R = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
     auto deq_R = ngraph::pattern::wrap_type<ngraph::opset9::Multiply>({convert_R, weights_scale_R});
 
-    const auto B_m = ngraph::pattern::wrap_type<ngraph::opset9::Constant>();
+    const auto B_m = ngraph::pattern::wrap_type<ov::op::v0::Constant>();
 
     auto lstm_seq_m  = ngraph::pattern::wrap_type<ngraph::opset9::LSTMSequence>({deq_X, H_in, cell_state_m, sequence_length_m, deq_W, deq_R, B_m});
     auto gru_seq_m   = ngraph::pattern::wrap_type<ngraph::opset9::GRUSequence> ({deq_X, H_in,               sequence_length_m, deq_W, deq_R, B_m});
@@ -87,7 +87,7 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
         const auto& activation   = pattern_map.at(X_m);
         const auto  hidden_state_it = pattern_map.find(H_m);
 
-        ngraph::Output<ngraph::Node> hidden_state;
+        ngraph::Output<ov::Node> hidden_state;
         if (hidden_state_it != pattern_map.end()) { // is it H(i8/u8) -> dequantized -> RNN pattern?
             hidden_state = hidden_state_it->second;
         } else {
@@ -98,7 +98,7 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
         const auto& r_weights    = pattern_map.at(R_m);
         const auto& bias         = pattern_map.at(B_m);
 
-        std::shared_ptr<ngraph::Node> rnn_quantized;
+        std::shared_ptr<ov::Node> rnn_quantized;
 
         if (const auto lstm_seq = ngraph::as_type_ptr<ngraph::opset9::LSTMSequence>(rnn)) {
             const auto& cell_state = pattern_map.at(cell_state_m);
@@ -128,8 +128,8 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
             const auto& sequence_length = pattern_map.at(sequence_length_m);
 
             auto rnn_quantized_tr = std::make_shared<op::TypeRelaxed<ngraph::opset9::GRUSequence>>(
-                std::vector<ngraph::element::Type>{ element::f32, element::f32, element::f32, element::f32, element::f32, element::f32},
-                std::vector<ngraph::element::Type>{ element::f32, element::f32 },
+                std::vector<ov::element::Type>{ element::f32, element::f32, element::f32, element::f32, element::f32, element::f32},
+                std::vector<ov::element::Type>{ element::f32, element::f32 },
                 op::TemporaryReplaceOutputType(activation, element::f32).get(),
                 op::TemporaryReplaceOutputType(hidden_state, element::f32).get(),
                 op::TemporaryReplaceOutputType(sequence_length, element::f32).get(),
@@ -154,8 +154,8 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
         const auto& input_scale_output   = pattern_map.at(input_scale_X);
         const auto& weights_scale_output = pattern_map.at(weights_scale_W);
         // extract constant values
-        const auto input_scale_constant   = std::dynamic_pointer_cast<ngraph::opset9::Constant>(input_scale_output.get_node_shared_ptr());
-        const auto weights_scale_constant = std::dynamic_pointer_cast<ngraph::opset9::Constant>(weights_scale_output.get_node_shared_ptr());
+        const auto input_scale_constant   = ov::as_type<ov::op::v0::Constant>(input_scale_output.get_node_shared_ptr().get());
+        const auto weights_scale_constant = ov::as_type<ov::op::v0::Constant>(weights_scale_output.get_node_shared_ptr().get());
 
         if (!input_scale_constant || !weights_scale_constant)
             return false;
@@ -176,8 +176,8 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
         const auto input_shift_it = pattern_map.find(input_shift_X);
 
         if (input_shift_it != pattern_map.end()) {
-            const auto  input_shift_constant = std::dynamic_pointer_cast<ngraph::opset9::Constant>(input_shift_it->second.get_node_shared_ptr());
-            const float* input_shift_ptr      = input_shift_constant->get_data_ptr<float>();
+            const auto input_shift_constant = ov::as_type<op::v0::Constant>(input_shift_it->second.get_node_shared_ptr().get());
+            const float* input_shift_ptr = input_shift_constant->get_data_ptr<float>();
 
             runtime_info["inputShift"] = *input_shift_ptr;
         }
@@ -201,7 +201,7 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
             std::shared_ptr<Node> multiply_in = new_convert;
             // dequantize with subtract
             if (subtract_it != pattern_map.end()) {
-                const auto subtract = std::dynamic_pointer_cast<ngraph::opset9::Subtract>(subtract_it->second.get_node_shared_ptr());
+                const auto subtract = ov::as_type<ov::op::v1::Subtract>(subtract_it->second.get_node_shared_ptr().get());
                 auto new_subtract = subtract->clone_with_new_inputs({rnn_quantized->output(1), subtract->input_value(1)});
                 multiply_in = new_subtract;
             }

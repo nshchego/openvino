@@ -15,16 +15,16 @@ namespace CPULayerTestsDefinitions {
 
 using TensorIteratorParams = typename std::tuple<
         std::vector<InputShape>,                    // Input shapes
-        ngraph::op::RecurrentSequenceDirection,     // Direction
+        ov::op::RecurrentSequenceDirection,     // Direction
         ElementType>;                               // element type
 
 
 class TensorIteratorCPUTest : public testing::WithParamInterface<TensorIteratorParams>,
                               virtual public SubgraphBaseTest {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<TensorIteratorParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<TensorIteratorParams> &obj) {
         std::vector<InputShape> shapes;
-        ngraph::op::RecurrentSequenceDirection direction;
+        ov::op::RecurrentSequenceDirection direction;
         ElementType inType;
         std::tie(shapes, direction, inType) = obj.param;
 
@@ -45,7 +45,7 @@ public:
 protected:
     void SetUp() override {
         std::vector<InputShape> shapes;
-        ngraph::op::RecurrentSequenceDirection direction;
+        ov::op::RecurrentSequenceDirection direction;
         ElementType inType;
         std::tie(shapes, direction, inType) = this->GetParam();
 
@@ -56,25 +56,25 @@ protected:
         auto tensor_iterator = std::make_shared<ngraph::opset5::TensorIterator>();
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
 
-        ngraph::ParameterVector body_params;
+        ov::ParameterVector body_params;
         for (size_t i = 0; i < shapes.size(); i++) {
-            ngraph::PartialShape shape = shapes[i].first;
+            ov::PartialShape shape = shapes[i].first;
             shape[sequence_axis] = 1;
-            auto paramNode = std::make_shared<ngraph::opset1::Parameter>(inType, shape);
+            auto paramNode = std::make_shared<ov::op::v0::Parameter>(inType, shape);
             body_params.push_back(paramNode);
         }
         auto tanh = ngraph::builder::makeActivation(body_params[0], inType, ngraph::helpers::Tanh);
         auto relu = ngraph::builder::makeActivation(body_params[1], inType, ngraph::helpers::Relu);
-        auto add = std::make_shared<ngraph::opset1::Add>(tanh, relu);
+        auto add = std::make_shared<op::v1::Add>(tanh, relu);
 
-        auto body = std::make_shared<ov::Model>(ngraph::OutputVector{add}, body_params, "body");
+        auto body = std::make_shared<ov::Model>(ov::OutputVector{add}, body_params, "body");
         tensor_iterator->set_function(body);
 
-        if (direction == ngraph::op::RecurrentSequenceDirection::FORWARD) {
+        if (direction == ov::op::RecurrentSequenceDirection::FORWARD) {
             tensor_iterator->set_sliced_input(body_params[0], params[0], 0, 1, 1, -1, sequence_axis);
             tensor_iterator->set_sliced_input(body_params[1], params[1], 0, 1, 1, -1, sequence_axis);
             tensor_iterator->get_concatenated_slices(add, 0, 1, 1, -1, sequence_axis);
-        } else if (direction == ngraph::op::RecurrentSequenceDirection::REVERSE) {
+        } else if (direction == ov::op::RecurrentSequenceDirection::REVERSE) {
             tensor_iterator->set_sliced_input(body_params[0], params[0], -1, -1, 1, 0, sequence_axis);
             tensor_iterator->set_sliced_input(body_params[1], params[1], -1, -1, 1, 0, sequence_axis);
             tensor_iterator->get_concatenated_slices(add, -1, -1, 1, 0, sequence_axis);
@@ -82,7 +82,7 @@ protected:
             NGRAPH_CHECK(false, "Bidirectional case is not supported.");
         }
 
-        function = std::make_shared<ov::Model>(ngraph::OutputVector{tensor_iterator->output(0)}, params);
+        function = std::make_shared<ov::Model>(ov::OutputVector{tensor_iterator->output(0)}, params);
     }
 };
 
@@ -98,8 +98,8 @@ const std::vector<ElementType> inputPrecisions = {
         ElementType::i8
 };
 
-std::vector<ngraph::op::RecurrentSequenceDirection> direction = {ngraph::op::RecurrentSequenceDirection::FORWARD,
-                                                                 ngraph::op::RecurrentSequenceDirection::REVERSE};
+std::vector<ov::op::RecurrentSequenceDirection> direction = {ov::op::RecurrentSequenceDirection::FORWARD,
+                                                                 ov::op::RecurrentSequenceDirection::REVERSE};
 std::vector<std::vector<InputShape>> inputs = {
     {  //first test suit
         {   //dynamic shape for first input

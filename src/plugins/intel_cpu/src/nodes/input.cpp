@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <utils/general_utils.h>
-#include <ngraph/ops.hpp>
+#include <openvino/op/ops.hpp>
 #include <ie_parallel.hpp>
 #include <ie_ngraph_utils.hpp>
 #include <blob_factory.hpp>
@@ -26,7 +26,7 @@
 using namespace dnnl;
 using namespace InferenceEngine;
 using namespace details;
-using namespace ngraph::op;
+using namespace ov::op;
 using namespace dnnl::impl::cpu::x64;
 using namespace Xbyak;
 
@@ -232,7 +232,7 @@ jit_has_subnormals_base::fn_t jit_has_subnormals_function() {
 }   // namespace
 #endif
 
-Input::Input(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, PassThroughShapeInferFactory()) {
     if (!one_of(op->get_type_info(),
             v0::Parameter::get_type_info_static(),
@@ -244,7 +244,7 @@ Input::Input(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr c
 
     constant = ConstantType::NoConst;
 
-    constOp = ngraph::as_type_ptr<ngraph::op::Constant>(op);
+    constOp = ov::as_type_ptr<ov::op::v0::Constant>(op);
     if (constOp) {
         constant = ConstantType::Const;
         cloneBlobIfRequired();
@@ -252,7 +252,7 @@ Input::Input(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr c
 }
 
 void Input::cloneBlobIfRequired() {
-    Shape shape(constOp->get_shape().empty() ? ngraph::Shape(1, 1) : constOp->get_shape());
+    Shape shape(constOp->get_shape().empty() ? ov::Shape(1, 1) : constOp->get_shape());
     const auto prec = convertPrecision(constOp->get_element_type());
     const size_t size = shape.getElementsCount();
     DnnlBlockedMemoryDesc memDesc(prec, shape);
@@ -382,7 +382,7 @@ Input::Input(const Shape& shape,
              const InferenceEngine::Precision& prc,
              const std::string& name,
              const std::string& type,
-             const GraphContext::CPtr context)
+             const GraphContext::CPtr& context)
     : Node(type, name, context) {
     constant = ConstantType::NoConst;
     if (getType() == Type::Input) {
@@ -394,7 +394,7 @@ Input::Input(const Shape& shape,
     }
 }
 
-Input::Input(MemoryDescPtr memDesc, const std::string& name, const std::string& type, const GraphContext::CPtr context)
+Input::Input(MemoryDescPtr memDesc, const std::string& name, const std::string& type, const GraphContext::CPtr& context)
     : Input(memDesc->getShape(), memDesc->getPrecision(), name, type, context) {
     extMemDesc = memDesc;
 }

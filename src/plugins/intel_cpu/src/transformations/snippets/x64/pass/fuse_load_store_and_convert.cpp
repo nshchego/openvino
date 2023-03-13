@@ -26,7 +26,7 @@ ov::intel_cpu::pass::FuseLoadConvert::FuseLoadConvert() {
             return false;
         }
 
-        const auto load = std::dynamic_pointer_cast<ngraph::snippets::op::Load>(load_shared);
+        const auto load = ov::as_type<ngraph::snippets::op::Load>(load_shared.get());
         if (!load)
             return false;
 
@@ -34,14 +34,14 @@ ov::intel_cpu::pass::FuseLoadConvert::FuseLoadConvert() {
         if (transformation_callback(convert))
             return false;
 
-        std::shared_ptr<ngraph::Node> load_convert = nullptr;
+        std::shared_ptr<ov::Node> load_convert = nullptr;
         if (const auto convert_saturation =
-                std::dynamic_pointer_cast<ngraph::snippets::op::ConvertSaturation>(convert)) {
+                ov::as_type<ngraph::snippets::op::ConvertSaturation>(convert.get())) {
             load_convert = std::make_shared<ov::intel_cpu::LoadConvertSaturation>(load->input_value(0),
                                                                                   convert_saturation->get_destination_type(),
                                                                                   load->get_count(), load->get_offset());
         } else if (const auto convert_truncation =
-                std::dynamic_pointer_cast<ngraph::snippets::op::ConvertTruncation>(convert)) {
+                ov::as_type<ngraph::snippets::op::ConvertTruncation>(convert.get())) {
             load_convert = std::make_shared<ov::intel_cpu::LoadConvertTruncation>(load->input_value(0),
                                                                                   convert_truncation->get_destination_type(),
                                                                                   load->get_count(), load->get_offset());
@@ -75,7 +75,7 @@ ov::intel_cpu::pass::FuseStoreConvert::FuseStoreConvert() {
         auto& pm = m.get_pattern_value_map();
         const auto input = pm.at(input_pattern).get_node_shared_ptr();
 
-        const auto store = std::dynamic_pointer_cast<ngraph::snippets::op::Store>(pm.at(store_pattern).get_node_shared_ptr());
+        const auto store = ov::as_type_ptr<ngraph::snippets::op::Store>(pm.at(store_pattern).get_node_shared_ptr());
         if (!store)
             return false;
 
@@ -83,14 +83,14 @@ ov::intel_cpu::pass::FuseStoreConvert::FuseStoreConvert() {
         if (convert->output(0).get_target_inputs().size() != 1 || transformation_callback(convert))
             return false;
 
-        std::shared_ptr<ngraph::Node> store_convert = nullptr;
+        std::shared_ptr<ov::Node> store_convert = nullptr;
         if (const auto convert_saturation =
-                std::dynamic_pointer_cast<ngraph::snippets::op::ConvertSaturation>(convert)) {
+                ov::as_type<ngraph::snippets::op::ConvertSaturation>(convert.get())) {
             store_convert = std::make_shared<ov::intel_cpu::StoreConvertSaturation>(input,
                                                                                     convert_saturation->get_destination_type(),
                                                                                     store->get_count(), store->get_offset());
         } else if (const auto convert_truncation =
-                std::dynamic_pointer_cast<ngraph::snippets::op::ConvertTruncation>(convert)) {
+                ov::as_type<ngraph::snippets::op::ConvertTruncation>(convert.get())) {
             store_convert = std::make_shared<ov::intel_cpu::StoreConvertTruncation>(input,
                                                                                     convert_truncation->get_destination_type(),
                                                                                     store->get_count(), store->get_offset());

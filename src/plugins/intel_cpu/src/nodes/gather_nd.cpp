@@ -2,28 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
 #include "gather_nd.h"
-#include <ngraph/opsets/opset8.hpp>
-#include <precision_utils.h>
-#include <utils/general_utils.h>
+
+#include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
+#include <openvino/op/gather_nd.hpp>
 
 using namespace InferenceEngine;
-
-#define THROW_ERROR IE_THROW() << "GatherND layer with name '" << getName() << "' "
 
 namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool GatherND::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool GatherND::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(), ngraph::op::v5::GatherND::get_type_info_static(), ngraph::op::v8::GatherND::get_type_info_static())) {
+        if (!one_of(op->get_type_info(), ov::op::v5::GatherND::get_type_info_static(), ov::op::v8::GatherND::get_type_info_static())) {
             errorMessage = "Node is not an instance of the GatherND operation from operation set v5 and v8.";
             return false;
         }
@@ -34,7 +27,7 @@ bool GatherND::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
     return true;
 }
 
-GatherND::GatherND(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+GatherND::GatherND(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
@@ -42,39 +35,39 @@ GatherND::GatherND(const std::shared_ptr<ngraph::Node>& op, const GraphContext::
     }
 
     if (inputShapes.size() != 2 && outputShapes.size() != 1)
-        THROW_ERROR << "has invalid number of input/output edges.";
+        THROW_CPU_NODE_ERR << "has invalid number of input/output edges.";
 
     const size_t dataInputRank = getInputShapeAtPort(GATHERND_DATA).getRank();
     const size_t indicesInputRank = getInputShapeAtPort(GATHERND_INDEXES).getRank();
 
-    if (auto gatherNdOp = ngraph::as_type_ptr<const ngraph::op::v8::GatherND>(op)) {
+    if (auto gatherNdOp = ov::as_type_ptr<const ov::op::v8::GatherND>(op)) {
         attrs.batchDims = gatherNdOp->get_batch_dims();
-    } else if (auto gatherNdOp = ngraph::as_type_ptr<const ngraph::op::v5::GatherND>(op)) {
+    } else if (auto gatherNdOp = ov::as_type_ptr<const ov::op::v5::GatherND>(op)) {
         attrs.batchDims = gatherNdOp->get_batch_dims();
     } else {
-        THROW_ERROR << "has support only opset5.";
+        THROW_CPU_NODE_ERR << "has support only opset5.";
     }
     if (attrs.batchDims >= std::min(dataInputRank, indicesInputRank))
-        THROW_ERROR << "has invalid batch_dims attribute: " << attrs.batchDims;
+        THROW_CPU_NODE_ERR << "has invalid batch_dims attribute: " << attrs.batchDims;
 }
 
 void GatherND::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inDataPrecision = getOriginalInputPrecisionAtPort(GATHERND_DATA);
+    const auto& inDataPrecision = getOriginalInputPrecisionAtPort(GATHERND_DATA);
     if (!one_of(inDataPrecision.size(),
                 sizeof(PrecisionTrait<Precision::I32>::value_type),
                 sizeof(PrecisionTrait<Precision::I16>::value_type),
                 sizeof(PrecisionTrait<Precision::I8>::value_type))) {
-        THROW_ERROR << "has unsupported 'data' input precision: " << inDataPrecision;
+        THROW_CPU_NODE_ERR << "has unsupported 'data' input precision: " << inDataPrecision;
     }
     attrs.dataSize = inDataPrecision.size();
 
     Precision indicesPrecision = getOriginalInputPrecisionAtPort(GATHERND_INDEXES);
     if (!one_of(indicesPrecision,
                 Precision::I32, Precision::I64, Precision::I16, Precision::U16, Precision::I8, Precision::U8)) {
-        THROW_ERROR << "has unsupported 'indices' input precision: " << indicesPrecision;
+        THROW_CPU_NODE_ERR << "has unsupported 'indices' input precision: " << indicesPrecision;
     }
 
     addSupportedPrimDesc({{LayoutType::ncsp, inDataPrecision},
@@ -88,13 +81,13 @@ void GatherND::prepareParams() {
     auto& idxMemPtr = getParentEdgeAt(GATHERND_INDEXES)->getMemoryPtr();
     auto& dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        THROW_ERROR << " has not allocated input memory of 'data'.";
+        THROW_CPU_NODE_ERR << " has not allocated input memory of 'data'.";
     if (!idxMemPtr || !idxMemPtr->isAllocated())
-        THROW_ERROR << " has not allocated input memory of 'indices'.";
+        THROW_CPU_NODE_ERR << " has not allocated input memory of 'indices'.";
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        THROW_ERROR << " has not allocated output memory.";
+        THROW_CPU_NODE_ERR << " has not allocated output memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        THROW_ERROR << " has unidentified preferable primitive descriptor.";
+        THROW_CPU_NODE_ERR << " has unidentified preferable primitive descriptor.";
 
     attrs.srcDims = srcMemPtr->getStaticDims();
     attrs.srcStrides = srcMemPtr->GetDescWithType<BlockedMemoryDesc>()->getStrides();
@@ -129,7 +122,7 @@ GatherND::GatherNDExecutor::GatherNDExecutor(const GatherNDAttributes& attrs) : 
 
 void GatherND::execute(dnnl::stream strm) {
     if (!execPtr)
-        THROW_ERROR << "has not compiled executor.";
+        THROW_CPU_NODE_ERR << "has not compiled executor.";
 
     execPtr->exec(getParentEdgeAt(GATHERND_DATA)->getMemoryPtr(),
                   getParentEdgeAt(GATHERND_INDEXES)->getMemoryPtr(),

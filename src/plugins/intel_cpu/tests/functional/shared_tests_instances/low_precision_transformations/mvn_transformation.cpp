@@ -12,7 +12,7 @@ const std::vector<element::Type> precisions = {
     element::f32
 };
 
-const std::vector<ngraph::PartialShape> inputAndQuantizationShapes = {
+const std::vector<ov::PartialShape> inputAndQuantizationShapes = {
     { 1ul, 4ul, 16ul, 16ul },
 };
 

@@ -25,7 +25,7 @@ using FuseTransposeAndReorderParams = std::tuple<
 class FuseTransposeAndReorderTest : public testing::WithParamInterface<FuseTransposeAndReorderParams>, public CPUTestsBase,
         virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<FuseTransposeAndReorderParams> obj);
+    static std::string getTestCaseName(const testing::TestParamInfo<FuseTransposeAndReorderParams> &obj);
 
 protected:
     void SetUp() override;

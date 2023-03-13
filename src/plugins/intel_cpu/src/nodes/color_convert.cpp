@@ -23,7 +23,7 @@ namespace intel_cpu {
 namespace node {
 namespace {
 
-std::tuple<Algorithm, std::string> getAlgorithmFor(const std::shared_ptr<const ngraph::Node>& op) {
+std::tuple<Algorithm, std::string> getAlgorithmFor(const std::shared_ptr<const ov::Node>& op) {
     if (ov::is_type<ov::op::v8::NV12toRGB>(op))
         return std::make_tuple(Algorithm::ColorConvertNV12toRGB, std::string());
     if (ov::is_type<ov::op::v8::NV12toBGR>(op))
@@ -1000,7 +1000,7 @@ private:
 
 class ColorConvertShapeInferFactory : public ShapeInferFactory {
 public:
-    ColorConvertShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    ColorConvertShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         bool isSinglePlain = m_op->get_input_size() == 1;
         return std::make_shared<ColorConvertShapeInfer>(isSinglePlain);
@@ -1037,13 +1037,13 @@ const VectorDims & ColorConvert::Converter::inputDims(size_t idx) const {
     return _node->getParentEdgesAtPort(idx)[0]->getMemory().getStaticDims();
 }
 
-bool ColorConvert::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ColorConvert::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     Algorithm alg;
     std::tie(alg, errorMessage) = getAlgorithmFor(op);
     return alg != Algorithm::Default;
 }
 
-ColorConvert::ColorConvert(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ColorConvert::ColorConvert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, ColorConvertShapeInferFactory(op)) {
     std::string errorMessage;
     std::tie(algorithm, errorMessage) = getAlgorithmFor(op);

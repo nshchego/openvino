@@ -82,9 +82,9 @@ protected:
             shape.push_back({});
         }
 
-        std::shared_ptr<ngraph::Node> inp2;
-        std::shared_ptr<ngraph::Node> inp3;
-        std::shared_ptr<ngraph::Node> inp4;
+        std::shared_ptr<ov::Node> inp2;
+        std::shared_ptr<ov::Node> inp3;
+        std::shared_ptr<ov::Node> inp4;
 
         auto paramsIn = ngraph::builder::makeDynamicParams(netPrecision, {inputDynamicShapes[0]});
         if (ngraph::helpers::InputLayerType::PARAMETER == secondaryInputType) {
@@ -92,9 +92,9 @@ protected:
             inp3 = ngraph::builder::makeDynamicInputLayer(netPrecision, secondaryInputType, inputDynamicShapes[2]);
             inp4 = ngraph::builder::makeDynamicInputLayer(netPrecision, secondaryInputType, inputDynamicShapes[3]);
 
-            paramsIn.push_back(std::dynamic_pointer_cast<ngraph::opset1::Parameter>(inp2));
-            paramsIn.push_back(std::dynamic_pointer_cast<ngraph::opset1::Parameter>(inp3));
-            paramsIn.push_back(std::dynamic_pointer_cast<ngraph::opset1::Parameter>(inp4));
+            paramsIn.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(inp2));
+            paramsIn.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(inp3));
+            paramsIn.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(inp4));
         } else if (ngraph::helpers::InputLayerType::CONSTANT == secondaryInputType) {
             auto maxBeamIndex = inputShape.second.front().at(2) - 1;
 
@@ -107,11 +107,11 @@ protected:
 
         auto operationResult = std::make_shared<ngraph::opset4::GatherTree>(paramsIn.front(), inp2, inp3, inp4);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset4::Result>(operationResult)};
-        function = std::make_shared<ngraph::Function>(results, paramsIn, "GatherTree");
+        ov::ResultVector results{std::make_shared<ngraph::opset4::Result>(operationResult)};
+        function = std::make_shared<ov::Model>(results, paramsIn, "GatherTree");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto maxBeamIndex = targetInputStaticShapes.front().at(2) - 1;
         const auto& funcInputs = function->inputs();

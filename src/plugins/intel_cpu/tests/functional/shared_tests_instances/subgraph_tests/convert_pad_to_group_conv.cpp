@@ -18,11 +18,11 @@ namespace {
 
     INSTANTIATE_TEST_SUITE_P(smoke_Pad_1D, ConvertPadToConvTests,
                             ::testing::Combine(
-                                    ::testing::Values(ngraph::Shape{1, 8, 64}),
+                                    ::testing::Values(ov::Shape{1, 8, 64}),
                                     ::testing::ValuesIn(pads_1d),
                                     ::testing::ValuesIn(pads_1d),
                                     ::testing::ValuesIn(values),
-                                    ::testing::Values(ngraph::op::PadMode::CONSTANT),
+                                    ::testing::Values(ov::op::PadMode::CONSTANT),
                                     ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                             ConvertPadToConvTests::getTestCaseName);
 
@@ -33,11 +33,11 @@ namespace {
 
     INSTANTIATE_TEST_SUITE_P(smoke_Pad_2D, ConvertPadToConvTests,
                             ::testing::Combine(
-                                    ::testing::Values(ngraph::Shape{1, 8, 64, 16}),
+                                    ::testing::Values(ov::Shape{1, 8, 64, 16}),
                                     ::testing::ValuesIn(pads_2d),
                                     ::testing::ValuesIn(pads_2d),
                                     ::testing::ValuesIn(values),
-                                    ::testing::Values(ngraph::op::PadMode::CONSTANT),
+                                    ::testing::Values(ov::op::PadMode::CONSTANT),
                                     ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                             ConvertPadToConvTests::getTestCaseName);
 }  // namespace

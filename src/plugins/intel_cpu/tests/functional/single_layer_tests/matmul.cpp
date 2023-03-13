@@ -162,7 +162,7 @@ protected:
 
         auto matrixB = builder::makeDynamicInputLayer(netType, secondaryInputType, inShapeB);
         if (secondaryInputType == helpers::InputLayerType::PARAMETER) {
-            params.push_back(std::dynamic_pointer_cast<opset1::Parameter>(matrixB));
+            params.push_back(ov::as_type_ptr<opset1::Parameter>(matrixB));
         }
         auto paramOuts = helpers::convert2OutputVector(helpers::castOps2Nodes<opset1::Parameter>(params));
         auto matMul = builder::makeMatMul(paramOuts[0], matrixB, transpA, transpB);

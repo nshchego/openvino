@@ -2,14 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include <selective_build.h>
 #include "batch_to_space.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset2.hpp>
+
+#include "ie_parallel.hpp"
+#include <openvino/op/batch_to_space.hpp>
 
 using namespace InferenceEngine;
 
@@ -17,10 +13,9 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool BatchToSpace::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool BatchToSpace::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto batchToSpace = std::dynamic_pointer_cast<const ngraph::opset2::BatchToSpace>(op);
-        if (!batchToSpace) {
+        if (op->get_type_info() != ov::op::v1::BatchToSpace::get_type_info_static()) {
             errorMessage = "Only opset2 BatchToSpace operation is supported";
             return false;
         }
@@ -30,24 +25,22 @@ bool BatchToSpace::isSupportedOperation(const std::shared_ptr<const ngraph::Node
     return true;
 }
 
-BatchToSpace::BatchToSpace(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+BatchToSpace::BatchToSpace(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, PortMask(1, 2, 3))) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "BatchToSpace layer with name '" + op->get_friendly_name() + "'";
-
     if (inputShapes.size() != 4 || outputShapes.size() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input or output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input or output edges!";
 
     const auto &inDims = getInputShapeAtPort(0).getDims();
     const auto &outDims = getOutputShapeAtPort(0).getDims();
     if (inDims.size() < 4 || inDims.size() > 5)
-        IE_THROW() << errorPrefix << " has unsupported 'data' input rank: " << inDims.size();
+        THROW_CPU_NODE_ERR << " has unsupported 'data' input rank: " << inDims.size();
     if (inDims.size() != outDims.size())
-        IE_THROW() << errorPrefix << " has incorrect number of input/output dimensions";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output dimensions";
 }
 
 void BatchToSpace::initSupportedPrimitiveDescriptors() {
@@ -55,10 +48,10 @@ void BatchToSpace::initSupportedPrimitiveDescriptors() {
         return;
 
     const auto &inDims = getInputShapeAtPort(0).getDims();
-    const auto precision = getOriginalInputPrecisionAtPort(0);
+    const auto& precision = getOriginalInputPrecisionAtPort(0);
     const std::set<size_t> supported_precision_sizes = {1, 2, 4, 8};
     if (supported_precision_sizes.find(precision.size()) == supported_precision_sizes.end())
-        IE_THROW() << errorPrefix << " has unsupported precision: " << precision.name();
+        THROW_CPU_NODE_ERR << " has unsupported precision: " << precision.name();
 
     addSupportedPrimDesc({{LayoutType::nspc, precision},
                           {LayoutType::ncsp, Precision::I32},

@@ -24,7 +24,7 @@ TEST_F(EdgeWithSameNameInTwoModels, smoke_CompareWithRef) {
     const std::vector<ptrdiff_t> padsBegin{0, 0};
     const std::vector<ptrdiff_t> padsEnd{0, 0};
     const std::vector<size_t> dilations{1, 1};
-    const ngraph::op::PadType autoPad(ngraph::op::PadType::EXPLICIT);
+    const ov::op::PadType autoPad(ov::op::PadType::EXPLICIT);
 
     if (InferenceEngine::with_cpu_x86_avx512f()) {
         std::tie(inFmts, outFmts, priority, selectedType) = conv_avx512_2D;

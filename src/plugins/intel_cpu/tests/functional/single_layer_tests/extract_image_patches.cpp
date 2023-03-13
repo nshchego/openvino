@@ -4,8 +4,8 @@
 
 #include "shared_test_classes/base/ov_subgraph.hpp"
 #include "test_utils/cpu_test_utils.hpp"
-#include "shared_test_classes/base/layer_test_utils.hpp"
-#include "ngraph_functions/builders.hpp"
+//#include "shared_test_classes/base/layer_test_utils.hpp"
+ #include "ngraph_functions/builders.hpp"
 
 using namespace CPUTestUtils;
 using namespace ov::test;
@@ -22,7 +22,7 @@ using extractImagePatchesParams = typename std::tuple<
 class ExtractImagePatchesLayerCPUTest : public testing::WithParamInterface<extractImagePatchesParams>,
                                         virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<extractImagePatchesParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<extractImagePatchesParams> &obj) {
         InputShape inputShapes;
         ElementType inputPrecision;
         ov::Shape kernelSize;

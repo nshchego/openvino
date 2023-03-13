@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-
-#include <ngraph/opsets/opset6.hpp>
-#include "ie_parallel.hpp"
 #include "experimental_detectron_priorgridgenerator.h"
+
+#include <openvino/op/experimental_detectron_prior_grid_generator.hpp>
 
 using namespace InferenceEngine;
 
@@ -14,11 +12,10 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool ExperimentalDetectronPriorGridGenerator::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
+bool ExperimentalDetectronPriorGridGenerator::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                                                              std::string& errorMessage) noexcept {
     try {
-        const auto priorGridGen = std::dynamic_pointer_cast<const ngraph::opset6::ExperimentalDetectronPriorGridGenerator>(op);
-        if (!priorGridGen) {
+        if (!one_of(op->get_type_info(), ov::op::v6::ExperimentalDetectronPriorGridGenerator::get_type_info_static())) {
             errorMessage = "Only opset6 ExperimentalDetectronPriorGridGenerator operation is supported";
             return false;
         }
@@ -29,18 +26,17 @@ bool ExperimentalDetectronPriorGridGenerator::isSupportedOperation(const std::sh
 }
 
 ExperimentalDetectronPriorGridGenerator::ExperimentalDetectronPriorGridGenerator(
-    const std::shared_ptr<ngraph::Node>& op,
-    const GraphContext::CPtr context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        const std::shared_ptr<ov::Node>& op,
+        const GraphContext::CPtr& context)
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "ExperimentalDetectronPriorGridGenerator layer with name '" + op->get_friendly_name() + "'";
-    const auto priorGridGen = std::dynamic_pointer_cast<const ngraph::opset6::ExperimentalDetectronPriorGridGenerator>(op);
+    const auto priorGridGen = ov::as_type<const ov::op::v6::ExperimentalDetectronPriorGridGenerator>(op.get());
     if (getOriginalInputsNumber() != 3 || getOriginalOutputsNumber() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
     const auto &attr = priorGridGen->get_attrs();
     grid_w_ = attr.w;

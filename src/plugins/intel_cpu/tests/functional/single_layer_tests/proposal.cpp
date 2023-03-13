@@ -59,7 +59,7 @@ using proposalLayerTestCPUParams = std::tuple<
 class ProposalLayerCPUTest : public testing::WithParamInterface<proposalLayerTestCPUParams>,
                              public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<proposalLayerTestCPUParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<proposalLayerTestCPUParams> &obj) {
         std::vector<InputShape> inputShapes;
         proposalSpecificParams proposalParams;
         Precision netPrecision;
@@ -140,9 +140,9 @@ protected:
 
         auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
         auto params = ngraph::builder::makeDynamicParams(ngPrc, {inputDynamicShapes[0], inputDynamicShapes[1], inputDynamicShapes[2]});
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
 
-        ngraph::op::ProposalAttrs attrs;
+        ov::op::v0::Proposal::Attributes attrs;
         attrs.base_size = base_size;
         attrs.pre_nms_topn = pre_nms_topn;
         attrs.post_nms_topn = post_nms_topn;
@@ -161,12 +161,12 @@ protected:
 
         auto proposal = std::make_shared<opset4::Proposal>(paramOuts[0], paramOuts[1], paramOuts[2], attrs);
 
-        ngraph::ResultVector results{
-                std::make_shared<ngraph::opset1::Result>(proposal->output(0)),
-                std::make_shared<ngraph::opset1::Result>(proposal->output(1))
+        ov::ResultVector results{
+                std::make_shared<ov::op::v0::Result>(proposal->output(0)),
+                std::make_shared<ov::op::v0::Result>(proposal->output(1))
         };
 
-        function = std::make_shared<ngraph::Function>(results, params, "Proposal");
+        function = std::make_shared<ov::Model>(results, params, "Proposal");
     }
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();

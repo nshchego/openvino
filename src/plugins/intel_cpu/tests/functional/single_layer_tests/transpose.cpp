@@ -25,7 +25,7 @@ typedef std::tuple<
 class TransposeLayerCPUTest : public testing::WithParamInterface<TransposeLayerCPUTestParamSet>,
                               public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<TransposeLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<TransposeLayerCPUTestParamSet> &obj) {
         Precision netPrecision;
         InputShape inputShapes;
         std::vector<size_t> inputOrder;
@@ -75,7 +75,7 @@ protected:
         transpose->get_rt_info() = getCPUInfo();
         const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(transpose)};
 
-        function = std::make_shared<ngraph::Function>(results, params, "TransposeLayerCPUTest");
+        function = std::make_shared<ov::Model>(results, params, "TransposeLayerCPUTest");
         functionRefs = ngraph::clone_function(*function);
     }
 };

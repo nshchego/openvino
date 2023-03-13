@@ -17,7 +17,7 @@ TEST(StaticShapeInferenceTest, BroadcastBidirectionalTest) {
     int32_t target_shape_val[] = {1, 16, 50, 1};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{4}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{4}, target_shape_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{16, 1, 8}, StaticShape{4}},
                              static_output_shapes = {StaticShape{}};
@@ -49,7 +49,7 @@ TEST(StaticShapeInferenceTest, BroadcastPDPDTest) {
     int32_t target_shape_val[] = {2, 3, 6};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{3}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{3}, target_shape_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{3, 1}, StaticShape{3}},
                              static_output_shapes = {StaticShape{}};
@@ -81,7 +81,7 @@ TEST(StaticShapeInferenceTest, BroadcastNumpyTest) {
     int32_t target_shape_val[] = {1, 16, 50, 50};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{4}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{4}, target_shape_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{16, 1, 1}, StaticShape{4}},
                              static_output_shapes = {StaticShape{}};
@@ -116,9 +116,9 @@ TEST(StaticShapeInferenceTest, BroadcastExplicitTest) {
     int32_t axes_mapping_val[] = {1};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{4}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{4}, target_shape_val);
     constant_data[2] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{1}, axes_mapping_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{1}, axes_mapping_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{16}, StaticShape{4}, StaticShape{1}};
     std::vector<StaticShape> static_output_shapes = {StaticShape{}};
@@ -156,7 +156,7 @@ TEST(StaticShapeInferenceTest, BroadcastV1PDPDTest) {
     int32_t target_shape_val[] = {2, 3, 6};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{3}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{3}, target_shape_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{3, 1}, StaticShape{3}},
                              static_output_shapes = {StaticShape{}};
@@ -176,7 +176,7 @@ TEST(StaticShapeInferenceTest, BroadcastV1NumpyTest) {
     int32_t target_shape_val[] = {2, 3, 6};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{3}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{3}, target_shape_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{3, 1}, StaticShape{3}},
                              static_output_shapes = {StaticShape{}};
@@ -198,9 +198,9 @@ TEST(StaticShapeInferenceTest, BroadcastV1ExplicitTest) {
     int32_t axes_mapping_val[] = {1, 2};
     std::map<size_t, std::shared_ptr<ngraph::runtime::HostTensor>> constant_data;
     constant_data[1] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{3}, target_shape_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{3}, target_shape_val);
     constant_data[2] =
-        std::make_shared<ngraph::runtime::HostTensor>(ngraph::element::Type_t::i32, ov::Shape{2}, axes_mapping_val);
+        std::make_shared<ngraph::runtime::HostTensor>(ov::element::Type_t::i32, ov::Shape{2}, axes_mapping_val);
 
     std::vector<StaticShape> static_input_shapes = {StaticShape{3, 1}, StaticShape{3}, StaticShape{2}},
                              static_output_shapes = {StaticShape{}};

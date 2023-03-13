@@ -12,7 +12,7 @@ using ngraph::helpers::ActivationTypes;
 
 namespace SubgraphTestsDefinitions {
 
-std::string FuseMulAddAndEwSimpleTest::getTestCaseName(testing::TestParamInfo<FuseMulAddAndEwSimpleParams> obj) {
+std::string FuseMulAddAndEwSimpleTest::getTestCaseName(const testing::TestParamInfo<FuseMulAddAndEwSimpleParams> &obj) {
     std::ostringstream result;
     SizeVector inputShape;
     Precision inPrec;
@@ -49,8 +49,8 @@ void FuseMulAddAndEwSimpleTest1::CreateGraph() {
     auto mul1 = ngraph::builder::makeEltwise(params[1], params[2], EltwiseTypes::MULTIPLY);
     auto add = ngraph::builder::makeEltwise(tanh, mul1, EltwiseTypes::ADD);
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(add)};
-    function = std::make_shared<ngraph::Function>(results, params, "MulAdd_EwSimple");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(add)};
+    function = std::make_shared<ov::Model>(results, params, "MulAdd_EwSimple");
 }
 
 TEST_P(FuseMulAddAndEwSimpleTest1, CompareWithRefs) {
@@ -72,8 +72,8 @@ void FuseMulAddAndEwSimpleTest2::CreateGraph() {
     auto mul1 = ngraph::builder::makeEltwise(tanh2, tanh1, EltwiseTypes::MULTIPLY);
     auto add = ngraph::builder::makeEltwise(mul1, params[2], EltwiseTypes::ADD);
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(add)};
-    function = std::make_shared<ngraph::Function>(results, params, "MulAdd_EwSimple_2");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(add)};
+    function = std::make_shared<ov::Model>(results, params, "MulAdd_EwSimple_2");
 }
 
 TEST_P(FuseMulAddAndEwSimpleTest2, CompareWithRefs) {
@@ -94,8 +94,8 @@ void FuseMulAddAndEwSimpleTest3::CreateGraph() {
     auto mul2 = ngraph::builder::makeEltwise(tanh1, params[3], EltwiseTypes::MULTIPLY);
     auto add2 = ngraph::builder::makeEltwise(params[4], mul2, EltwiseTypes::ADD);
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset5::Result>(add2)};
-    function = std::make_shared<ngraph::Function>(results, params, "MulAdd_EwSimple_3");
+    ov::ResultVector results{std::make_shared<ngraph::opset5::Result>(add2)};
+    function = std::make_shared<ov::Model>(results, params, "MulAdd_EwSimple_3");
 }
 
 TEST_P(FuseMulAddAndEwSimpleTest3, CompareWithRefs) {

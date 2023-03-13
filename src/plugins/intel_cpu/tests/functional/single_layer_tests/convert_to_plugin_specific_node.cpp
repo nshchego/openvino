@@ -3,7 +3,7 @@
 //
 
 #include "test_utils/cpu_test_utils.hpp"
-#include "ngraph_functions/builders.hpp"
+ #include "ngraph_functions/builders.hpp"
 
 using namespace ngraph;
 using namespace InferenceEngine;
@@ -21,7 +21,7 @@ using ConvertToPluginSpecificNodeParams = std::tuple<SizeVector,            // n
 class ConvertToPluginSpecificNode : public testing::WithParamInterface<ConvertToPluginSpecificNodeParams>,
                         public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ConvertToPluginSpecificNodeParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ConvertToPluginSpecificNodeParams> &obj) {
         SizeVector nonConstShape, constShape;
         Precision prc;
         helpers::EltwiseTypes nodeType;
@@ -54,15 +54,15 @@ protected:
         IE_ASSERT(shape_size(constShape) == 1);
 
         const auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(prc);
-        const auto param = std::make_shared<ngraph::opset1::Parameter>(ngPrc, ngraph::Shape(nonConstShape));
-        const auto constNode = builder::makeConstant(ngPrc, ngraph::Shape(constShape), std::vector<float>{}, true);
+        const auto param = std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(nonConstShape));
+        const auto constNode = builder::makeConstant(ngPrc, ov::Shape(constShape), std::vector<float>{}, true);
         OutputVector inputs(2);
         inputs[port] = constNode;
         inputs[1 - port] = param;
 
         auto powerStatic = ngraph::builder::makeEltwise(inputs[0], inputs[1], nodeType);
 
-        function = std::make_shared<ngraph::Function>(powerStatic, ParameterVector{param}, "ConvertToPluginSpecificNode");
+        function = std::make_shared<ov::Model>(powerStatic, ParameterVector{param}, "ConvertToPluginSpecificNode");
     }
 };
 

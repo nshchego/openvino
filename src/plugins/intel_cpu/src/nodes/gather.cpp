@@ -2,21 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
+#include "gather.h"
 
 #include "ie_parallel.hpp"
-#include "gather.h"
-#include <ngraph/opsets/opset1.hpp>
 #include "common/cpu_memcpy.h"
-#include <utils/general_utils.h>
 #include "kernels/x64/gather_uni_kernel.hpp"
+#include <openvino/op/constant.hpp>
+#include <openvino/op/gather.hpp>
+#include <utils/general_utils.h>
+#include <utils/ngraph_utils.hpp>
 #include "utils/shape_inference/shape_inference_cpu.hpp"
 
 using namespace InferenceEngine;
 using namespace dnnl::impl::cpu;
-
-#define THROW_ERROR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
 
 namespace ov {
 namespace intel_cpu {
@@ -90,7 +88,7 @@ private:
 
 class GatherShapeInferFactory : public ShapeInferFactory {
 public:
-    GatherShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    GatherShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         static constexpr size_t GATHER_INDICES = 1, GATHER_AXIS = 2;
 
@@ -112,7 +110,7 @@ private:
 };
 } // namespace
 
-Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, GatherShapeInferFactory(op)),
       batchDims(0) {
     std::string errorMessage;
@@ -121,7 +119,7 @@ Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
     }
 
     if (op->get_input_size() != 3 || op->get_output_size() != 1)
-        THROW_ERROR << "has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << "has incorrect number of input/output edges!";
 
     const auto& dataShape = getInputShapeAtPort(GATHER_DATA);
     isDataShapeStat = dataShape.isStatic();
@@ -131,7 +129,7 @@ Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
     isIdxShapeStat = idxShape.isStatic();
     const auto indicesRank = idxShape.getRank();
     if (dataSrcRank == 0lu || indicesRank == 0lu)
-        THROW_ERROR << "has incorrect input parameters ranks.";
+        THROW_CPU_NODE_ERR << "has incorrect input parameters ranks.";
 
     if (ov::is_type<ov::op::v8::Gather>(op)) {
         batchDims = static_cast<int>(ov::as_type_ptr<ov::op::v8::Gather>(op)->get_batch_dims());
@@ -152,7 +150,7 @@ Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
     if (batchDims < 0)
         batchDims += indicesRank;
     if (batchDims < 0 || batchDims > std::min(static_cast<int>(dataSrcRank), static_cast<int>(indicesRank)))
-        THROW_ERROR << "has incorrect batch_dims " << batchDims << "!";
+        THROW_CPU_NODE_ERR << "has incorrect batch_dims " << batchDims << "!";
 
     if (ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_AXIS))) {
         isAxisInputConst = true;
@@ -160,7 +158,7 @@ Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
         if (axis < 0)
             axis += dataSrcRank;
         if (axis < 0 || axis >= dataSrcRank || batchDims > axis)
-            THROW_ERROR << "has incorrect input parameter axis value: " << axis;
+            THROW_CPU_NODE_ERR << "has incorrect input parameter axis value: " << axis;
     }
 }
 
@@ -283,19 +281,19 @@ bool Gather::needPrepareParams() const {
 void Gather::prepareParams() {
     auto& dataMemPtr = getParentEdgeAt(GATHER_DATA)->getMemoryPtr();
     if (!dataMemPtr || !dataMemPtr->isAllocated())
-        THROW_ERROR << " has not allocated input data memory.";
+        THROW_CPU_NODE_ERR << " has not allocated input data memory.";
     auto& idxMemPtr = getParentEdgeAt(GATHER_INDICES)->getMemoryPtr();
     if (!idxMemPtr || !idxMemPtr->isAllocated())
-        THROW_ERROR << " has not allocated input indices memory.";
+        THROW_CPU_NODE_ERR << " has not allocated input indices memory.";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        THROW_ERROR << " has unidentified preferable primitive descriptor.";
+        THROW_CPU_NODE_ERR << " has unidentified preferable primitive descriptor.";
 
     if (!isAxisInputConst) {
         axis = (reinterpret_cast<const int32_t*>(getParentEdgeAt(GATHER_AXIS)->getMemoryPtr()->GetPtr()))[0];
         if (axis < 0)
             axis += dataSrcRank;
         if (axis < 0 || axis >= dataSrcRank || batchDims > axis)
-            THROW_ERROR << "has incorrect input parameter axis value: " << axis;
+            THROW_CPU_NODE_ERR << "has incorrect input parameter axis value: " << axis;
     }
 
     if (!isDataShapeStat || !isAxisInputConst) {
@@ -455,7 +453,7 @@ void Gather::executeDynamicImpl(dnnl::stream strm) {
 
 void Gather::initShortParams(threadExecParams& p, const uint64_t start) {
     if (!jitKernel)
-        THROW_ERROR << "has uninitialized kernel in function initShortParams.";
+        THROW_CPU_NODE_ERR << "has uninitialized kernel in function initShortParams.";
     const uint64_t idxElPerVec = jitKernel->getIdxElPerVec();
 
     if (afterAxisSize == 1) { // Elementwise gather.

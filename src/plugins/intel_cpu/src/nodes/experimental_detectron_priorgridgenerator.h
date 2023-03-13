@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
 
 namespace ov {
@@ -13,7 +12,7 @@ namespace node {
 
 class ExperimentalDetectronPriorGridGenerator : public Node {
 public:
-    ExperimentalDetectronPriorGridGenerator(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    ExperimentalDetectronPriorGridGenerator(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -22,7 +21,7 @@ public:
 
     bool needPrepareParams() const override;
     void executeDynamicImpl(dnnl::stream strm) override { execute(strm); }
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
     // Inputs:
@@ -42,8 +41,6 @@ private:
     int grid_h_;
     float stride_w_;
     float stride_h_;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

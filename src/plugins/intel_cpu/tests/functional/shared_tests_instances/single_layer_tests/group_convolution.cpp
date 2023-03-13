@@ -30,14 +30,14 @@ const auto groupConv1DParams_ExplicitPadding = ::testing::Combine(
     ::testing::ValuesIn(padBegins1d), ::testing::ValuesIn(padEnds1d),
     ::testing::ValuesIn(dilations1d), ::testing::ValuesIn(numOutChannels1d),
     ::testing::ValuesIn(numGroups1d),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT));
+    ::testing::Values(ov::op::PadType::EXPLICIT));
 const auto groupConv1DParams_AutoPadValid = ::testing::Combine(
     ::testing::ValuesIn(kernels1d), ::testing::ValuesIn(strides1d),
     ::testing::Values(std::vector<ptrdiff_t>({0})),
     ::testing::Values(std::vector<ptrdiff_t>({0})),
     ::testing::ValuesIn(dilations1d), ::testing::ValuesIn(numOutChannels1d),
     ::testing::ValuesIn(numGroups1d),
-    ::testing::Values(ngraph::op::PadType::VALID));
+    ::testing::Values(ov::op::PadType::VALID));
 
 INSTANTIATE_TEST_SUITE_P(
     smoke_GroupConvolution1D_ExplicitPadding, GroupConvolutionLayerTest,
@@ -78,14 +78,14 @@ const auto groupConv2DParams_ExplicitPadding = ::testing::Combine(
     ::testing::ValuesIn(padBegins), ::testing::ValuesIn(padEnds),
     ::testing::ValuesIn(dilations), ::testing::ValuesIn(numOutChannels),
     ::testing::ValuesIn(numGroups),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT));
+    ::testing::Values(ov::op::PadType::EXPLICIT));
 const auto groupConv2DParams_AutoPadValid = ::testing::Combine(
     ::testing::ValuesIn(kernels), ::testing::ValuesIn(strides),
     ::testing::Values(std::vector<ptrdiff_t>({0, 0})),
     ::testing::Values(std::vector<ptrdiff_t>({0, 0})),
     ::testing::ValuesIn(dilations), ::testing::ValuesIn(numOutChannels),
     ::testing::ValuesIn(numGroups),
-    ::testing::Values(ngraph::op::PadType::VALID));
+    ::testing::Values(ov::op::PadType::VALID));
 
 INSTANTIATE_TEST_SUITE_P(
     smoke_GroupConvolution2D_ExplicitPadding, GroupConvolutionLayerTest,
@@ -122,13 +122,13 @@ const auto groupConv3DParams_ExplicitPadding = ::testing::Combine(
     ::testing::ValuesIn(kernels3d), ::testing::ValuesIn(strides3d),
     ::testing::ValuesIn(paddings3d), ::testing::ValuesIn(paddings3d),
     ::testing::ValuesIn(dilations3d), ::testing::Values(4),
-    ::testing::Values(2), ::testing::Values(ngraph::op::PadType::EXPLICIT));
+    ::testing::Values(2), ::testing::Values(ov::op::PadType::EXPLICIT));
 const auto groupConv3DParams_AutoPadValid = ::testing::Combine(
     ::testing::ValuesIn(kernels3d), ::testing::ValuesIn(strides3d),
     ::testing::Values(std::vector<ptrdiff_t>({0, 0, 0})),
     ::testing::Values(std::vector<ptrdiff_t>({0, 0, 0})),
     ::testing::ValuesIn(dilations3d), ::testing::Values(4),
-    ::testing::Values(2), ::testing::Values(ngraph::op::PadType::VALID));
+    ::testing::Values(2), ::testing::Values(ov::op::PadType::VALID));
 
 INSTANTIATE_TEST_SUITE_P(
     smoke_GroupConvolution3D_ExplicitPadding, GroupConvolutionLayerTest,

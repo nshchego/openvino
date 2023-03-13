@@ -17,7 +17,7 @@ class MatmulStridedInputsOutputsTest : public testing::WithParamInterface<Matmul
                                        public CPUTestsBase,
                                        virtual public LayerTestsUtils::LayerTestsCommon {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<MatmulStridedInputsOutputsTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<MatmulStridedInputsOutputsTestParams> &obj) {
         Precision netPrecision;
         netPrecision = obj.param;
 
@@ -36,25 +36,25 @@ protected:
 
         SizeVector splitShape{1, 2, 1, 16};
         auto splitInputParams = builder::makeParams(ngPrec, {splitShape});
-        const auto splitOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(splitInputParams));
+        const auto splitOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(splitInputParams));
         const auto split = builder::makeSplit(splitOutputNodes[0], ngPrec, 2 /* splits */, 1 /* 2nd axis */);
 
         std::vector<SizeVector> concatShapes{{1, 1, 8, 8}, {1, 1, 8, 8}};
         auto concatInputParams = builder::makeParams(ngPrec, {concatShapes});
-        const auto concatOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(concatInputParams));
+        const auto concatOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(concatInputParams));
         const auto concat = builder::makeConcat(concatOutputNodes, 2);
 
         const auto matMul1 = builder::makeMatMul(split->output(0), concat, false, false);
 
         SizeVector matmulShape{1, 1, 16, 8};
         auto matmulInputParams = builder::makeParams(ngPrec, {matmulShape});
-        const auto matmulOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<op::Parameter>(matmulInputParams));
+        const auto matmulOutputNodes = helpers::convert2OutputVector(helpers::castOps2Nodes<ov::op::v0::Parameter>(matmulInputParams));
 
         const auto matMul2 = builder::makeMatMul(split->output(1), matmulOutputNodes[0], false, false);
 
         const auto concatMatMuls = builder::makeConcat({matMul1, matMul2}, 2 /* 3rd axis */);
 
-        ngraph::ParameterVector inputParams = {splitInputParams[0], concatInputParams[0], concatInputParams[1], matmulInputParams[0]};
+        ov::ParameterVector inputParams = {splitInputParams[0], concatInputParams[0], concatInputParams[1], matmulInputParams[0]};
         function = makeNgraphFunction(ngPrec, inputParams, concatMatMuls, "MatmulStridedInputsOutputs");
     }
 };
