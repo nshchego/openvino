@@ -60,7 +60,7 @@ template<typename CallArgs>
 void JitReduceKernelBase<CallArgs>::horiz_pd(const Xmm &xmm, const Operand &op) {
     switch (jcp.reduce_mode) {
         case Algorithm::ReduceAnd:
-            vandpd(xmm, xmm, op);
+            uni_vandpd(xmm, xmm, op);
             break;
         case Algorithm::ReduceL1:
         case Algorithm::ReduceL2:
@@ -72,16 +72,16 @@ void JitReduceKernelBase<CallArgs>::horiz_pd(const Xmm &xmm, const Operand &op) 
             vaddpd(xmm, xmm, op);
             break;
         case Algorithm::ReduceMax:
-            vmaxpd(xmm, xmm, op);
+            uni_vmaxpd(xmm, xmm, op);
             break;
         case Algorithm::ReduceMin:
-            vminpd(xmm, xmm, op);
+            uni_vminpd(xmm, xmm, op);
             break;
         case Algorithm::ReduceOr:
-            vorpd(xmm, xmm, op);
+            uni_vorpd(xmm, xmm, op);
             break;
         case Algorithm::ReduceProd:
-            vmulpd(xmm, xmm, op);
+            uni_vmulpd(xmm, xmm, op);
             break;
         default:
             IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
@@ -736,102 +736,185 @@ void JitReduceKernel<isa>::reduce_main_loop() {
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_kernel(const Vmm &vmm_src, const Vmm &vmm_dst) {
-    switch (jcp.reduce_mode) {
-        case Algorithm::ReduceAnd:
-            if (isa == x64::avx512_core) {
-                vcmpps(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
-                vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux);
-            } else {
-                uni_cmpneqps(vmm_src, vmm_src, vmm_zero);
-            }
-            uni_vandps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceL1:
-            uni_vandps(vmm_src, vmm_src, vmm_aux);
-            uni_vaddps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceLogSum:
-        case Algorithm::ReduceMean:
-        case Algorithm::ReduceSum:
-            if (exec_prc == Precision::FP32) {
+    if (exec_prc == Precision::FP32) {
+        switch (jcp.reduce_mode) {
+            case Algorithm::ReduceAnd:
+                if (isa == x64::avx512_core) {
+                    vcmpps(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
+                    vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux);
+                } else {
+                    uni_cmpneqps(vmm_src, vmm_src, vmm_zero);
+                }
+                uni_vandps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceL1:
+                uni_vandps(vmm_src, vmm_src, vmm_aux);
                 uni_vaddps(vmm_dst, vmm_dst, vmm_src);
-            } else if (exec_prc == Precision::FP64) {
-                vaddpd(vmm_dst, vmm_dst, vmm_src);
-            }
-            break;
-        case Algorithm::ReduceMax:
-            uni_vmaxps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceMin:
-            uni_vminps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceL2:
-        case Algorithm::ReduceSumSquare:
-            uni_vmulps(vmm_src, vmm_src, vmm_src);
-            uni_vaddps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceLogSumExp:
-            exp_injector->compute_vector_range(vmm_src.getIdx(), vmm_src.getIdx() + 1);
-            uni_vaddps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceOr:
-            if (isa == x64::avx512_core) {
-                vcmpps(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
-                vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux);
-            }
-            uni_vorps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        case Algorithm::ReduceProd:
-            uni_vmulps(vmm_dst, vmm_dst, vmm_src);
-            break;
-        default:
-            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
-    }
+                break;
+            case Algorithm::ReduceLogSum:
+            case Algorithm::ReduceMean:
+            case Algorithm::ReduceSum:
+                uni_vaddps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceMax:
+                uni_vmaxps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceMin:
+                uni_vminps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceL2:
+            case Algorithm::ReduceSumSquare:
+                uni_vmulps(vmm_src, vmm_src, vmm_src);
+                uni_vaddps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceLogSumExp:
+                exp_injector->compute_vector_range(vmm_src.getIdx(), vmm_src.getIdx() + 1);
+                uni_vaddps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceOr:
+                if (isa == x64::avx512_core) {
+                    vcmpps(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
+                    vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux);
+                }
+                uni_vorps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceProd:
+                uni_vmulps(vmm_dst, vmm_dst, vmm_src);
+                break;
+            default:
+                IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+        }
+    } else if (exec_prc == Precision::FP64) {
+        switch (jcp.reduce_mode) {
+            case Algorithm::ReduceAnd:
+                if (isa == x64::avx512_core) {
+                    vcmppd(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
+                    vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux); // TODO
+                } else {
+                    uni_vcmppd(vmm_src, vmm_src, vmm_zero, _cmp_neq_uq);
+                }
+                uni_vandpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceL1:
+                uni_vandpd(vmm_src, vmm_src, vmm_aux);
+                uni_vaddpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceLogSum:
+            case Algorithm::ReduceMean:
+            case Algorithm::ReduceSum:
+                uni_vaddpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceMax:
+                uni_vmaxpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceMin:
+                uni_vminpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceL2:
+            case Algorithm::ReduceSumSquare:
+                uni_vmulpd(vmm_src, vmm_src, vmm_src);
+                uni_vaddpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceLogSumExp:
+                exp_injector->compute_vector_range(vmm_src.getIdx(), vmm_src.getIdx() + 1);
+                uni_vaddpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceOr:
+                if (isa == x64::avx512_core) {
+                    vcmppd(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
+                    vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux);
+                }
+                uni_vorpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            case Algorithm::ReduceProd:
+                uni_vmulpd(vmm_dst, vmm_dst, vmm_src);
+                break;
+            default:
+                IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+        }
+    } 
 }
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_kernel_scalar(const Xmm &xmm_src, const Xmm &xmm_dst) {
-    switch (jcp.reduce_mode) {
-        case Algorithm::ReduceAnd:
-            uni_cmpneqps(xmm_src, xmm_src, xmm_zero);
-            uni_vandps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceL1:
-            uni_vandps(xmm_src, xmm_src, xmm_aux);
-            uni_vaddps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceLogSum:
-        case Algorithm::ReduceMean:
-        case Algorithm::ReduceSum:
-            if (exec_prc == Precision::FP32) {
+    if (exec_prc == Precision::FP32) {
+        switch (jcp.reduce_mode) {
+            case Algorithm::ReduceAnd:
+                uni_cmpneqps(xmm_src, xmm_src, xmm_zero);
+                uni_vandps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceL1:
+                uni_vandps(xmm_src, xmm_src, xmm_aux);
                 uni_vaddps(xmm_dst, xmm_dst, xmm_src);
-            } else if (exec_prc == Precision::FP64) {
-                vaddpd(xmm_dst, xmm_dst, xmm_src);
-            }
-            break;
-        case Algorithm::ReduceMax:
-            uni_vmaxps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceMin:
-            uni_vminps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceL2:
-        case Algorithm::ReduceSumSquare:
-            uni_vmulps(xmm_src, xmm_src, xmm_src);
-            uni_vaddps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceLogSumExp:
-            exp_injector->compute_vector_range(xmm_src.getIdx(), xmm_src.getIdx() + 1);
-            uni_vaddps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceOr:
-            uni_vorps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        case Algorithm::ReduceProd:
-            uni_vmulps(xmm_dst, xmm_dst, xmm_src);
-            break;
-        default:
-            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+                break;
+            case Algorithm::ReduceLogSum:
+            case Algorithm::ReduceMean:
+            case Algorithm::ReduceSum:
+                uni_vaddps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceMax:
+                uni_vmaxps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceMin:
+                uni_vminps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceL2:
+            case Algorithm::ReduceSumSquare:
+                uni_vmulps(xmm_src, xmm_src, xmm_src);
+                uni_vaddps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceLogSumExp:
+                exp_injector->compute_vector_range(xmm_src.getIdx(), xmm_src.getIdx() + 1);
+                uni_vaddps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceOr:
+                uni_vorps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceProd:
+                uni_vmulps(xmm_dst, xmm_dst, xmm_src);
+                break;
+            default:
+                IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+        }
+    } else if (exec_prc == Precision::FP64) {
+        switch (jcp.reduce_mode) {
+            case Algorithm::ReduceAnd:
+                uni_vcmppd(xmm_src, xmm_src, xmm_zero, _cmp_neq_uq);
+                uni_vandpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceL1:
+                uni_vandpd(xmm_src, xmm_src, xmm_aux);
+                uni_vaddpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceLogSum:
+            case Algorithm::ReduceMean:
+            case Algorithm::ReduceSum:
+                uni_vaddpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceMax:
+                uni_vmaxpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceMin:
+                uni_vminpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceL2:
+            case Algorithm::ReduceSumSquare:
+                uni_vmulpd(xmm_src, xmm_src, xmm_src);
+                uni_vaddpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceLogSumExp:
+                exp_injector->compute_vector_range(xmm_src.getIdx(), xmm_src.getIdx() + 1);
+                uni_vaddpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceOr:
+                uni_vorpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            case Algorithm::ReduceProd:
+                uni_vmulpd(xmm_dst, xmm_dst, xmm_src);
+                break;
+            default:
+                IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+        }
     }
 }
 
@@ -960,12 +1043,12 @@ void JitReduceKernel<isa>::horiz_store_pd(const Xmm &xmm_dst, const Precision &d
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::prepare_aux_table() {
-    auto broadcast_int32 = [&](int32_t val) {
+    auto broadcast_int32 = [&](uint32_t val) {
         for (size_t d = 0; d < vlen / exec_prc.size(); ++d) {
             dd(val);
         }
     };
-    auto broadcast_int64 = [&](int64_t val) {
+    auto broadcast_int64 = [&](uint64_t val) {
         for (size_t d = 0; d < vlen / exec_prc.size(); ++d) {
             dq(val);
         }
@@ -1036,10 +1119,6 @@ void JitReducePostKernel<isa>::generate() {
         mov(reg_oc_off, ptr[reg_params + GET_OFF_POST(oc_off)]);
     }
 
-//    if (isa == x64::avx512_core) {
-//        uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
-//    }
-
     if (jcp.layout == ReduceLayoutType::reduce_blocked) {
         reduce_post_main();
     } else if (jcp.layout == ReduceLayoutType::reduce_nspc && attr.post_ops_.len() != 0) {
@@ -1072,7 +1151,7 @@ void JitReducePostKernel<isa>::generate() {
         uni_vcvtneps2bf16->emit_data();
     }
 
-    if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
+    if (one_of(jcp.reduce_mode, Algorithm::ReduceLogSum, Algorithm::ReduceLogSumExp)) {
         log_injector->prepare_table();
     }
 
@@ -1357,11 +1436,15 @@ void JitReducePostKernel<isa>::reduce_map_kernel(const Vmm &vmm_dst) {
         if (exec_prc == Precision::FP32) {
             uni_vdivps(vmm_dst, vmm_dst, vmm_aux);
         } else if (exec_prc == Precision::FP64) {
-            vdivpd(vmm_dst, vmm_dst, vmm_aux);
+            uni_vdivpd(vmm_dst, vmm_dst, vmm_aux);
         }
     } else if (jcp.reduce_mode == Algorithm::ReduceL2) {
-        uni_vsqrtps(vmm_dst, vmm_dst);
-    } else if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
+        if (exec_prc == Precision::FP32) {
+            uni_vsqrtps(vmm_dst, vmm_dst);
+        } else if (exec_prc == Precision::FP64) {
+            uni_vsqrtpd(vmm_dst, vmm_dst);
+        }
+    } else if (one_of(jcp.reduce_mode, Algorithm::ReduceLogSum, Algorithm::ReduceLogSumExp)) {
         log_injector->compute_vector_range(vmm_dst.getIdx(), vmm_dst.getIdx() + 1);
     }
 }
@@ -1372,11 +1455,15 @@ void JitReducePostKernel<isa>::reduce_map_kernel_scalar(const Xmm &xmm_dst) {
         if (exec_prc == Precision::FP32) {
             uni_vdivps(xmm_dst, xmm_dst, xmm_aux);
         } else if (exec_prc == Precision::FP64) {
-            vdivpd(xmm_dst, xmm_dst, xmm_aux);
+            uni_vdivpd(xmm_dst, xmm_dst, xmm_aux);
         }
     } else if (jcp.reduce_mode == Algorithm::ReduceL2) {
-        uni_vsqrtps(xmm_dst, xmm_dst);
-    } else if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
+        if (exec_prc == Precision::FP32) {
+            uni_vsqrtps(xmm_dst, xmm_dst);
+        } else if (exec_prc == Precision::FP64) {
+            uni_vsqrtpd(xmm_dst, xmm_dst);
+        }
+    } else if (one_of(jcp.reduce_mode, Algorithm::ReduceLogSum, Algorithm::ReduceLogSumExp)) {
         log_injector->compute_vector_range(xmm_dst.getIdx(), xmm_dst.getIdx() + 1);
     }
 }
@@ -1413,7 +1500,7 @@ void JitReducePostKernel<x64::avx512_core>::horiz_reduce_store_pd(const Zmm &zmm
     vextractf128(xmm_aux2, ymm_aux1, 1);
     horiz_pd(xmm_aux1, xmm_aux2);
     if (one_of(jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
-               Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
+                                Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
         vhaddpd(xmm_aux1, xmm_aux1, xmm_aux1);
     } else {
         uni_vmovhlps(xmm_aux2, xmm_aux2, xmm_aux1);

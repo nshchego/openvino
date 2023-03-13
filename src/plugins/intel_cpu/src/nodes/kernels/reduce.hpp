@@ -195,19 +195,19 @@ private:
     void prepare_aux_table();
 
     const struct aux_vals_type {
-        int float_one = 0x3f800000; // 1.0f
-        int float_abs = 0x7fffffff; // mask to make positive
-        int float_min = 0xff7fffff; // float minimum
-        int float_max = 0x7f7fffff; // float maximum
-        int int32_min = 0xcf000000; // -2^31 presented in float
-        int int32_max = 0x4effffff; // 2^31-1 presented in float
+        uint32_t float_one = 0x3f800000; // 1.0f
+        uint32_t float_abs = 0x7fffffff; // mask to make positive
+        uint32_t float_min = 0xff7fffff; // float lowest
+        uint32_t float_max = 0x7f7fffff; // float maximum
+        uint32_t int32_min = 0xcf000000; // -2^31 presented in float
+        uint32_t int32_max = 0x4effffff; // 2^31-1 presented in float
 
-        int64_t double_one = 0x3ff0000000000000; // 1.0
-        int64_t double_abs = 0x7fffffffffffffff; // mask to make positive
-        int64_t double_min = 0x0010000000000000; // double minimum
-        int64_t double_max = 0x7fefffffffffffff; // double maximum
-        int64_t int64_min  = 0xcf00000000000000; // -2^31 presented in float
-        int64_t int64_max  = 0x4effffffffffffff; // 2^31-1 presented in float
+        uint64_t double_one = 0x3ff0000000000000; // 1.0
+        uint64_t double_abs = 0x7fffffffffffffff; // mask to make positive
+        uint64_t double_min = 0xffefffffffffffff; // double lowest
+        uint64_t double_max = 0x7fefffffffffffff; // double maximum
+        uint64_t int64_min  = 0xc3e0000000000000; // lowest int64 presented in double
+        uint64_t int64_max  = 0x43dfffffffffffff; // max int64 presented in double
     } aux_vals;
 };
 

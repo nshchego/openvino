@@ -16,18 +16,16 @@ namespace intel_cpu {
 
 uint8_t DnnlExtensionUtils::sizeOfDataType(memory::data_type dataType) {
     switch (dataType) {
-    case memory::data_type::f32:
-        return 4;
-    case memory::data_type::s32:
-        return 4;
+    case memory::data_type::f64:
     case memory::data_type::s64:
         return 8;
+    case memory::data_type::f32:
+    case memory::data_type::s32:
+        return 4;
     case memory::data_type::bf16:
         return 2;
     case memory::data_type::s8:
-        return 1;
     case memory::data_type::u8:
-        return 1;
     case memory::data_type::bin:
         return 1;
     case memory::data_type::undef:
@@ -39,6 +37,10 @@ uint8_t DnnlExtensionUtils::sizeOfDataType(memory::data_type dataType) {
 
 memory::data_type DnnlExtensionUtils::IEPrecisionToDataType(const InferenceEngine::Precision& prec) {
     switch (prec) {
+        case InferenceEngine::Precision::FP64:
+            return memory::data_type::f64;
+        case InferenceEngine::Precision::I64:
+            return memory::data_type::s64;
         case InferenceEngine::Precision::FP32:
             return memory::data_type::f32;
         case InferenceEngine::Precision::I32:
@@ -52,10 +54,6 @@ memory::data_type DnnlExtensionUtils::IEPrecisionToDataType(const InferenceEngin
             return memory::data_type::u8;
         case InferenceEngine::Precision::BIN:
             return memory::data_type::bin;
-        case InferenceEngine::Precision::I64:
-            return memory::data_type::s64;
-        case InferenceEngine::Precision::FP64:
-            return memory::data_type::f64;
         case InferenceEngine::Precision::UNSPECIFIED:
             return memory::data_type::undef;
         default: {
@@ -66,14 +64,14 @@ memory::data_type DnnlExtensionUtils::IEPrecisionToDataType(const InferenceEngin
 
 InferenceEngine::Precision DnnlExtensionUtils::DataTypeToIEPrecision(memory::data_type dataType) {
     switch (dataType) {
-        case memory::data_type::f32:
-            return InferenceEngine::Precision::FP32;
         case memory::data_type::f64:
             return InferenceEngine::Precision::FP64;
-        case memory::data_type::s32:
-            return InferenceEngine::Precision::I32;
         case memory::data_type::s64:
             return InferenceEngine::Precision::I64;
+        case memory::data_type::f32:
+            return InferenceEngine::Precision::FP32;
+        case memory::data_type::s32:
+            return InferenceEngine::Precision::I32;
         case memory::data_type::bf16:
             return InferenceEngine::Precision::BF16;
         case memory::data_type::s8:

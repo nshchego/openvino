@@ -6,8 +6,9 @@
 
 #include <node.h>
 #include "kernels/reduce.hpp"
-#include <string>
+
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace ov {
@@ -74,7 +75,7 @@ private:
     size_t OB, OC, OD, OH, OW;
     size_t PD, PW;
     size_t srcDataSize, dstDataSize, prcDataSize;
-    size_t reduce_stride;
+    size_t reduceStride;
     kernel::ReduceLayoutType layout;
     InferenceEngine::Precision outputPrc;
     InferenceEngine::SizeVector srcDims;

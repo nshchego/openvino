@@ -94,6 +94,17 @@ void JitKernelBase::uni_vpaddd(const Ymm& vDst,
     }
 }
 
+void JitKernelBase::uni_vaddpd(const Xmm &vDst, const Operand &op1, const Operand &op2) {
+    if (isValidIsa(x64::avx)) {
+        vaddpd(vDst, op1, op2);
+    } else {
+        if (vDst.getIdx() != op1.getIdx()) {
+            movupd(vDst, op1);
+        }
+        addpd(vDst, op2);
+    }
+}
+
 void JitKernelBase::uni_vpsubd(const Ymm& vDst,
                                const Ymm& vSrc,
                                const Operand& op) {
@@ -128,6 +139,19 @@ void JitKernelBase::uni_vpsubd(const Ymm& vDst,
     }
 }
 
+void JitKernelBase::uni_vmulpd(const Xmm& vDst,
+                               const Operand& op1,
+                               const Operand& op2) {
+    if (isValidIsa(x64::avx)) {
+        vmulpd(vDst, op1, op2);
+    } else {
+        if (vDst.getIdx() != op1.getIdx()) {
+            movupd(vDst, op1);
+        }
+        mulpd(vDst, op2);
+    }
+}
+
 void JitKernelBase::uni_vdivps(const Xmm& vDst,
                                const Operand& op1,
                                const Operand& op2) {
@@ -138,6 +162,27 @@ void JitKernelBase::uni_vdivps(const Xmm& vDst,
             movups(vDst, op1);
         }
         divps(vDst, op2);
+    }
+}
+
+void JitKernelBase::uni_vdivpd(const Xmm& vDst,
+                               const Operand& op1,
+                               const Operand& op2) {
+    if (isValidIsa(x64::avx)) {
+        vdivpd(vDst, op1, op2);
+    } else {
+        if (vDst.getIdx() != op1.getIdx()) {
+            movupd(vDst, op1);
+        }
+        divpd(vDst, op2);
+    }
+}
+
+void JitKernelBase::uni_vsqrtpd(const Xmm &vDst, const Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vsqrtpd(vDst, op);
+    } else {
+        sqrtpd(vDst, op);
     }
 }
 
@@ -167,6 +212,32 @@ void JitKernelBase::uni_vandpd(const Xmm& vDst,
     }
 }
 
+void JitKernelBase::uni_vandnps(const Xmm& vDst,
+                                const Xmm& vSrs,
+                                const Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vandnps(vDst, vSrs, op);
+    } else {
+        if (!vDst.isEqualIfNotInherited(vSrs)) {
+            movups(vDst, vSrs);
+        }
+        andnps(vDst, op);
+    }
+}
+
+void JitKernelBase::uni_vorpd(const Xmm& vDst,
+                              const Xmm& vSrs,
+                              const Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vorpd(vDst, vSrs, op);
+    } else {
+        if (vDst.getIdx() != vSrs.getIdx()) {
+            movupd(vDst, vSrs);
+        }
+        orpd(vDst, op);
+    }
+}
+
 void JitKernelBase::uni_vcmppd(const Xmm &vDst,
                                const Xmm &vSrs,
                                const Operand &op,
@@ -181,16 +252,25 @@ void JitKernelBase::uni_vcmppd(const Xmm &vDst,
     }
 }
 
-void JitKernelBase::uni_vandnps(const Xmm& vDst,
-                                const Xmm& vSrs,
-                                const Operand &op) {
+void JitKernelBase::uni_vmaxpd(const Xmm &vDst, const Operand &op1, const Operand &op2) {
     if (isValidIsa(x64::avx)) {
-        vandnps(vDst, vSrs, op);
+        vmaxpd(vDst, op1, op2);
     } else {
-        if (!vDst.isEqualIfNotInherited(vSrs)) {
-            movups(vDst, vSrs);
+        if (vDst.getIdx() != op1.getIdx()) {
+            movupd(vDst, op1);
         }
-        andnps(vDst, op);
+        maxpd(vDst, op2);
+    }
+}
+
+void JitKernelBase::uni_vminpd(const Xmm &vDst, const Operand &op1, const Operand &op2) {
+    if (isValidIsa(x64::avx)) {
+        vminpd(vDst, op1, op2);
+    } else {
+        if (vDst.getIdx() != op1.getIdx()) {
+            movupd(vDst, op1);
+        }
+        minpd(vDst, op2);
     }
 }
 
