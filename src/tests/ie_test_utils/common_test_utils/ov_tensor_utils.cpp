@@ -237,6 +237,21 @@ void compare(const ov::Tensor& expected,
     double abs_threshold = abs_threshold_;
     double rel_threshold = rel_threshold_;
     size_t shape_size_cnt = shape_size(expected_shape);
+  std::cout << "COMPARE: " << std::endl;
+  std::cout << "EXPECTED: " << std::endl;
+  for (int i = 0; i < shape_size_cnt; i++) {
+      if (i != 0 && i % 8  == 0)
+          std::cout << "| ";
+      std::cout << expected_data[i] << "; ";
+  }
+  std::cout << std::endl;
+  std::cout << "ACTUAL: " << std::endl;
+  for (int i = 0; i < shape_size_cnt; i++) {
+      if (i != 0 && i % 8  == 0)
+          std::cout << "| ";
+      std::cout << actual_data[i] << "; ";
+  }
+  std::cout << std::endl;
     if (abs_threshold == std::numeric_limits<double>::max() && rel_threshold == std::numeric_limits<double>::max()) {
         if (sizeof(ExpectedT) == 1 || sizeof(ActualT) == 1) {
             abs_threshold = 1.;
@@ -252,12 +267,12 @@ void compare(const ov::Tensor& expected,
             }
         }
     }
-    if (!std::isnan(abs_threshold)) {
-        std::cout << "[ COMPARATION ] rel_threshold: " << rel_threshold << std::endl;
-    }
-    if (!std::isnan(rel_threshold)) {
-        std::cout << "[ COMPARATION ] abs_threshold: " << abs_threshold << std::endl;
-    }
+//    if (!std::isnan(abs_threshold)) {
+//        std::cout << "[ COMPARATION ] rel_threshold: " << rel_threshold << std::endl;
+//    }
+//    if (!std::isnan(rel_threshold)) {
+//        std::cout << "[ COMPARATION ] abs_threshold: " << abs_threshold << std::endl;
+//    }
 
     Error abs_error(abs_threshold), rel_error(rel_threshold);
     for (size_t i = 0; i < shape_size_cnt; ++i) {

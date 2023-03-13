@@ -26,47 +26,61 @@
 #include "ngraph/type.hpp"
 
 bool ov::op::util::is_unary_elementwise_arithmetic(const ov::Node* node) {
-    return dynamic_cast<const ov::op::util::UnaryElementwiseArithmetic*>(node) != nullptr;
+//    return dynamic_cast<const ov::op::util::UnaryElementwiseArithmetic*>(node) != nullptr;
+    return node->get_type_info() == ov::op::util::UnaryElementwiseArithmetic::get_type_info_static();
 }
 
 bool ov::op::util::is_binary_elementwise_arithmetic(const ov::Node* node) {
-    return dynamic_cast<const ov::op::util::BinaryElementwiseArithmetic*>(node) != nullptr;
+//    return dynamic_cast<const ov::op::util::BinaryElementwiseArithmetic*>(node) != nullptr;
+    return node->get_type_info() == ov::op::util::BinaryElementwiseArithmetic::get_type_info_static();
 }
 
 bool ov::op::util::is_binary_elementwise_comparison(const ov::Node* node) {
-    return dynamic_cast<const ov::op::util::BinaryElementwiseComparison*>(node) != nullptr;
+//    return dynamic_cast<const ov::op::util::BinaryElementwiseComparison*>(node) != nullptr;
+    return node->get_type_info() == ov::op::util::BinaryElementwiseComparison::get_type_info_static();
 }
 
 bool ov::op::util::is_binary_elementwise_logical(const ov::Node* node) {
-    return dynamic_cast<const ov::op::util::BinaryElementwiseLogical*>(node) != nullptr;
+//    return dynamic_cast<const ov::op::util::BinaryElementwiseLogical*>(node) != nullptr;
+    return node->get_type_info() == ov::op::util::BinaryElementwiseLogical::get_type_info_static();
 }
 
 bool ov::op::util::supports_auto_broadcast(const ov::Node* node) {
-    return dynamic_cast<const ngraph::op::v1::Select*>(node) != nullptr ||
-           dynamic_cast<const ngraph::op::v0::SquaredDifference*>(node) != nullptr ||
-           dynamic_cast<const ov::op::util::BinaryElementwiseComparison*>(node) != nullptr ||
-           dynamic_cast<const ov::op::util::BinaryElementwiseLogical*>(node) != nullptr ||
-           dynamic_cast<const ov::op::util::BinaryElementwiseArithmetic*>(node) != nullptr;
+   return dynamic_cast<const ngraph::op::v1::Select*>(node) != nullptr ||
+          dynamic_cast<const ngraph::op::v0::SquaredDifference*>(node) != nullptr ||
+          dynamic_cast<const ov::op::util::BinaryElementwiseComparison*>(node) != nullptr ||
+          dynamic_cast<const ov::op::util::BinaryElementwiseLogical*>(node) != nullptr ||
+          dynamic_cast<const ov::op::util::BinaryElementwiseArithmetic*>(node) != nullptr;
+    // return node->get_type_info() == ov::op::v1::Select::get_type_info_static() ||
+    //        node->get_type_info() == ov::op::v0::SquaredDifference::get_type_info_static() ||
+    //        node->get_type_info() == ov::op::util::BinaryElementwiseComparison::get_type_info_static() ||
+    //        node->get_type_info() == ov::op::util::BinaryElementwiseLogical::get_type_info_static() ||
+    //        node->get_type_info() == ov::op::util::BinaryElementwiseArithmetic::get_type_info_static();
 }
 
 bool ov::op::util::is_op(const ov::Node* node) {
-    return dynamic_cast<const ov::op::Op*>(node) != nullptr;
+//    return dynamic_cast<const ov::op::Op*>(node) != nullptr;
+    return node->get_type_info() == ov::op::Op::get_type_info_static();
 }
 
 bool ov::op::util::is_parameter(const ov::Node* node) {
-    return dynamic_cast<const ngraph::op::Parameter*>(node) != nullptr;
+//    return dynamic_cast<const ngraph::op::Parameter*>(node) != nullptr;
+    return node->get_type_info() == ov::op::v0::Parameter::get_type_info_static();
 }
 
 bool ov::op::util::is_output(const ov::Node* node) {
-    return dynamic_cast<const ngraph::op::Result*>(node) != nullptr;
+//    return dynamic_cast<const ngraph::op::Result*>(node) != nullptr;
+    return node->get_type_info() == ov::op::v0::Result::get_type_info_static();
 }
 
 bool ov::op::util::is_sink(const ov::Node* node) {
-    return dynamic_cast<const ngraph::op::Sink*>(node) != nullptr;
+//    return dynamic_cast<const ngraph::op::Sink*>(node) != nullptr;
+    return node->get_type_info() == ov::op::Sink::get_type_info_static();
 }
 
 bool ov::op::util::is_constant(const ov::Node* node) {
-    return dynamic_cast<const ngraph::op::Constant*>(node) != nullptr;
+//    return dynamic_cast<const ngraph::op::Constant*>(node) != nullptr;
+    return node->get_type_info() == ov::op::v0::Constant::get_type_info_static();
 }
 
 bool ov::op::util::is_commutative(const ov::Node* node) {
@@ -80,6 +94,16 @@ bool ov::op::util::is_commutative(const ov::Node* node) {
            dynamic_cast<const ngraph::op::v1::Minimum*>(node) != nullptr ||
            dynamic_cast<const ngraph::op::v1::Multiply*>(node) != nullptr ||
            dynamic_cast<const ngraph::op::v1::LogicalOr*>(node) != nullptr;
+//    return node->get_type_info() == ov::op::v1::Add::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::Maximum::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::Equal::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::NotEqual::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::LogicalAnd::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v0::Xor::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::LogicalXor::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::Minimum::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::Multiply::get_type_info_static() ||
+//           node->get_type_info() == ov::op::v1::LogicalOr::get_type_info_static();
 }
 
 bool ov::op::util::is_unary_elementwise_arithmetic(const std::shared_ptr<ov::Node>& node) {

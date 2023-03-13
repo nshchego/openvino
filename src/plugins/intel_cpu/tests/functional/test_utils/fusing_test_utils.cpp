@@ -64,10 +64,13 @@ void CpuTestWithFusing::CheckFusingResults(const std::shared_ptr<const ov::Model
         }
     }
     std::stringstream error_message;
-    error_message << "Node with types \"";
-    for (const auto& elem : nodeType)
-        error_message << elem << ", ";
-    error_message << "\" wasn't found";
+    if (!isNodeFound) {
+        error_message << "Node with types \"";
+        for (const auto& elem : nodeType) {
+            error_message << elem << ", ";
+        }
+        error_message << "\" wasn't found";
+    }
     ASSERT_TRUE(isNodeFound) << error_message.str();
 }
 
