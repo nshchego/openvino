@@ -184,7 +184,7 @@ TEST_P(ReduceCPULayerTest, CompareWithRefs) {
     CheckPluginRelatedResults(compiledModel, "Reduce");
 }
 namespace {
-const std::vector<ElementType> inpOutPrc = {ElementType::bf16, ElementType::f32};
+const std::vector<ElementType> inpOutPrc = {ElementType::bf16, ElementType::f32, ElementType::f64, ElementType::i64};
 
 const std::vector<bool> keepDims = {
         true,
@@ -635,13 +635,15 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 /* ================================ 2.1 Fusion - KeepDims ================================ */
+const std::vector<ElementType> inpOutPrcFusing = {ElementType::bf16, ElementType::f32, ElementType::f64};
+
 const auto params_OneAxis_fusing = testing::Combine(
         testing::Combine(
             testing::ValuesIn(axes),
             testing::ValuesIn(opTypes),
             testing::Values(true),
             testing::ValuesIn(reductionTypesFusing),
-            testing::ValuesIn(inpOutPrc),
+            testing::ValuesIn(inpOutPrcFusing),
             testing::Values(ElementType::undefined),
             testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
@@ -654,7 +656,7 @@ const auto params_MultiAxis_4D_fusing = testing::Combine(
                 testing::Values(CommonTestUtils::OpType::VECTOR),
                 testing::Values(true),
                 testing::ValuesIn(reductionTypesFusing),
-                testing::ValuesIn(inpOutPrc),
+                testing::ValuesIn(inpOutPrcFusing),
                 testing::Values(ElementType::undefined),
                 testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes)),
@@ -667,7 +669,7 @@ const auto params_MultiAxis_5D_fusing = testing::Combine(
                 testing::Values(CommonTestUtils::OpType::VECTOR),
                 testing::Values(true),
                 testing::ValuesIn(reductionTypesFusing),
-                testing::ValuesIn(inpOutPrc),
+                testing::ValuesIn(inpOutPrcFusing),
                 testing::Values(ElementType::undefined),
                 testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_5D)),
@@ -702,7 +704,7 @@ const auto params_OneAxis_fusing_KeepNoDims = testing::Combine(
             testing::ValuesIn(opTypes),
             testing::Values(false),
             testing::ValuesIn(reductionTypesFusing),
-            testing::ValuesIn(inpOutPrc),
+            testing::ValuesIn(inpOutPrcFusing),
             testing::Values(ElementType::undefined),
             testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
@@ -715,7 +717,7 @@ const auto params_MultiAxis_4D_Hybrid_fusing_KeepNoDims = testing::Combine(
             testing::Values(CommonTestUtils::OpType::VECTOR),
             testing::Values(false),
             testing::ValuesIn(reductionTypesFusing),
-            testing::ValuesIn(inpOutPrc),
+            testing::ValuesIn(inpOutPrcFusing),
             testing::Values(ElementType::undefined),
             testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
@@ -728,7 +730,7 @@ const auto params_MultiAxis_5D_Hybrid_fusing_KeepNoDims = testing::Combine(
             testing::Values(CommonTestUtils::OpType::VECTOR),
             testing::Values(false),
             testing::ValuesIn(reductionTypesFusing),
-            testing::ValuesIn(inpOutPrc),
+            testing::ValuesIn(inpOutPrcFusing),
             testing::Values(ElementType::undefined),
             testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes_5D)),

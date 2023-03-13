@@ -1,9 +1,8 @@
-// Copyright (C) 2020-2023 Intel Corporation
+// Copyright (C) 2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 
 
 #include "convert_precision_i64_i32.hpp"
-#include <openvino/core/rt_info.hpp>
 #include <openvino/opsets/opset10.hpp>
 #include "transformations/utils/utils.hpp"
 
@@ -23,6 +22,8 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
         ov::opset10::Multiply::get_type_info_static(),
         ov::opset10::NonMaxSuppression::get_type_info_static(),
         ov::opset10::Parameter::get_type_info_static(),
+        ov::opset10::ReduceL2::get_type_info_static(),
+        ov::opset10::ReduceLogicalAnd::get_type_info_static(),
         ov::opset10::ReduceMax::get_type_info_static(),
         ov::opset10::ReduceMean::get_type_info_static(),
         ov::opset10::ReduceMin::get_type_info_static(),
@@ -85,7 +86,7 @@ bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr
                     }
 
                     auto& convertTensor = convert->output(0).get_tensor();
-                    const std::string newName = ngraph::op::util::get_ie_output_name(output);
+                    const std::string newName = ov::op::util::get_ie_output_name(output);
                     if (ov::descriptor::get_ov_tensor_legacy_name(convertTensor).empty()) {
                         ov::descriptor::set_ov_tensor_legacy_name(convertTensor, newName);
                     }

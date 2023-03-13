@@ -32,21 +32,35 @@ public:
 
     void uni_vpaddd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
+    void uni_vaddpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+
     void uni_vpsubd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op) {
         jit_generator::uni_vpsubd(vDst, vSrc, op);
     }
 
     void uni_vpsubd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
+    void uni_vmulpd(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+
     void uni_vdivps(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+
+    void uni_vdivpd(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+
+    void uni_vsqrtpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op);
 
     void uni_vandps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
 
     void uni_vandpd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
 
-    void uni_vcmppd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op, const uint8_t imm);
-
     void uni_vandnps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+
+    void uni_vorpd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+
+    void uni_vcmppd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op, const uint8_t imm);
+    
+    void uni_vmaxpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+    
+    void uni_vminpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
         kmovd(kDst, kSrc);
