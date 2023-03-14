@@ -21,6 +21,7 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
         ov::opset10::Less::get_type_info_static(),
         ov::opset10::Multiply::get_type_info_static(),
         ov::opset10::NonMaxSuppression::get_type_info_static(),
+        ov::opset10::OneHot::get_type_info_static(),
         ov::opset10::Parameter::get_type_info_static(),
         ov::opset10::ReduceL2::get_type_info_static(),
         ov::opset10::ReduceLogicalAnd::get_type_info_static(),
