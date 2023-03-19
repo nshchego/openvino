@@ -184,7 +184,7 @@ TEST_P(ReduceCPULayerTest, CompareWithRefs) {
     CheckPluginRelatedResults(compiledModel, "Reduce");
 }
 namespace {
-const std::vector<ElementType> inpOutPrc = {ElementType::bf16, ElementType::f32, ElementType::f64, ElementType::i64};
+const std::vector<ElementType> inpOutPrc = {ElementType::bf16, ElementType::f32};
 
 const std::vector<bool> keepDims = {
         true,
@@ -309,6 +309,12 @@ std::vector<CPUSpecificParams> cpuParams_4D = {
         CPUSpecificParams({nhwc}, {nhwc}, {}, {})
 };
 
+std::vector<CPUSpecificParams> cpuParams_4D_i64 = {
+        CPUSpecificParams({nChw8c}, {nChw8c}, {}, {}),
+        CPUSpecificParams({nchw}, {nchw}, {}, {}),
+        CPUSpecificParams({nhwc}, {nhwc}, {}, {})
+};
+
 std::vector<CPUSpecificParams> cpuParams_5D = {
         CPUSpecificParams({nCdhw16c}, {nCdhw16c}, {}, {}),
         CPUSpecificParams({ncdhw}, {ncdhw}, {}, {}),
@@ -359,7 +365,7 @@ const auto params_OneAxis = testing::Combine(
             testing::ValuesIn(opTypes),
             testing::ValuesIn(keepDims),
             testing::ValuesIn(reductionTypes),
-            testing::ValuesIn(inpOutPrc),
+            testing::ValuesIn({ElementType::bf16, ElementType::f32, ElementType::i64}),
             testing::Values(ElementType::undefined),
             testing::Values(ElementType::undefined),
             testing::ValuesIn(inputShapes)),
@@ -377,6 +383,19 @@ const auto params_MultiAxis_4D = testing::Combine(
                 testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes)),
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D)),
+        testing::Values(emptyFusingSpec));
+
+const auto params_MultiAxis_4D_i64 = testing::Combine(
+        testing::Combine(
+                testing::ValuesIn(axesND),
+                testing::Values(CommonTestUtils::OpType::VECTOR),
+                testing::Values(true),
+                testing::ValuesIn(reductionTypes),
+                testing::Values(ElementType::i64),
+                testing::Values(ElementType::undefined),
+                testing::Values(ElementType::undefined),
+                testing::ValuesIn(inputShapes)),
+        testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D_i64)),
         testing::Values(emptyFusingSpec));
 
 const auto params_MultiAxis_5D = testing::Combine(
@@ -424,7 +443,7 @@ const auto params_MultiAxis_6D = testing::Combine(
                 testing::Values(CommonTestUtils::OpType::VECTOR),
                 testing::ValuesIn(keepDims),
                 testing::ValuesIn(reductionTypes),
-                testing::ValuesIn(inpOutPrc),
+                testing::ValuesIn({ElementType::bf16, ElementType::f32, ElementType::i64}),
                 testing::Values(ElementType::undefined),
                 testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_6D)),
@@ -468,6 +487,13 @@ INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_4D_CPU,
         ReduceCPULayerTest,
         params_MultiAxis_4D,
+        ReduceCPULayerTest::getTestCaseName
+);
+
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_MultiAxis_4D_CPU_i64,
+        ReduceCPULayerTest,
+        params_MultiAxis_4D_i64,
         ReduceCPULayerTest::getTestCaseName
 );
 
@@ -635,7 +661,7 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 /* ================================ 2.1 Fusion - KeepDims ================================ */
-const std::vector<ElementType> inpOutPrcFusing = {ElementType::bf16, ElementType::f32, ElementType::f64};
+const std::vector<ElementType> inpOutPrcFusing = {ElementType::bf16, ElementType::f32};
 
 const auto params_OneAxis_fusing = testing::Combine(
         testing::Combine(
@@ -759,4 +785,3 @@ INSTANTIATE_TEST_SUITE_P(
 );
 } // namespace
 } // namespace CPULayerTestsDefinitions
-

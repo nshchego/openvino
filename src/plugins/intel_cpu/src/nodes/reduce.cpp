@@ -271,39 +271,25 @@ void Reduce::initSupportedPrimitiveDescriptors() {
         if ((getInputShapeAtPort(REDUCE_DATA).getRank() == 4 || getInputShapeAtPort(REDUCE_DATA).getRank() == 5) &&
                 getInputShapeAtPort(REDUCE_DATA).getMinDims()[1] > 1) {
             if (keepDims) {
-                // pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, outputPrc, impl_type);
-                // if (x64::mayiuse(x64::avx512_core)) {
-                //     if (srcDataSize == 4) {
-                //         pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, outputPrc, impl_type);
-                //     } else if (srcDataSize == 8) {
-                //         pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
-                //     }
-                // } else if (srcDataSize == 4 && x64::mayiuse(x64::sse41)) {
-                //     pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
-                // }
+                pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, outputPrc, impl_type);
                 if (x64::mayiuse(x64::avx512_core)) {
-                    pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, outputPrc, impl_type);
-                    pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, outputPrc, impl_type);
-                } else if (x64::mayiuse(x64::sse41)) {
-                    pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    if (srcDataSize == 4) {
+                        pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    } else if (srcDataSize == 8) {
+                        pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    }
+                } else if (srcDataSize == 4 && x64::mayiuse(x64::sse41)) {
                     pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
                 }
             } else {
-                // pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                // if (x64::mayiuse(x64::avx512_core)) {
-                //     if (srcDataSize == 4) {
-                //         pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                //     } else if (srcDataSize == 8) {
-                //         pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                //     }
-                // } else if (srcDataSize == 4 && x64::mayiuse(x64::sse41)) {
-                //     pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                // }
+                pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
                 if (x64::mayiuse(x64::avx512_core)) {
-                    pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                    pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                } else if (x64::mayiuse(x64::sse41)) {
-                    pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    if (srcDataSize == 4) {
+                        pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    } else if (srcDataSize == 8) {
+                        pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    }
+                } else if (srcDataSize == 4 && x64::mayiuse(x64::sse41)) {
                     pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
                 }
             }
@@ -961,45 +947,45 @@ std::cout << std::endl;
 }
 
 inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
-//     const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
-//     if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
-//         parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
-//             uint8_t *out_p = out_ptr + (ob * OC + oc) * OD * OH * OW * dstDataSize;
-//             auto arg = JitReducePostCallArgs();
-//             arg.dst = static_cast<void *>(out_p);
-//             arg.oc_off = layout == ReduceLayoutType::reduce_nspc ? 0 : oc * sizeof(float);
-//             arg.channel_size = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
-//             arg.work_amount = OD * OH * OW;
-//             if (reducePostKernel->get_exec_prc() == Precision::FP32) {
-//                 const auto divisor = static_cast<float>(integerDivisor);
-//                 arg.divisor = &divisor;
-//             } else if (reducePostKernel->get_exec_prc() == Precision::FP64) {
-//                 const auto divisor = static_cast<double>(integerDivisor);
-//                 arg.divisor = &divisor;
-//             }
-//             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
-//             (*reducePostKernel)(&arg);
-//         });
-//     } else {
-//         size_t OCB = div_up(OC, blockLen);
-//         parallel_for2d(OB, OCB, [&](size_t ob, size_t ocb) {
-//             uint8_t *out_p = out_ptr + (ob * OCB + ocb) * OD * OH * OW * blockLen * dstDataSize;
-//             auto arg = JitReducePostCallArgs();
-//             arg.dst = static_cast<void *>(out_p);
-//             arg.reduce_c = ReduceC ? 1 : 0;
-//             arg.oc_off = ocb * blockLen * sizeof(float);
-//             arg.work_amount = OD * OH * OW * blockLen;
-//             if (reducePostKernel->get_exec_prc() == Precision::FP32) {
-//                 const auto divisor = static_cast<float>(integerDivisor);
-//                 arg.divisor = &divisor;
-//             } else if (reducePostKernel->get_exec_prc() == Precision::FP64) {
-//                 const auto divisor = static_cast<double>(integerDivisor);
-//                 arg.divisor = &divisor;
-//             }
-//             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
-//             (*reducePostKernel)(&arg);
-//         });
-//     }
+    const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
+    if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
+        parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
+            uint8_t *out_p = out_ptr + (ob * OC + oc) * OD * OH * OW * dstDataSize;
+            auto arg = JitReducePostCallArgs();
+            arg.dst = static_cast<void *>(out_p);
+            arg.oc_off = layout == ReduceLayoutType::reduce_nspc ? 0 : oc * sizeof(float);
+            arg.channel_size = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
+            arg.work_amount = OD * OH * OW;
+            if (reducePostKernel->get_exec_prc() == Precision::FP32) {
+                const auto divisor = static_cast<float>(integerDivisor);
+                arg.divisor = &divisor;
+            } else if (reducePostKernel->get_exec_prc() == Precision::FP64) {
+                const auto divisor = static_cast<double>(integerDivisor);
+                arg.divisor = &divisor;
+            }
+            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
+            (*reducePostKernel)(&arg);
+        });
+    } else {
+        size_t OCB = div_up(OC, blockLen);
+        parallel_for2d(OB, OCB, [&](size_t ob, size_t ocb) {
+            uint8_t *out_p = out_ptr + (ob * OCB + ocb) * OD * OH * OW * blockLen * dstDataSize;
+            auto arg = JitReducePostCallArgs();
+            arg.dst = static_cast<void *>(out_p);
+            arg.reduce_c = ReduceC ? 1 : 0;
+            arg.oc_off = ocb * blockLen * sizeof(float);
+            arg.work_amount = OD * OH * OW * blockLen;
+            if (reducePostKernel->get_exec_prc() == Precision::FP32) {
+                const auto divisor = static_cast<float>(integerDivisor);
+                arg.divisor = &divisor;
+            } else if (reducePostKernel->get_exec_prc() == Precision::FP64) {
+                const auto divisor = static_cast<double>(integerDivisor);
+                arg.divisor = &divisor;
+            }
+            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
+            (*reducePostKernel)(&arg);
+        });
+    }
 }
 
 void Reduce::nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
@@ -1173,7 +1159,7 @@ inline void Reduce::initDstData(uint8_t *out_ptr, size_t dst_size) {
         case Algorithm::ReduceMax:
             if (outputPrc == Precision::FP64) {
                 auto out_p = reinterpret_cast<double *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::lowest(); });
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<double>::lowest(); });
             } else if (outputPrc == Precision::FP32) {
                 auto out_p = reinterpret_cast<float *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::lowest(); });
@@ -1197,7 +1183,7 @@ inline void Reduce::initDstData(uint8_t *out_ptr, size_t dst_size) {
         case Algorithm::ReduceMin:
             if (outputPrc == Precision::FP64) {
                 auto out_p = reinterpret_cast<double *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::max(); });
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<double>::max(); });
             } else if (outputPrc == Precision::FP32) {
                 auto out_p = reinterpret_cast<float *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::max(); });
