@@ -11,6 +11,7 @@
 bool isNativelySupported(const ov::Node::type_info_t &type) {
     static const std::unordered_set<ov::Node::type_info_t> i64Ops = {
         ov::opset10::Add::get_type_info_static(),
+        ov::op::v1::Broadcast::get_type_info_static(),
         ov::opset10::Broadcast::get_type_info_static(),
         ov::opset10::Convert::get_type_info_static(),
         ov::opset10::Divide::get_type_info_static(),
