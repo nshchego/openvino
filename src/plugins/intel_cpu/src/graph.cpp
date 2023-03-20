@@ -1070,55 +1070,55 @@ void Graph::InferDynamic(InferRequestBase* request) {
 
     std::function<void(size_t)> updateNodes;
 
-#if (IE_THREAD == IE_THREAD_TBB || IE_THREAD == IE_THREAD_TBB_AUTO)
-    std::atomic<size_t> prepareCounter(0);
-    std::vector<std::atomic<uint8_t>> waveFrontCount(executableGraphNodes.size());
-    waveFrontCount.front().store(1);
-    for (size_t i = 1; i < waveFrontCount.size(); ++i) {
-        waveFrontCount[i].store(2);
-    }
+// #if (IE_THREAD == IE_THREAD_TBB || IE_THREAD == IE_THREAD_TBB_AUTO)
+//     std::atomic<size_t> prepareCounter(0);
+//     std::vector<std::atomic<uint8_t>> waveFrontCount(executableGraphNodes.size());
+//     waveFrontCount.front().store(1);
+//     for (size_t i = 1; i < waveFrontCount.size(); ++i) {
+//         waveFrontCount[i].store(2);
+//     }
 
-    tbb::task_group tg;
-    std::function<void(size_t, size_t)> updateShapes;
-    std::function<void(size_t, size_t)> updateDynParams;
+//     tbb::task_group tg;
+//     std::function<void(size_t, size_t)> updateShapes;
+//     std::function<void(size_t, size_t)> updateDynParams;
 
-    updateShapes = [&](size_t node_indx, size_t stop_indx) {
-        prepareCounter.store(node_indx);
-        if (node_indx >= stop_indx) {
-            return;
-        }
+//     updateShapes = [&](size_t node_indx, size_t stop_indx) {
+//         prepareCounter.store(node_indx);
+//         if (node_indx >= stop_indx) {
+//             return;
+//         }
 
-        const auto& node = executableGraphNodes[node_indx];
-        if (node->isDynamicNode()) {
-            node->updateShapes();
-        }
-        if (--waveFrontCount[node_indx] == 0) {
-            tg.run([=, &updateDynParams](){ updateDynParams(node_indx, stop_indx); });
-        }
-        updateShapes(node_indx + 1, stop_indx);
-    };
+//         const auto& node = executableGraphNodes[node_indx];
+//         if (node->isDynamicNode()) {
+//             node->updateShapes();
+//         }
+//         if (--waveFrontCount[node_indx] == 0) {
+//             tg.run([=, &updateDynParams](){ updateDynParams(node_indx, stop_indx); });
+//         }
+//         updateShapes(node_indx + 1, stop_indx);
+//     };
 
-    updateDynParams = [&](size_t node_indx, size_t stop_indx) {
-        if (node_indx >= stop_indx) {
-            prepareCounter.store(node_indx);
-            return;
-        }
+//     updateDynParams = [&](size_t node_indx, size_t stop_indx) {
+//         if (node_indx >= stop_indx) {
+//             prepareCounter.store(node_indx);
+//             return;
+//         }
 
-        const auto& node = executableGraphNodes[node_indx];
-        if (node->isDynamicNode()) {
-            node->updateDynamicParams();
-        }
-        if (node_indx + 1 < waveFrontCount.size() && --waveFrontCount[node_indx + 1] == 0) {
-            tg.run([=, &updateDynParams](){ updateDynParams(node_indx + 1, stop_indx); });
-        }
-    };
+//         const auto& node = executableGraphNodes[node_indx];
+//         if (node->isDynamicNode()) {
+//             node->updateDynamicParams();
+//         }
+//         if (node_indx + 1 < waveFrontCount.size() && --waveFrontCount[node_indx + 1] == 0) {
+//             tg.run([=, &updateDynParams](){ updateDynParams(node_indx + 1, stop_indx); });
+//         }
+//     };
 
-    updateNodes = [&](size_t stopIndx) {
-        auto startCounter = prepareCounter.load();
-        tg.run([=, &updateShapes](){ updateShapes(startCounter, stopIndx); });
-        tg.wait();
-    };
-#else
+//     updateNodes = [&](size_t stopIndx) {
+//         auto startCounter = prepareCounter.load();
+//         tg.run([=, &updateShapes](){ updateShapes(startCounter, stopIndx); });
+//         tg.wait();
+//     };
+// #else
     size_t prepareCounter = 0;
     updateNodes = [&](size_t stopIndx) {
         for (; prepareCounter < stopIndx; ++prepareCounter) {
@@ -1129,7 +1129,7 @@ void Graph::InferDynamic(InferRequestBase* request) {
             }
         }
     };
-#endif
+// #endif
     size_t inferCounter = 0;
 
     for (auto stopIndx : syncIndsWorkSet) {
