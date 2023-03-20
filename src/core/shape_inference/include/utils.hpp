@@ -39,6 +39,9 @@ void eltwise_shape_infer(const OpType* op, const std::vector<T>& input_shapes, s
     if (autob.m_type == ov::op::AutoBroadcastType::NONE) {
         NODE_VALIDATION_CHECK(op, T::merge_into(output_shape, input_shapes[1]), "Argument shapes are inconsistent.");
     } else if (autob.m_type == ov::op::AutoBroadcastType::NUMPY || autob.m_type == ov::op::AutoBroadcastType::PDPD) {
+if (op->get_friendly_name() == "TFNodes/yolo_evaluation_layer_1/sub_1") {
+    std::cout << "output_shape: " << output_shape << "; input_shapes[1] : " << input_shapes[1] << "; autob: " << autob.m_type << std::endl;
+}
         NODE_VALIDATION_CHECK(op,
                               T::broadcast_merge_into(output_shape, input_shapes[1], autob),
                               "Argument shapes are inconsistent.");

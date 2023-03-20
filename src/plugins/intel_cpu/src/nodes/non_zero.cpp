@@ -55,10 +55,9 @@ void NonZero::initSupportedPrimitiveDescriptors() {
         IE_THROW() << "Can't create primitive descriptor for NonZero layer with name: " << getName() << " doesn't support "
                    << inPrc.name() << " precision on 0 port";
     }
-    const auto &outPrc = getOriginalOutputPrecisionAtPort(0);
-    if (!one_of(outPrc, Precision::I64, Precision::I32)) {
-        IE_THROW() << "Can't create primitive descriptor for NonZero layer with name: " << getName() << " doesn't support "
-                   << outPrc.name() << " precision on 1 port";
+    auto outPrc = getOriginalOutputPrecisionAtPort(0);
+    if (!one_of(outPrc, /*Precision::I64,*/ Precision::I32)) {
+        outPrc = Precision::I32;
     }
 
     addSupportedPrimDesc({{LayoutType::ncsp}},
@@ -122,8 +121,8 @@ void NonZero::execute(dnnl::stream strm) {
     OV_SWITCH(intel_cpu, NonZeroExecute, ctx, inputPrec,
               OV_CASE(Precision::FP32, float),
               OV_CASE(Precision::BF16, bfloat16_t),
-              OV_CASE(Precision::I64, int),
-              OV_CASE(Precision::I32, int),
+              OV_CASE(Precision::I64, int64_t),
+              OV_CASE(Precision::I32, int32_t),
               OV_CASE(Precision::U32, uint32_t),
               OV_CASE(Precision::I8, int8_t),
               OV_CASE(Precision::U8, uint8_t))
