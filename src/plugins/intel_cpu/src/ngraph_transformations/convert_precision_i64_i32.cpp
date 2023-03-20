@@ -62,7 +62,7 @@ bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr
                 auto parentOutput = input.get_source_output();
                 auto parentNode = parentOutput.get_node_shared_ptr();
                 if (ov::is_type<ov::opset10::Convert>(parentNode) &&
-                        parentNode->get_rt_info().find("convert_i64_i32") != parentNode->get_rt_info().end()) {
+                        parentNode->get_rt_info().find("convert_i32_i64") != parentNode->get_rt_info().end()) {
                     input.replace_source_output(parentNode->input_value(0));
                 } else {
                     auto convert = std::make_shared<ov::opset10::Convert>(input.get_source_output(), ov::element::i32);
@@ -82,7 +82,7 @@ bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr
                     auto convert = std::make_shared<ov::opset10::Convert>(output, ov::element::i64);
 
                     auto& rt_info = convert->get_rt_info();
-                    rt_info["convert_i64_i32"] = "";
+                    rt_info["convert_i32_i64"] = "";
                     for (const auto& targetInput : targetInputs) {
                         targetInput.replace_source_output(convert);
                     }

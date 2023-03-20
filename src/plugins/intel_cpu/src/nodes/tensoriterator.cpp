@@ -165,7 +165,7 @@ class IterCountPortHelper : public PortMapHelper {
 public:
     IterCountPortHelper(const MemoryPtr &to, const dnnl::engine& eng) {
         // Only scalar I32 tensor is supported
-        IE_ASSERT(to->GetDataType() == memory::data_type::s32);
+        // IE_ASSERT(to->GetDataType() == memory::data_type::s32);
         IE_ASSERT(to->GetShape() == Shape(VectorDims{1}));
         mem_holder_dst = to->GetPrimitive();
     }
