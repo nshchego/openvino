@@ -13,6 +13,7 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
         ov::opset10::Add::get_type_info_static(),
         ov::op::v1::Broadcast::get_type_info_static(),
         ov::opset10::Broadcast::get_type_info_static(),
+        ov::opset10::Constant::get_type_info_static(),
         ov::opset10::Convert::get_type_info_static(),
         ov::opset10::Divide::get_type_info_static(),
         ov::opset10::Equal::get_type_info_static(),
@@ -49,6 +50,29 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
     return i64Ops.find(type) != i64Ops.end();
 }
 
+std::shared_ptr<ngraph::Node> changeConstantPrecision(std::shared_ptr<ov::opset10::Constant>& constant) {
+    const auto* srcData = constant->get_data_ptr<int64_t>();
+    const auto size = shape_size(constant->get_shape());
+
+    auto newConstant = std::make_shared<ov::opset10::Constant>(ov::element::i32, constant->get_shape());
+    newConstant->output(0).set_names(constant->output(0).get_names());
+    auto* dstData = const_cast<int32_t*>(reinterpret_cast<const int32_t*>(newConstant->get_data_ptr()));
+    if (dstData == nullptr) {
+        throw ngraph::ngraph_error("Can't get destination data pointer");
+    }
+
+    for (size_t i = 0; i < size; ++i) {
+        if (srcData[i] >= std::numeric_limits<int32_t>::max()) {
+            dstData[i] = std::numeric_limits<int32_t>::max();
+        } else if (srcData[i] <= std::numeric_limits<int32_t>::lowest()) {
+            dstData[i] = std::numeric_limits<int32_t>::lowest();
+        } else {
+            dstData[i] = static_cast<int32_t>(srcData[i]);
+        }
+    }
+    return newConstant;
+}
+
 bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr<ov::Model> &model) {
     const auto orderedOps = model->get_ordered_ops();
     for (const auto& op : orderedOps) {
@@ -64,6 +88,10 @@ bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr
                 if (ov::is_type<ov::opset10::Convert>(parentNode) &&
                         parentNode->get_rt_info().find("convert_i32_i64") != parentNode->get_rt_info().end()) {
                     input.replace_source_output(parentNode->input_value(0));
+                } else if (auto constOp = ov::as_type_ptr<ov::opset10::Constant>(parentNode)) {
+                    auto newConst = changeConstantPrecision(constOp);
+                    input.replace_source_output(newConst);
+                    newConst->set_friendly_name(constOp->get_friendly_name());
                 } else {
                     auto convert = std::make_shared<ov::opset10::Convert>(input.get_source_output(), ov::element::i32);
                     convert->output(0).add_names(parentOutput.get_names());

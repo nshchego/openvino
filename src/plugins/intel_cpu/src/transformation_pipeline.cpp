@@ -196,19 +196,32 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
 
     auto get_convert_precisions = []() {
         precisions_map map = {
-            {ov::element::u64,     ov::element::i64},
             {ov::element::i16,     ov::element::i32},
             {ov::element::u16,     ov::element::i32},
             {ov::element::u32,     ov::element::i32},
-//            {ov::element::f64,     ov::element::f32}, // TODO: revert.
+            {ov::element::f64,     ov::element::f32},
             {ov::element::f16,     ov::element::f32},
             {ov::element::boolean, ov::element::u8},
             {ov::element::i4,      ov::element::i8},
             {ov::element::u4,      ov::element::u8}
         };
 
-        if (!dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core))
+        bool supportI64 = true; // take from config
+
+        if (!supportI64) {
+            // find extension/not supported layer
+        }
+
+        if (supportI64) {
+            array.push_back({ov::element::u64, ov::element::i64});
+        } else {
+            array.push_back({ov::element::u64, ov::element::i32});
+            array.push_back({ov::element::i64, ov::element::i32});
+        }
+
+        if (!dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core)) {
             map.insert({ov::element::bf16, ov::element::f32});
+        }
 
         return map;
     };
