@@ -69,7 +69,7 @@ void JitReduceKernelBase<CallArgs>::horiz_pd(const Xmm &xmm, const Operand &op) 
         case Algorithm::ReduceSum:
         case Algorithm::ReduceSumSquare:
         case Algorithm::ReduceLogSumExp:
-            vaddpd(xmm, xmm, op);
+            uni_vaddpd(xmm, xmm, op);
             break;
         case Algorithm::ReduceMax:
             uni_vmaxpd(xmm, xmm, op);
@@ -116,7 +116,7 @@ void JitReduceKernel<isa>::generate() {
     }
 
     if (isa == x64::avx512_core || one_of(jcp.reduce_mode, Algorithm::ReduceAnd, Algorithm::ReduceOr)) {
-        uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
+        uni_vpxor(vmm_zero, vmm_zero, vmm_zero); // TODO: not for all
     }
 
     if ((isa == x64::avx512_core && jcp.reduce_mode == Algorithm::ReduceAnd) || jcp.reduce_mode == Algorithm::ReduceOr) {
@@ -509,7 +509,7 @@ void JitReduceKernel<isa>::reduce_gather(const Vmm &vmm_dst, int offset) {
                     uni_vcvtdq2ps(vmm_src, vmm_src); // TODO
                 }
             } else {
-                pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_prc); // TODO
+                pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_prc);
             }
             break;
         case Precision::FP32:
@@ -741,11 +741,11 @@ void JitReduceKernel<isa>::reduce_kernel(const Vmm &vmm_src, const Vmm &vmm_dst)
             case Algorithm::ReduceAnd:
                 if (isa == x64::avx512_core) {
                     vcmpps(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
-                    vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux);
+                    vandps(vmm_dst | k_mask | T_z, vmm_dst, vmm_src);
                 } else {
                     uni_cmpneqps(vmm_src, vmm_src, vmm_zero);
+                    uni_vandps(vmm_dst, vmm_dst, vmm_src);
                 }
-                uni_vandps(vmm_dst, vmm_dst, vmm_src);
                 break;
             case Algorithm::ReduceL1:
                 uni_vandps(vmm_src, vmm_src, vmm_aux);
@@ -789,11 +789,11 @@ void JitReduceKernel<isa>::reduce_kernel(const Vmm &vmm_src, const Vmm &vmm_dst)
             case Algorithm::ReduceAnd:
                 if (isa == x64::avx512_core) {
                     vcmppd(k_mask, vmm_src, vmm_zero, _cmp_neq_uq);
-                    vblendmps(vmm_src | k_mask, vmm_zero, vmm_aux); // TODO
+                    vandpd(vmm_dst | k_mask | T_z, vmm_dst, vmm_src);
                 } else {
                     uni_vcmppd(vmm_src, vmm_src, vmm_zero, _cmp_neq_uq);
+                    uni_vandpd(vmm_dst, vmm_dst, vmm_src);
                 }
-                uni_vandpd(vmm_dst, vmm_dst, vmm_src);
                 break;
             case Algorithm::ReduceL1:
                 uni_vandpd(vmm_src, vmm_src, vmm_aux);

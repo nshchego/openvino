@@ -196,7 +196,21 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         manager.register_pass<ov::pass::MarkDequantizationSubgraph>(defaultPrecisions);
     }
 
-    auto get_convert_precisions = []() {
+    bool supportI64 = true; // take from config
+
+    if (!supportI64) {
+        // Switch on INT64 if a model contains Reference node.
+        auto orderedOps = model->get_ordered_ops();
+        for (const auto& op : orderedOps) {
+            const NodePtr node {Node::factory().create(op, nullptr)};
+            if (node->getType() == Type::Reference) {
+                supportI64 = true;
+                break;
+            }
+        }
+    }
+
+    auto get_convert_precisions = [&]() {
         precisions_map map = {
             {ov::element::i16,     ov::element::i32},
             {ov::element::u16,     ov::element::i32},
@@ -207,12 +221,6 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
             {ov::element::i4,      ov::element::i8},
             {ov::element::u4,      ov::element::u8}
         };
-
-        bool supportI64 = true; // take from config
-
-        if (!supportI64) {
-            // find extension/not supported layer
-        }
 
         if (supportI64) {
             array.push_back({ov::element::u64, ov::element::i64});
@@ -259,7 +267,9 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
     }
     manager.register_pass<ov::pass::Validate>();
     manager.register_pass<ov::pass::ConvertPrecision>(precisions, type_to_fuse);
-    manager.register_pass<ConvertPrecisionI64ToI32>();
+    if (supportI64) {
+        manager.register_pass<ConvertPrecisionI64ToI32>();
+    }
     manager.register_pass<ov::pass::EliminateConvert>();
     manager.register_pass<SwapConvertTranspose>();
     manager.register_pass<ConvertToInteraction>();

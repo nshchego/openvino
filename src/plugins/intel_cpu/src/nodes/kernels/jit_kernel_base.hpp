@@ -82,6 +82,10 @@ public:
 
     void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op);
 
+    void uni_vcvtpd2dq(const Xbyak::Xmm &vDst, const Xbyak::Operand &op);
+
+    void uni_vcvtpd2ps(const Xbyak::Xmm &vDst, const Xbyak::Operand &op);
+
     void gatherdd(const Xbyak::Xmm&    vDst,
                   const Xbyak::Reg64&  rSrcPtr,
                   const Xbyak::Xmm&    vSrcShift,
