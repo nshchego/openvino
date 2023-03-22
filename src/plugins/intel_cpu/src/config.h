@@ -47,6 +47,7 @@ struct Config {
     int batchLimit = 0;
     float fcSparseWeiDecompressionRate = 1.0f;
     size_t rtCacheCapacity = 5000ul;
+    bool enableNativeI64 = false;
     InferenceEngine::IStreamsExecutor::Config streamExecutorConfig;
     InferenceEngine::PerfHintsConfig  perfHintsConfig;
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)

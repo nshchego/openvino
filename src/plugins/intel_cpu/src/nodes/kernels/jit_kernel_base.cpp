@@ -274,6 +274,22 @@ void JitKernelBase::uni_vminpd(const Xmm &vDst, const Operand &op1, const Operan
     }
 }
 
+void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm &vDst, const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vcvtpd2dq(vDst, op);
+    } else {
+        cvtpd2dq(vDst, op);
+    }
+}
+
+void JitKernelBase::uni_vcvtpd2ps(const Xbyak::Xmm &vDst, const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vcvtpd2ps(vDst, op);
+    } else {
+        cvtpd2ps(vDst, op);
+    }
+}
+
 void JitKernelBase::gatherdd(const Xmm&    vDst,
                              const Reg64&  rSrcPtr,
                              const Xmm&    vSrcShift,
@@ -709,11 +725,7 @@ void JitKernelBase::loadVector(const Xmm &vDst,
                         // TODO
                     }
                 } else if (dstPrc == Precision::I32) {
-                    if (x64::mayiuse(x64::avx512_core)) {
-                        vcvtpd2dq(vDst, srcAdr);
-                    } else {
-                        // TODO
-                    }
+                    uni_vcvtpd2dq(x64::mayiuse(x64::avx512_core) ? ymmDst : xmmDst, srcAdr);
                 } else if (dstPrc == Precision::FP64) {
                     uni_vmovups(vDst, srcAdr);
                 }
@@ -814,7 +826,8 @@ void JitKernelBase::loadScalar(const Xmm &vDst,
                 if (x64::mayiuse(x64::avx512_core)) {
                     vcvtpd2dq(vDst, srcAdrBcst);
                 } else {
-                    // TODO
+                    uni_vpinsrq(vDst, vDst, srcAdr, 0);
+                    vcvtpd2dq(vDst, vDst);
                 }
             } else if (dstPrc == Precision::FP64) {
                 uni_vmovsd(vDst, srcAdr);
@@ -904,17 +917,13 @@ void JitKernelBase::storeVector(const Address &dstAdr,
                                 const Xmm &vSrc,
                                 const InferenceEngine::Precision &dstPrc,
                                 const InferenceEngine::Precision &srcPrc) {
-    Xmm xmmSrc = Xmm(vSrc.getIdx());
-    Ymm ymmSrc = Ymm(vSrc.getIdx());
+    auto xmmSrc = Xmm(vSrc.getIdx());
+    auto ymmSrc = Ymm(vSrc.getIdx());
 
     switch (srcPrc) {
         case Precision::FP64:
             if (dstPrc == Precision::FP32) {
-                if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtpd2ps(ymmSrc, vSrc);
-                } else {
-                    // TODO
-                }
+                uni_vcvtpd2ps(x64::mayiuse(x64::avx512_core) ? ymmSrc : xmmSrc, vSrc);
             } else if (dstPrc == Precision::I64) {
                 if (x64::mayiuse(x64::avx512_core)) {
                     vcvtpd2qq(vSrc, vSrc);
@@ -1068,17 +1077,12 @@ void JitKernelBase::storeScalar(const Address &dstAdr,
                                 const Xmm &vSrc,
                                 const InferenceEngine::Precision &dstPrc,
                                 const InferenceEngine::Precision &srcPrc) {
-    auto zmmSrc = Zmm(vSrc.getIdx());
     auto ymmSrc = Ymm(vSrc.getIdx());
 
     switch (srcPrc) {
         case Precision::FP64:
             if (dstPrc == Precision::FP32) {
-                if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtpd2ps(ymmSrc, zmmSrc);
-                } else {
-                    // TODO
-                }
+                uni_vcvtpd2ps(vSrc, vSrc);
             } else if (dstPrc == Precision::I64) {
                 if (x64::mayiuse(x64::avx512_core)) {
                     vcvtpd2qq(vSrc, vSrc);
@@ -1086,7 +1090,7 @@ void JitKernelBase::storeScalar(const Address &dstAdr,
                     // TODO
                 }
             } else if (dstPrc == Precision::I32) {
-                vcvtpd2dq(vSrc, vSrc);
+                uni_vcvtpd2dq(vSrc, vSrc);
             }
             break;
         case Precision::I64:

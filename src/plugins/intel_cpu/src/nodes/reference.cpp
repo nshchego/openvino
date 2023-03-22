@@ -4,10 +4,8 @@
 
 #include "reference.h"
 #include <ie_ngraph_utils.hpp>
-#include <ngraph/opsets/opset1.hpp>
-#include "common/cpu_memcpy.h"
+#include <openvino/opsets/opset1.hpp>
 
-using namespace dnnl;
 using namespace InferenceEngine;
 using namespace InferenceEngine::details;
 

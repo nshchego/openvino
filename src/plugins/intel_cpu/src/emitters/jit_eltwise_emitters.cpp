@@ -237,14 +237,7 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, cons
             if (isa == x64::avx512_core) {
                 h->vpmullq(vmm_dst, vmm_src0, vmm_src1);
             } else {
-                // h->vpsrad();
-                // h->vpblendw();
-                // h->vpaddq();
-                // h->vpblendw();
-                // h->vsubpd();
-                // h->vaddpd();
-
-                // h->vmulpd();
+                // TODO: need WA via double
             }
             break;
         default: IE_THROW() << "jit_multiply_emitter doesn't support precision '" << exec_prc_ << "'";
