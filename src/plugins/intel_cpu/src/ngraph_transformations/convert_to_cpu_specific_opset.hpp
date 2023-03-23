@@ -36,7 +36,7 @@ inline void ConvertToCPUSpecificOpset(std::shared_ptr<ov::Model> &model) {
     manager.register_pass<ConvertToLeakyRelu>();
     manager.register_pass<ConvertToSwishCPU>();
     manager.register_pass<OptimizeSequenceTransposes>();
-    if (!ov::op::util::has_op_with_type<ov::op::FakeQuantize>(nGraphFunc)) {
+    if (!ov::op::util::has_op_with_type<ov::op::v0::FakeQuantize>(model)) {
         manager.register_pass<ReshapeFullyConnectedFusion>();
     }
     // after transformation "MoveEltwiseUpThroughDataMov" there can be Reshape sequences that should be eliminated or fused

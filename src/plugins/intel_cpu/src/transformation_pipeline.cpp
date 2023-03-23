@@ -196,7 +196,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         manager.register_pass<ov::pass::MarkDequantizationSubgraph>(defaultPrecisions);
     }
 
-    bool supportI64 = true; // take from config
+    bool supportI64 = config->enableNativeI64;
 
     if (!supportI64) {
         // Switch on INT64 if a model contains Reference node.
@@ -204,8 +204,24 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         for (const auto& op : orderedOps) {
             const NodePtr node {Node::factory().create(op, nullptr)};
             if (node->getType() == Type::Reference) {
-                supportI64 = true;
-                break;
+                for (auto prc : node->getOriginalInputPrecisions()) {
+                    if (prc == Precision::I64) {
+                        supportI64 = true;
+                        break;
+                    }
+                }
+                if (supportI64) {
+                    break;
+                }
+                for (auto prc : node->getOriginalOutputPrecisions()) {
+                    if (prc == Precision::I64) {
+                        supportI64 = true;
+                        break;
+                    }
+                }
+                if (supportI64) {
+                    break;
+                }
             }
         }
     }
@@ -223,10 +239,10 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         };
 
         if (supportI64) {
-            array.push_back({ov::element::u64, ov::element::i64});
+            map.insert({ov::element::u64, ov::element::i64});
         } else {
-            array.push_back({ov::element::u64, ov::element::i32});
-            array.push_back({ov::element::i64, ov::element::i32});
+            map.insert({ov::element::u64, ov::element::i32});
+            map.insert({ov::element::i64, ov::element::i32});
         }
 
         if (!dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core)) {

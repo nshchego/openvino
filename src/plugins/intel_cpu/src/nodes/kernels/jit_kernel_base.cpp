@@ -1077,8 +1077,6 @@ void JitKernelBase::storeScalar(const Address &dstAdr,
                                 const Xmm &vSrc,
                                 const InferenceEngine::Precision &dstPrc,
                                 const InferenceEngine::Precision &srcPrc) {
-    auto ymmSrc = Ymm(vSrc.getIdx());
-
     switch (srcPrc) {
         case Precision::FP64:
             if (dstPrc == Precision::FP32) {

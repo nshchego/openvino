@@ -6,8 +6,9 @@
 
 #include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
-#include "input.h"
 #include <openvino/opsets/opset1.hpp>
+#include <utils/shape_inference/shape_inference_ngraph.hpp>
+#include "slice_shape_inference_utils.hpp"
 
 #include <string>
 
