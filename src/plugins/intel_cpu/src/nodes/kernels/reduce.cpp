@@ -974,7 +974,7 @@ void JitReduceKernel<isa>::horiz_reduce_store_ps(const Vmm &vmm_dst, const Preci
 template <>
 void JitReduceKernel<x64::avx512_core>::horiz_reduce_store_pd(const Zmm &zmm_dst, const Precision &dst_prc, bool load_embedded) {
     auto ymm_dst = Ymm(zmm_dst.getIdx());
-    auto xmm_dst = Ymm(zmm_dst.getIdx());
+
     vextractf64x4(ymm_aux1, zmm_dst, 1);
     horiz_pd(ymm_aux1, ymm_dst);
     vextractf128(xmm_aux2, ymm_aux1, 1);
@@ -1494,7 +1494,7 @@ void JitReducePostKernel<isa>::horiz_reduce_store_ps(const Vmm &vmm_dst, const P
 template <>
 void JitReducePostKernel<x64::avx512_core>::horiz_reduce_store_pd(const Zmm &zmm_dst, const Precision &dst_prc, bool load_embedded) {
     auto ymm_dst = Ymm(zmm_dst.getIdx());
-    auto xmm_dst = Ymm(zmm_dst.getIdx());
+
     vextractf64x4(ymm_aux1, zmm_dst, 1);
     horiz_pd(ymm_aux1, ymm_dst);
     vextractf128(xmm_aux2, ymm_aux1, 1);
