@@ -74,8 +74,8 @@ std::set<std::vector<element::Type>> jit_add_emitter::get_supported_precisions(c
 }
 
 /// MUL_ADD ///
-jit_mul_add_emitter::jit_mul_add_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-    : jit_emitter(host, host_isa, node, exec_prc) {}
+jit_mul_add_emitter::jit_mul_add_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node)
+    : jit_emitter(host, host_isa, node, get_arithmetic_binary_exec_precision(node)) {}
 jit_mul_add_emitter::jit_mul_add_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
     : jit_emitter(host, host_isa, exec_prc) {}
 
@@ -160,7 +160,7 @@ size_t jit_mul_add_emitter::aux_vecs_count() const {
     return 1;
 }
 
-std::set<std::vector<element::Type>> jit_mul_add_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_mul_add_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}};
 }
 
@@ -204,9 +204,9 @@ std::set<std::vector<element::Type>> jit_subtract_emitter::get_supported_precisi
 }
 
 /// MULTIPLY ///
-jit_multiply_emitter::jit_multiply_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-    : jit_emitter(host, host_isa, node, exec_prc) {}
-jit_multiply_emitter::jit_multiply_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
+jit_multiply_emitter::jit_multiply_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node)
+    : jit_emitter(host, host_isa, node, get_arithmetic_binary_exec_precision(node)) {}
+jit_multiply_emitter::jit_multiply_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const Precision &exec_prc)
     : jit_emitter(host, host_isa, exec_prc) {}
 
 size_t jit_multiply_emitter::get_inputs_num() const { return 2; }
@@ -321,7 +321,7 @@ void jit_divide_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const 
     }
 }
 
-std::set<std::vector<element::Type>> jit_divide_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_divide_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
 }
 
@@ -337,7 +337,7 @@ jit_floor_emitter::jit_floor_emitter(x64::jit_generator *host, x64::cpu_isa_t ho
 
 size_t jit_floor_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_floor_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_floor_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -369,7 +369,7 @@ jit_ceiling_emitter::jit_ceiling_emitter(x64::jit_generator *host, x64::cpu_isa_
 
 size_t jit_ceiling_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_ceiling_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_ceiling_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -402,7 +402,7 @@ jit_floor_mod_emitter::jit_floor_mod_emitter(x64::jit_generator *host, x64::cpu_
 
 size_t jit_floor_mod_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_floor_mod_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_floor_mod_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -456,7 +456,7 @@ jit_mod_emitter::jit_mod_emitter(x64::jit_generator *host, x64::cpu_isa_t host_i
 
 size_t jit_mod_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_mod_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_mod_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -546,7 +546,7 @@ void jit_maximum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
     }
 }
 
-std::set<std::vector<element::Type>> jit_maximum_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_maximum_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}, {element::i32, element::i32}};
 }
 
@@ -594,7 +594,7 @@ void jit_minimum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
     }
 }
 
-std::set<std::vector<element::Type>> jit_minimum_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_minimum_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}, {element::i32, element::i32}};
 }
 
@@ -649,7 +649,7 @@ void jit_squared_difference_emitter::emit_isa(const std::vector<size_t> &in_vec_
     }
 }
 
-std::set<std::vector<element::Type>> jit_squared_difference_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_squared_difference_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}, {element::i32, element::i32}};
 }
 
@@ -662,7 +662,7 @@ jit_power_dynamic_emitter::jit_power_dynamic_emitter(x64::jit_generator *host, x
 
 size_t jit_power_dynamic_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_power_dynamic_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_power_dynamic_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -689,8 +689,8 @@ void jit_power_dynamic_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs,
 
     // caller obligation to save gprs as callee may use them
     size_t gpr_size = 8;
-    Xbyak::Operand gprs_to_save[] = {h->r8, h->r9, h->r10, h->r11, h->rax,
-                                     h->rcx, h->rdx, h->rdi, h->rsi, h->rbp, h->rbx};
+    Operand gprs_to_save[] = {h->r8, h->r9, h->r10, h->r11, h->rax,
+                              h->rcx, h->rdx, h->rdi, h->rsi, h->rbp, h->rbx};
     size_t n_gprs_to_save = sizeof(gprs_to_save) / sizeof(gprs_to_save[0]);
 
     h->sub(h->rsp, n_gprs_to_save * gpr_size);
@@ -777,8 +777,8 @@ jit_equal_emitter::jit_equal_emitter(x64::jit_generator *host, x64::cpu_isa_t ho
 
 size_t jit_equal_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_equal_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
-    return {{element::f32, element::f32}};
+std::set<std::vector<element::Type>> jit_equal_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
 }
 
 void jit_equal_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
@@ -850,10 +850,6 @@ void jit_equal_emitter::register_table_entries() {
     }
 }
 
-std::set<Precision> jit_equal_emitter::get_supported_precisions() {
-    return { Precision::FP32, Precision::I32, Precision::I64 };
-}
-
 /// NOT_EQUAL ///
 jit_not_equal_emitter::jit_not_equal_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
 : jit_emitter(host, host_isa, node, exec_prc) {
@@ -866,7 +862,7 @@ jit_not_equal_emitter::jit_not_equal_emitter(x64::jit_generator *host, x64::cpu_
 
 size_t jit_not_equal_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_not_equal_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_not_equal_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -929,8 +925,8 @@ jit_greater_emitter::jit_greater_emitter(x64::jit_generator *host, x64::cpu_isa_
 
 size_t jit_greater_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_greater_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
-    return {{element::f32, element::f32}};
+std::set<std::vector<element::Type>> jit_greater_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
 }
 
 void jit_greater_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
@@ -1000,10 +996,6 @@ void jit_greater_emitter::register_table_entries() {
     }
 }
 
-std::set<Precision> jit_greater_emitter::get_supported_precisions() {
-    return { Precision::FP32, Precision::I32, Precision::I64 };
-}
-
 /// GREATER_EQUAL ///
 jit_greater_equal_emitter::jit_greater_equal_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node,
                                                      Precision exec_prc)
@@ -1017,7 +1009,7 @@ jit_greater_equal_emitter::jit_greater_equal_emitter(x64::jit_generator *host, x
 
 size_t jit_greater_equal_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_greater_equal_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_greater_equal_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -1080,8 +1072,8 @@ jit_less_emitter::jit_less_emitter(x64::jit_generator *host, x64::cpu_isa_t host
 
 size_t jit_less_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_less_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
-    return {{element::f32, element::f32}};
+std::set<std::vector<element::Type>> jit_less_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
 }
 
 void jit_less_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
@@ -1151,10 +1143,6 @@ void jit_less_emitter::register_table_entries() {
     }
 }
 
-std::set<Precision> jit_less_emitter::get_supported_precisions() {
-    return { Precision::FP32, Precision::I32, Precision::I64 };
-}
-
 /// LESS_EQUAL ///
 jit_less_equal_emitter::jit_less_equal_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
 : jit_emitter(host, host_isa, node, exec_prc) {
@@ -1167,7 +1155,7 @@ jit_less_equal_emitter::jit_less_equal_emitter(x64::jit_generator *host, x64::cp
 
 size_t jit_less_equal_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_less_equal_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_less_equal_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -1231,7 +1219,7 @@ jit_logical_and_emitter::jit_logical_and_emitter(x64::jit_generator *host, x64::
 
 size_t jit_logical_and_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_logical_and_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_logical_and_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -1315,7 +1303,7 @@ jit_logical_or_emitter::jit_logical_or_emitter(x64::jit_generator *host, x64::cp
 
 size_t jit_logical_or_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_logical_or_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_logical_or_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -1398,7 +1386,7 @@ jit_logical_xor_emitter::jit_logical_xor_emitter(x64::jit_generator *host, x64::
 
 size_t jit_logical_xor_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_logical_xor_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_logical_xor_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -1481,7 +1469,7 @@ jit_logical_not_emitter::jit_logical_not_emitter(x64::jit_generator *host, x64::
 
 size_t jit_logical_not_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_logical_not_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_logical_not_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -1555,7 +1543,7 @@ jit_power_static_emitter::jit_power_static_emitter(x64::jit_generator *host, x64
 
 size_t jit_power_static_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_power_static_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_power_static_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -1635,8 +1623,8 @@ void jit_power_static_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, 
 
         // caller obligation to save gprs as callee may use them
         size_t gpr_size = 8;
-        Xbyak::Operand gprs_to_save[] = {h->r8, h->r9, h->r10, h->r11, h->rax,
-                                         h->rcx, h->rdx, h->rdi, h->rsi, h->rbp, h->rbx};
+        Operand gprs_to_save[] = {h->r8, h->r9, h->r10, h->r11, h->rax,
+                                  h->rcx, h->rdx, h->rdi, h->rsi, h->rbp, h->rbx};
         size_t n_gprs_to_save = sizeof(gprs_to_save) / sizeof(gprs_to_save[0]);
 
         h->sub(h->rsp, n_gprs_to_save * gpr_size);
@@ -1733,7 +1721,7 @@ jit_prelu_emitter::jit_prelu_emitter(x64::jit_generator *host, x64::cpu_isa_t ho
 }
 size_t jit_prelu_emitter::get_inputs_num() const { return 2; }
 
-std::set<std::vector<element::Type>> jit_prelu_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_prelu_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32}};
 }
 
@@ -1792,7 +1780,7 @@ jit_sqrt_emitter::jit_sqrt_emitter(x64::jit_generator *host, x64::cpu_isa_t host
 
 size_t jit_sqrt_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_sqrt_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_sqrt_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -1823,7 +1811,7 @@ jit_negative_emitter::jit_negative_emitter(x64::jit_generator *host, x64::cpu_is
 
 size_t jit_negative_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_negative_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_negative_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -1861,7 +1849,7 @@ jit_erf_emitter::jit_erf_emitter(x64::jit_generator *host, x64::cpu_isa_t host_i
 
 size_t jit_erf_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_erf_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_erf_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -1892,8 +1880,7 @@ void jit_erf_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std
     Vmm vmm_aux3 = Vmm(aux_vec_idxs[3]);
     Vmm vmm_aux4 = Vmm(aux_vec_idxs[4]);
 
-    auto compute_cmp_mask = [&](const Vmm &vmm_src,
-        const Xbyak::Operand &compare_operand, int cmp_predicate) {
+    auto compute_cmp_mask = [&](const Vmm &vmm_src, const Operand &compare_operand, int cmp_predicate) {
         if (host_isa_ == x64::avx512_core) {
             h->vcmpps(k_mask, vmm_src, compare_operand, cmp_predicate);
         } else {
@@ -1901,7 +1888,7 @@ void jit_erf_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std
         }
     };
 
-    auto blend_with_mask = [&](const Vmm &vmm_dst, const Xbyak::Operand &src) {
+    auto blend_with_mask = [&](const Vmm &vmm_dst, const Operand &src) {
         if (host_isa_ == x64::avx512_core) {
             h->vblendmps(vmm_dst | k_mask, vmm_dst, src);
         } else {
@@ -2045,7 +2032,7 @@ jit_soft_sign_emitter::jit_soft_sign_emitter(x64::jit_generator *host, x64::cpu_
 
 size_t jit_soft_sign_emitter::get_inputs_num() const { return 1; }
 
-std::set<std::vector<element::Type>> jit_soft_sign_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_soft_sign_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32}};
 }
 
@@ -2253,14 +2240,14 @@ void jit_is_nan_emitter::register_table_entries() {
 }
 
 /// SELECT ///
-jit_select_emitter::jit_select_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ngraph::Node>& node, Precision exec_prc)
+jit_select_emitter::jit_select_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
         : jit_emitter(host, host_isa, node, exec_prc) {}
 jit_select_emitter::jit_select_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
         : jit_emitter(host, host_isa, exec_prc) {}
 
 size_t jit_select_emitter::get_inputs_num() const { return 3; }
 
-std::set<std::vector<element::Type>> jit_select_emitter::get_supported_precisions(const std::shared_ptr<ngraph::Node>& node) {
+std::set<std::vector<element::Type>> jit_select_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
     return {{element::f32, element::f32, element::f32}};
 }
 
@@ -2285,7 +2272,7 @@ void jit_select_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, const
     }
 }
 
-template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+template <x64::cpu_isa_t isa>
 void jit_select_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const {
     using Vmm = typename conditional3<isa == x64::sse41, Xmm, isa == x64::avx2, Ymm, Zmm>::type;
     Vmm vmm_cond = Vmm(in_vec_idxs[0]);

@@ -6,7 +6,7 @@
 
 #include <ie_parallel.hpp>
 
-#include "cpu_types.h"
+// #include "cpu_types.h"
 #include "utils/bfloat16.hpp"
 #include "ie_ngraph_utils.hpp"
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
@@ -28,7 +28,6 @@
 #include "utils/cpu_utils.hpp"
 #include <common/primitive_hashing_utils.hpp>
 
-//#include "ngraph/ngraph.hpp"
 #include <openvino/opsets/opset1.hpp>
 #include "ngraph_transformations/op/power_static.hpp"
 #include "ngraph_transformations/op/leaky_relu.hpp"
@@ -243,7 +242,7 @@ struct jit_uni_eltwise_generic : public jit_uni_eltwise_kernel, public jit_gener
         for (int i = 0; i < jep_.inputs_number; i++) {
             if (jep_.src_prc[i] != exec_prc) {
                 if (exec_prc == Precision::I32 && jep_.src_prc[i] == Precision::I64) {
-                    if (supported_precision_intersection.find(Precision::I64) != supported_precision_intersection.end()) {
+                    if (supported_precision_intersection.find({element::i64, element::i64}) != supported_precision_intersection.end()) {
                         exec_prc = Precision::I64;
                     }
                 } else if (exec_prc == Precision::I64 && jep_.src_prc[i] == Precision::I32) {

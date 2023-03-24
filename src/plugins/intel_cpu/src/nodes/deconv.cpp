@@ -993,11 +993,11 @@ void Deconvolution::prepareParams() {
 
         auto scratchpadMem = getScratchPadMem(execPtr->getScratchPadDesc());
         primArgs[DNNL_ARG_SCRATCHPAD] = scratchpadMem->GetPrimitive();
-#ifdef CPU_DEBUG_CAPS
-        if (result.second == CacheEntryBase::LookUpStatus::Miss) {
-            DEBUG_LOG("verbose##", getName(), "##", pd->info(), "\n");
-        }
-#endif
+// #ifdef CPU_DEBUG_CAPS
+//         if (result.second == CacheEntryBase::LookUpStatus::Miss) {
+//             DEBUG_LOG("verbose##", getName(), "##", pd->info(), "\n");
+//         }
+// #endif
     } else {
         IE_THROW() << "Primitive descriptor was not found for node " << getName() << ".";
     }

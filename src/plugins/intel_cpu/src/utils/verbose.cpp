@@ -142,10 +142,10 @@ void Verbose::printInfo() {
     }
 
     std::string nodeImplementer = "cpu";
-    if (node->prim)
-        nodeImplementer = "dnnl"; // oneDNN
-    else if (node->getType() == Type::Reference)
-        nodeImplementer = "ngraph_ref"; // ngraph reference
+    // if (node->prim)
+    //     nodeImplementer = "dnnl"; // oneDNN
+    // else if (node->getType() == Type::Reference)
+    //     nodeImplementer = "ngraph_ref"; // ngraph reference
 
     const std::string& nodeName = colorize(GREEN, node->getName());
     const std::string& nodeType = colorize(CYAN, NameFromType(node->getType()));

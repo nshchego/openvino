@@ -434,11 +434,11 @@ void FullyConnected::prepareParams() {
 
         auto schratchpadMem = getScratchPadMem(execPtr->getScratchPadDesc());
         primArgs[DNNL_ARG_SCRATCHPAD] = schratchpadMem->GetPrimitive();
-#ifdef CPU_DEBUG_CAPS
-        if (result.second == CacheEntryBase::LookUpStatus::Miss) {
-            DEBUG_LOG("verbose##", getName(), "##", pd->info(), "\n");
-        }
-#endif
+// #ifdef CPU_DEBUG_CAPS
+//         if (result.second == CacheEntryBase::LookUpStatus::Miss) {
+//             DEBUG_LOG("verbose##", getName(), "##", pd->info(), "\n");
+//         }
+// #endif
     } else {
         IE_THROW() << "Executor is not created for node " << getName() << ".";
     }

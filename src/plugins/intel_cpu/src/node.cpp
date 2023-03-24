@@ -577,13 +577,13 @@ void Node::updateDynamicParams() {
             DEBUG_LOG(" prepareParams() on #", getExecIndex(), " ", getTypeStr(), " ", algToString(getAlgorithm()),
                       " ", getName(), " ", getOriginalLayers());
             prepareParams();
-#ifdef CPU_DEBUG_CAPS
-            if (prim) {
-                auto pd_c = prim.get_primitive_desc();
-                auto* pd = reinterpret_cast<const dnnl_primitive_desc*>(pd_c);
-                DEBUG_LOG("verbose##", getName(), "##", pd->info(), "\n");
-            }
-#endif
+// #ifdef CPU_DEBUG_CAPS
+//             if (prim) {
+//                 auto pd_c = prim.get_primitive_desc();
+//                 auto* pd = reinterpret_cast<const dnnl_primitive_desc*>(pd_c);
+//                 DEBUG_LOG("verbose##", getName(), "##", pd->info(), "\n");
+//             }
+// #endif
         }
     }
 }
