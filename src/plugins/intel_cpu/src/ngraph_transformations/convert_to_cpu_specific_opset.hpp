@@ -16,6 +16,7 @@
 #include "convert_to_swish_cpu.hpp"
 #include "rnn_sequences_optimization.hpp"
 #include "transformations/common_optimizations/reshape_sequence_fusion.hpp"
+#include "ngram_fusion.hpp"
 
 #include "itt.hpp"
 
@@ -41,6 +42,7 @@ inline void ConvertToCPUSpecificOpset(std::shared_ptr<ov::Model> &model) {
     // after transformation "MoveEltwiseUpThroughDataMov" there can be Reshape sequences that should be eliminated or fused
     manager.register_pass<ov::pass::ReshapeSequenceFusion>();
     manager.register_pass<ov::pass::ConstantFolding>();
+    manager.register_pass<NgramFusion>();
     manager.register_pass<ov::pass::Validate>();
 
     manager.run_passes(model);

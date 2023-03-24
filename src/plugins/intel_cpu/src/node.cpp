@@ -63,6 +63,7 @@
 #include "memory_desc/dnnl_blocked_memory_desc.h"
 #include <common/primitive_desc.hpp>
 #include <common/primitive_desc_iface.hpp>
+#include "perf_count.h"
 
 using namespace dnnl;
 using namespace openvino;
@@ -560,10 +561,19 @@ std::vector<memory::format_tag> Node::getAvailableFormatsForDims(const Shape &di
 
 void Node::updateShapes() {
     IE_ASSERT(isDynamicNode()) << "Node::updateShapes() is called to a static shape node of type: " << getTypeStr() << " with name: " << getName();
+
+    std::vector<VectorDims> shape;
     if (needShapeInfer()) {
-        auto result = shapeInfer();
-        if (ShapeInferStatus::success == result.status) {
-            redefineOutputMemory(result.dims);
+        IShapeInfer::Result result;
+        {
+            PERF_SI(this, true);
+            result = shapeInfer();
+        }
+        {
+            PERF_ROM(this, true);
+            if (ShapeInferStatus::success == result.status) {
+                redefineOutputMemory(result.dims);
+            }
         }
     }
 }
@@ -571,6 +581,7 @@ void Node::updateShapes() {
 void Node::updateDynamicParams() {
     IE_ASSERT(isDynamicNode()) << "Node::updateDynamicParams() is called to a static shape node of type: " << getTypeStr() << " with name: " << getName();
     if (isExecutable()) {
+        PERF_PP(this, true);
         if (needPrepareParams()) {
             IE_ASSERT(inputShapesDefined()) << "Can't prepare params for " << getTypeStr() << " node with name: " << getName() <<
                 " since the input shapes are not defined.";
@@ -589,7 +600,10 @@ void Node::updateDynamicParams() {
 }
 void Node::executeDynamic(dnnl::stream strm) {
     if (isExecutable()) {
-        executeDynamicImpl(strm);
+        {
+            PERF_EX(this, true);
+            executeDynamicImpl(strm);
+        }
     }
     updateLastInputDims();
 }
