@@ -50,7 +50,7 @@
 
 #include "nodes/common/cpu_memcpy.h"
 #include "utils/rt_info/memory_formats_attribute.hpp"
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/opsets/opset1.hpp>
 
 #include <dnnl_types.h>
 #include <dnnl_debug.h>

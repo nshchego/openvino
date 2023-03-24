@@ -88,6 +88,38 @@ void JitReduceKernelBase<CallArgs>::horiz_pd(const Xmm &xmm, const Operand &op) 
     }
 }
 
+template<typename CallArgs>
+void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm &xmm, const Operand &op) {
+    switch (jcp.reduce_mode) {
+        case Algorithm::ReduceAnd:
+            uni_vandpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceL1:
+        case Algorithm::ReduceL2:
+        case Algorithm::ReduceLogSum:
+        case Algorithm::ReduceMean:
+        case Algorithm::ReduceSum:
+        case Algorithm::ReduceSumSquare:
+        case Algorithm::ReduceLogSumExp:
+            uni_vpaddq(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceMax:
+            vpmaxsq(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceMin:
+            vpminsq(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceOr:
+            uni_vorpd(xmm, xmm, op);
+            break;
+        case Algorithm::ReduceProd:
+            vpmullq(xmm, xmm, op);
+            break;
+        default:
+            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+    }
+}
+
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::generate() {
     if (jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
@@ -382,9 +414,9 @@ void JitReduceKernel<isa>::reduce_tail() {
             reduce_kernel_scalar(xmm_src, xmm_dst);
             if (jcp.reduce_mode == Algorithm::ReduceOr) {
                 if (exec_prc == Precision::FP32) {
-                    uni_cmpneqps(xmm_dst, xmm_dst, xmm_zero);
+                    uni_vcmpps(xmm_dst, xmm_dst, xmm_zero, _cmp_neq_uq);
                     uni_vandps(xmm_dst, xmm_dst, xmm_aux);
-                } else if (exec_prc == Precision::FP64) {
+                } else if (exec_prc == Precision::FP64 || exec_prc == Precision::I64) {
                     uni_vcmppd(xmm_dst, xmm_dst, xmm_zero, _cmp_neq_uq);
                     uni_vandpd(xmm_dst, xmm_dst, xmm_aux);
                 }
