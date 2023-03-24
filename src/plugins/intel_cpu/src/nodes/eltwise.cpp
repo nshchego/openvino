@@ -9,7 +9,7 @@
 
 #include <ie_parallel.hpp>
 
-#include "cpu_types.h"
+// #include "cpu_types.h"
 #include "utils/bfloat16.hpp"
 #include "ie_ngraph_utils.hpp"
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
@@ -31,7 +31,6 @@
 #include "utils/cpu_utils.hpp"
 #include <common/primitive_hashing_utils.hpp>
 
-//#include "ngraph/ngraph.hpp"
 #include <openvino/opsets/opset1.hpp>
 #include "ngraph_transformations/op/power_static.hpp"
 #include "ngraph_transformations/op/leaky_relu.hpp"
