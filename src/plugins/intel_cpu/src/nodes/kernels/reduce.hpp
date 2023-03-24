@@ -86,6 +86,8 @@ protected:
 
     void horiz_pd(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 
+    void horiz_qq(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+
     JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
 };

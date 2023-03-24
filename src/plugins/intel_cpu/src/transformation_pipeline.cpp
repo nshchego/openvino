@@ -196,16 +196,15 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         manager.register_pass<ov::pass::MarkDequantizationSubgraph>(defaultPrecisions);
     }
 
-    bool supportI64 = config->enableNativeI64;
+    bool supportI64 = config.enableNativeI64;
 
     if (!supportI64) {
-        // Switch on INT64 if a model contains Reference node.
+        // Switch on the INT64 if a model contains Extension node.
         auto orderedOps = model->get_ordered_ops();
         for (const auto& op : orderedOps) {
-            const NodePtr node {Node::factory().create(op, nullptr)};
-            if (node->getType() == Type::Reference) {
-                for (auto prc : node->getOriginalInputPrecisions()) {
-                    if (prc == Precision::I64) {
+            if (TypeFromName(op->get_type_name()) == Type::Unknown) {
+                for (size_t i = 0lu; i < op->get_input_size(); i++) {
+                    if (one_of(op->get_input_element_type(i), element::i64, element::u64)) {
                         supportI64 = true;
                         break;
                     }
@@ -213,8 +212,8 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
                 if (supportI64) {
                     break;
                 }
-                for (auto prc : node->getOriginalOutputPrecisions()) {
-                    if (prc == Precision::I64) {
+                for (size_t i = 0lu; i < op->get_output_size(); i++) {
+                    if (one_of(op->get_output_element_type(i), element::i64, element::u64)) {
                         supportI64 = true;
                         break;
                     }
