@@ -261,6 +261,23 @@ InferenceEngine::Precision eltwise_precision_helper::get_precision(const size_t 
             }
         }
     }*/
+     bool allInpI64 = true;
+        for (size_t i = 0lu; i < jep_.inputs_number; i++) {
+            if (jep_.src_prc[i] != Precision::I64) {
+                allInpI64 = false;
+                break;
+            }
+        }
+        if (allInpI64) {
+            for (const auto &prcs : supported_precision_intersection) {
+                if (prcs[0] == element::i64) {
+                    exec_prc = Precision::I64;
+                    break;
+                } else if (prcs[0] == element::f64) {
+                    exec_prc = Precision::FP64;
+                }
+            }
+        }
 
     if (exec_prc == Precision::UNSPECIFIED) {
         IE_THROW() << "Eltwise jitter failed to specify execution precision for Eltwise node";
@@ -418,12 +435,12 @@ std::cout << "ELTW ALGO: " << int(eltwise_data_[i].algo) << std::endl;
 
         mov(reg_post_op_ptrs, ptr[reg_const_params + GET_OFF(post_op_data)]);
 
-        Xbyak::Label unroll_loop_label;
-        Xbyak::Label unroll_loop_end_label;
-        Xbyak::Label main_loop_label;
-        Xbyak::Label main_loop_end_label;
-        Xbyak::Label tail_loop_label;
-        Xbyak::Label tail_loop_end_label;
+        Label unroll_loop_label;
+        Label unroll_loop_end_label;
+        Label main_loop_label;
+        Label main_loop_end_label;
+        Label tail_loop_label;
+        Label tail_loop_end_label;
 
         if (isa == x64::avx512_core)
             vpxord(vmm_zero, vmm_zero, vmm_zero);
@@ -758,7 +775,7 @@ private:
         }
     }
 
-    inline void load_vector(Vmm vmm_src, const Xbyak::Address &op, Precision src_prc, Precision dst_prc, bool broadcast) {
+    inline void load_vector(const Vmm &vmm_src, const Address &op, const Precision &src_prc, const Precision &dst_prc, bool broadcast) {
         Xmm xmm_src = Xmm(vmm_src.getIdx());
         Ymm ymm_src = Ymm(vmm_src.getIdx());
 
@@ -784,6 +801,12 @@ private:
                 case Precision::I64:
                     if (dst_prc == Precision::I64 || dst_prc == Precision::I32) {
                         uni_vmovups(vmm_src, op);
+                    } else if (dst_prc == Precision::FP64) {
+                        if (x64::mayiuse(x64::avx512_core)) {
+                            vcvtqq2pd(vmm_src, op);
+                        } else {
+                            // TODO
+                        }
                     }
                     break;
                 case Precision::BF16:
@@ -830,21 +853,31 @@ private:
                     }
                     break;
                 case Precision::I64:
+                case Precision::FP64:
                     break;
                 default:
-                    IE_THROW() << "Unknown dst_prc: " << dst_prc;
+                    IE_THROW() << "Unsupported destination precision: " << dst_prc;
             }
         }
     }
 
-    inline void load_scalar(Xmm xmm_src, const Xbyak::Address &op, Precision src_prc, Precision dst_prc) {
+    inline void load_scalar(const Xmm &xmm_src, const Address &op, const Precision &src_prc, const Precision &dst_prc) {
+        Address srcAdrBcst(op.getBit(), true, op.getRegExp());
         switch (src_prc) {
             case Precision::I64:
-                uni_vmovsd(xmm_src, op);
+                if (dst_prc == Precision::I64) {
+                    uni_vmovsd(xmm_src, op);
+                } else if (dst_prc == Precision::FP64) {
+                    if (x64::mayiuse(x64::avx512_core)) {
+                        vcvtqq2pd(xmm_src, srcAdrBcst);
+                    } else {
+                        // TODO
+                    }
+                }
                 break;
             case Precision::FP32:
             case Precision::I32:
-                uni_vmovss(xmm_src, op);
+                uni_vmovss(xmm_src, op); // TODO: AVX512 uni_vcvtdq2ps with bct
                 break;
             case Precision::BF16:
                 uni_vpinsrw(xmm_src, xmm_src, op, 0);
@@ -894,17 +927,31 @@ private:
                 }
                 break;
             case Precision::I64:
+            case Precision::FP64:
                 break;
             default:
-                assert(!"unknown dst_prc");
+                IE_THROW() << "Unsupported destination precision: " << dst_prc;
         }
     }
 
-    inline void store_vector(const Xbyak::Address &op, Vmm vmm_dst, Precision src_prc, Precision dst_prc) {
+    inline void store_vector(const Address &op, const Vmm &vmm_dst, const Precision &src_prc, const Precision &dst_prc) {
         Xmm xmm_dst = Xmm(vmm_dst.getIdx());
         Ymm ymm_dst = Ymm(vmm_dst.getIdx());
 
         switch (src_prc) {
+            case Precision::FP64:
+                if (dst_prc == Precision::FP32) {
+                    uni_vcvtpd2ps(x64::mayiuse(x64::avx512_core) ? ymm_dst : xmm_dst, vmm_dst);
+                } else if (dst_prc == Precision::I64) {
+                    if (x64::mayiuse(x64::avx512_core)) {
+                        vcvtpd2qq(vmm_dst, vmm_dst);
+                    } else {
+                        // TODO
+                    }
+                } else if (dst_prc == Precision::I32) {
+                    vcvtpd2dq(ymm_dst, vmm_dst);
+                }
+                break;
             case Precision::FP32:
                 if (dst_prc == Precision::I64) {
                     if (isa == x64::avx512_core) {
@@ -930,7 +977,7 @@ private:
                 }
                 break;
             default:
-                assert(!"unknown src_prc");
+                IE_THROW() << "Unsupported source precision: " << src_prc;
         }
 
         switch (dst_prc) {
@@ -942,9 +989,7 @@ private:
                 }
                 break;
             case Precision::I64:
-//                if (src_prc == Precision::I64) {
-                    uni_vmovups(op, vmm_dst);
-//                }
+                uni_vmovups(op, vmm_dst);
                 break;
             case Precision::I32:
                 if (src_prc == Precision::I64) {
@@ -1026,12 +1071,25 @@ private:
                 }
                 break;
             default:
-                assert(!"unknown dst_prc");
+                IE_THROW() << "Unsupported destination precision: " << dst_prc;
         }
     }
 
-    inline void store_scalar(const Xbyak::Address &op, Xmm xmm_dst, Precision src_prc, Precision dst_prc) {
+    inline void store_scalar(const Address &op, const Xmm &xmm_dst, const Precision &src_prc, const Precision &dst_prc) {
         switch (src_prc) {
+            case Precision::FP64:
+                if (dst_prc == Precision::FP32) {
+                    uni_vcvtpd2ps(xmm_dst, xmm_dst);
+                } else if (dst_prc == Precision::I64) {
+                    if (x64::mayiuse(x64::avx512_core)) {
+                        vcvtpd2qq(xmm_dst, xmm_dst);
+                    } else {
+                        // TODO
+                    }
+                } else if (dst_prc == Precision::I32) {
+                    uni_vcvtpd2dq(xmm_dst, xmm_dst);
+                }
+                break;
             case Precision::FP32:
                 if (dst_prc == Precision::I64) {
                     if (isa == x64::avx512_core) {
@@ -1063,14 +1121,13 @@ private:
                 }
                 break;
             default:
-                assert(!"unknown src_prc");
+                IE_THROW() << "Unsupported source precision: " << src_prc;
         }
 
         switch (dst_prc) {
+            case Precision::FP64:
             case Precision::I64:
-//                if (src_prc == Precision::I64) {
-                    uni_vmovsd(op, xmm_dst);
-//                }
+                uni_vmovsd(op, xmm_dst);
                 break;
             case Precision::FP32:
             case Precision::I32:
@@ -1100,7 +1157,7 @@ private:
                 uni_vpextrb(op, xmm_dst, 0);
                 break;
             default:
-                assert(!"unknown dst_prc");
+                IE_THROW() << "Unsupported destination precision: " << dst_prc;
         }
     }
 };
@@ -1662,19 +1719,39 @@ std::cout << "OUT_PRC: " << outPrc << std::endl;
         if (_pKernel->jep_.input_size == optimalTensorRank) {
 std::cout << "exec Optimized 6D" << std::endl;
             // execute Optimized 6D
-            parallel_for5d(dims_out[0], dims_out[1], dims_out[2], dims_out[3], dims_out[4],
-                           [&](size_t i0, size_t i1, size_t i2, size_t i3, size_t i4) {
-                               auto args = jit_eltwise_call_args_indexes();
-                               args.indexes[0] = i0;
-                               args.indexes[1] = i1;
-                               args.indexes[2] = i2;
-                               args.indexes[3] = i3;
-                               args.indexes[4] = i4;
-// TODO: not efficient division on threads
-//std::cout << "EXEC i3: " << i3 << "; i4: " << i4 << std::endl;
+//             parallel_for5d(dims_out[0], dims_out[1], dims_out[2], dims_out[3], dims_out[4],
+//                            [&](size_t i0, size_t i1, size_t i2, size_t i3, size_t i4) {
+//                                auto args = jit_eltwise_call_args_indexes();
+//                                args.indexes[0] = i0;
+//                                args.indexes[1] = i1;
+//                                args.indexes[2] = i2;
+//                                args.indexes[3] = i3;
+//                                args.indexes[4] = i4;
+// // TODO: not efficient work division
+// // std::cout << "EXEC i3: " << i3 << "; i4: " << i4 << std::endl;
 
-                               (*_pKernel)(&args_ptrs, &args);
-                           });
+//                                (*_pKernel)(&args_ptrs, &args);
+//                            });
+            for (int i0 = 0; i0 < dims_out[0]; i0++) {
+            for (int i1 = 0; i1 < dims_out[1]; i1++) {
+            for (int i2 = 0; i2 < dims_out[2]; i2++) {
+            for (int i3 = 0; i3 < dims_out[3]; i3++) {
+            for (int i4 = 0; i4 < dims_out[4]; i4++) {
+                auto args = jit_eltwise_call_args_indexes();
+                args.indexes[0] = i0;
+                args.indexes[1] = i1;
+                args.indexes[2] = i2;
+                args.indexes[3] = i3;
+                args.indexes[4] = i4;
+                
+// std::cout << "EXEC i0: " << i0 << "; i3: " << i3 << "; i4: " << i4 << std::endl;
+                (*_pKernel)(&args_ptrs, &args);
+            }
+            }
+            }
+            }
+            }
+std::cout << "AFTER KER" << std::endl;
         } else {
 std::cout << "exec Optimized Generic" << std::endl;
             // execute Optimized Generic

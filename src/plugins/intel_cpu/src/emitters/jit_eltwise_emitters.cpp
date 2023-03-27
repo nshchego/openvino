@@ -99,53 +99,52 @@ void jit_mul_add_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
     Vmm vmm_src0 = Vmm(in_vec_idxs[0]);
     Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
     Vmm vmm_src2 = Vmm(in_vec_idxs[2]);
-    Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
-    auto uni_vfmadd231_xmm = [this](Xmm vmm_dst, Xmm vmm_src0, Xmm vmm_src1, Xmm vmm_src2) {
-        h->uni_vmovups(vmm_dst, vmm_src0);
+    auto uni_vfmadd231_xmm = [this](const Xmm &vmm_dst, const Xmm &vmm_src0, const Xmm &vmm_src1, const Xmm &vmm_src2) {
         switch (exec_prc_) {
             case Precision::FP32: {
-                h->uni_vmulps(vmm_dst, vmm_dst, vmm_src1);
+                h->uni_vmulps(vmm_dst, vmm_src0, vmm_src1);
                 h->uni_vaddps(vmm_dst, vmm_dst, vmm_src2);
-            } break;
-            case Precision::I32: {
-                h->uni_vpmulld(vmm_dst, vmm_dst, vmm_src1);
-                h->uni_vpaddd(vmm_dst, vmm_dst, vmm_src2);
-            } break;
-            default: assert(!"unsupported precision");
-        }
-    };
-
-    auto uni_vfmadd231_vmm = [this, vmm_aux0](Vmm vmm_dst, Vmm vmm_src0, Vmm vmm_src1, Vmm vmm_src2) {
-        switch (exec_prc_) {
-            case Precision::FP32: {
-                Vmm vmm_mul0;
-                if (vmm_dst.getIdx() == vmm_src0.getIdx()) {
-                    h->uni_vmovups(vmm_aux0, vmm_src0);
-                    vmm_mul0 = vmm_aux0;
-                } else {
-                    vmm_mul0 = vmm_src0;
-                }
-
-                Vmm vmm_mul1;
-                if (vmm_dst.getIdx() == vmm_src1.getIdx()) {
-                    h->uni_vmovups(vmm_aux0, vmm_src1);
-                    vmm_mul1 = vmm_aux0;
-                } else {
-                    vmm_mul1 = vmm_src1;
-                }
-
-                if (vmm_dst.getIdx() != vmm_src2.getIdx())
-                    h->uni_vmovups(vmm_dst, vmm_src2);
-
-                h->uni_vfmadd231ps(vmm_dst, vmm_mul0, vmm_mul1);
             } break;
             case Precision::I32: {
                 h->uni_vpmulld(vmm_dst, vmm_src0, vmm_src1);
                 h->uni_vpaddd(vmm_dst, vmm_dst, vmm_src2);
             } break;
-            default: assert(!"unsupported precision");
+            case Precision::I64: {
+                // TODO: need WA via double
+            } break;
+            default: IE_THROW() << "jit_mul_add_emitter doesn't support precision '" << exec_prc_ << "'";
+        }
+    };
+
+    auto uni_vfmadd231_vmm = [this](const Vmm &vmm_dst, const Vmm &vmm_src0, const Vmm &vmm_src1, const Vmm &vmm_src2) {
+        switch (exec_prc_) {
+            case Precision::FP32: {
+                if (vmm_dst.getIdx() == vmm_src0.getIdx()) {
+                    h->uni_vfmadd132ps(vmm_src0, vmm_src2, vmm_src1);
+                } else if (vmm_dst.getIdx() == vmm_src1.getIdx()) {
+                    h->uni_vfmadd132ps(vmm_src1, vmm_src2, vmm_src0);
+                } else if (vmm_dst.getIdx() == vmm_src2.getIdx()) {
+                    h->uni_vfmadd231ps(vmm_src2, vmm_src0, vmm_src1);
+                } else {
+                    h->uni_vmovups(vmm_dst, vmm_src2);
+                    h->uni_vfmadd231ps(vmm_dst, vmm_src0, vmm_src1);
+                }
+            } break;
+            case Precision::I32: {
+                h->uni_vpmulld(vmm_dst, vmm_src0, vmm_src1);
+                h->uni_vpaddd(vmm_dst, vmm_dst, vmm_src2);
+            } break;
+            case Precision::I64: {
+                if (isa == x64::avx512_core) {
+                    h->vpmullq(vmm_dst, vmm_src0, vmm_src1);
+                    h->uni_vpaddq(vmm_dst, vmm_dst, vmm_src2);
+                } else {
+                    // TODO: need WA via double
+                }
+            } break;
+            default: IE_THROW() << "jit_mul_add_emitter doesn't support precision '" << exec_prc_ << "'";
         }
     };
 
@@ -156,12 +155,12 @@ void jit_mul_add_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
     }
 }
 
-size_t jit_mul_add_emitter::aux_vecs_count() const {
-    return 1;
-}
-
 std::set<std::vector<element::Type>> jit_mul_add_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}};
+    if (x64::mayiuse(x64::avx512_core)) {
+        return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}, {element::i64, element::i64, element::i64}};
+    } else {
+        return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}};
+    }
 }
 
 /// SUB ///
@@ -298,15 +297,19 @@ void jit_divide_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const 
                 break;
             }
             case Precision::I64: {
-                Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                if (isa == x64::avx512_core) {
+                    Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
 
-                // The opset doesn't contain vector instruction for integer divide operation
-                // As WA we emulate its behavior via fp divide followed by rounding to zero
-                h->vcvtqq2pd(vmm_dst, vmm_src0);
-                h->vcvtqq2pd(vmm_aux0, vmm_src1);
-                h->vdivpd(vmm_dst, vmm_dst, vmm_aux0); // uni_vdivpd
-                h->vrndscalepd(vmm_dst, vmm_dst, 3); // rounding to zero uni_vroundpd
-                h->vcvtpd2qq(vmm_dst, vmm_dst);
+                    // The opset doesn't contain vector instruction for integer divide operation
+                    // As WA we emulate its behavior via fp divide followed by rounding to zero
+                    h->vcvtqq2pd(vmm_dst, vmm_src0);
+                    h->vcvtqq2pd(vmm_aux0, vmm_src1);
+                    h->uni_vdivpd(vmm_dst, vmm_dst, vmm_aux0);
+                    h->uni_vroundpd(vmm_dst, vmm_dst, 3); // rounding to zero
+                    h->vcvtpd2qq(vmm_dst, vmm_dst);
+                } else {
+                    // TODO: need WA via double
+                }
                 break;
             }
             default: IE_THROW() << "jit_divide_emitter doesn't support precision '" << exec_prc_ << "'";
@@ -322,7 +325,11 @@ void jit_divide_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const 
 }
 
 std::set<std::vector<element::Type>> jit_divide_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+    if (x64::mayiuse(x64::avx512_core)) {
+        return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+    } else {
+        return {{element::f32, element::f32}, {element::i32, element::i32}};
+    }
 }
 
 size_t jit_divide_emitter::aux_vecs_count() const {
@@ -331,9 +338,9 @@ size_t jit_divide_emitter::aux_vecs_count() const {
 
 /// FLOOR ///
 jit_floor_emitter::jit_floor_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-: jit_emitter(host, host_isa, node, exec_prc) {}
+    : jit_emitter(host, host_isa, node, exec_prc) {}
 jit_floor_emitter::jit_floor_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-: jit_emitter(host, host_isa, exec_prc) {}
+    : jit_emitter(host, host_isa, exec_prc) {}
 
 size_t jit_floor_emitter::get_inputs_num() const { return 1; }
 
@@ -396,14 +403,14 @@ void jit_ceiling_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
 
 /// FLOOR_MOD ///
 jit_floor_mod_emitter::jit_floor_mod_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-: jit_emitter(host, host_isa, node, exec_prc) {}
+    : jit_emitter(host, host_isa, node, exec_prc) {}
 jit_floor_mod_emitter::jit_floor_mod_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-: jit_emitter(host, host_isa, exec_prc) {}
+    : jit_emitter(host, host_isa, exec_prc) {}
 
 size_t jit_floor_mod_emitter::get_inputs_num() const { return 2; }
 
 std::set<std::vector<element::Type>> jit_floor_mod_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    return {{element::f32, element::f32}};
+    return {{element::f32, element::f32}, {element::f64, element::f64}};
 }
 
 void jit_floor_mod_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
@@ -426,21 +433,49 @@ void jit_floor_mod_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, con
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
     Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
 
-    if (isa == x64::sse41) {
-        if (vmm_dst.getIdx() != vmm_src0.getIdx())
-            h->uni_vmovups(vmm_dst, vmm_src0);
-        h->uni_vmovups(vmm_aux0, vmm_src0);
-        h->uni_vdivps(vmm_aux0, vmm_aux0, vmm_src1);
-        h->uni_vroundps(vmm_aux0, vmm_aux0, 1); // rounding down
-        h->uni_vmulps(vmm_aux0, vmm_aux0, vmm_src1);
-        h->uni_vsubps(vmm_dst, vmm_dst, vmm_aux0);
-    } else {
-        if (vmm_dst.getIdx() != vmm_src0.getIdx())
-            h->uni_vmovups(vmm_dst, vmm_src0);
-        h->uni_vdivps(vmm_aux0, vmm_src0, vmm_src1);
-        h->uni_vroundps(vmm_aux0, vmm_aux0, 1); // rounding down
-        h->uni_vmulps(vmm_aux0, vmm_aux0, vmm_src1);
-        h->uni_vsubps(vmm_dst, vmm_dst, vmm_aux0);
+    switch (exec_prc_) {
+        case Precision::FP32: {
+            if (isa == x64::sse41) {
+                if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+                    h->uni_vmovups(vmm_dst, vmm_src0);
+                }
+                h->uni_vdivps(vmm_aux0, vmm_src0, vmm_src1);
+                h->uni_vroundps(vmm_aux0, vmm_aux0, 1); // rounding down
+                h->uni_vmulps(vmm_aux0, vmm_aux0, vmm_src1);
+                h->uni_vsubps(vmm_dst, vmm_dst, vmm_aux0);
+            } else {
+                if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+                    h->uni_vdivps(vmm_dst, vmm_src0, vmm_src1);
+                    h->uni_vroundps(vmm_dst, vmm_dst, 1); // rounding down
+                    h->vfnmadd132ps(vmm_dst, vmm_src0, vmm_src1);
+                } else {
+                    h->uni_vdivps(vmm_aux0, vmm_src0, vmm_src1);
+                    h->uni_vroundps(vmm_aux0, vmm_aux0, 1); // rounding down
+                    h->vfnmadd231ps(vmm_dst, vmm_aux0, vmm_src1);
+                }
+            }
+        } break;
+        case Precision::FP64: {
+            if (isa == x64::sse41) {
+                if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+                    h->uni_vmovups(vmm_dst, vmm_src0);
+                }
+                h->uni_vdivpd(vmm_aux0, vmm_src0, vmm_src1);
+                h->uni_vroundpd(vmm_aux0, vmm_aux0, 1); // rounding down
+                h->uni_vmulpd(vmm_aux0, vmm_aux0, vmm_src1);
+                h->uni_vsubpd(vmm_dst, vmm_dst, vmm_aux0);
+            } else {
+                if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+                    h->uni_vdivpd(vmm_dst, vmm_src0, vmm_src1);
+                    h->uni_vroundpd(vmm_dst, vmm_dst, 1); // rounding down
+                    h->vfnmadd132pd(vmm_dst, vmm_src0, vmm_src1);
+                } else {
+                    h->uni_vdivpd(vmm_aux0, vmm_src0, vmm_src1);
+                    h->uni_vroundpd(vmm_aux0, vmm_aux0, 1); // rounding down
+                    h->vfnmadd231pd(vmm_dst, vmm_aux0, vmm_src1);
+                }
+            }
+        } break;
     }
 }
 
@@ -600,10 +635,10 @@ std::set<std::vector<element::Type>> jit_minimum_emitter::get_supported_precisio
 
 /// SQUARED_DIFFERENCE ///
 jit_squared_difference_emitter::jit_squared_difference_emitter(
-    x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-: jit_emitter(host, host_isa, node, exec_prc) {}
+        x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
+    : jit_emitter(host, host_isa, node, exec_prc) {}
 jit_squared_difference_emitter::jit_squared_difference_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-: jit_emitter(host, host_isa, exec_prc) {}
+    : jit_emitter(host, host_isa, exec_prc) {}
 
 size_t jit_squared_difference_emitter::get_inputs_num() const { return 2; }
 
@@ -615,7 +650,7 @@ void jit_squared_difference_emitter::emit_impl(const std::vector<size_t> &in_vec
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_squared_difference_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -626,31 +661,33 @@ void jit_squared_difference_emitter::emit_isa(const std::vector<size_t> &in_vec_
     Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
-    auto uni_vsqdiff = [this](Vmm vmm_dst, Vmm vmm_src0, Vmm vmm_src1) {
-        switch (exec_prc_) {
-            case Precision::FP32: {
-                h->uni_vsubps(vmm_dst, vmm_src0, vmm_src1);
-                h->uni_vmulps(vmm_dst, vmm_dst, vmm_dst);
-            } break;
-            case Precision::I32: {
-                h->uni_vpsubd(vmm_dst, vmm_src0, vmm_src1);
-                h->uni_vpmulld(vmm_dst, vmm_dst, vmm_dst);
-            } break;
-            default: assert(!"unsupported precision");
-        }
-    };
+    switch (exec_prc_) {
+        case Precision::FP32: {
+            h->uni_vsubps(vmm_dst, vmm_src0, vmm_src1);
+            h->uni_vmulps(vmm_dst, vmm_dst, vmm_dst);
+        } break;
+        case Precision::I32: {
+            h->uni_vpsubd(vmm_dst, vmm_src0, vmm_src1);
+            h->uni_vpmulld(vmm_dst, vmm_dst, vmm_dst);
+        } break;
+        case Precision::I64: {
+            if (isa == x64::avx512_core) {
+                h->uni_vpsubq(vmm_dst, vmm_src0, vmm_src1);
+                h->vpmullq(vmm_dst, vmm_dst, vmm_dst);
+            } else {
 
-    if (isa == x64::sse41) {
-        if (vmm_src0.getIdx() != vmm_dst.getIdx())
-            h->uni_vmovups(vmm_dst, vmm_src0);
-        uni_vsqdiff(vmm_dst, vmm_dst, vmm_src1);
-    } else {
-        uni_vsqdiff(vmm_dst, vmm_src0, vmm_src1);
+            }
+        } break;
+        default: IE_THROW() << "jit_squared_difference_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
 std::set<std::vector<element::Type>> jit_squared_difference_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    return {{element::f32, element::f32}, {element::i32, element::i32}};
+    if (x64::mayiuse(x64::avx512_core)) {
+        return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+    } else {
+        return {{element::f32, element::f32}, {element::i32, element::i32}};
+    }
 }
 
 /// POWER_DYNAMIC ///

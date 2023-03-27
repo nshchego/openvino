@@ -195,7 +195,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
     if (useLpt) {
         manager.register_pass<ov::pass::MarkDequantizationSubgraph>(defaultPrecisions);
     }
-
+std::cout << "PreLpt enableNativeI64: " << config.enableNativeI64 << std::endl;
     bool supportI64 = config.enableNativeI64;
 
     if (!supportI64) {
@@ -224,6 +224,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
             }
         }
     }
+std::cout << "PreLpt supportI64: " << supportI64 << std::endl;
 
     auto get_convert_precisions = [&]() {
         precisions_map map = {
@@ -250,7 +251,8 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
 
         return map;
     };
-    static const auto precisions = get_convert_precisions();
+
+    const auto precisions = get_convert_precisions();
     type_to_fuse_map type_to_fuse = {{ov::opset10::Convert::get_type_info_static(), fuse_type_to_convert}};
 
     manager.register_pass<ov::pass::AUGRUCellFusion>();

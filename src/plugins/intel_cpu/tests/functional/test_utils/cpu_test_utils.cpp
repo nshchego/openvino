@@ -357,9 +357,9 @@ std::vector<CPUSpecificParams> filterCPUSpecificParams(std::vector<CPUSpecificPa
     return paramsVector;
 }
 
-inline void CheckNumberOfNodesWithTypeImpl(std::shared_ptr<const ov::Model> function,
-                                           std::string nodeType,
-                                           size_t expectedCount) {
+inline void CheckNumberOfNodesWithTypeImpl(const std::shared_ptr<const ov::Model> &function,
+                                           const std::string &nodeType,
+                                           const size_t expectedCount) {
     ASSERT_NE(nullptr, function);
     size_t actualNodeCount = 0;
     for (const auto &node : function->get_ops()) {

@@ -523,6 +523,16 @@ template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::reduce_gather(const Vmm &vmm_dst, int offset) {
     switch (jcp.src_prc) {
         case Precision::FP64:
+            if (isa == x64::avx512_core) {
+                kxnorq(k_mask, k_mask, k_mask);
+                vgatherdpd(vmm_src | k_mask, ptr[reg_src + offset + ymm_idx]);
+            } else if (isa == x64::avx2) {
+                uni_vpcmpeqq(vmm_mask, vmm_mask, vmm_mask);
+                vgatherdpd(vmm_src, ptr[reg_src + offset + xmm_idx], vmm_mask);
+            } else {
+                pack_gathered_vector(vmm_src, vmm_idx, offset, jcp.src_prc);
+            }
+            break;
         case Precision::I64:
             if (isa == x64::avx512_core) {
                 kxnorq(k_mask, k_mask, k_mask);

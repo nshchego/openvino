@@ -132,7 +132,9 @@ void JitKernelBase::uni_vpsubd(const Ymm& vDst,
             IE_THROW() << "Not supported operand type.";
         }
     } else if (isValidIsa(x64::sse41)) {
-        assert(vDst.getIdx() != vSrc.getIdx());
+        if (vDst.getIdx() != vSrc.getIdx()) {
+            movups(vDst, vSrc);
+        }
         psubd(vDst, op);
     } else {
         IE_THROW() << "Not defined behavior for instruction 'vpsubd' in current instructions set.";

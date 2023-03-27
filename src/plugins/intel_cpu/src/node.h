@@ -433,6 +433,9 @@ public:
     }
 
     void setOriginalOutputPrecisionAtPort(size_t port, InferenceEngine::Precision precision) {
+// if (precision == InferenceEngine::Precision::BF16) {
+    // std::cout << "[" << typeStr << "][" << name << "] setOriginalOutputPrecisionAtPort: " << precision << std::endl;
+// }
         if (originalOutputPrecisions.size() <= port) {
             IE_THROW() << "Incorrect output port number for node " << getName();
         }

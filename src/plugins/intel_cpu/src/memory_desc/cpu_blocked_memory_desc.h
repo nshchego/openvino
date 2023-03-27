@@ -92,6 +92,9 @@ private:
     MemoryDescPtr cloneWithNewDimsImp(const VectorDims& dims) const override;
 
     void setPrecision(InferenceEngine::Precision prc) override {
+// if (prc == InferenceEngine::Precision::BF16) {
+//     std::cout << "setPrecision: BF16" << std::endl;
+// }
         precision = std::move(prc);
     }
 
