@@ -5,6 +5,7 @@
 #include "convert_precision_i64_i32.hpp"
 #include <openvino/opsets/opset10.hpp>
 #include "transformations/utils/utils.hpp"
+#include "cpu_types.h"
 
 #include <unordered_set>
 
@@ -26,6 +27,7 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
         ov::opset10::NonMaxSuppression::get_type_info_static(),
         ov::opset10::OneHot::get_type_info_static(),
         ov::opset10::Parameter::get_type_info_static(),
+        ov::opset10::ReduceL1::get_type_info_static(),
         ov::opset10::ReduceL2::get_type_info_static(),
         ov::opset10::ReduceLogicalAnd::get_type_info_static(),
         ov::opset10::ReduceMax::get_type_info_static(),
@@ -78,7 +80,7 @@ std::shared_ptr<ngraph::Node> changeConstantPrecision(std::shared_ptr<ov::opset1
 bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr<ov::Model> &model) {
     const auto orderedOps = model->get_ordered_ops();
     for (const auto& op : orderedOps) {
-        if (isNativelySupported(op->get_type_info())) {
+        if (isNativelySupported(op->get_type_info()) || TypeFromName(op->get_type_name()) == Type::Unknown) {
             continue;
         }
 

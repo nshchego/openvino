@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Intel Corporation
+// Copyright (C) 2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -9,6 +9,16 @@ using namespace dnnl::impl::cpu;
 using namespace Xbyak;
 using Precision = typename InferenceEngine::Precision;
 
+
+JitKernelBase::JitKernelBase(const char* name) : x64::jit_generator(name) {
+    if (isValidIsa(x64::avx512_core)) {
+        vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::avx512_core));
+    } else if (isValidIsa(x64::avx2)) {
+        vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::avx2));
+    } else if (isValidIsa(x64::sse41)) {
+        vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::sse41));
+    } 
+}
 
 void JitKernelBase::uni_vfmsub132ps(const Xmm& vDst,
                                     const Xmm& vSrc,
@@ -378,6 +388,44 @@ void JitKernelBase::gatherdd(const Ymm&   vDst,
     }
 }
 
+// void JitKernelBase::gatherqq(const Xmm&   vDst,
+//                              const Reg64& rSrcPtr,
+//                              const Xmm&   vSrcShift,
+//                              const Xmm&   vReadMask,
+//                              const bool useMask,
+//                              const bool zeroFill) {
+//     if (vDst.getIdx() == vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
+//         IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
+//     }
+//     if (zeroFill)
+//         pxor(vDst, vDst); // Don't use vpxor. It zeros the rest of the YMM register.
+
+//     if (isValidIsa(x64::avx2)) {
+//         if (!useMask)
+//             uni_vpcmpeqq(vReadMask, vReadMask, vReadMask);
+
+//         vpgatherqq(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
+//     } else {
+//         auto rAux = getReg64();
+//         // Reg32 r32Aux = Reg32(rAux.getIdx());
+//         const uint8_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / sizeof(int);
+
+//         for (uint8_t i = 0; i < elPerVec; i++) {
+//             Label lLoopNext;
+//             if (useMask) {
+//                 uni_vpextrd(rAux, vReadMask, i);
+//                 cmp(rAux, 0); // TODO: check significant bit
+//                 je(lLoopNext, T_NEAR);
+//             }
+//             uni_vpextrd(rAux, vSrcShift, i);
+//             pinsrd(vDst, ptr[rSrcPtr + rAux], i);
+
+//             if (useMask)
+//                 L(lLoopNext);
+//         }
+//     }
+// }
+
 void JitKernelBase::uni_vpbroadcastd(const Xmm &x, const Operand &op) {
     if (isValidIsa(x64::avx2)) {
         vpbroadcastd(x, op);
@@ -491,8 +539,8 @@ void JitKernelBase::fillRestWorkMask(const Ymm& ymmDstMask,
 void JitKernelBase::load(const Xmm&     vDst,
                          const Address& srcAddr,
                          const Reg64&   rLoadNum,
-                         const size_t          typeSize,
-                         const bool            zeroFilling) {
+                         const size_t   typeSize,
+                         const bool     zeroFilling) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not load data with type size " << typeSize;
     }
@@ -521,8 +569,8 @@ void JitKernelBase::load(const Xmm&     vDst,
 void JitKernelBase::load(const Ymm&     vDst,
                          const Address& srcAddr,
                          const Reg64&   rLoadNum,
-                         const size_t          typeSize,
-                         const bool            zeroFilling) {
+                         const size_t   typeSize,
+                         const bool     zeroFilling) {
     if (!one_of(typeSize, 1, 2, 4, 8)) {
         IE_THROW() << "Could not load data with type size " << typeSize;
     }
@@ -1001,7 +1049,7 @@ void JitKernelBase::storeVector(const Address &dstAdr,
             }
             break;
         case Precision::BF16:
-            // TODO: uni_vcvtneps2bf16->emit_code({static_cast<size_t>(vSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
+            vcvtneps2bf16->emit_code({static_cast<size_t>(ymmSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
             vmovdqu16(dstAdr, ymmSrc);
             break;
         case Precision::I16:

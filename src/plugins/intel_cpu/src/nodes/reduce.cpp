@@ -419,81 +419,81 @@ void Reduce::createPrimitive() {
 
 void Reduce::execute(dnnl::stream strm) {
 // DEBUG
-    // std::cout << "\n[INPUT 0] size " << getParentEdgeAt(0)->getMemoryPtr()->GetSize() << std::endl;
-    // const int elPerVec = 64 / getOriginalInputPrecisionAtPort(0).size();
+    std::cout << "\n[INPUT 0] size " << getParentEdgeAt(0)->getMemoryPtr()->GetSize() << std::endl;
+    const int elPerVec = 64 / getOriginalInputPrecisionAtPort(0).size();
 
-    // void* firstData = getParentEdgeAt(0)->getMemoryPtr()->GetPtr();
-    // const auto dims = getParentEdgeAt(0)->getMemoryPtr()->getStaticDims();
-    // const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
-    // for (int i = 0; i < blLen; i++) {
-    //     if (i != 0 && i % elPerVec == 0) {
-    //         std::cout << "| ";
-    //     }
-    //     if (getOriginalInputPrecisionAtPort(0) == Precision::FP64) {
-    //         std::cout << reinterpret_cast<double *>(firstData)[i] << "; ";
-    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::I64) {
-    //         std::cout << reinterpret_cast<int64_t *>(firstData)[i] << "; ";
-    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::I32) {
-    //         std::cout << reinterpret_cast<int32_t *>(firstData)[i] << "; ";
-    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::FP32) {
-    //         std::cout << reinterpret_cast<float *>(firstData)[i] << "; ";
-    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::U8) {
-    //         std::cout << int(reinterpret_cast<uint8_t *>(firstData)[i]) << "; ";
-    //     } else if (getOriginalInputPrecisionAtPort(0) == Precision::I8) {
-    //         std::cout << int(reinterpret_cast<int8_t *>(firstData)[i]) << "; ";
-    //     }
-    // }
-    // std::cout << std::endl;
+    void* firstData = getParentEdgeAt(0)->getMemoryPtr()->GetPtr();
+    const auto dims = getParentEdgeAt(0)->getMemoryPtr()->getStaticDims();
+    const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+    for (int i = 0; i < blLen; i++) {
+        if (i != 0 && i % elPerVec == 0) {
+            std::cout << "| ";
+        }
+        if (getOriginalInputPrecisionAtPort(0) == Precision::FP64) {
+            std::cout << reinterpret_cast<double *>(firstData)[i] << "; ";
+        } else if (getOriginalInputPrecisionAtPort(0) == Precision::I64) {
+            std::cout << reinterpret_cast<int64_t *>(firstData)[i] << "; ";
+        } else if (getOriginalInputPrecisionAtPort(0) == Precision::I32) {
+            std::cout << reinterpret_cast<int32_t *>(firstData)[i] << "; ";
+        } else if (getOriginalInputPrecisionAtPort(0) == Precision::FP32) {
+            std::cout << reinterpret_cast<float *>(firstData)[i] << "; ";
+        } else if (getOriginalInputPrecisionAtPort(0) == Precision::U8) {
+            std::cout << int(reinterpret_cast<uint8_t *>(firstData)[i]) << "; ";
+        } else if (getOriginalInputPrecisionAtPort(0) == Precision::I8) {
+            std::cout << int(reinterpret_cast<int8_t *>(firstData)[i]) << "; ";
+        }
+    }
+    std::cout << std::endl;
 
-    // if (getParentEdges().size() > 1) {
-    //     std::cout << "[INPUT 1] size " << getParentEdgeAt(1)->getMemoryPtr()->GetSize() << std::endl;
+    if (getParentEdges().size() > 1) {
+        std::cout << "[INPUT 1] size " << getParentEdgeAt(1)->getMemoryPtr()->GetSize() << std::endl;
 
-    //     const auto dims = getParentEdgeAt(1)->getMemoryPtr()->getStaticDims();
-    //     const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
-    //     auto* secData = getParentEdgeAt(1)->getMemoryPtr()->GetPtr();
-    //     for (int i = 0; i < blLen; i++) {
-    //         if (i != 0 && i % elPerVec == 0) {
-    //             std::cout << "| ";
-    //         }
-    //         if (getOriginalInputPrecisionAtPort(1) == Precision::FP64) {
-    //             std::cout << reinterpret_cast<double*>(secData)[i] << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
-    //             std::cout << reinterpret_cast<int64_t*>(secData)[i] << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
-    //             std::cout << reinterpret_cast<int32_t*>(secData)[i] << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
-    //             std::cout << reinterpret_cast<float*>(secData)[i] << "; ";
-    //         }else if (getOriginalInputPrecisionAtPort(1) == Precision::U8) {
-    //             std::cout << int(reinterpret_cast<uint8_t *>(secData)[i]) << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I8) {
-    //             std::cout << int(reinterpret_cast<int8_t *>(secData)[i]) << "; ";
-    //         }
-    //     }
-    //     std::cout << std::endl;
-    // }
-    // if (getParentEdges().size() > 2) {
-    //     std::cout << "INPUT 2: " << std::endl;
-    //     std::cout << "Size: " << getParentEdgeAt(2)->getMemoryPtr()->GetSize() << std::endl;
+        const auto dims = getParentEdgeAt(1)->getMemoryPtr()->getStaticDims();
+        const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+        auto* secData = getParentEdgeAt(1)->getMemoryPtr()->GetPtr();
+        for (int i = 0; i < blLen; i++) {
+            if (i != 0 && i % elPerVec == 0) {
+                std::cout << "| ";
+            }
+            if (getOriginalInputPrecisionAtPort(1) == Precision::FP64) {
+                std::cout << reinterpret_cast<double*>(secData)[i] << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
+                std::cout << reinterpret_cast<int64_t*>(secData)[i] << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
+                std::cout << reinterpret_cast<int32_t*>(secData)[i] << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
+                std::cout << reinterpret_cast<float*>(secData)[i] << "; ";
+            }else if (getOriginalInputPrecisionAtPort(1) == Precision::U8) {
+                std::cout << int(reinterpret_cast<uint8_t *>(secData)[i]) << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I8) {
+                std::cout << int(reinterpret_cast<int8_t *>(secData)[i]) << "; ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    if (getParentEdges().size() > 2) {
+        std::cout << "INPUT 2: " << std::endl;
+        std::cout << "Size: " << getParentEdgeAt(2)->getMemoryPtr()->GetSize() << std::endl;
 
-    //     const auto dims = getParentEdgeAt(2)->getMemoryPtr()->getStaticDims();
-    //     const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
-    //     auto thrData = getParentEdgeAt(2)->getMemoryPtr()->GetPtr();
-    //     for (int i = 0; i < blLen; i++) {
-    //         if (i != 0 && i % elPerVec == 0) {
-    //             std::cout << "| ";
-    //         }
-    //         if (getOriginalInputPrecisionAtPort(1) == Precision::FP64) {
-    //             std::cout << reinterpret_cast<double*>(thrData)[i] << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
-    //             std::cout << reinterpret_cast<int64_t*>(thrData)[i] << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
-    //             std::cout << reinterpret_cast<int32_t*>(thrData)[i] << "; ";
-    //         } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
-    //             std::cout << reinterpret_cast<float*>(thrData)[i] << "; ";
-    //         }
-    //     }
-    //     std::cout << std::endl;
-    // }
+        const auto dims = getParentEdgeAt(2)->getMemoryPtr()->getStaticDims();
+        const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+        auto thrData = getParentEdgeAt(2)->getMemoryPtr()->GetPtr();
+        for (int i = 0; i < blLen; i++) {
+            if (i != 0 && i % elPerVec == 0) {
+                std::cout << "| ";
+            }
+            if (getOriginalInputPrecisionAtPort(1) == Precision::FP64) {
+                std::cout << reinterpret_cast<double*>(thrData)[i] << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
+                std::cout << reinterpret_cast<int64_t*>(thrData)[i] << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
+                std::cout << reinterpret_cast<int32_t*>(thrData)[i] << "; ";
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
+                std::cout << reinterpret_cast<float*>(thrData)[i] << "; ";
+            }
+        }
+        std::cout << std::endl;
+    }
 // DEBUG
 
     auto &dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
@@ -579,11 +579,16 @@ void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
     if (ReduceN && !ReduceC && !ReduceD && !ReduceH && !ReduceW) {
         size_t IA = IC * ID * IH * IW;
         reduceStride = IA;
-        parallel_for(IA / blockLen, [&](size_t iba){
+        // parallel_for(IA / blockLen, [&](size_t iba){
+        //     size_t oba = iba;
+        //     reduceKernelProcess(in_ptr + iba * blockLen * srcDataSize, out_ptr + oba * blockLen * dstDataSize,
+        //                           blockLen, 0, IB);
+        // });
+        for (int iba = 0; iba < IA / blockLen; iba++) {
             size_t oba = iba;
             reduceKernelProcess(in_ptr + iba * blockLen * srcDataSize, out_ptr + oba * blockLen * dstDataSize,
                                   blockLen, 0, IB);
-        });
+        }
 
         size_t tail_start = IA / blockLen * blockLen;
         reduceKernelProcess(in_ptr + tail_start * srcDataSize, out_ptr + tail_start * dstDataSize,
@@ -599,15 +604,21 @@ void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
                     size_t output_inner_size = ReduceH ? OH * OW : OW;
                     size_t IK = outer_size / blockLen;
                     std::vector<int> indicesBuf(16, workAmount * srcDataSize);
-                    for (size_t i = 0; i < indicesBuf.size(); i++) {
+                    for (size_t i = 0; i < blockLen; i++) {
                         indicesBuf[i] *= i;
                     }
-                    parallel_for(IK, [&](size_t ik) {
+                    // parallel_for(IK, [&](size_t ik) {
+                    //     size_t ok = ik;
+                    //     reduceKernelProcess(in_ptr_n + ik * blockLen * inner_size * srcDataSize,
+                    //                           out_ptr_n + ok * blockLen * output_inner_size * dstDataSize,
+                    //                           workAmount, 1, 0, static_cast<int *>(&indicesBuf[0]));
+                    // });
+                    for (size_t ik = 0; ik < IK; ik++) {
                         size_t ok = ik;
                         reduceKernelProcess(in_ptr_n + ik * blockLen * inner_size * srcDataSize,
                                               out_ptr_n + ok * blockLen * output_inner_size * dstDataSize,
                                               workAmount, 1, 0, static_cast<int *>(&indicesBuf[0]));
-                    });
+                    }
                     size_t tail_start = IK * blockLen;
                     size_t IT = outer_size - tail_start;
                     parallel_for(IT, [&](size_t it) {
@@ -622,11 +633,20 @@ void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
                             reduceKernelProcess(in_ptr_ncd, out_ptr_ncd, workAmount, 1);
                         });
                     } else {
-                        parallel_for3d(IC, ID, IH, [&](size_t ic, size_t id, size_t ih) {
-                            size_t oc = ic, od = id; GET_PTR_NCD_BASE_PTR_N_PLN;
-                            size_t oh = ih; GET_PTR_NCDH_PLN;
-                            reduceKernelProcess(in_ptr_ncdh, out_ptr_ncdh, workAmount, 1);
-                        });
+                        // parallel_for3d(IC, ID, IH, [&](size_t ic, size_t id, size_t ih) {
+                        //     size_t oc = ic, od = id; GET_PTR_NCD_BASE_PTR_N_PLN;
+                        //     size_t oh = ih; GET_PTR_NCDH_PLN;
+                        //     reduceKernelProcess(in_ptr_ncdh, out_ptr_ncdh, workAmount, 1);
+                        // });
+                        for (int ic = 0; ic < IC; ic++) {
+                            for (int id = 0; id < ID; id++) {
+                                for (int ih = 0; ih < IH; ih++) {
+                                    size_t oc = ic, od = id; GET_PTR_NCD_BASE_PTR_N_PLN;
+                                    size_t oh = ih; GET_PTR_NCDH_PLN;
+                                    reduceKernelProcess(in_ptr_ncdh, out_ptr_ncdh, workAmount, 1);
+                                }
+                            }
+                        }
                     }
                 }
             } else if (ReduceH && ReduceW) {
@@ -947,6 +967,7 @@ inline void Reduce::reduceKernelProcess(const uint8_t *inPtr, uint8_t *outPtr, s
 }
 
 inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
+// printf("reduceKernelPostProcess workAmount+\n");
     const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
     if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
         parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
@@ -986,6 +1007,7 @@ inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
             (*reducePostKernel)(&arg);
         });
     }
+// printf("reduceKernelPostProcess workAmount-\n");
 }
 
 void Reduce::nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {

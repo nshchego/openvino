@@ -61,7 +61,7 @@ struct JitReduceKernelBase : public JitKernelBase {
         if (jcp.src_prc.size() <= 4) {
             exec_prc = InferenceEngine::Precision::FP32;
         } else if (jcp.src_prc.size() == 8) {
-            exec_prc = InferenceEngine::Precision::FP64;
+            exec_prc = jcp.src_prc;
         }
     }
 
@@ -166,9 +166,9 @@ private:
 
     void reduce_batch();
 
-    void reduce_gather(const Vmm &vmm_dst, int offset);
+    void reduce_gather(const Vmm &vmm_dst, int64_t offset);
 
-    void pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int offset, const InferenceEngine::Precision &src_dt);
+    void pack_gathered_vector(const Vmm &vmm_val, const Vmm &vmm_index, int64_t offset, const InferenceEngine::Precision &src_dt);
 
     void reduce_kernel_tail();
 
@@ -190,6 +190,8 @@ private:
 
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
+    void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+
     void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
     void horiz_store_pd(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
@@ -201,15 +203,22 @@ private:
         uint32_t float_abs = 0x7fffffff; // mask to make positive
         uint32_t float_min = 0xff7fffff; // float lowest
         uint32_t float_max = 0x7f7fffff; // float maximum
-        uint32_t int32_min = 0xcf000000; // -2^31 presented in float
-        uint32_t int32_max = 0x4effffff; // 2^31-1 presented in float
+        uint32_t float_int32_min = 0xcf000000; // -2^31 presented in float
+        uint32_t float_int32_max = 0x4effffff; // 2^31-1 presented in float
 
         uint64_t double_one = 0x3ff0000000000000; // 1.0
         uint64_t double_abs = 0x7fffffffffffffff; // mask to make positive
         uint64_t double_min = 0xffefffffffffffff; // double lowest
         uint64_t double_max = 0x7fefffffffffffff; // double maximum
-        uint64_t int64_min  = 0xc3e0000000000000; // lowest int64 presented in double
-        uint64_t int64_max  = 0x43dfffffffffffff; // max int64 presented in double
+        uint64_t double_int64_min = 0xc3e0000000000000; // lowest int64 presented in double
+        uint64_t double_int64_max = 0x43dfffffffffffff; // max int64 presented in double
+
+        uint64_t int64_one = 0x0000000000000001; // 1
+        uint64_t int64_abs = 0x7fffffffffffffff; // mask to make positive
+        // uint64_t int64_min = 0xffefffffffffffff; // double lowest
+        // uint64_t int64_max = 0x7fefffffffffffff; // double maximum
+        uint64_t int64_min  = 0x0000000000000000; // lowest int64 presented in double
+        uint64_t int64_max  = 0x7fffffffffffffff; // max int64
     } aux_vals;
 };
 
@@ -283,6 +292,8 @@ private:
     void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+
+    void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 

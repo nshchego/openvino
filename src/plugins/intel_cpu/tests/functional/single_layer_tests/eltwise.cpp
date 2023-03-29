@@ -215,7 +215,7 @@ std::vector<ngraph::helpers::EltwiseTypes> eltwiseOpTypesDiffInp = { // Differen
 };
 
 ov::AnyMap additional_config;
-ov::AnyMap additional_config_i64 = {{CPUConfigParams::KEY_CPU_ENABLE_NATIVE_I64, "1"}, {CPUConfigParams::KEY_CPU_ENABLE_NATIVE_I64, "0"}};
+ov::AnyMap additional_config_i64 = {{CPUConfigParams::KEY_CPU_ENABLE_NATIVE_I64, "1"}};
 
 std::vector<ElementType> netType = {ElementType::bf16, ElementType::f32};
 

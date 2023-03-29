@@ -6,6 +6,7 @@
 
 #include "cpu/x64/jit_generator.hpp"
 #include "registers_pool.hpp"
+#include "emitters/jit_bf16_emitters.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -18,7 +19,7 @@ namespace kernel {
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 public:
-    JitKernelBase(const char* name) : dnnl::impl::cpu::x64::jit_generator(name) {}
+    JitKernelBase(const char* name);
 
     void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
@@ -186,6 +187,8 @@ protected:
     }
 
     RegistersPool::Ptr registersPool;
+
+    std::shared_ptr<jit_uni_vcvtneps2bf16> vcvtneps2bf16;
 
     enum {
         // Comparison predicate operand (immediate byte) for single-precision floating-point values.
