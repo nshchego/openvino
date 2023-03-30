@@ -196,6 +196,8 @@ private:
 
     void horiz_store_pd(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
+    void horiz_store_qq(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc, bool load_embedded);
+
     void prepare_aux_table();
 
     const struct aux_vals_type {

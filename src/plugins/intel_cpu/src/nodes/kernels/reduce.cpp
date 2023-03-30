@@ -1231,23 +1231,23 @@ void JitReduceKernel<x64::avx2>::horiz_reduce_store_qq(const Ymm &ymm_dst, const
 
 template <>
 void JitReduceKernel<x64::sse41>::horiz_reduce_store_qq(const Vmm &vmm_dst, const Precision &dst_prc, bool load_embedded) {
-    horiz_store_pd(vmm_dst, dst_prc, load_embedded);
+    horiz_store_qq(vmm_dst, dst_prc, load_embedded);
 }
 
-// template <x64::cpu_isa_t isa>
-// void JitReduceKernel<isa>::horiz_store_qq(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
-//     vshufpd(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
-//     horiz_qq(xmm_aux1, xmm_aux2);
-//     if (load_embedded) {
-//         if (exec_prc == dst_prc) {
-//             horiz_qq(xmm_aux1, ptr_b[reg_dst]);
-//         } else {
-//             loadScalar(xmm_aux2, ptr[reg_dst], exec_prc, dst_prc);
-//             horiz_qq(xmm_aux1, xmm_aux2);
-//         }
-//     }
-//     storeScalar(ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
-// }
+template <x64::cpu_isa_t isa>
+void JitReduceKernel<isa>::horiz_store_qq(const Xmm &xmm_dst, const Precision &dst_prc, bool load_embedded) {
+    vshufpd(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
+    horiz_qq(xmm_aux1, xmm_aux2);
+    if (load_embedded) {
+        if (exec_prc == dst_prc) {
+            horiz_qq(xmm_aux1, ptr_b[reg_dst]);
+        } else {
+            loadScalar(xmm_aux2, ptr[reg_dst], exec_prc, dst_prc);
+            horiz_qq(xmm_aux1, xmm_aux2);
+        }
+    }
+    storeScalar(ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
+}
 
 //////////////////////////////////////////////////
 
@@ -1661,8 +1661,12 @@ void JitReducePostKernel<isa>::reduce_map_kernel(const Vmm &vmm_dst) {
         } else if (exec_prc == Precision::I64) {
             if (isa == x64::avx512_core) {
                 vcvtqq2pd(vmm_dst, vmm_dst);
-                uni_vdivpd(vmm_dst, vmm_dst, vmm_aux);
-                uni_vroundpd(vmm_dst, vmm_dst, 0x3); // Truncation
+            } else {
+                // TODO
+            }
+            uni_vdivpd(vmm_dst, vmm_dst, vmm_aux);
+            uni_vroundpd(vmm_dst, vmm_dst, 0x3); // Truncation
+            if (isa == x64::avx512_core) {
                 vcvtpd2qq(vmm_dst, vmm_dst);
             } else {
                 // TODO
