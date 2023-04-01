@@ -39,6 +39,8 @@ private:
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const;
+
+    size_t aux_vecs_count() const override;
 };
 
 
@@ -68,6 +70,8 @@ public:
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
 
+    size_t aux_vecs_count() const override;
+
 private:
     void emit_impl(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const override;
 
@@ -91,7 +95,10 @@ private:
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const;
+
     size_t aux_vecs_count() const override;
+
+    void register_table_entries() override;
 };
 
 class jit_floor_emitter : public jit_emitter {

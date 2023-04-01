@@ -112,7 +112,20 @@ void jit_mul_add_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
                 h->uni_vpaddd(vmm_dst, vmm_dst, vmm_src2);
             } break;
             case Precision::I64: {
-                // TODO: need WA via double
+                Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
+                // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
+                // vmm_src0 = ab; vmm_src1 = cd;
+                h->uni_vpmuludq(vmm_dst, vmm_src0, vmm_src1);  // b * d
+                h->uni_vpsrlq(vmm_aux0, vmm_src0, 32);
+                h->uni_vpmuludq(vmm_aux0, vmm_aux0, vmm_src1); // a * d
+                h->uni_vpsrlq(vmm_aux1, vmm_src1, 32);
+                h->uni_vpmuludq(vmm_aux1, vmm_aux1, vmm_src0); // b * c
+                h->uni_vpaddq(vmm_aux1, vmm_aux1, vmm_aux0);   // a * d + b * c
+                h->uni_vpsllq(vmm_aux1, vmm_aux1, 32);
+                h->uni_vpaddq(vmm_dst, vmm_dst, vmm_aux1);     // (a * d + b * c) << 32 + b * d
+
+                h->uni_vpaddq(vmm_dst, vmm_dst, vmm_src2);
             } break;
             default: IE_THROW() << "jit_mul_add_emitter doesn't support precision '" << exec_prc_ << "'";
         }
@@ -141,7 +154,20 @@ void jit_mul_add_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
                     h->vpmullq(vmm_dst, vmm_src0, vmm_src1);
                     h->uni_vpaddq(vmm_dst, vmm_dst, vmm_src2);
                 } else {
-                    // TODO: need WA via double
+                    Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                    Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
+                    // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
+                    // vmm_src0 = ab; vmm_src1 = cd;
+                    h->uni_vpmuludq(vmm_dst, vmm_src0, vmm_src1);  // b * d
+                    h->uni_vpsrlq(vmm_aux0, vmm_src0, 32);
+                    h->uni_vpmuludq(vmm_aux0, vmm_aux0, vmm_src1); // a * d
+                    h->uni_vpsrlq(vmm_aux1, vmm_src1, 32);
+                    h->uni_vpmuludq(vmm_aux1, vmm_aux1, vmm_src0); // b * c
+                    h->uni_vpaddq(vmm_aux1, vmm_aux1, vmm_aux0);   // a * d + b * c
+                    h->uni_vpsllq(vmm_aux1, vmm_aux1, 32);
+                    h->uni_vpaddq(vmm_dst, vmm_dst, vmm_aux1);     // (a * d + b * c) << 32 + b * d
+
+                    h->uni_vpaddq(vmm_dst, vmm_dst, vmm_src2);
                 }
             } break;
             default: IE_THROW() << "jit_mul_add_emitter doesn't support precision '" << exec_prc_ << "'";
@@ -156,10 +182,14 @@ void jit_mul_add_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
 }
 
 std::set<std::vector<element::Type>> jit_mul_add_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
+    return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}, {element::i64, element::i64, element::i64}};
+}
+
+size_t jit_mul_add_emitter::aux_vecs_count() const {
     if (x64::mayiuse(x64::avx512_core)) {
-        return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}, {element::i64, element::i64, element::i64}};
-    } else {
-        return {{element::f32, element::f32, element::f32}, {element::i32, element::i32, element::i32}};
+        return 0;
+    } else if (exec_prc_ == Precision::I64) {
+        return 2;
     }
 }
 
@@ -236,7 +266,18 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, cons
             if (isa == x64::avx512_core) {
                 h->vpmullq(vmm_dst, vmm_src0, vmm_src1);
             } else {
-                // TODO: need WA via double
+                Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
+                // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
+                // vmm_src0 = ab; vmm_src1 = cd;
+                h->uni_vpmuludq(vmm_dst, vmm_src0, vmm_src1);  // b * d
+                h->uni_vpsrlq(vmm_aux0, vmm_src0, 32);
+                h->uni_vpmuludq(vmm_aux0, vmm_aux0, vmm_src1); // a * d
+                h->uni_vpsrlq(vmm_aux1, vmm_src1, 32);
+                h->uni_vpmuludq(vmm_aux1, vmm_aux1, vmm_src0); // b * c
+                h->uni_vpaddq(vmm_aux1, vmm_aux1, vmm_aux0);   // a * d + b * c
+                h->uni_vpsllq(vmm_aux1, vmm_aux1, 32);
+                h->uni_vpaddq(vmm_dst, vmm_dst, vmm_aux1);     // (a * d + b * c) << 32 + b * d
             }
             break;
         default: IE_THROW() << "jit_multiply_emitter doesn't support precision '" << exec_prc_ << "'";
@@ -244,20 +285,30 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, cons
 }
 
 std::set<std::vector<element::Type>> jit_multiply_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+}
+
+size_t jit_multiply_emitter::aux_vecs_count() const {
     if (x64::mayiuse(x64::avx512_core)) {
-        return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+        return 0;
     } else {
-        return {{element::f32, element::f32}, {element::i32, element::i32}};
+        return 2;
     }
 }
 
 /// DIVIDE ///
 jit_divide_emitter::jit_divide_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, Precision exec_prc)
-	: jit_emitter(host, host_isa, node, get_arithmetic_binary_exec_precision(node)) {}
+	    : jit_emitter(host, host_isa, node, get_arithmetic_binary_exec_precision(node)) {
+    prepare_table();
+}
 jit_divide_emitter::jit_divide_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, Precision exec_prc)
-    : jit_emitter(host, host_isa, exec_prc) {}
+        : jit_emitter(host, host_isa, exec_prc) {
+    prepare_table();
+}
 
-size_t jit_divide_emitter::get_inputs_num() const { return 2; }
+size_t jit_divide_emitter::get_inputs_num() const {
+    return 2;
+}
 
 void jit_divide_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const {
     if (host_isa_ == x64::sse41) {
@@ -278,62 +329,70 @@ void jit_divide_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const 
     Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
-    auto uni_vdiv = [this](Vmm vmm_dst, Vmm vmm_src0, Vmm vmm_src1) {
-        switch (exec_prc_) {
-            case Precision::FP32: {
-                h->uni_vdivps(vmm_dst, vmm_src0, vmm_src1);
-                break;
-            }
-            case Precision::I32: {
+    // The opset doesn't contain vector instruction for integer divide operation
+    // As WA we emulate its behavior via fp divide followed by rounding to zero
+    switch (exec_prc_) {
+        case Precision::FP32: {
+            h->uni_vdivps(vmm_dst, vmm_src0, vmm_src1);
+            break;
+        }
+        case Precision::I32: {
+            Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+
+            h->uni_vcvtdq2ps(vmm_dst, vmm_src0);
+            h->uni_vcvtdq2ps(vmm_aux0, vmm_src1);
+            h->uni_vdivps(vmm_dst, vmm_dst, vmm_aux0);
+            h->uni_vroundps(vmm_dst, vmm_dst, 3); // rounding to zero
+            h->uni_vcvtps2dq(vmm_dst, vmm_dst);
+            break;
+        }
+        case Precision::I64: {
+            if (isa == x64::avx512_core) {
                 Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
 
-                // The opset doesn't contain vector instruction for integer divide operation
-                // As WA we emulate its behavior via fp divide followed by rounding to zero
-                h->uni_vcvtdq2ps(vmm_dst, vmm_src0);
-                h->uni_vcvtdq2ps(vmm_aux0, vmm_src1);
-                h->uni_vdivps(vmm_dst, vmm_dst, vmm_aux0);
-                h->uni_vroundps(vmm_dst, vmm_dst, 3); // rounding to zero
-                h->uni_vcvtps2dq(vmm_dst, vmm_dst);
-                break;
-            }
-            case Precision::I64: {
-                if (isa == x64::avx512_core) {
-                    Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                h->vcvtqq2pd(vmm_dst, vmm_src0);
+                h->vcvtqq2pd(vmm_aux0, vmm_src1);
+                h->uni_vdivpd(vmm_dst, vmm_dst, vmm_aux0);
+                h->uni_vroundpd(vmm_dst, vmm_dst, 3); // rounding to zero
+                h->vcvtpd2qq(vmm_dst, vmm_dst);
+            } else {
+                Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
+                h->uni_vmovups(vmm_aux1, table_val_64("dMask"));
 
-                    // The opset doesn't contain vector instruction for integer divide operation
-                    // As WA we emulate its behavior via fp divide followed by rounding to zero
-                    h->vcvtqq2pd(vmm_dst, vmm_src0);
-                    h->vcvtqq2pd(vmm_aux0, vmm_src1);
-                    h->uni_vdivpd(vmm_dst, vmm_dst, vmm_aux0);
-                    h->uni_vroundpd(vmm_dst, vmm_dst, 3); // rounding to zero
-                    h->vcvtpd2qq(vmm_dst, vmm_dst);
-                } else {
-                    // TODO: need WA via double
-                }
-                break;
+                h->uni_vpaddq(vmm_dst,  vmm_src0, vmm_aux1);
+                h->uni_vsubpd(vmm_dst,  vmm_dst,  vmm_aux1);
+                h->uni_vpaddq(vmm_aux0, vmm_src1, vmm_aux1);
+                h->uni_vsubpd(vmm_aux0, vmm_aux0, vmm_aux1);
+
+                h->uni_vdivpd(vmm_dst, vmm_dst, vmm_aux0);
+                h->uni_vroundpd(vmm_dst, vmm_dst, 3); // rounding to zero
+
+                h->uni_vaddpd(vmm_dst, vmm_dst, vmm_aux1);
+                h->uni_vpsubq(vmm_dst, vmm_dst, vmm_aux1);
             }
-            default: IE_THROW() << "jit_divide_emitter doesn't support precision '" << exec_prc_ << "'";
+            break;
         }
-    };
-
-    if (isa == x64::sse41) {
-        h->uni_vmovups(vmm_dst, vmm_src0);
-        uni_vdiv(vmm_dst, vmm_dst, vmm_src1);
-    } else {
-        uni_vdiv(vmm_dst, vmm_src0, vmm_src1);
+        default: IE_THROW() << "jit_divide_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
 std::set<std::vector<element::Type>> jit_divide_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    if (x64::mayiuse(x64::avx512_core)) {
-        return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
-    } else {
-        return {{element::f32, element::f32}, {element::i32, element::i32}};
-    }
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
 }
 
 size_t jit_divide_emitter::aux_vecs_count() const {
-    return (exec_prc_ == Precision::I32 || exec_prc_ == Precision::I64) ? 1 : 0;
+    if (x64::mayiuse(x64::avx512_core)) {
+        return (exec_prc_ == Precision::I32 || exec_prc_ == Precision::I64) ? 1 : 0;
+    } else {
+        return exec_prc_ == Precision::I32 ? 1 : exec_prc_ == Precision::I64 ? 2 : 0;
+    }
+}
+
+void jit_divide_emitter::register_table_entries() {
+    if (host_isa_ != x64::avx512_core) {
+        push_arg_entry_of_64("dMask",  0x433800002150d000, true);
+    }
 }
 
 /// FLOOR ///
