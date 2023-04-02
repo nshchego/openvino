@@ -17,7 +17,7 @@ JitKernelBase::JitKernelBase(const char* name) : x64::jit_generator(name) {
         vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::avx2));
     } else if (isValidIsa(x64::sse41)) {
         vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::sse41));
-    } 
+    }
 }
 
 void JitKernelBase::uni_vfmsub132ps(const Xmm& vDst,

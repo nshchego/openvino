@@ -29,7 +29,7 @@ struct JitReduceConfigParams {
 
 struct JitReduceCallArgs {
     const void *src;
-    const int *idx;
+    const void *idx;
     void *dst;
     size_t work_amount;
     size_t work_batch;

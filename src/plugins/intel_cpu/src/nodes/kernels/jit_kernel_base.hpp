@@ -58,9 +58,9 @@ public:
     void uni_vorpd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
 
     void uni_vcmppd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op, const uint8_t imm);
-    
+
     void uni_vmaxpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
-    
+
     void uni_vminpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {

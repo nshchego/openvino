@@ -463,7 +463,7 @@ void Reduce::execute(dnnl::stream strm) {
                 std::cout << reinterpret_cast<int32_t*>(secData)[i] << "; ";
             } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
                 std::cout << reinterpret_cast<float*>(secData)[i] << "; ";
-            }else if (getOriginalInputPrecisionAtPort(1) == Precision::U8) {
+            } else if (getOriginalInputPrecisionAtPort(1) == Precision::U8) {
                 std::cout << int(reinterpret_cast<uint8_t *>(secData)[i]) << "; ";
             } else if (getOriginalInputPrecisionAtPort(1) == Precision::I8) {
                 std::cout << int(reinterpret_cast<int8_t *>(secData)[i]) << "; ";
@@ -1239,9 +1239,10 @@ inline void Reduce::initDstData(uint8_t *out_ptr, size_t dst_size) {
 
 inline void Reduce::create_working_memory() {
     auto rank = getInputShapeAtPort(REDUCE_DATA).getRank();
-    dnnl::memory::format_tag format = (layout == ReduceLayoutType::reduce_nspc) ? (rank == 4 ? dnnl::memory::format_tag::nhwc : dnnl::memory::format_tag::ndhwc)
-                                        : (rank == 4 ? (x64::mayiuse(x64::avx512_core) ? dnnl::memory::format_tag::nChw16c : dnnl::memory::format_tag::nChw8c)
-                                                     : (x64::mayiuse(x64::avx512_core) ? dnnl::memory::format_tag::nCdhw16c : dnnl::memory::format_tag::nCdhw8c));
+    dnnl::memory::format_tag format =
+            (layout == ReduceLayoutType::reduce_nspc) ? (rank == 4 ? dnnl::memory::format_tag::nhwc : dnnl::memory::format_tag::ndhwc)
+                    : (rank == 4 ? (x64::mayiuse(x64::avx512_core) ? dnnl::memory::format_tag::nChw16c : dnnl::memory::format_tag::nChw8c)
+                                 : (x64::mayiuse(x64::avx512_core) ? dnnl::memory::format_tag::nCdhw16c : dnnl::memory::format_tag::nCdhw8c));
     auto prc_dims = rank == 4 ? std::vector<size_t>{OB, OC, OH, OW} : std::vector<size_t>{OB, OC, OD, OH, OW};
     auto desc = dnnl::memory::desc(DnnlExtensionUtils::convertToDnnlDims(prc_dims), DnnlExtensionUtils::IEPrecisionToDataType(outputPrc), format);
     prc_mem = dnnl::memory(desc, getEngine());

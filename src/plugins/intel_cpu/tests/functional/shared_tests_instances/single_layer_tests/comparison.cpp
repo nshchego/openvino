@@ -37,7 +37,7 @@ std::vector<ngraph::helpers::InputLayerType> secondInputTypes = {
 
 std::map<std::string, std::string> additional_config = {};
 
-INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs, ComparisonLayerTest, 
+INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs, ComparisonLayerTest,
         ::testing::Combine(
                 ::testing::ValuesIn(CommonTestUtils::combineParams(inputShapes)),
                 ::testing::ValuesIn(std::vector<Precision>{Precision::FP32, Precision::I32, Precision::I64}),

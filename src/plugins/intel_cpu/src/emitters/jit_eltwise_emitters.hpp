@@ -12,7 +12,7 @@ namespace intel_cpu {
 class jit_add_emitter : public jit_emitter {
 public:
     jit_add_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_add_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n);
 
     size_t get_inputs_num() const override;
@@ -28,7 +28,7 @@ private:
 class jit_mul_add_emitter : public jit_emitter {
 public:
     jit_mul_add_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                        InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                        const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_mul_add_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n);
 
     size_t get_inputs_num() const override;
@@ -47,7 +47,7 @@ private:
 class jit_subtract_emitter : public jit_emitter {
 public:
     jit_subtract_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                         InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                         const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_subtract_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n);
 
     size_t get_inputs_num() const override;
@@ -83,9 +83,8 @@ private:
 class jit_divide_emitter : public jit_emitter {
 public:
     jit_divide_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                       InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
-    jit_divide_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                       InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                       const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
+    jit_divide_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -104,9 +103,9 @@ private:
 class jit_floor_emitter : public jit_emitter {
 public:
     jit_floor_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_floor_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -121,9 +120,9 @@ private:
 class jit_ceiling_emitter : public jit_emitter {
 public:
     jit_ceiling_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_ceiling_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -138,9 +137,9 @@ private:
 class jit_floor_mod_emitter : public jit_emitter {
 public:
     jit_floor_mod_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                          InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                          const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_floor_mod_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                          InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                          const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -151,15 +150,17 @@ private:
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const;
     size_t aux_vecs_count() const override;
+
+    void register_table_entries() override;
 };
 
 
 class jit_mod_emitter : public jit_emitter {
 public:
     jit_mod_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_mod_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -176,7 +177,7 @@ private:
 class jit_maximum_emitter : public jit_emitter {
 public:
     jit_maximum_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                        InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                        const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_maximum_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n);
 
     size_t get_inputs_num() const override;
@@ -193,7 +194,7 @@ private:
 class jit_minimum_emitter : public jit_emitter {
 public:
     jit_minimum_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                        InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                        const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_minimum_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n);
 
     size_t get_inputs_num() const override;
@@ -210,10 +211,9 @@ private:
 class jit_squared_difference_emitter : public jit_emitter {
 public:
     jit_squared_difference_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                                   InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
-    jit_squared_difference_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                                   const std::shared_ptr<ov::Node>& n,
-                                   InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                                   const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
+    jit_squared_difference_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
+                                   const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -223,15 +223,17 @@ private:
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const;
+
+    size_t aux_vecs_count() const override;
 };
 
 
 class jit_power_dynamic_emitter : public jit_emitter {
 public:
     jit_power_dynamic_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                              InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                              const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_power_dynamic_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                              InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                              const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -247,9 +249,9 @@ private:
 class jit_equal_emitter : public jit_emitter {
 public:
     jit_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -267,9 +269,9 @@ private:
 class jit_not_equal_emitter : public jit_emitter {
 public:
     jit_not_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                          InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                          const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_not_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                          InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                          const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -288,9 +290,9 @@ private:
 class jit_greater_emitter : public jit_emitter {
 public:
     jit_greater_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                        InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                        const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_greater_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                        InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                        const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -308,9 +310,9 @@ private:
 class jit_greater_equal_emitter : public jit_emitter {
 public:
     jit_greater_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                              InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                              const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_greater_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                              InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                              const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -329,9 +331,9 @@ private:
 class jit_less_emitter : public jit_emitter {
 public:
     jit_less_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                     InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                     const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_less_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                     InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                     const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -349,10 +351,10 @@ private:
 class jit_less_equal_emitter : public jit_emitter {
 public:
     jit_less_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                           InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                           const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     jit_less_equal_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                           InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                           const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -371,9 +373,9 @@ private:
 class jit_logical_and_emitter : public jit_emitter {
 public:
     jit_logical_and_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                            InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                            const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_logical_and_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                            InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                            const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -392,9 +394,9 @@ private:
 class jit_logical_or_emitter : public jit_emitter {
 public:
     jit_logical_or_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                           InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                           const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_logical_or_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                           InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                           const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -413,9 +415,9 @@ private:
 class jit_logical_xor_emitter : public jit_emitter {
 public:
     jit_logical_xor_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                            InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                            const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_logical_xor_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                            InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                            const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -433,9 +435,9 @@ private:
 class jit_logical_not_emitter : public jit_emitter {
 public:
     jit_logical_not_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                            InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                            const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_logical_not_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                            InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                            const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -454,9 +456,9 @@ class jit_power_static_emitter : public jit_emitter {
 public:
     jit_power_static_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
                              float inpPower, float inpScale, float inpShift,
-                             InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                             const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_power_static_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                             InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                             const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -479,9 +481,9 @@ private:
 class jit_prelu_emitter : public jit_emitter {
 public:
     jit_prelu_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_prelu_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                      InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                      const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -498,9 +500,9 @@ private:
 class jit_sqrt_emitter : public jit_emitter {
 public:
     jit_sqrt_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_sqrt_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -515,7 +517,7 @@ private:
 class jit_negative_emitter : public jit_emitter {
 public:
     jit_negative_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -530,10 +532,10 @@ private:
 class jit_erf_emitter : public jit_emitter {
 public:
     jit_erf_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-        InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+        const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     jit_erf_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                    InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                    const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -553,9 +555,9 @@ private:
 class jit_soft_sign_emitter : public jit_emitter {
 public:
     jit_soft_sign_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                          InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                          const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_soft_sign_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                          InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                          const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
@@ -657,9 +659,9 @@ private:
 class jit_select_emitter : public jit_emitter {
 public:
     jit_select_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa,
-                       InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                       const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
     jit_select_emitter(dnnl::impl::cpu::x64::jit_generator *host, dnnl::impl::cpu::x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& n,
-                       InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32);
+                       const InferenceEngine::Precision &exec_prc = InferenceEngine::Precision::FP32);
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);

@@ -54,7 +54,7 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
     return i64Ops.find(type) != i64Ops.end();
 }
 
-std::shared_ptr<ngraph::Node> changeConstantPrecision(std::shared_ptr<ov::opset10::Constant>& constant) {
+std::shared_ptr<ov::Node> changeConstantPrecision(std::shared_ptr<ov::opset10::Constant>& constant) {
     const auto* srcData = constant->get_data_ptr<int64_t>();
     const auto size = shape_size(constant->get_shape());
 
