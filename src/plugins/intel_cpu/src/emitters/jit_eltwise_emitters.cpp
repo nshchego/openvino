@@ -210,10 +210,10 @@ std::set<std::vector<element::Type>> jit_mul_add_emitter::get_supported_precisio
 }
 
 size_t jit_mul_add_emitter::aux_vecs_count() const {
-    if (x64::mayiuse(x64::avx512_core)) {
-        return 0;
-    } else if (exec_prc_ == Precision::I64) {
+    if (!x64::mayiuse(x64::avx512_core) && exec_prc_ == Precision::I64) {
         return 2;
+    } else {
+        return 0;
     }
 }
 

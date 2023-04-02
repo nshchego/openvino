@@ -628,10 +628,14 @@ void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
                     });
                 } else {
                     if (ReduceH) {
-                        parallel_for2d(IC, ID, [&](size_t ic, size_t id) {
+                        for (int ic = 0; ic < IC; ic++) {
+                        for (int id = 0; id < ID; id++) {
+                        // parallel_for2d(IC, ID, [&](size_t ic, size_t id) {
                             size_t oc = ic, od = id; GET_PTR_NCD_BASE_PTR_N_PLN;
                             reduceKernelProcess(in_ptr_ncd, out_ptr_ncd, workAmount, 1);
-                        });
+                        // });
+                        }
+                        }
                     } else {
                         // parallel_for3d(IC, ID, IH, [&](size_t ic, size_t id, size_t ih) {
                         //     size_t oc = ic, od = id; GET_PTR_NCD_BASE_PTR_N_PLN;
@@ -939,13 +943,13 @@ void Reduce::reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr)
 
 inline void Reduce::reduceKernelProcess(const uint8_t *inPtr, uint8_t *outPtr, size_t workAmount,
                                                     size_t reduceW, size_t workBatch, const int *tabIdx) {
-printf("reduceKernelProcess workAmount: %ld; reduceW: %ld; workBatch: %ld\n", workAmount, reduceW, workBatch);
-auto iIn = reinterpret_cast<const int64_t *>(inPtr);
-std::cout << "IN:  ";
-for (int i = 0; i < workAmount; i++) {
-    std::cout << iIn[i] << ";";
-}
-std::cout << std::endl;
+// printf("reduceKernelProcess workAmount: %ld; reduceW: %ld; workBatch: %ld\n", workAmount, reduceW, workBatch);
+// auto iIn = reinterpret_cast<const int64_t *>(inPtr);
+// std::cout << "IN:  ";
+// for (int i = 0; i < workAmount; i++) {
+//     std::cout << iIn[i] << ";";
+// }
+// std::cout << std::endl;
 
     auto arg = JitReduceCallArgs();
     arg.src = static_cast<const void *>(inPtr);
@@ -958,61 +962,67 @@ std::cout << std::endl;
 
     (*reduceKernel)(&arg);
 
-auto iOut = reinterpret_cast<const int64_t *>(outPtr);
-std::cout << "OUT: ";
-for (int i = 0; i < workAmount; i++) {
-    std::cout << iOut[i] << ";";
-}
-std::cout << std::endl;
+// auto iOut = reinterpret_cast<const int64_t *>(outPtr);
+// std::cout << "OUT: ";
+// for (int i = 0; i < workAmount; i++) {
+//     std::cout << iOut[i] << ";";
+// }
+// std::cout << std::endl;
 }
 
 inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
 // printf("reduceKernelPostProcess workAmount+\n");
-    const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
-    if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
-        parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
-        // for (int ob = 0; ob < OB; ob++) {
-        // for (int oc = 0; oc < OC; oc++) {
-// std::cout << "reduceKernelPostProcess oc+: " << oc << std::endl;
-            uint8_t *out_p = out_ptr + (ob * OC + oc) * OD * OH * OW * dstDataSize;
-            auto arg = JitReducePostCallArgs();
-            arg.dst = static_cast<void *>(out_p);
-            arg.oc_off = layout == ReduceLayoutType::reduce_nspc ? 0 : oc * sizeof(float);
-            arg.channel_size = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
-            arg.work_amount = OD * OH * OW;
-            if (reducePostKernel->get_exec_prc() == Precision::FP32) {
-                const auto divisor = static_cast<float>(integerDivisor);
-                arg.divisor = &divisor;
-            } else if (one_of(reducePostKernel->get_exec_prc(), Precision::FP64, Precision::I64)) {
-                const auto divisor = static_cast<double>(integerDivisor);
-                arg.divisor = &divisor;
-            }
-            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
-            (*reducePostKernel)(&arg);
-// std::cout << "reduceKernelPostProcess oc-: " << oc << std::endl;
-        // }
-        // }
-        });
-    } else {
-        size_t OCB = div_up(OC, blockLen);
-        parallel_for2d(OB, OCB, [&](size_t ob, size_t ocb) {
-            uint8_t *out_p = out_ptr + (ob * OCB + ocb) * OD * OH * OW * blockLen * dstDataSize;
-            auto arg = JitReducePostCallArgs();
-            arg.dst = static_cast<void *>(out_p);
-            arg.reduce_c = ReduceC ? 1 : 0;
-            arg.oc_off = ocb * blockLen * sizeof(float);
-            arg.work_amount = OD * OH * OW * blockLen;
-            if (reducePostKernel->get_exec_prc() == Precision::FP32) {
-                const auto divisor = static_cast<float>(integerDivisor);
-                arg.divisor = &divisor;
-            } else if (one_of(reducePostKernel->get_exec_prc(), Precision::FP64, Precision::I64)) {
-                const auto divisor = static_cast<double>(integerDivisor);
-                arg.divisor = &divisor;
-            }
-            arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
-            (*reducePostKernel)(&arg);
-        });
-    }
+//     const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
+//     if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
+//         // parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
+//         for (int ob = 0; ob < OB; ob++) {
+//         for (int oc = 0; oc < OC; oc++) {
+// // std::cout << "reduceKernelPostProcess oc+: " << oc << std::endl;
+//             uint8_t *out_p = out_ptr + (ob * OC + oc) * OD * OH * OW * dstDataSize;
+//             auto arg = JitReducePostCallArgs();
+//             arg.dst = static_cast<void *>(out_p);
+//             arg.oc_off = layout == ReduceLayoutType::reduce_nspc ? 0 : oc * sizeof(float);
+//             arg.channel_size = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
+//             arg.work_amount = OD * OH * OW;
+//             if (reducePostKernel->get_exec_prc() == Precision::FP32) {
+//                 const auto divisor = static_cast<float>(integerDivisor);
+//                 arg.divisor = &divisor;
+//             } else if (one_of(reducePostKernel->get_exec_prc(), Precision::FP64, Precision::I64)) {
+//                 const auto divisor = static_cast<double>(integerDivisor);
+//                 arg.divisor = &divisor;
+//             }
+//             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
+//             (*reducePostKernel)(&arg);
+// // std::cout << "reduceKernelPostProcess oc-: " << oc << std::endl;
+// auto iOut = reinterpret_cast<const float *>(out_p);
+// std::cout << "OUT: ";
+// for (int i = 0; i < arg.work_amount; i++) {
+//     std::cout << iOut[i] << ";";
+// }
+// std::cout << std::endl;
+//         }
+//         }
+//         // });
+//     } else {
+//         size_t OCB = div_up(OC, blockLen);
+//         parallel_for2d(OB, OCB, [&](size_t ob, size_t ocb) {
+//             uint8_t *out_p = out_ptr + (ob * OCB + ocb) * OD * OH * OW * blockLen * dstDataSize;
+//             auto arg = JitReducePostCallArgs();
+//             arg.dst = static_cast<void *>(out_p);
+//             arg.reduce_c = ReduceC ? 1 : 0;
+//             arg.oc_off = ocb * blockLen * sizeof(float);
+//             arg.work_amount = OD * OH * OW * blockLen;
+//             if (reducePostKernel->get_exec_prc() == Precision::FP32) {
+//                 const auto divisor = static_cast<float>(integerDivisor);
+//                 arg.divisor = &divisor;
+//             } else if (one_of(reducePostKernel->get_exec_prc(), Precision::FP64, Precision::I64)) {
+//                 const auto divisor = static_cast<double>(integerDivisor);
+//                 arg.divisor = &divisor;
+//             }
+//             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
+//             (*reducePostKernel)(&arg);
+//         });
+//     }
 // printf("reduceKernelPostProcess workAmount-\n");
 }
 

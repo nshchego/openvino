@@ -91,9 +91,7 @@ void regmodule_properties(py::module m) {
     wrap_property_RW(m_intel_cpu,
                      ov::intel_cpu::sparse_weights_decompression_rate,
                      "sparse_weights_decompression_rate");
-    wrap_property_RW(m_intel_cpu,
-                     ov::intel_cpu::enable_native_i64,
-                     "enable_native_i64");
+    wrap_property_RW(m_intel_cpu, ov::intel_cpu::enable_native_i64, "enable_native_i64");
 
     // Submodule intel_gpu
     py::module m_intel_gpu =

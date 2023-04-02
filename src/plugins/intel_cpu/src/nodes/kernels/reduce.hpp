@@ -48,6 +48,7 @@ struct JitReducePostCallArgs {
     const void** post_op_data;
 };
 
+
 template<typename CallArgs>
 struct JitReduceKernelBase : public JitKernelBase {
     void (*kernel_func)(const CallArgs *);
@@ -88,8 +89,22 @@ protected:
 
     void horiz_qq(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 
+    template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+    void horiz_reduce_store_ps(const Xbyak::Xmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+
+    template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+    void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+
     JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
+
+    const Xbyak::Reg64 &reg_dst = r9;
+
+    Xbyak::Xmm xmm_aux1;
+    Xbyak::Xmm xmm_aux2;
+    Xbyak::Xmm xmm_aux3;
+    
+    Xbyak::Ymm ymm_aux1;
 };
 
 
@@ -97,7 +112,7 @@ template <dnnl::impl::cpu::x64::cpu_isa_t isa>
 struct JitReduceKernel : public JitReduceKernelBase<JitReduceCallArgs> {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReduceKernel)
 
-    explicit JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase<JitReduceCallArgs>(jcp, jit_name()) {}
+    explicit JitReduceKernel(const JitReduceConfigParams &jcp);
 
     void generate() override;
 
@@ -111,7 +126,6 @@ private:
     Xbyak::Address table_val(int index) { return ptr[reg_table + index * vlen]; }
 
     const Xbyak::Reg64 &reg_src            = r8;
-    const Xbyak::Reg64 &reg_dst            = r9;
     const Xbyak::Reg64 &reg_idx            = rdx;
     const Xbyak::Reg64 &reg_work_amount    = r10;
     const Xbyak::Reg64 &reg_reduce_w       = r11;
@@ -140,12 +154,8 @@ private:
     Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
     Xbyak::Xmm xmm_zero = Xbyak::Xmm(vmm_zero.getIdx());
     Xbyak::Xmm xmm_idx  = Xbyak::Xmm(vmm_idx.getIdx());
-    Xbyak::Xmm xmm_aux1 = Xbyak::Xmm(5);
-    Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(6);
-    Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(7);
 
     Xbyak::Ymm ymm_idx  = Xbyak::Ymm(vmm_idx.getIdx());
-    Xbyak::Ymm ymm_aux1 = Xbyak::Ymm(xmm_aux1.getIdx());
 
     const Xbyak::Opmask &k_mask = k1;
 
@@ -186,13 +196,13 @@ private:
 
     void store_dst_vector();
 
-    void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    // void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+    // void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
     void horiz_store_pd(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
@@ -217,10 +227,8 @@ private:
 
         uint64_t int64_one = 0x0000000000000001; // 1
         uint64_t int64_abs = 0x7fffffffffffffff; // mask to make positive
-        // uint64_t int64_min = 0xffefffffffffffff; // double lowest
-        // uint64_t int64_max = 0x7fefffffffffffff; // double maximum
-        uint64_t int64_min  = 0x0000000000000000; // lowest int64 presented in double
-        uint64_t int64_max  = 0x7fffffffffffffff; // max int64
+        uint64_t int64_min = 0x0000000000000000; // lowest int64 presented in double
+        uint64_t int64_max = 0x7fffffffffffffff; // max int64
     } aux_vals;
 };
 
@@ -228,8 +236,7 @@ template <dnnl::impl::cpu::x64::cpu_isa_t isa>
 struct JitReducePostKernel : public JitReduceKernelBase<JitReducePostCallArgs> {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(JitReducePostKernel)
 
-    explicit JitReducePostKernel(const JitReduceConfigParams &jcp, const dnnl_primitive_attr &attr)
-        : JitReduceKernelBase<JitReducePostCallArgs>(jcp, jit_name()), attr(attr) {}
+    explicit JitReducePostKernel(const JitReduceConfigParams &jcp, const dnnl_primitive_attr &attr);
 
     void generate() override;
 
@@ -242,8 +249,7 @@ private:
     const size_t vlen = dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen;
     bool planar_layout = false;
 
-    const Xbyak::Reg64 &reg_dst               = r8;
-    const Xbyak::Reg64 &reg_work_amount       = r9;
+    const Xbyak::Reg64 &reg_work_amount       = r8;
     const Xbyak::Reg64 &reg_total_work_amount = r10;
     const Xbyak::Reg64 &reg_channel_size      = r11;
     const Xbyak::Reg64 &reg_divisor           = r12;
@@ -268,11 +274,6 @@ private:
 
     Xbyak::Xmm xmm_aux  = Xbyak::Xmm(vmm_aux.getIdx());
     Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
-    Xbyak::Xmm xmm_aux1 = Xbyak::Xmm(4);
-    Xbyak::Xmm xmm_aux2 = Xbyak::Xmm(5);
-    Xbyak::Xmm xmm_aux3 = Xbyak::Xmm(6);
-
-    Xbyak::Ymm ymm_aux1 = Xbyak::Ymm(xmm_aux1.getIdx());
 
     std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
@@ -291,7 +292,7 @@ private:
 
     void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
 
-    void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    // void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
