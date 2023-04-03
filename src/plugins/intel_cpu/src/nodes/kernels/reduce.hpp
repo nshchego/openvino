@@ -93,7 +93,7 @@ protected:
     void horiz_reduce_store_ps(const Xbyak::Xmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-    void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+    void horiz_reduce_store_qq(const Xbyak::Xmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
@@ -196,17 +196,13 @@ private:
 
     void store_dst_vector();
 
-    // void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
-
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
-
-    // void horiz_store_ps(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+    // void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_store_pd(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
 
-    void horiz_store_qq(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc, bool load_embedded);
+    // void horiz_store_qq(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc, bool load_embedded);
 
     void prepare_aux_table();
 
@@ -292,15 +288,11 @@ private:
 
     void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
 
-    // void horiz_reduce_store_ps(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
-
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    // void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
     void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
-
-//    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 };
 
 }   // namespace kernel
