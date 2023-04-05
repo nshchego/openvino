@@ -103,7 +103,7 @@ protected:
     Xbyak::Xmm xmm_aux1;
     Xbyak::Xmm xmm_aux2;
     Xbyak::Xmm xmm_aux3;
-    
+
     Xbyak::Ymm ymm_aux1;
 };
 

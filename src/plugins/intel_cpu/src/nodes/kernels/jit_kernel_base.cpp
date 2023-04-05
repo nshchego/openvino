@@ -753,109 +753,121 @@ void JitKernelBase::memMovDD(const Reg64& rDst,
 void JitKernelBase::loadVector(const Xmm &vDst,
                                const Address &srcAdr,
                                const InferenceEngine::Precision &dstPrc,
-                               const InferenceEngine::Precision &srcPrc,
-                               bool broadcast) {
+                               const InferenceEngine::Precision &srcPrc) {
     Xmm xmmDst = Xmm(vDst.getIdx());
     Ymm ymmDst = Ymm(vDst.getIdx());
 
-    if (broadcast) {
-        loadScalar(xmmDst, srcAdr, dstPrc, srcPrc);
-        if (srcPrc.size() == 4) {
-            uni_vbroadcastss(vDst, xmmDst);
-        } else if (srcPrc.size() == 8) {
-            uni_vbroadcastsd(vDst, xmmDst);
-        }
-    } else {
-        switch (srcPrc) {
-            case Precision::FP64:
+    switch (srcPrc) {
+        case Precision::FP64:
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::I64, Precision::I32, Precision::FP32)) {
                 if (dstPrc == Precision::I64) {
-                    if (x64::mayiuse(x64::avx512_core)) {
-                        vcvtpd2qq(vDst, srcAdr);
-                    } else {
-                        // TODO
-                    }
+                    vcvtpd2qq(vDst, srcAdr);
                 } else if (dstPrc == Precision::I32) {
-                    uni_vcvtpd2dq(x64::mayiuse(x64::avx512_core) ? ymmDst : xmmDst, srcAdr);
-                } else if (dstPrc == Precision::FP64) {
-                    uni_vmovups(vDst, srcAdr);
+                    uni_vcvtpd2dq(vDst.isZMM() ? ymmDst : vDst, srcAdr);
+                } else if (dstPrc == Precision::FP32) {
+                    uni_vcvtpd2ps(vDst.isZMM() ? ymmDst : vDst, srcAdr);
                 }
-                break;
-            case Precision::I64:
-                if (dstPrc == Precision::I64 || dstPrc == Precision::I32) {
-                    uni_vmovups(vDst, srcAdr);
-                } else if (dstPrc == Precision::FP64) {
-                    if (x64::mayiuse(x64::avx512_core)) {
-                        vcvtqq2pd(vDst, srcAdr);
-                    } else {
-                        // TODO
-                    }
-                }
-                break;
-            case Precision::FP32:
+            } else if (!x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP32, Precision::I32)) {
                 if (dstPrc == Precision::FP32) {
-                    uni_vmovups(vDst, srcAdr);
-                } else if (dstPrc == Precision::FP64) {
-                    vcvtps2pd(vDst, srcAdr);
+                    uni_vcvtpd2ps(xmmDst, srcAdr);
+                } else if (dstPrc == Precision::I32) {
+                    uni_vcvtpd2dq(xmmDst, srcAdr);
                 }
-                break;
-            case Precision::I32:
-                if (dstPrc == Precision::I32) {
-                    uni_vmovups(vDst, srcAdr);
-                } else if (dstPrc == Precision::FP64) {
-                    vcvtdq2pd(vDst, srcAdr);
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::I64:
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP64, Precision::FP32)) {
+                if (dstPrc == Precision::FP64) {
+                    vcvtqq2pd(vDst, srcAdr);
+                } else if (dstPrc == Precision::FP32) {
+                    vcvtqq2ps(vDst.isZMM() ? ymmDst : vDst, srcAdr);
                 }
-                break;
-            case Precision::BF16:
-                vpmovzxwd(vDst, srcAdr);
-                uni_vpslld(vDst, vDst, 16);
-                break;
-            case Precision::U16:
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::FP32:
+            if (dstPrc == Precision::I32) {
+                uni_vcvtps2dq(vDst, srcAdr);
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::I32:
+            if (dstPrc == Precision::FP64) {
+                uni_vcvtdq2pd(vDst, srcAdr);
+            } else if (dstPrc == Precision::FP32) {
+                uni_vcvtdq2ps(vDst, srcAdr);
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::BF16:
+            uni_vpmovzxwd(vDst, srcAdr);
+            uni_vpslld(vDst, vDst, 16);
+            break;
+        case Precision::U16:
+            if (one_of(dstPrc, Precision::FP32, Precision::I32)) {
                 uni_vpmovzxwd(vDst, srcAdr);
-                break;
-            case Precision::I16:
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::I16:
+            if (one_of(dstPrc, Precision::FP32, Precision::I32)) {
                 uni_vpmovsxwd(vDst, srcAdr);
-                break;
-            case Precision::I8:
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::I8:
+            if (one_of(dstPrc, Precision::FP32, Precision::I32)) {
                 uni_vpmovsxbd(vDst, srcAdr);
-                break;
-            case Precision::U8:
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        case Precision::U8:
+            if (one_of(dstPrc, Precision::FP32, Precision::I32)) {
                 uni_vpmovzxbd(vDst, srcAdr);
-                break;
-            default:
-                IE_THROW() << "Unsupported source precision: " << srcPrc;
-        }
+            } else {
+                uni_vmovups(vDst, srcAdr);
+            }
+            break;
+        default:
+            IE_THROW() << "Unsupported source precision: " << srcPrc;
+    }
 
-        switch (dstPrc) {
-            case Precision::FP32:
+    switch (dstPrc) {
+        case Precision::FP32:
+            if (!x64::mayiuse(x64::avx512_core) && (srcPrc == Precision::I64)) {
+                // Do conversion later.
+            }
+            if (one_of(srcPrc, Precision::U8, Precision::I8, Precision::I16, Precision::U16)) {
+                uni_vcvtdq2ps(vDst, vDst);
+            }
+            break;
+        case Precision::I32:
+            if (x64::mayiuse(x64::avx512_core)) {
                 if (srcPrc == Precision::I64) {
-                    if (x64::mayiuse(x64::avx512_core)) {
-                        vcvtqq2ps(ymmDst, srcAdr);
-                    } else {
-                        // TODO
-                    }
-                } else if (srcPrc == Precision::I32) {
-                    uni_vcvtdq2ps(vDst, srcAdr);
-                } else if (srcPrc != Precision::FP32 && srcPrc != Precision::BF16) {
-                    uni_vcvtdq2ps(vDst, vDst);
+                    vpmovsqd(vDst, vDst);
                 }
-                break;
-            case Precision::I32:
+            } else {
                 if (srcPrc == Precision::I64) {
-                    if (x64::mayiuse(x64::avx512_core)) {
-                        vpmovsqd(ymmDst, vDst);
-                    } else {
-                        // TODO
-                    }
-                } else if (srcPrc == Precision::FP32 || srcPrc == Precision::BF16) {
-                    uni_vcvtps2dq(vDst, srcAdr);
+                    // Do conversion later.
                 }
-                break;
-            case Precision::I64:
-            case Precision::FP64:
-                break;
-            default:
-                IE_THROW() << "Unsupported destination precision: " << dstPrc;
-        }
+            }
+            if (one_of(srcPrc, Precision::BF16)) {
+                uni_vcvtps2dq(vDst, vDst);
+            }
+            break;
+        case Precision::I64:
+        case Precision::FP64:
+            break;
+        default:
+            IE_THROW() << "Unsupported destination precision: " << dstPrc;
     }
 }
 
@@ -864,46 +876,50 @@ void JitKernelBase::loadScalar(const Xmm &vDst,
                                const InferenceEngine::Precision &dstPrc,
                                const InferenceEngine::Precision &srcPrc) {
     Address srcAdrBcst(srcAdr.getBit(), true, srcAdr.getRegExp());
+
     switch (srcPrc) {
         case Precision::FP64:
-            if (dstPrc == Precision::I64) {
-                if (x64::mayiuse(x64::avx512_core)) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::I64, Precision::I32, Precision::FP32)) {
+                if (dstPrc == Precision::I64) {
                     vcvtpd2qq(vDst, srcAdrBcst);
-                } else {
-                    // TODO
-                }
-            } else if (dstPrc == Precision::I32) {
-                if (x64::mayiuse(x64::avx512_core)) {
+                } else if (dstPrc == Precision::I32) {
                     vcvtpd2dq(vDst, srcAdrBcst);
-                } else {
-                    uni_vpinsrq(vDst, vDst, srcAdr, 0);
-                    vcvtpd2dq(vDst, vDst);
+                } else if (dstPrc == Precision::FP32) {
+                    vcvtpd2ps(vDst, srcAdrBcst);
                 }
-            } else if (dstPrc == Precision::FP64) {
+            } else {
                 uni_vmovsd(vDst, srcAdr);
             }
             break;
         case Precision::I64:
-            if (dstPrc == Precision::I64) {
-                uni_vmovsd(vDst, srcAdr);
-            } else if (dstPrc == Precision::FP64) {
-                if (x64::mayiuse(x64::avx512_core)) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP64, Precision::FP32)) {
+                if (dstPrc == Precision::FP64) {
                     vcvtqq2pd(vDst, srcAdrBcst);
-                } else {
-                    // TODO
+                } else if (dstPrc == Precision::FP32) {
+                    vcvtqq2ps(vDst, srcAdrBcst);
                 }
+            } else {
+                uni_vmovsd(vDst, srcAdr);
             }
             break;
         case Precision::FP32:
-            if (dstPrc == Precision::FP64) {
-                vcvtps2pd(vDst, srcAdrBcst);
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP64, Precision::I32)) {
+                if (dstPrc == Precision::FP64) {
+                    vcvtps2pd(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::I32) {
+                    vcvtps2dq(vDst, srcAdrBcst);
+                }
             } else {
                 uni_vmovss(vDst, srcAdr);
             }
             break;
         case Precision::I32:
-            if (dstPrc == Precision::FP64) {
-                vcvtdq2pd(vDst, srcAdrBcst);
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP32, Precision::FP64)) {
+                if (dstPrc == Precision::FP32) {
+                    vcvtdq2ps(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::FP64) {
+                    vcvtdq2pd(vDst, srcAdrBcst);
+                }
             } else {
                 uni_vmovss(vDst, srcAdr);
             }
@@ -934,25 +950,150 @@ void JitKernelBase::loadScalar(const Xmm &vDst,
 
     switch (dstPrc) {
         case Precision::FP32:
-            if (srcPrc == Precision::I64) {
-                if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtqq2ps(vDst, vDst);
-                } else {
-                    // TODO
+            if (x64::mayiuse(x64::avx512_core)) {
+                if (one_of(srcPrc, Precision::U8, Precision::I8, Precision::U16, Precision::I16)) {
+                    uni_vcvtdq2ps(vDst, vDst);
                 }
-            } else if (srcPrc != Precision::FP32 && srcPrc != Precision::BF16) {
-                uni_vcvtdq2ps(vDst, vDst);
+            } else {
+                if (srcPrc == Precision::FP64) {
+                    uni_vcvtpd2ps(vDst, vDst);
+                } else if (srcPrc == Precision::I64) {
+                    // Do conversion later.
+                } else if (one_of(srcPrc, Precision::U8, Precision::I8, Precision::U16, Precision::I16, Precision::I32)) {
+                    uni_vcvtdq2ps(vDst, vDst);
+                }
             }
             break;
         case Precision::I32:
-            if (srcPrc == Precision::I64) {
-                if (x64::mayiuse(x64::avx512_core)) {
-                    vpmovsqd(vDst, vDst);
-                } else {
-                    // TODO
+            if (!x64::mayiuse(x64::avx512_core)) {
+                if (srcPrc == Precision::I64) {
+                    // Do conversion later.
+                } else if (one_of(srcPrc, Precision::FP32, Precision::BF16)) {
+                    uni_vcvtps2dq(vDst, vDst);
                 }
-            } else if (srcPrc == Precision::FP32 || srcPrc == Precision::BF16) {
-                uni_vcvtps2dq(vDst, vDst);
+            } else if (srcPrc == Precision::I64) {
+                vpmovsqd(vDst, vDst);
+            }
+            break;
+        case Precision::I64:
+        case Precision::FP64:
+            break;
+        default:
+            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+    }
+}
+
+void JitKernelBase::loadWithBcst(const Xmm &vDst,
+                                 const Address &srcAdr,
+                                 const InferenceEngine::Precision &dstPrc,
+                                 const InferenceEngine::Precision &srcPrc) {
+    Address srcAdrBcst(srcAdr.getBit(), true, srcAdr.getRegExp());
+    auto xmmDst = Xmm(vDst.getIdx());
+
+    switch (srcPrc) {
+        case Precision::FP64:
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::I64, Precision::I32, Precision::FP32)) {
+                if (dstPrc == Precision::I64) {
+                    vcvtpd2qq(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::I32) {
+                    vcvtpd2dq(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::FP32) {
+                    vcvtpd2ps(vDst, srcAdrBcst);
+                }
+            } else {
+                uni_vbroadcastsd(vDst, srcAdr); // does not work with XMM, use vpbroadcastq instead
+            }
+            break;
+        case Precision::I64:
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP64, Precision::FP32)) {
+                if (dstPrc == Precision::FP64) {
+                    vcvtqq2pd(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::FP32) {
+                    vcvtqq2ps(vDst, srcAdrBcst);
+                }
+            } else {
+                uni_vbroadcastsd(vDst, srcAdr);
+            }
+            break;
+        case Precision::FP32:
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP64, Precision::I32)) {
+                if (dstPrc == Precision::FP64) {
+                    vcvtps2pd(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::I32) {
+                    vcvtps2dq(vDst, srcAdrBcst);
+                }
+            } else {
+                uni_vbroadcastss(vDst, srcAdr);
+            }
+            break;
+        case Precision::I32:
+            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, Precision::FP32, Precision::FP64)) {
+                if (dstPrc == Precision::FP32) {
+                    vcvtdq2ps(vDst, srcAdrBcst);
+                } else if (dstPrc == Precision::FP64) {
+                    vcvtdq2pd(vDst, srcAdrBcst);
+                }
+            } else {
+                uni_vbroadcastss(vDst, srcAdr);
+            }
+            break;
+        case Precision::BF16:
+            uni_vpinsrw(vDst, vDst, srcAdr, 0);
+            uni_vpslld(vDst, vDst, 16);
+            break;
+        case Precision::I16:
+            uni_vpinsrw(vDst, vDst, srcAdr, 0);
+            uni_vpmovsxwd(vDst, srcAdr);
+            break;
+        case Precision::U16:
+            uni_vpinsrw(vDst, vDst, srcAdr, 0);
+            uni_vpmovzxwd(vDst, srcAdr);
+            break;
+        case Precision::I8:
+            if (dstPrc == Precision::I32) {
+                pinsrb(vDst, srcAdr, 0);
+                uni_vpmovsxbd(vDst, vDst);
+            } else {
+                vpbroadcastb(vDst, srcAdr);
+            }
+            break;
+        case Precision::U8:
+            if (dstPrc == Precision::I32) {
+                pinsrb(vDst, srcAdr, 0);
+                uni_vpmovzxbd(vDst, vDst);
+            } else {
+                vpbroadcastb(vDst, srcAdr);
+            }
+            break;
+        default:
+            IE_THROW() << "Unsupported source precision: " << srcPrc;
+    }
+
+    switch (dstPrc) {
+        case Precision::FP32:
+            if (x64::mayiuse(x64::avx512_core)) {
+                if (one_of(srcPrc, Precision::U8, Precision::I8, Precision::U16, Precision::I16)) {
+                    uni_vcvtdq2ps(vDst, vDst);
+                }
+            } else {
+                if (srcPrc == Precision::FP64) {
+                    uni_vcvtpd2ps(vDst, vDst);
+                } else if (srcPrc == Precision::I64) {
+                    // Do conversion later.
+                } else if (one_of(srcPrc, Precision::U8, Precision::I8, Precision::U16, Precision::I16, Precision::I32)) {
+                    uni_vcvtdq2ps(vDst, vDst);
+                }
+            }
+            break;
+        case Precision::I32:
+            if (!x64::mayiuse(x64::avx512_core)) {
+                if (srcPrc == Precision::I64) {
+                    // Do conversion later.
+                } else if (one_of(srcPrc, Precision::FP32, Precision::BF16)) {
+                    uni_vcvtps2dq(vDst, vDst);
+                }
+            } else if (srcPrc == Precision::I64) {
+                vpmovsqd(vDst, vDst);
             }
             break;
         case Precision::I64:

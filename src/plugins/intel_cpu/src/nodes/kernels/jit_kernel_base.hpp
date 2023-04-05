@@ -163,13 +163,17 @@ public:
     void loadVector(const Xbyak::Xmm &vDst,
                     const Xbyak::Address &srcAdr,
                     const InferenceEngine::Precision &dstPrc,
-                    const InferenceEngine::Precision &srcPrc,
-                    bool broadcast = false);
+                    const InferenceEngine::Precision &srcPrc);
 
     void loadScalar(const Xbyak::Xmm &vDst,
                     const Xbyak::Address &srcAdr,
                     const InferenceEngine::Precision &dstPrc,
                     const InferenceEngine::Precision &srcPrc);
+
+    void loadWithBcst(const Xbyak::Xmm &vDst,
+                      const Xbyak::Address &srcAdr,
+                      const InferenceEngine::Precision &dstPrc,
+                      const InferenceEngine::Precision &srcPrc);
 
     void storeVector(const Xbyak::Address &dstAdr,
                      const Xbyak::Xmm &vSrc,

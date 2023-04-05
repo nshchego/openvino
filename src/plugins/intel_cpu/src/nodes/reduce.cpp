@@ -420,53 +420,58 @@ void Reduce::createPrimitive() {
 
 void Reduce::execute(dnnl::stream strm) {
 // DEBUG
-    std::cout << "\n[INPUT 0] size " << getParentEdgeAt(0)->getMemoryPtr()->GetSize() << std::endl;
-    const int elPerVec = 64 / getOriginalInputPrecisionAtPort(0).size();
+    auto memPtr = getParentEdgeAt(0)->getMemoryPtr();
+    auto inPrc = memPtr->getDesc().getPrecision();
+    std::cout << "\n[INPUT 0][" << inPrc << "] size: " << memPtr->GetSize() << std::endl;
 
-    void* firstData = getParentEdgeAt(0)->getMemoryPtr()->GetPtr();
-    const auto dims = getParentEdgeAt(0)->getMemoryPtr()->getStaticDims();
+    void* firstData = memPtr->GetPtr();
+    const auto dims = memPtr->getStaticDims();
     const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
+    const int elPerVec = 64 / inPrc.size();
     for (int i = 0; i < blLen; i++) {
         if (i != 0 && i % elPerVec == 0) {
             std::cout << "| ";
         }
-        if (getOriginalInputPrecisionAtPort(0) == Precision::FP64) {
+        if (inPrc == Precision::FP64) {
             std::cout << reinterpret_cast<double *>(firstData)[i] << "; ";
-        } else if (getOriginalInputPrecisionAtPort(0) == Precision::I64) {
+        } else if (inPrc == Precision::I64) {
             std::cout << reinterpret_cast<int64_t *>(firstData)[i] << "; ";
-        } else if (getOriginalInputPrecisionAtPort(0) == Precision::I32) {
+        } else if (inPrc == Precision::I32) {
             std::cout << reinterpret_cast<int32_t *>(firstData)[i] << "; ";
-        } else if (getOriginalInputPrecisionAtPort(0) == Precision::FP32) {
+        } else if (inPrc == Precision::FP32) {
             std::cout << reinterpret_cast<float *>(firstData)[i] << "; ";
-        } else if (getOriginalInputPrecisionAtPort(0) == Precision::U8) {
+        } else if (inPrc == Precision::U8) {
             std::cout << int(reinterpret_cast<uint8_t *>(firstData)[i]) << "; ";
-        } else if (getOriginalInputPrecisionAtPort(0) == Precision::I8) {
+        } else if (inPrc == Precision::I8) {
             std::cout << int(reinterpret_cast<int8_t *>(firstData)[i]) << "; ";
         }
     }
     std::cout << std::endl;
 
     if (getParentEdges().size() > 1) {
-        std::cout << "[INPUT 1] size " << getParentEdgeAt(1)->getMemoryPtr()->GetSize() << std::endl;
+        auto memPtr = getParentEdgeAt(1)->getMemoryPtr();
+        auto inPrc = memPtr->getDesc().getPrecision();
+        std::cout << "[INPUT 1][" << inPrc << "] size: " << memPtr->GetSize() << std::endl;
 
-        const auto dims = getParentEdgeAt(1)->getMemoryPtr()->getStaticDims();
+        const auto dims = memPtr->getStaticDims();
         const auto blLen = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<Dim>());
-        auto* secData = getParentEdgeAt(1)->getMemoryPtr()->GetPtr();
+        auto* secData = memPtr->GetPtr();
+        const int elPerVec = 64 / inPrc.size();
         for (int i = 0; i < blLen; i++) {
             if (i != 0 && i % elPerVec == 0) {
                 std::cout << "| ";
             }
-            if (getOriginalInputPrecisionAtPort(1) == Precision::FP64) {
+            if (inPrc == Precision::FP64) {
                 std::cout << reinterpret_cast<double*>(secData)[i] << "; ";
-            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I64) {
+            } else if (inPrc == Precision::I64) {
                 std::cout << reinterpret_cast<int64_t*>(secData)[i] << "; ";
-            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I32) {
+            } else if (inPrc == Precision::I32) {
                 std::cout << reinterpret_cast<int32_t*>(secData)[i] << "; ";
-            } else if (getOriginalInputPrecisionAtPort(1) == Precision::FP32) {
+            } else if (inPrc == Precision::FP32) {
                 std::cout << reinterpret_cast<float*>(secData)[i] << "; ";
-            } else if (getOriginalInputPrecisionAtPort(1) == Precision::U8) {
+            } else if (inPrc == Precision::U8) {
                 std::cout << int(reinterpret_cast<uint8_t *>(secData)[i]) << "; ";
-            } else if (getOriginalInputPrecisionAtPort(1) == Precision::I8) {
+            } else if (inPrc == Precision::I8) {
                 std::cout << int(reinterpret_cast<int8_t *>(secData)[i]) << "; ";
             }
         }
@@ -946,13 +951,14 @@ void Reduce::reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr)
 
 inline void Reduce::reduceKernelProcess(const uint8_t *inPtr, uint8_t *outPtr, size_t workAmount,
                                                     size_t reduceW, size_t workBatch, const int *tabIdx) {
-// printf("reduceKernelProcess workAmount: %ld; reduceW: %ld; workBatch: %ld\n", workAmount, reduceW, workBatch);
-// auto iIn = reinterpret_cast<const int64_t *>(inPtr);
-// std::cout << "IN:  ";
-// for (int i = 0; i < workAmount; i++) {
-//     std::cout << iIn[i] << ";";
-// }
-// std::cout << std::endl;
+printf("reduceKernelProcess workAmount: %ld; reduceW: %ld; workBatch: %ld\n", workAmount, reduceW, workBatch);
+auto iIn = reinterpret_cast<const uint8_t *>(inPtr);
+std::cout << "IN:  ";
+for (int i = 0; i < workAmount; i++) {
+    // std::cout << iIn[i] << ";";
+    std::cout << uint32_t(iIn[i]) << ";";
+}
+std::cout << std::endl;
 
     auto arg = JitReduceCallArgs();
     arg.src = static_cast<const void *>(inPtr);
@@ -965,16 +971,16 @@ inline void Reduce::reduceKernelProcess(const uint8_t *inPtr, uint8_t *outPtr, s
 
     (*reduceKernel)(&arg);
 
-// auto iOut = reinterpret_cast<const int64_t *>(outPtr);
-// std::cout << "OUT: ";
-// for (int i = 0; i < workAmount; i++) {
-//     std::cout << iOut[i] << ";";
-// }
-// std::cout << std::endl;
+auto iOut = reinterpret_cast<const uint8_t *>(outPtr);
+std::cout << "OUT: ";
+for (int i = 0; i < workAmount; i++) {
+    std::cout << uint32_t(iOut[i]) << ";";
+}
+std::cout << std::endl;
 }
 
 inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
-// printf("reduceKernelPostProcess workAmount+\n");
+printf("reduceKernelPostProcess workAmount+\n");
     const size_t integerDivisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
     if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
         // parallel_for2d(OB, OC, [&](size_t ob, size_t oc) {
@@ -997,12 +1003,12 @@ inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
             (*reducePostKernel)(&arg);
 // std::cout << "reduceKernelPostProcess oc-: " << oc << std::endl;
-// auto iOut = reinterpret_cast<const float *>(out_p);
-// std::cout << "OUT: ";
-// for (int i = 0; i < arg.work_amount; i++) {
-//     std::cout << iOut[i] << ";";
-// }
-// std::cout << std::endl;
+auto iOut = reinterpret_cast<const uint8_t *>(out_p);
+std::cout << "OUT: ";
+for (int i = 0; i < arg.work_amount; i++) {
+    std::cout << uint32_t(iOut[i]) << ";";
+}
+std::cout << std::endl;
         }
         }
         // });

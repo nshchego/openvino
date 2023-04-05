@@ -15,8 +15,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
         InferenceEngine::Precision::FP16,
         InferenceEngine::Precision::I64,
         InferenceEngine::Precision::I32,
-        InferenceEngine::Precision::U64,
-        InferenceEngine::Precision::FP64
+        InferenceEngine::Precision::U64
 };
 
 const std::vector<bool> keepDims = {

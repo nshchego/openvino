@@ -105,7 +105,6 @@ Node::Node(const std::shared_ptr<ov::Node>& op,
         originalInputPrecisions.emplace_back(details::convertPrecision(op->get_input_element_type(i)));
     }
 
-//    if (typeStr != "Result" && typeStr != "Assign") {
     if (type != Type::Output && type != Type::MemoryOutput) {
         if (op->get_output_size() == 0) {
             IE_THROW() << "Node with type '" << typeStr << "' and name '" << name << "' does not have any outputs.";
@@ -121,6 +120,7 @@ Node::Node(const std::shared_ptr<ov::Node>& op,
             originalOutputPrecisions.emplace_back(details::convertPrecision(op->get_output_element_type(i)));
         }
     }
+
 std::cout << "CPU Node CTR {" << typeStr << "} originalInputPrecisions: ";
 for (auto& prc : originalInputPrecisions) {
     std::cout << prc << "; ";
@@ -562,6 +562,11 @@ void Node::updateShapes() {
     IE_ASSERT(isDynamicNode()) << "Node::updateShapes() is called to a static shape node of type: " << getTypeStr() << " with name: " << getName();
     if (needShapeInfer()) {
         auto result = shapeInfer();
+// std::cout << "updateShapes type: " << int(type) << "; name: " << name << "; {" << std::endl;
+// for (auto &dim : result.dims[0]) {
+//     std::cout << dim << "; ";
+// }
+// std::cout << "}" << std::endl;
         if (ShapeInferStatus::success == result.status) {
             redefineOutputMemory(result.dims);
         }
