@@ -63,7 +63,5 @@ static constexpr Property<bool> denormals_optimization{"CPU_DENORMALS_OPTIMIZATI
  */
 static constexpr Property<float> sparse_weights_decompression_rate{"CPU_SPARSE_WEIGHTS_DECOMPRESSION_RATE"};
 
-static constexpr Property<float> enable_native_i64{"ENABLE_NATIVE_I64"};
-
 }  // namespace intel_cpu
 }  // namespace ov

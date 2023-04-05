@@ -97,6 +97,7 @@
 #include "ngraph_transformations/convert_to_interaction.hpp"
 #include "ngraph_transformations/convert_fq_rnn_to_quantized_rnn.hpp"
 #include "ngraph_transformations/move_eltwise_up_data_movement.hpp"
+#include "ngraph_transformations/ref_convert_i64_i32.hpp"
 #include "ngraph_transformations/swap_convert_transpose.hpp"
 
 // Snippets
@@ -198,34 +199,6 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
 std::cout << "PreLpt enableNativeI64: " << config.enableNativeI64 << std::endl;
     bool supportI64 = config.enableNativeI64;
 
-    if (!supportI64) {
-        // Switch on the INT64 if a model contains Extension node.
-        auto orderedOps = model->get_ordered_ops();
-        for (const auto& op : orderedOps) {
-            if (TypeFromName(op->get_type_name()) == Type::Unknown) {
-                for (size_t i = 0lu; i < op->get_input_size(); i++) {
-                    if (one_of(op->get_input_element_type(i), element::i64, element::u64)) {
-                        supportI64 = true;
-                        break;
-                    }
-                }
-                if (supportI64) {
-                    break;
-                }
-                for (size_t i = 0lu; i < op->get_output_size(); i++) {
-                    if (one_of(op->get_output_element_type(i), element::i64, element::u64)) {
-                        supportI64 = true;
-                        break;
-                    }
-                }
-                if (supportI64) {
-                    break;
-                }
-            }
-        }
-    }
-std::cout << "PreLpt supportI64: " << supportI64 << std::endl;
-
     auto get_convert_precisions = [&]() {
         precisions_map map = {
             {ov::element::i16,     ov::element::i32},
@@ -283,6 +256,9 @@ std::cout << "PreLpt supportI64: " << supportI64 << std::endl;
         manager.register_pass<ngraph::pass::low_precision::ConvertSubtractConstant>(defaultPrecisions);
     }
     manager.register_pass<ov::pass::Validate>();
+    if (!supportI64) {
+        manager.register_pass<RefConvertI64ToI32>();
+    }
     manager.register_pass<ov::pass::ConvertPrecision>(precisions, type_to_fuse);
     if (supportI64) {
         manager.register_pass<ConvertPrecisionI64ToI32>();

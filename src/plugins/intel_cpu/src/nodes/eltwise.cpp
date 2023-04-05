@@ -1759,7 +1759,7 @@ std::cout << "exec Optimized 6D" << std::endl;
             }
             }
             }
-std::cout << "AFTER KER" << std::endl;
+// std::cout << "AFTER KER" << std::endl;
         } else {
 std::cout << "exec Optimized Generic" << std::endl;
             // execute Optimized Generic

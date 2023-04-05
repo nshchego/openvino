@@ -481,7 +481,7 @@ Engine::LoadExeNetworkImpl(const InferenceEngine::CNNNetwork &network, const std
 
     DEBUG_LOG(PrintableModel(*nGraphFunc, "org_"));
 
-    // TODO: Can we call 'engConfig.readProperties(config)' instead of below code ???
+    // TODO: Can we call 'engConfig.readProperties(config)' instead of below code?
     auto i64prop = config.find(CPUConfigParams::KEY_CPU_ENABLE_NATIVE_I64);
     if (i64prop != config.end()) {
         try {
