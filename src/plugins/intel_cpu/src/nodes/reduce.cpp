@@ -209,8 +209,12 @@ void Reduce::getSupportedDescriptors() {
 
 void Reduce::initSupportedPrimitiveDescriptors() {
     const auto &inputPrc0 = getOriginalInputPrecisionAtPort(REDUCE_DATA);
-    const auto &inputPrc1 = getOriginalInputPrecisionAtPort(REDUCE_INDEXES);
+    auto inputPrc1 = getOriginalInputPrecisionAtPort(REDUCE_INDEXES);
     outputPrc = getOriginalOutputPrecisionAtPort(0);
+
+    if (!one_of(inputPrc1, Precision::I32, Precision::I64)) {
+        inputPrc1 = Precision::I32;
+    }
 
     if (!fusedWith.empty()) {
         outputPrc = fusedWith[fusedWith.size() - 1]->getOriginalOutputPrecisionAtPort(0);
@@ -272,30 +276,20 @@ void Reduce::initSupportedPrimitiveDescriptors() {
                 getInputShapeAtPort(REDUCE_DATA).getMinDims()[1] > 1) {
             if (keepDims) {
                 pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, outputPrc, impl_type);
+                pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
                 if (x64::mayiuse(x64::avx512_core)) {
-                    if (srcDataSize == 4) {
-                        pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, outputPrc, impl_type);
-                    } else if (srcDataSize == 8) {
-                        pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
-                    }
-                } else if (srcDataSize == 4 && x64::mayiuse(x64::sse41)) {
-                    pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, outputPrc, impl_type);
                 }
             } else {
                 pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
                 if (x64::mayiuse(x64::avx512_core)) {
-                    if (srcDataSize == 4) {
-                        pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                    } else if (srcDataSize == 8) {
-                        pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
-                    }
-                } else if (srcDataSize == 4 && x64::mayiuse(x64::sse41)) {
-                    pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
                 }
             }
         }
     } else {
-        pushDesc(LayoutType::ncsp, LayoutType::ncsp, Precision::FP32, Precision::FP32, Precision::FP32, impl_desc_type::ref);
+        pushDesc(LayoutType::ncsp, LayoutType::ncsp, Precision::FP32, Precision::I32, Precision::FP32, impl_desc_type::ref);
     }
 }
 

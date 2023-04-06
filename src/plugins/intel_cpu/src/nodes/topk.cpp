@@ -1844,7 +1844,7 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
 	            top_k = topKL->get_vector<int32_t>()[0];
 	        }
 	    } else {
-            IE_THROW() << errorPrefix <<  "gets non-constant second tensor in static shape mode!";
+            THROW_CPU_NODE_ERR << " gets non-constant second tensor in static shape mode!";
         }
     }
 

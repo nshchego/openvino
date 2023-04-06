@@ -242,6 +242,7 @@ void Config::readProperties(const std::map<std::string, std::string> &prop) {
             } else {
                 IE_THROW() << "Wrong value for property key " << ov::hint::execution_mode.name()
                     << ". Supported values: PERFORMANCE, ACCURACY";
+            }
         } else if (key == CPUConfigParams::KEY_CPU_ENABLE_NATIVE_I64) {
             try {
                 enableNativeI64 = std::stoi(val);

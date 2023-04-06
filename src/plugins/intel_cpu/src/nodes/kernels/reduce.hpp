@@ -161,7 +161,6 @@ private:
 
     Xbyak::Label l_table;
 
-    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> exp_injector;
 
     void reduce_main();
@@ -271,7 +270,6 @@ private:
     Xbyak::Xmm xmm_aux  = Xbyak::Xmm(vmm_aux.getIdx());
     Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
 
-    std::shared_ptr<jit_uni_vcvtneps2bf16> uni_vcvtneps2bf16;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
 
     std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>>> eltwise_injectors;

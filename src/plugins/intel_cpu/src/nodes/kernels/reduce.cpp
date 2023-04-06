@@ -234,10 +234,6 @@ void JitReduceKernel<isa>::generate() {
         exp_injector = std::make_shared<x64::jit_uni_eltwise_injector_f32<isa>>(this, dnnl::impl::alg_kind::eltwise_exp, 0.f, 0.f, 1.f);
     }
 
-    if (x64::mayiuse(x64::avx512_core)) {
-        uni_vcvtneps2bf16 = std::make_shared<jit_uni_vcvtneps2bf16>(this, isa);
-    }
-
     this->preamble();
 
     planar_layout = jcp.layout == ReduceLayoutType::reduce_ncsp || jcp.layout == ReduceLayoutType::reduce_nspc;
@@ -268,8 +264,8 @@ void JitReduceKernel<isa>::generate() {
 
     this->postamble();
 
-    if (x64::mayiuse(x64::avx512_core)) {
-        uni_vcvtneps2bf16->emit_data();
+    if (isa == x64::avx512_core) {
+        vcvtneps2bf16->emit_data();
     }
 
     if (one_of(jcp.reduce_mode, Algorithm::ReduceAnd, Algorithm::ReduceL1, Algorithm::ReduceMax,
@@ -1334,10 +1330,6 @@ void JitReducePostKernel<isa>::generate() {
         log_injector = std::make_shared<x64::jit_uni_eltwise_injector_f32<isa>>(this, dnnl::impl::alg_kind::eltwise_log, 0.f, 0.f, 1.f);
     }
 
-    if (isa ==x64::avx512_core) {
-        uni_vcvtneps2bf16 = std::make_shared<jit_uni_vcvtneps2bf16>(this, isa);
-    }
-
     this->preamble();
 
     planar_layout = jcp.layout == ReduceLayoutType::reduce_ncsp || jcp.layout == ReduceLayoutType::reduce_nspc;
@@ -1382,7 +1374,7 @@ void JitReducePostKernel<isa>::generate() {
     this->postamble();
 
     if (isa == x64::avx512_core) {
-        uni_vcvtneps2bf16->emit_data();
+        vcvtneps2bf16->emit_data();
     }
 
     if (one_of(jcp.reduce_mode, Algorithm::ReduceLogSum, Algorithm::ReduceLogSumExp)) {
