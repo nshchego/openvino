@@ -104,7 +104,10 @@ void Reshape::initSupportedPrimitiveDescriptors() {
         return;
 
     auto inPrec = getOriginalInputPrecisionAtPort(0);
-    const auto &secondInPrc = getOriginalInputPrecisionAtPort(1);
+    Precision secondInPrc = Precision::I32;
+    if (getOriginalInputPrecisions().size() > 1) {
+        secondInPrc = getOriginalInputPrecisionAtPort(1);
+    }
     const auto &outPrec = getOriginalOutputPrecisionAtPort(0);
 
     // Current reshape implementation is simple memory reinterpret,
@@ -125,7 +128,7 @@ void Reshape::initSupportedPrimitiveDescriptors() {
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         config.inConfs[i].inPlace(-1);
         config.inConfs[i].constant(false);
-        config.inConfs[i].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc((i > 0 ? secondInPrc : inPrec), getInputShapeAtPort(i)));
+        config.inConfs[i].setMemDesc(creatorsMap.at(LayoutType::ncsp)->createSharedDesc((i == 0 ? inPrec : secondInPrc), getInputShapeAtPort(i)));
     }
     config.outConfs.resize(1);
     config.outConfs[0].inPlace(canBeInPlace ? 0 : -1);

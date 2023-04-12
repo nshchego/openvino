@@ -21,9 +21,27 @@ CpuBlockedMemoryDesc::CpuBlockedMemoryDesc(InferenceEngine::Precision prc, const
 CpuBlockedMemoryDesc::CpuBlockedMemoryDesc(InferenceEngine::Precision prc, const Shape& shape, const VectorDims& blockedDims,
                   const VectorDims& order, size_t offsetPadding, const VectorDims& offsetPaddingToData,
                   const VectorDims& strides) : MemoryDesc(shape, Blocked), precision(prc) {
-if (prc == InferenceEngine::Precision::BF16) {
-    std::cout << "CpuBlockedMemoryDesc: BF16" << std::endl;
-}
+// std::cout << "CpuBlockedMemoryDesc: prc: " << prc << "; shape: " << shape.toString() << "; blockedDims {";
+// for (auto dim : blockedDims) {
+//     std::cout << dim << "; ";
+// }
+// std::cout << "}; order {";
+// for (auto dim : order) {
+//     std::cout << dim << "; ";
+// }
+// std::cout << "};  offsetPadding: " << offsetPadding << "; offsetPaddingToData {";
+// for (auto dim : offsetPaddingToData) {
+//     std::cout << dim << "; ";
+// }
+// std::cout << "}; strides {";
+// for (auto dim : strides) {
+//     std::cout << dim << "; ";
+// }
+// std::cout << "}" << std::endl;
+
+// if (prc == InferenceEngine::Precision::BF16) {
+//     std::cout << "CpuBlockedMemoryDesc: BF16" << std::endl;
+// }
     if (std::any_of(order.begin(), order.end(), [](size_t val) { return val == Shape::UNDEFINED_DIM; })) {
         IE_THROW() << "CpuBlockedMemoryDesc do not support undefined order.";
     }

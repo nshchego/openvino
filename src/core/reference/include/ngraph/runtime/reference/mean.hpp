@@ -20,6 +20,7 @@ namespace runtime {
 namespace reference {
 template <typename T>
 void mean(const T* arg, T* out, const Shape& in_shape, const AxisSet& reduction_axes) {
+std::cout << "MEAN REF" << std::endl;
     constexpr bool dont_keep_dims_in_output = false;
     const auto out_shape = reduce(in_shape, reduction_axes, dont_keep_dims_in_output);
     std::vector<T> cs(shape_size(out_shape), 0);

@@ -1837,13 +1837,13 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
 
     top_k = 0;
     if (!isDynamicNgraphNode(op)) {
-	    if (auto topKL = ov::as_type<ov::opset1::Constant>(topKOp->get_input_node_ptr(TOPK_K))) {
-	        if (topKL->get_element_type() == ov::element::i64) {
-	            top_k = topKL->get_vector<int64_t>()[0];
-	        } else if (topKL->get_element_type() == ov::element::i32) {
-	            top_k = topKL->get_vector<int32_t>()[0];
-	        }
-	    } else {
+        if (auto topKL = ov::as_type<ov::opset1::Constant>(topKOp->get_input_node_ptr(TOPK_K))) {
+            if (topKL->get_element_type() == ov::element::i64) {
+                top_k = topKL->get_vector<int64_t>()[0];
+            } else if (topKL->get_element_type() == ov::element::i32) {
+                top_k = topKL->get_vector<int32_t>()[0];
+            }
+        } else {
             THROW_CPU_NODE_ERR << " gets non-constant second tensor in static shape mode!";
         }
     }

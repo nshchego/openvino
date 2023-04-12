@@ -165,6 +165,8 @@ protected:
                 auto data_ptr = reinterpret_cast<float*>(data_tensor.data());
                 std::vector<float> data(data_ptr, data_ptr + ov::shape_size(shape));
                 secondaryInput = ngraph::builder::makeConstant(netType, shape, data);
+            } else {
+                IE_THROW() << "Unsupported data type.";
             }
         }
 

@@ -11,7 +11,7 @@
 bool ov::intel_cpu::RefConvertI64ToI32::run_on_model(const std::shared_ptr<ov::Model> &model) {
     const auto orderedOps = model->get_ordered_ops();
     for (const auto& op : orderedOps) {
-        if (TypeFromName(op->get_type_name()) == Type::Unknown) {            
+        if (TypeFromName(op->get_type_name()) == Type::Unknown) {
             for (auto& output : op->outputs()) {
                 if (output.get_element_type() == ov::element::i64 || output.get_element_type() == ov::element::u64) {
                     auto targetInputs = output.get_target_inputs();
