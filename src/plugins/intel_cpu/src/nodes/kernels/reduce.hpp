@@ -8,7 +8,7 @@
 #include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
-#include "emitters/jit_bf16_emitters.hpp"
+#include <emitters/jit_eltwise_emitters.hpp>
 
 namespace ov {
 namespace intel_cpu {
@@ -58,13 +58,7 @@ struct JitReduceKernelBase : public JitKernelBase {
         kernel_func(args);
     }
 
-    explicit JitReduceKernelBase(const JitReduceConfigParams &jcp, const char *name) : JitKernelBase(name), kernel_func(nullptr), jcp(jcp) {
-        if (jcp.src_prc.size() <= 4) {
-            exec_prc = InferenceEngine::Precision::FP32;
-        } else if (jcp.src_prc.size() == 8) {
-            exec_prc = jcp.src_prc;
-        }
-    }
+    explicit JitReduceKernelBase(const JitReduceConfigParams& jcp, const char* name);
 
     virtual ~JitReduceKernelBase() = default;
 
@@ -90,10 +84,10 @@ protected:
     void horiz_qq(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-    void horiz_reduce_store_ps(const Xbyak::Xmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    void horiz_reduce_store_ps(const Xbyak::Xmm& vmm_dst, const InferenceEngine::Precision& dst_dt, bool load_embedded = false);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-    void horiz_reduce_store_qq(const Xbyak::Xmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
+    void horiz_reduce_store_qq(const Xbyak::Xmm& vmm_dst, const InferenceEngine::Precision& dst_dt, bool load_embedded = false);
 
     JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
@@ -102,9 +96,11 @@ protected:
 
     Xbyak::Xmm xmm_aux1;
     Xbyak::Xmm xmm_aux2;
-    Xbyak::Xmm xmm_aux3;
+//    Xbyak::Xmm xmm_aux3;
 
     Xbyak::Ymm ymm_aux1;
+
+    std::shared_ptr<jit_multiply_emitter> jit_multiply_i64;
 };
 
 
@@ -197,11 +193,7 @@ private:
 
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    // void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
-
     void horiz_store_pd(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
-
-    // void horiz_store_qq(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_prc, bool load_embedded);
 
     void prepare_aux_table();
 
@@ -288,10 +280,8 @@ private:
 
     void horiz_reduce_store_pd(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
 
-    // void horiz_reduce_store_qq(const Vmm &vmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded = false);
-
     void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
-};
+};  // JitReducePostKernel
 
 }   // namespace kernel
 }   // namespace intel_cpu

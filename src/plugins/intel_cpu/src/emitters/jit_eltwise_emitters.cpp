@@ -313,10 +313,10 @@ std::set<std::vector<element::Type>> jit_multiply_emitter::get_supported_precisi
 }
 
 size_t jit_multiply_emitter::aux_vecs_count() const {
-    if (x64::mayiuse(x64::avx512_core)) {
-        return 0;
-    } else {
+    if (exec_prc_ == Precision::I64 && !x64::mayiuse(x64::avx512_core)) {
         return 2;
+    } else {
+        return 0;
     }
 }
 

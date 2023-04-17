@@ -24,6 +24,24 @@ static inline bool isFloatCompatible(const Precision &type) {
 ///////////////////////////////
 
 template<typename CallArgs>
+JitReduceKernelBase<CallArgs>::JitReduceKernelBase(const JitReduceConfigParams& jcp, const char* name) : JitKernelBase(name), kernel_func(nullptr), jcp(jcp) {
+    if (jcp.src_prc.size() <= 4) {
+        exec_prc = InferenceEngine::Precision::FP32;
+    } else if (jcp.src_prc.size() == 8) {
+        exec_prc = jcp.src_prc;
+    }
+    if (exec_prc == InferenceEngine::Precision::I64) {
+        if (isValidIsa(x64::avx512_core)) {
+            jit_multiply_i64.reset(new jit_multiply_emitter(this, x64::avx512_core));
+        } else if (isValidIsa(x64::avx2)) {
+            jit_multiply_i64.reset(new jit_multiply_emitter(this, x64::avx2));
+        } else if (isValidIsa(x64::sse41)) {
+            jit_multiply_i64.reset(new jit_multiply_emitter(this, x64::sse41));
+        }
+    }
+}
+
+template<typename CallArgs>
 void JitReduceKernelBase<CallArgs>::horiz_pd(const Xmm &vmm, const Operand &op) {
     // switch (jcp.reduce_mode) {
     //     case Algorithm::ReduceAnd:
@@ -171,6 +189,7 @@ void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm &vmm, const Operand &op) 
             break;
         case Algorithm::ReduceProd:
             vpmullq(vmm, vmm, op);
+            vcvtneps2bf16->emit_code({static_cast<size_t>(ymmSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
             break;
         default:
             IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
@@ -266,6 +285,9 @@ void JitReduceKernel<isa>::generate() {
 
     if (isa == x64::avx512_core) {
         vcvtneps2bf16->emit_data();
+    }
+    if (exec_prc == Precision::I64) {
+        jit_multiply_i64->emit_data();
     }
 
     if (one_of(jcp.reduce_mode, Algorithm::ReduceAnd, Algorithm::ReduceL1, Algorithm::ReduceMax,
@@ -1299,16 +1321,16 @@ void JitReduceKernel<isa>::prepare_aux_table() {
     }
 }
 
-
 ///////////////////////////////
 ///// JitReducePostKernel /////
 ///////////////////////////////
+
 template <x64::cpu_isa_t isa>
 JitReducePostKernel<isa>::JitReducePostKernel(const JitReduceConfigParams &jcp, const dnnl_primitive_attr &attr)
         : JitReduceKernelBase<JitReducePostCallArgs>(jcp, jit_name()), attr(attr) {
     xmm_aux1 = Xmm(4);
     xmm_aux2 = Xmm(5);
-    xmm_aux3 = Xmm(6);
+//    xmm_aux3 = Xmm(6);
 
     ymm_aux1 = Ymm(xmm_aux1.getIdx());
 }
