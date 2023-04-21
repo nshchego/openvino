@@ -31,7 +31,7 @@ using LoopParams = typename std::tuple<
 class LoopLayerCPUTest : public testing::WithParamInterface<LoopParams>,
                          virtual public SubgraphBaseTest {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<LoopParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<LoopParams> &obj) {
         InputLayerType trip_count_type;
         int64_t trip_count;
         bool exec_cond;
@@ -99,34 +99,34 @@ protected:
 
         // Set up the cell body, a function from (Xi, Yi) -> (Zo)
         // Body parameters
-        const std::vector<ngraph::PartialShape> body_params_shapes(shapes.size(), ngraph::PartialShape::dynamic());
-        ngraph::ParameterVector body_params;
+        const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
+        ov::ParameterVector body_params;
         for (const auto &pshape : body_params_shapes) {
             body_params.emplace_back(std::make_shared<ngraph::opset1::Parameter>(netType, pshape));
         }
 
-        auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{1}, true);
-        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{1}, exec_cond);
-        std::shared_ptr<ngraph::Node> trip_count_input;
+        auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, true);
+        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, exec_cond);
+        std::shared_ptr<ov::Node> trip_count_input;
         int shift = 0;
         if (trip_count_type == InputLayerType::PARAMETER) {
             for (auto& target : targetStaticShapes)
-                target.insert(target.begin(), ngraph::Shape{});
-            trip_count_input = std::make_shared<ngraph::opset5::Parameter>(ngraph::element::i64, ngraph::Shape{1});
+                target.insert(target.begin(), ov::Shape{});
+            trip_count_input = std::make_shared<ngraph::opset5::Parameter>(ov::element::i64, ov::Shape{1});
             trip_count_input->set_friendly_name("trip_count");
             params.insert(params.begin(), ov::as_type_ptr<ngraph::opset5::Parameter>(trip_count_input));
             shift++;
         } else {
-            trip_count_input = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{1}, trip_count);
+            trip_count_input = std::make_shared<ngraph::opset5::Constant>(ov::element::i64, ov::Shape{1}, trip_count);
         }
 
         // Body
-        std::shared_ptr<ngraph::Node> Zo = body_params[0];
+        std::shared_ptr<ov::Node> Zo = body_params[0];
         for (int i = 1; i < body_params.size(); ++i) {
-            Zo = std::make_shared<ngraph::op::v1::Add>(body_params[i], Zo);
+            Zo = std::make_shared<ov::op::v1::Add>(body_params[i], Zo);
         }
 
-        auto body = std::make_shared<ov::Model>(ngraph::OutputVector{body_condition_const, Zo},
+        auto body = std::make_shared<ov::Model>(ov::OutputVector{body_condition_const, Zo},
                                                        body_params);
 
         auto loop = std::make_shared<ngraph::opset5::Loop>(trip_count_input, exec_condition);
@@ -153,7 +153,7 @@ protected:
         auto result0 = std::make_shared<ngraph::opset5::Result>(out0);
         auto result1 = std::make_shared<ngraph::opset5::Result>(out1);
         auto result2 = std::make_shared<ngraph::opset5::Result>(out2);
-        function = std::make_shared<ov::Model>(ngraph::ResultVector{result0, result1, result2}, params, "loop");
+        function = std::make_shared<ov::Model>(ov::ResultVector{result0, result1, result2}, params, "loop");
     }
 };
 
@@ -175,29 +175,29 @@ protected:
         targetDevice = CommonTestUtils::DEVICE_CPU;
         init_input_shapes(shapes);
         for (auto& target : targetStaticShapes)
-            target.insert(target.begin(), ngraph::Shape{});
+            target.insert(target.begin(), ov::Shape{});
 
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
 
         // Body parameters
-        const std::vector<ngraph::PartialShape> body_params_shapes(shapes.size(), ngraph::PartialShape::dynamic());
-        ngraph::ParameterVector body_params = { std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, ngraph::Shape{}) };
+        const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
+        ov::ParameterVector body_params = { std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{}) };
         for (const auto &pshape : body_params_shapes) {
             body_params.emplace_back(std::make_shared<ngraph::opset1::Parameter>(inType, pshape));
         }
 
-        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{}, exec_cond);
-        auto trip_count_input = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, ngraph::Shape{});
+        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{}, exec_cond);
+        auto trip_count_input = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{});
         trip_count_input->set_friendly_name("trip_count");
         params.insert(params.begin(), trip_count_input);
 
         // Body
-        auto const_body_cond = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{}, 10);
-        auto const_body_step = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{}, 2);
+        auto const_body_cond = std::make_shared<ngraph::opset5::Constant>(ov::element::i64, ov::Shape{}, 10);
+        auto const_body_step = std::make_shared<ngraph::opset5::Constant>(ov::element::i64, ov::Shape{}, 2);
         auto less = std::make_shared<ngraph::opset5::Less>(body_params[0], const_body_cond);
         auto exec_idx = std::make_shared<ngraph::opset5::Add>(body_params[0], const_body_step);
 
-        auto node_const = std::make_shared<ngraph::opset5::Constant>(inType, ngraph::Shape{}, 2);
+        auto node_const = std::make_shared<ngraph::opset5::Constant>(inType, ov::Shape{}, 2);
         auto node = std::make_shared<ngraph::opset5::Add>(body_params[1], node_const);
 
         // reference ngraph function is resized by input static shapes in tests but
@@ -207,7 +207,7 @@ protected:
         // const std::vector<int64_t> end(inputDynamicShapes[0].rank().get_length(), 0);
         // auto node = ngraph::builder::makePad(body_params[1], begin, end, .0f, PadMode::CONSTANT);
 
-        auto body = std::make_shared<ov::Model>(ngraph::OutputVector{less, exec_idx, node}, body_params);
+        auto body = std::make_shared<ov::Model>(ov::OutputVector{less, exec_idx, node}, body_params);
 
         auto loop = std::make_shared<ngraph::opset5::Loop>(params[0], exec_condition);
         loop->set_function(body);
@@ -221,7 +221,7 @@ protected:
 
         auto result0 = std::make_shared<ngraph::opset5::Result>(out0);
         auto result1 = std::make_shared<ngraph::opset5::Result>(out1);
-        function = std::make_shared<ov::Model>(ngraph::ResultVector{ result0, result1 }, params, "loop");
+        function = std::make_shared<ov::Model>(ov::ResultVector{ result0, result1 }, params, "loop");
     }
 };
 
@@ -250,25 +250,25 @@ protected:
 
         // Set up the cell body, a function from (Xi, Yi) -> (Zo)
         // Body parameters
-        const std::vector<ngraph::PartialShape> body_params_shapes(shapes.size(), ngraph::PartialShape::dynamic());
-        ngraph::ParameterVector body_params;
+        const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
+        ov::ParameterVector body_params;
         for (const auto &pshape : body_params_shapes) {
             body_params.emplace_back(std::make_shared<ngraph::opset1::Parameter>(inType, pshape));
         }
 
-        auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{1}, true);
-        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{1}, exec_cond);
-        std::shared_ptr<ngraph::Node> trip_count_input;
+        auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, true);
+        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, exec_cond);
+        std::shared_ptr<ov::Node> trip_count_input;
         int shift = 0;
         if (trip_count_type == InputLayerType::PARAMETER) {
             for (auto& target : targetStaticShapes)
-                target.insert(target.begin(), ngraph::Shape{});
-            trip_count_input = std::make_shared<ngraph::opset5::Parameter>(ngraph::element::i64, ngraph::Shape{1});
+                target.insert(target.begin(), ov::Shape{});
+            trip_count_input = std::make_shared<ngraph::opset5::Parameter>(ov::element::i64, ov::Shape{1});
             trip_count_input->set_friendly_name("trip_count");
             params.insert(params.begin(), ov::as_type_ptr<ngraph::opset5::Parameter>(trip_count_input));
             shift++;
         } else {
-            trip_count_input = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{1}, trip_count);
+            trip_count_input = std::make_shared<ngraph::opset5::Constant>(ov::element::i64, ov::Shape{1}, trip_count);
         }
 
         // Body
@@ -277,7 +277,7 @@ protected:
         auto constant = ngraph::builder::makeConstant(inType, std::vector<size_t>{1}, std::vector<float>{0.5});
         auto eltwise = std::make_shared<ov::op::v1::Add>(body_params[0], constant);
 
-        auto body = std::make_shared<ov::Model>(ngraph::OutputVector{body_condition_const, s, eltwise}, body_params);
+        auto body = std::make_shared<ov::Model>(ov::OutputVector{body_condition_const, s, eltwise}, body_params);
 
         auto loop = std::make_shared<ngraph::opset5::Loop>(trip_count_input, exec_condition);
         loop->set_function(body);
@@ -295,7 +295,7 @@ protected:
         auto result0 = std::make_shared<ngraph::opset5::Result>(out0);
         auto result1 = std::make_shared<ngraph::opset5::Result>(out1);
         auto result2 = std::make_shared<ngraph::opset5::Result>(out2);
-        function = std::make_shared<ov::Model>(ngraph::ResultVector{result0, result1, result2}, params, "loop");
+        function = std::make_shared<ov::Model>(ov::ResultVector{result0, result1, result2}, params, "loop");
     }
 };
 
@@ -320,22 +320,22 @@ protected:
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
 
         // Body parameters
-        const std::vector<ngraph::PartialShape> body_params_shapes(shapes.size(), ngraph::PartialShape::dynamic());
+        const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
         auto body_params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
 
-        auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{1}, true);
-        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ngraph::element::boolean, ngraph::Shape{1}, exec_cond);
-        std::shared_ptr<ngraph::Node> trip_count_input;
+        auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, true);
+        auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, exec_cond);
+        std::shared_ptr<ov::Node> trip_count_input;
         int shift = 0;
         if (trip_count_type == InputLayerType::PARAMETER) {
             for (auto& target : targetStaticShapes)
-                target.insert(target.begin(), ngraph::Shape{});
-            trip_count_input = std::make_shared<ngraph::opset5::Parameter>(ngraph::element::i64, ngraph::Shape{1});
+                target.insert(target.begin(), ov::Shape{});
+            trip_count_input = std::make_shared<ngraph::opset5::Parameter>(ov::element::i64, ov::Shape{1});
             trip_count_input->set_friendly_name("trip_count");
             params.insert(params.begin(), ov::as_type_ptr<ngraph::opset5::Parameter>(trip_count_input));
             shift++;
         } else {
-            trip_count_input = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{1}, trip_count);
+            trip_count_input = std::make_shared<ngraph::opset5::Constant>(ov::element::i64, ov::Shape{1}, trip_count);
         }
 
         // Body
@@ -343,7 +343,7 @@ protected:
         auto add = std::make_shared<ngraph::opset5::Add>(body_params[0], constant);
         auto concat = ngraph::builder::makeConcat({body_params[1], add}, 0);
 
-        auto body = std::make_shared<ov::Model>(ngraph::OutputVector{body_condition_const, concat}, body_params);
+        auto body = std::make_shared<ov::Model>(ov::OutputVector{body_condition_const, concat}, body_params);
 
         auto loop = std::make_shared<ngraph::opset5::Loop>(trip_count_input, exec_condition);
         loop->set_function(body);
@@ -357,7 +357,7 @@ protected:
 
         auto result0 = std::make_shared<ngraph::opset5::Result>(out0);
         auto result1 = std::make_shared<ngraph::opset5::Result>(out1);
-        function = std::make_shared<ov::Model>(ngraph::ResultVector{result0, result1}, params, "loop");
+        function = std::make_shared<ov::Model>(ov::ResultVector{result0, result1}, params, "loop");
     }
 };
 

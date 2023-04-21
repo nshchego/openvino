@@ -35,7 +35,7 @@ protected:
         const auto secondConsumpt = builder::makeEltwise(paramOuts[1], sharedNode, EltwiseTypes::ADD);
 
         NodeVector results{postOpCandidate, secondConsumpt};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "NotFusedConvSimpleOp");
+        function = std::make_shared<ov::Model>(results, inputParams, "NotFusedConvSimpleOp");
     }
 };
 

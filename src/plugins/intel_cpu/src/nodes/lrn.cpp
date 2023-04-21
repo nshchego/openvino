@@ -64,7 +64,7 @@ bool LrnKey::operator==(const LrnKey &rhs) const {
 }
 } // namespace
 
-bool Lrn::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Lrn::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         auto lrn = ngraph::as_type_ptr<const ngraph::opset1::LRN>(op);
         if (!lrn) {
@@ -110,12 +110,10 @@ bool Lrn::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, st
     return true;
 }
 
-Lrn::Lrn(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+Lrn::Lrn(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, PassThroughShapeInferFactory()) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "LRN node with name '" + getName() + "'";
-
         auto lrn = ngraph::as_type_ptr<const ngraph::opset1::LRN>(op);
         auto axes = ngraph::as_type_ptr<const ngraph::opset1::Constant>(lrn->get_input_node_shared_ptr(1))->cast_vector<int64_t>();
         bool isAcrossMaps = (axes.size() == 1 && axes[0] == 1);
@@ -134,9 +132,9 @@ void Lrn::getSupportedDescriptors() {
         return;
 
     if (getParentEdges().size() != 2)
-        IE_THROW() << errorPrefix << " has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges";
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << " has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of output edges";
 
     InferenceEngine::Precision precision = getOriginalOutputPrecisionAtPort(0);
     if (precision != InferenceEngine::Precision::FP32 && precision != InferenceEngine::Precision::BF16)
@@ -166,13 +164,13 @@ void Lrn::prepareParams() {
     auto& srcMemPtr = getParentEdgeAt(0)->getMemoryPtr();
     auto& dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " input memory did not allocate";
+        THROW_CPU_NODE_ERR << " input memory did not allocate";
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << "destination memory did not allocate";
+        THROW_CPU_NODE_ERR << "destination memory did not allocate";
 
     const NodeDesc* selected_pd = getSelectedPrimitiveDescriptor();
     if (selected_pd == nullptr)
-        IE_THROW() << errorPrefix << "preferable primitive descriptor did not set";
+        THROW_CPU_NODE_ERR << "preferable primitive descriptor did not set";
 
     auto inpDesc = getParentEdgeAt(0)->getMemory().GetDescWithType<DnnlMemoryDesc>();
 
@@ -259,7 +257,7 @@ void Lrn::execute(dnnl::stream strm) {
     if (execPtr) {
         execPtr->exec(primArgs, strm);
     } else {
-        IE_THROW() << errorPrefix << " doesn't have an initialized executor";
+        THROW_CPU_NODE_ERR << " doesn't have an initialized executor";
     }
 }
 

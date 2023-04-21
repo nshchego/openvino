@@ -272,7 +272,7 @@ private:
 };
 #endif // OPENVINO_ARCH_X86_64
 
-bool ExtractImagePatches::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ExtractImagePatches::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         auto extImgPatcher = ngraph::as_type_ptr<const ngraph::opset3::ExtractImagePatches>(op);
         if (!extImgPatcher) {
@@ -328,25 +328,24 @@ bool ExtractImagePatchesKey::operator==(const ExtractImagePatchesKey& rhs) const
 }
 }  // namespace
 
-ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "ExtractImagePatches layer with name '" + op->get_friendly_name() + "' ";
     auto extImgPatcher = ngraph::as_type_ptr<const ngraph::opset3::ExtractImagePatches>(op);
 
     if (inputShapes.size() != 1 || outputShapes.size() != 1)
-        IE_THROW() << errorPrefix << "has incorrect number of input or output edges!"
+        THROW_CPU_NODE_ERR << "has incorrect number of input or output edges!"
                    << " Input: " << inputShapes.size() << "; Output: " << outputShapes.size();
 
     if (getInputShapeAtPort(0).getRank() != 4)
-        IE_THROW() << errorPrefix << "must have 4D input tensor. Actual: " << getInputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "must have 4D input tensor. Actual: " << getInputShapeAtPort(0).getRank();
 
     if (getOutputShapeAtPort(0).getRank() != 4)
-        IE_THROW() << errorPrefix << "must have 4D output tensor. Actual: " << getOutputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "must have 4D output tensor. Actual: " << getOutputShapeAtPort(0).getRank();
 
     if (extImgPatcher->get_auto_pad() == ngraph::op::PadType::VALID) {
         _auto_pad = ExtImgPatcherPadType::VALID;
@@ -355,14 +354,14 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ngraph::Node>& op
     } else if (extImgPatcher->get_auto_pad() == ngraph::op::PadType::SAME_UPPER) {
         _auto_pad = ExtImgPatcherPadType::SAME_UPPER;
     } else {
-        IE_THROW() << errorPrefix << "has unsupported pad type: " << extImgPatcher->get_auto_pad();
+        THROW_CPU_NODE_ERR << "has unsupported pad type: " << extImgPatcher->get_auto_pad();
     }
 
     _ksizes = extImgPatcher->get_sizes();;
     _strides = extImgPatcher->get_strides();
     _rates = extImgPatcher->get_rates();
     if (_ksizes.size() != 2 || _strides.size() != 2 || _rates.size() != 2)
-        IE_THROW() << errorPrefix << "must have the following attributes with shape {2}: sizes, strides, rates.";
+        THROW_CPU_NODE_ERR << "must have the following attributes with shape {2}: sizes, strides, rates.";
 }
 
 void ExtractImagePatches::prepareParams() {
@@ -410,7 +409,7 @@ void ExtractImagePatches::initSupportedPrimitiveDescriptors() {
 
     const auto precision = getOriginalInputPrecisionAtPort(0);
     if (_supported_precisions_sizes.find(precision.size()) == _supported_precisions_sizes.end())
-        IE_THROW() << errorPrefix << "has unsupported precision: " << precision.name();
+        THROW_CPU_NODE_ERR << "has unsupported precision: " << precision.name();
 
     addSupportedPrimDesc({{LayoutType::ncsp, precision}},
                          {{LayoutType::ncsp, precision}},

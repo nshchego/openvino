@@ -24,7 +24,7 @@ using LRNParams = std::tuple<
 
 class LRNLayerCPUTest : public testing::WithParamInterface<LRNParams>, public ov::test::SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<LRNParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<LRNParams> &obj) {
         ElementType inputPrecision;
         InputShape inputShapes;
         double alpha, beta, bias;
@@ -56,7 +56,7 @@ protected:
         selectedType = makeSelectedTypeStr("ref_any", inputPrecision);
 
         auto params = ngraph::builder::makeDynamicParams(inputPrecision, { inputDynamicShapes });
-        auto axesNode = ngraph::opset1::Constant::create(ngraph::element::i32, { axes.size() }, axes);
+        auto axesNode = ov::op::v0::Constant::create(ov::element::i32, { axes.size() }, axes);
         auto lrn = std::make_shared<ngraph::opset3::LRN>(params[0], axesNode, alpha, beta, bias, size);
         function = makeNgraphFunction(inputPrecision, params, lrn, "LRN");
     }
@@ -68,7 +68,7 @@ TEST_P(LRNLayerCPUTest, CompareWithRefs) {
 }
 
 const std::vector<ElementType> inputPrecisions = {
-    ngraph::element::f32,
+    ov::element::f32,
 };
 
 const std::vector<std::vector<std::int64_t>> axes = {

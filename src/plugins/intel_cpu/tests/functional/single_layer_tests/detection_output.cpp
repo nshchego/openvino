@@ -68,7 +68,7 @@ public:
     static std::string getTestCaseName(const testing::TestParamInfo<DetectionOutputParamsDynamic>& obj) {
         DetectionOutputAttributes commonAttrs;
         ParamsWhichSizeDependsDynamic specificAttrs;
-        ngraph::op::DetectionOutputAttrs attrs;
+        ov::op::v0::DetectionOutput::Attributes attrs;
         size_t batch;
         bool replaceDynamicShapesToIntervals;
         std::string targetDevice;
@@ -111,7 +111,7 @@ public:
         return result.str();
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (auto i = 0ul; i < funcInputs.size(); ++i) {
@@ -199,11 +199,11 @@ public:
 
         init_input_shapes({ inShapes });
 
-        auto params = ngraph::builder::makeDynamicParams(ngraph::element::f32, inputDynamicShapes);
+        auto params = ngraph::builder::makeDynamicParams(ov::element::f32, inputDynamicShapes);
         auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::opset3::Parameter>(params));
         auto detOut = ngraph::builder::makeDetectionOutput(paramOuts, attrs);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(detOut)};
-        function = std::make_shared<ngraph::Function>(results, params, "DetectionOutputDynamic");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(detOut)};
+        function = std::make_shared<ov::Model>(results, params, "DetectionOutputDynamic");
     }
 
 private:
@@ -234,7 +234,7 @@ private:
             }
         }
     }
-    ngraph::op::DetectionOutputAttrs attrs;
+    ov::op::v0::DetectionOutput::Attributes attrs;
     std::vector<ov::test::InputShape> inShapes;
 };
 

@@ -19,7 +19,7 @@ using LSTMSequenceCpuSpecificParams = typename std::tuple<
         ngraph::helpers::SequenceTestsMode,     // Pure Sequence or TensorIterator
         std::vector<std::string>,               // Activations
         float,                                  // Clip
-        ngraph::op::RecurrentSequenceDirection, // Direction
+        ov::op::RecurrentSequenceDirection, // Direction
         ElementType,                            // Network precision
         CPUSpecificParams,                      // CPU specific params
         std::map<std::string, std::string>      // Additional config
@@ -145,7 +145,7 @@ protected:
 
         if (seqMode != ngraph::helpers::SequenceTestsMode::PURE_SEQ) {
             ov::pass::Manager manager;
-            if (direction == ngraph::op::RecurrentSequenceDirection::BIDIRECTIONAL)
+            if (direction == ov::op::RecurrentSequenceDirection::BIDIRECTIONAL)
                 manager.register_pass<ov::pass::BidirectionalLSTMSequenceDecomposition>();
             manager.register_pass<ov::pass::ConvertLSTMSequenceToTensorIterator>();
             manager.run_passes(function);

@@ -74,8 +74,8 @@ protected:
                 quantizeIntervals[1],
                 quantizeIntervals[2],
                 quantizeIntervals[3]);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset6::Result>(quantize)};
-        function = std::make_shared<ngraph::Function>(results, ngraph::ParameterVector{param}, "FuseScaleShiftAndQuantize");
+        ov::ResultVector results{std::make_shared<ngraph::opset6::Result>(quantize)};
+        function = std::make_shared<ov::Model>(results, ov::ParameterVector{param}, "FuseScaleShiftAndQuantize");
     }
 };
 

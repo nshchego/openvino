@@ -41,7 +41,7 @@ protected:
 
         Shape shape = ie_shape;
         size_t C = shape[1];
-        element::Type type = ngraph::element::f32;
+        element::Type type = ov::element::f32;
 
         auto input = make_shared<op::v0::Parameter>(type, shape);
         auto mem_i = make_shared<op::v0::Constant>(type, shape, 0);
@@ -66,9 +66,9 @@ protected:
         mem_w->add_control_dependency(mem_r);
         bias_2->add_control_dependency(mem_w);
 
-        function = std::make_shared<ngraph::Function>(
-                ngraph::NodeVector      {bias_2},
-                ngraph::ParameterVector {input},
+        function = std::make_shared<ov::Model>(
+                ov::NodeVector      {bias_2},
+                ov::ParameterVector {input},
                 "SimpleNet");
     }
 };
@@ -87,7 +87,7 @@ TEST_P(MemoryConv, CheckTypeConversion) {
     // check data type via exec graph
     auto exec_graph = exe_net.GetExecGraphInfo();
     auto exec_ops = exec_graph.getFunction()->get_ops();
-    std::shared_ptr<ngraph::Node> mem_r, mem_w;
+    std::shared_ptr<ov::Node> mem_r, mem_w;
 
     for (auto &node : exec_ops) {
         auto var = node->get_rt_info()["layerType"];
@@ -99,10 +99,10 @@ TEST_P(MemoryConv, CheckTypeConversion) {
     }
 
     ASSERT_NE(nullptr, mem_r);
-    ASSERT_EQ(ngraph::element::bf16, mem_r->output(0).get_element_type());
+    ASSERT_EQ(ov::element::bf16, mem_r->output(0).get_element_type());
 
     ASSERT_NE(nullptr, mem_w);
-    ASSERT_EQ(ngraph::element::bf16, mem_w->input(0).get_element_type());
+    ASSERT_EQ(ov::element::bf16, mem_w->input(0).get_element_type());
 }
 
 INSTANTIATE_TEST_SUITE_P(smoke_CPU, MemoryConv,

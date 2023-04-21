@@ -864,7 +864,7 @@ private:
     }
 };
 #endif
-bool FakeQuantize::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool FakeQuantize::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto fq = std::dynamic_pointer_cast<const ngraph::opset1::FakeQuantize>(op);
         if (!fq) {
@@ -960,22 +960,21 @@ struct FakeQuantKey {
 };
 }  // namespace
 
-FakeQuantize::FakeQuantize(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, PassThroughShapeInferFactory()) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
         algorithm = Algorithm::FQCommon;
         const auto fq = std::dynamic_pointer_cast<const ngraph::opset1::FakeQuantize>(op);
 
-        errorPrefix = "FakeQuantize node with name '" + getName() + "' ";
         levels = fq->get_levels();
         if (levels <= 1)
-            IE_THROW() << errorPrefix << "supports 'levels' attribute greater than or equal to 2";
+            THROW_CPU_NODE_ERR << "supports 'levels' attribute greater than or equal to 2";
 
         if (inputShapes.size() != 5)
-            IE_THROW() << errorPrefix << "has incorrect number of input edges: " << inputShapes.size();
+            THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << inputShapes.size();
         if (outputShapes.size() != 1)
-            IE_THROW() << errorPrefix << "has incorrect number of output edges: " << outputShapes.size();
+            THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << outputShapes.size();
 
         auto initAxisIdx = [&](const VectorDims& inputDims) {
             size_t axisIdx = 0;
@@ -1030,7 +1029,7 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ngraph::Node>& op, const GraphC
         auto outputHighAxisSize = ngraph::is_scalar(ohShape) ? 1 : ohShape[outputHighAxis];
 
         if (axisSize != -1 && !dimsEqualWeak(axisSize, getInputShapeAtPort(0).getDims()[axis])) {
-            IE_THROW() << errorPrefix << "has different quantization axis size on 'data' and 'range' inputs";
+            THROW_CPU_NODE_ERR << "has different quantization axis size on 'data' and 'range' inputs";
         }
 
         const auto inputLowNode = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(fq->get_input_node_shared_ptr(1));
@@ -1284,30 +1283,30 @@ void FakeQuantize::init() {
 
 void FakeQuantize::getSupportedDescriptors() {
     if (getParentEdges().size() != 5)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         if (getParentEdgesAtPort(i).size() != 1)
-            IE_THROW() << errorPrefix << "has unsupported number of parent edges at port " << i;
+            THROW_CPU_NODE_ERR << "has unsupported number of parent edges at port " << i;
     }
 
     if (getInputShapeAtPort(0).getRank() != getInputShapeAtPort(0).getRank()) {
-        IE_THROW() << errorPrefix << "has different ranks for input and output tensors";
+        THROW_CPU_NODE_ERR << "has different ranks for input and output tensors";
     }
 
     if (isBinarization()) {
         if (getInputShapeAtPort(0).getRank() != 4ul) {
-            IE_THROW() << errorPrefix << "doesn't support input/output rank != 4";
+            THROW_CPU_NODE_ERR << "doesn't support input/output rank != 4";
         }
     }
 
     if (getAxis() != 1) {
         if (isBinarization())
-            IE_THROW() << errorPrefix << "doesn't support non per-tensor binarization for axis: " << getAxis();
+            THROW_CPU_NODE_ERR << "doesn't support non per-tensor binarization for axis: " << getAxis();
         if (getAxis() != 0)
-            IE_THROW() << errorPrefix << "doesn't support non per-tensor quantization for axis: " << getAxis();
+            THROW_CPU_NODE_ERR << "doesn't support non per-tensor quantization for axis: " << getAxis();
     }
 }
 

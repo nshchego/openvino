@@ -94,7 +94,7 @@ protected:
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
         auto paramsOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
-        std::vector<ngraph::Shape> WRB = {{4 * hiddenSize, inputSize}, {4 * hiddenSize, hiddenSize}, {4 * hiddenSize}};
+        std::vector<ov::Shape> WRB = {{4 * hiddenSize, inputSize}, {4 * hiddenSize, hiddenSize}, {4 * hiddenSize}};
         auto lstmCellOp = ngraph::builder::makeLSTM(paramsOuts, WRB, hiddenSize, activations, {}, {}, clip);
 
         function = makeNgraphFunction(netPrecision, params, lstmCellOp, "LSTMCell");

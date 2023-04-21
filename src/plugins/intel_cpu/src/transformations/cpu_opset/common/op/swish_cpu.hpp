@@ -19,7 +19,7 @@ public:
 
     void validate_and_infer_types() override;
     bool visit_attributes(ngraph::AttributeVisitor& visitor) override;
-    std::shared_ptr<ngraph::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
+    std::shared_ptr<ov::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
 
     float get_alpha() const;
 

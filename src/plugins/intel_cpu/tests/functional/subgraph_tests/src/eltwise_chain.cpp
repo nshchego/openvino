@@ -65,7 +65,7 @@ public:
         return results.str();
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {
@@ -89,8 +89,8 @@ protected:
 
         init_input_shapes(inputShapes);
 
-        ngraph::ParameterVector ngraphParam;
-        std::vector<std::shared_ptr<ngraph::Node>> ngraphInputs;
+        ov::ParameterVector ngraphParam;
+        std::vector<std::shared_ptr<ov::Node>> ngraphInputs;
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             for (size_t i = 0; i < inputDynamicShapes.size(); i++) {
                 ngraphParam.push_back(std::make_shared<ngraph::opset1::Parameter>(inputPrecisions[i], inputDynamicShapes[i]));
@@ -99,14 +99,14 @@ protected:
         } else {
             ngraphParam = ngraph::builder::makeDynamicParams(inputPrecisions[0], {inputDynamicShapes.front()});
             for (int i = 1; i < inputPrecisions.size(); i++) {
-                std::vector<float> ngraphInput1Data(ngraph::shape_size(targetStaticShapes[0][i]));
+                std::vector<float> ngraphInput1Data(ov::shape_size(targetStaticShapes[0][i]));
                 ngraphInputs.push_back(ngraph::builder::makeConstant(inputPrecisions[i], targetStaticShapes[0][i],
                                                                      ngraphInput1Data, true));
             }
         }
 
         if (withQuantization) {
-            std::vector<std::shared_ptr<ngraph::Node>> eltwiseOps;
+            std::vector<std::shared_ptr<ov::Node>> eltwiseOps;
             eltwiseOps.push_back(ngraph::builder::makeEltwise(ngraphParam[0], ngraphInputs[0], eltwiseOpTypes[0]));
             for (int i = 1; i < eltwiseOpTypes.size() - 1; i++) {
                 eltwiseOps.push_back(ngraph::builder::makeEltwise(eltwiseOps[eltwiseOps.size() - 1], ngraphInputs[i], eltwiseOpTypes[i]));
@@ -115,22 +115,22 @@ protected:
             std::vector<size_t> constShape(targetStaticShapes[0][0].size(), 1);
             constShape[1] = targetStaticShapes[0][0][1];
             auto fq = ngraph::builder::makeFakeQuantize(eltwiseOps[eltwiseOps.size() - 1],
-                                                        ::ngraph::element::Type(::ngraph::element::Type_t::f32),
+                                                        ::ov::element::Type(::ov::element::Type_t::f32),
                                                         256, constShape);
 
             eltwiseOps.push_back(ngraph::builder::makeEltwise(fq, ngraphInputs[eltwiseOpTypes.size() - 1], eltwiseOpTypes[eltwiseOpTypes.size() - 1]));
 
-            ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(eltwiseOps[eltwiseOps.size() - 1])};
-            function = std::make_shared<ngraph::Function>(results, ngraphParam, "eltwise_chain_fq");
+            ov::ResultVector results{std::make_shared<ov::op::v0::Result>(eltwiseOps[eltwiseOps.size() - 1])};
+            function = std::make_shared<ov::Model>(results, ngraphParam, "eltwise_chain_fq");
         } else {
-            std::vector<std::shared_ptr<ngraph::Node>> eltwiseOps;
+            std::vector<std::shared_ptr<ov::Node>> eltwiseOps;
             eltwiseOps.push_back(ngraph::builder::makeEltwise(ngraphParam[0], ngraphInputs[0], eltwiseOpTypes[0]));
             for (int i = 1; i < eltwiseOpTypes.size(); i++) {
                 eltwiseOps.push_back(ngraph::builder::makeEltwise(eltwiseOps[eltwiseOps.size() - 1], ngraphInputs[i], eltwiseOpTypes[i]));
             }
 
-            ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(eltwiseOps[eltwiseOps.size() - 1])};
-            function = std::make_shared<ngraph::Function>(results, ngraphParam, "eltwise_chain");
+            ov::ResultVector results{std::make_shared<ov::op::v0::Result>(eltwiseOps[eltwiseOps.size() - 1])};
+            function = std::make_shared<ov::Model>(results, ngraphParam, "eltwise_chain");
         }
     }
 };
@@ -141,7 +141,7 @@ TEST_P(EltwiseChainTest, CompareWithRefs) {
 
 namespace {
 
-std::vector<std::vector<ngraph::Shape>> inputShapes = {
+std::vector<std::vector<ov::Shape>> inputShapes = {
     {{1, 1, 2, 3}, {1, 1, 2, 3}, {1, 1, 2, 3}, {1, 1, 2, 3}},
     {{1, 48, 5, 6}, {1, 48, 1, 1}, {1, 48, 5, 6}, {1, 1, 5, 6}},
     {{1, 72, 28, 28}, {1, 72, 1, 1}, {1, 72, 1, 1}, {1, 72, 1, 1}},
@@ -173,7 +173,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_EltwiseChain, EltwiseChainTest,
                                 ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                         EltwiseChainTest::getTestCaseName);
 
-std::vector<std::vector<ngraph::Shape>> inputShapesFQ = {
+std::vector<std::vector<ov::Shape>> inputShapesFQ = {
     {{1, 2, 2, 3}, {1, 2, 2, 3}, {1, 2, 2, 3}, {1, 2, 2, 3}},
     {{2, 33, 5, 5}, {2, 33, 5, 5}, {2, 33, 1, 5}, {2, 33, 5, 5}},
     {{2, 33, 5, 17}, {2, 33, 5, 17}, {2, 33, 5, 17}, {2, 33, 5, 17}},

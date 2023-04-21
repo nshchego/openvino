@@ -102,7 +102,7 @@ typedef std::tuple<
  * class ScaleshiftConv_x3_Eltwise : public BasicBF16Test {
  * protected:
  * void SetUp() override {
- *  fnPtr = std::make_shared<ngraph::Function>(ngraph::NodeVector{convNode3}, ngraph::ParameterVector{input1});
+ *  fnPtr = std::make_shared<ov::Model>(ov::NodeVector{convNode3}, ov::ParameterVector{input1});
 
         // STAGE1:
         threshold = 9e-1;
@@ -137,10 +137,10 @@ typedef std::tuple<
 class BasicBF16Test : public testing::WithParamInterface<basicParams>,
                       public CommonTestUtils::TestsCommon {
 protected:
-    virtual std::shared_ptr<ngraph::Function> createGraph(InferenceEngine::Precision netPrecision) = 0;
+    virtual std::shared_ptr<ov::Model> createGraph(InferenceEngine::Precision netPrecision) = 0;
 
 public:
-    std::shared_ptr<ngraph::Function> fnPtr;
+    std::shared_ptr<ov::Model> fnPtr;
     std::string targetDevice;
     InferenceEngine::SizeVector inputShapes, newInputShapes;
     InferenceEngine::Precision inputPrecision, netPrecision;

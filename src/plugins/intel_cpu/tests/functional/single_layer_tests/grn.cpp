@@ -24,7 +24,7 @@ using GRNCPUTestParams = typename std::tuple<
 class GRNLayerCPUTest : public testing::WithParamInterface<GRNCPUTestParams>,
                         virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<GRNCPUTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<GRNCPUTestParams> &obj) {
         ov::element::Type netPrecision;
         InferenceEngine::Precision inPrc, outPrc;
         InferenceEngine::Layout inLayout, outLayout;
@@ -69,10 +69,10 @@ protected:
 
         const auto paramsIn = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
 
-        const auto paramsOut = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(paramsIn));
+        const auto paramsOut = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(paramsIn));
         const auto grn = std::make_shared<ngraph::opset1::GRN>(paramsOut[0], bias);
-        const ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(grn)};
-        function = std::make_shared<ngraph::Function>(results, paramsIn, "Grn");
+        const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(grn)};
+        function = std::make_shared<ov::Model>(results, paramsIn, "Grn");
     }
 };
 

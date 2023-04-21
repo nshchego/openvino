@@ -277,7 +277,7 @@ void fill_output_blobs(const float* proposals, const int* roi_indices,
 }  // namespace
 
 bool GenerateProposals::isSupportedOperation
-            (const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+            (const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!ngraph::as_type_ptr<const ngraph::op::v9::GenerateProposals>(op)) {
             errorMessage = "Node is not an instance of the Proposal from the operations set v0.";
@@ -289,7 +289,7 @@ bool GenerateProposals::isSupportedOperation
     return true;
 }
 
-GenerateProposals::GenerateProposals(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+GenerateProposals::GenerateProposals(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, InternalDynShapeInferFactory()) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

@@ -20,7 +20,7 @@ LogicalLayerCPUTestParamSet;
 class LogicalLayerCPUTest : public testing::WithParamInterface<LogicalLayerCPUTestParamSet>,
                             virtual public LayerTestsUtils::LayerTestsCommon, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<LogicalLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<LogicalLayerCPUTestParamSet> &obj) {
         LayerTestsDefinitions::LogicalTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -58,20 +58,20 @@ protected:
 
         auto inputs = ngraph::builder::makeParams(ngInputsPrc, {inputShapes.first});
 
-        std::shared_ptr<ngraph::Node> logicalNode;
+        std::shared_ptr<ov::Node> logicalNode;
         if (logicalOpType != ngraph::helpers::LogicalTypes::LOGICAL_NOT) {
             auto secondInput = ngraph::builder::makeInputLayer(ngInputsPrc, secondInputType, inputShapes.second);
             if (secondInputType == ngraph::helpers::InputLayerType::PARAMETER) {
-                inputs.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(secondInput));
+                inputs.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(secondInput));
             }
             logicalNode = ngraph::builder::makeLogical(inputs[0], secondInput, logicalOpType);
         } else {
-            logicalNode = ngraph::builder::makeLogical(inputs[0], ngraph::Output<ngraph::Node>(), logicalOpType);
+            logicalNode = ngraph::builder::makeLogical(inputs[0], ov::Output<ov::Node>(), logicalOpType);
         }
 
         logicalNode->get_rt_info() = getCPUInfo();
 
-        function = std::make_shared<ngraph::Function>(logicalNode, inputs, "Logical");
+        function = std::make_shared<ov::Model>(logicalNode, inputs, "Logical");
     }
 };
 

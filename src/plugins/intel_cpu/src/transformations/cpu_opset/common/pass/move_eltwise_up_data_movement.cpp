@@ -16,7 +16,7 @@
 
 
 namespace {
-    bool is_data_movement_operation(const std::shared_ptr<ngraph::Node>& node) {
+    bool is_data_movement_operation(const std::shared_ptr<ov::Node>& node) {
         return ov::is_type<ngraph::op::v0::Squeeze>(node) ||
                ov::is_type<ngraph::op::v0::Unsqueeze>(node) ||
                ov::is_type<ngraph::op::v1::Reshape>(node) ||
@@ -33,7 +33,7 @@ namespace {
                ov::is_type<ngraph::op::v8::Gather>(node);
     }
 
-    bool is_scalar_like(const std::shared_ptr<ngraph::Node>& node) {
+    bool is_scalar_like(const std::shared_ptr<ov::Node>& node) {
         auto constantNode = std::dynamic_pointer_cast<ngraph::opset8::Constant>(node);
         return constantNode != nullptr && shape_size(constantNode->get_shape()) == 1;
     }

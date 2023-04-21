@@ -51,7 +51,7 @@ private:
 
 class OneHotShapeInferFactory : public ShapeInferFactory {
 public:
-    OneHotShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    OneHotShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         auto oneHot = ov::as_type_ptr<const ngraph::opset1::OneHot>(m_op);
         if (!oneHot) {
@@ -73,7 +73,7 @@ private:
 
 } // namespace
 
-bool OneHot::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool OneHot::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto oneHot = std::dynamic_pointer_cast<const ngraph::opset1::OneHot>(op);
         if (!oneHot) {
@@ -94,14 +94,13 @@ bool OneHot::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
     return true;
 }
 
-OneHot::OneHot(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+OneHot::OneHot(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, OneHotShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "OneHot layer with name '" + op->get_friendly_name() + "'";
     const auto oneHot = std::dynamic_pointer_cast<const ngraph::opset1::OneHot>(op);
     const auto depthNode = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(oneHot->get_input_node_shared_ptr(DEPTH_ID));
     if (depthNode) {
@@ -123,12 +122,12 @@ OneHot::OneHot(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr
         axis += output_dims_size;
     }
     if (axis < 0 || axis >= output_dims_size) {
-        IE_THROW() << errorPrefix << " has unsupported 'axis' attribute: " << oneHot->get_axis();
+        THROW_CPU_NODE_ERR << " has unsupported 'axis' attribute: " << oneHot->get_axis();
     }
 
     if (!(((1 + srcDims.size()) == dstDims.size()) ||
             (depthNode && (srcDims.size() == 1 && dstDims.size() == 1 && dstDims[0] == depth && srcDims[0] == 1))))
-        IE_THROW() << errorPrefix << " has incorrect number of input/output dimensions!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output dimensions!";
 }
 
 bool OneHot::needShapeInfer() const {
@@ -148,7 +147,7 @@ void OneHot::initSupportedPrimitiveDescriptors() {
     // check a precision of the input tensor
     auto input_precision = getOriginalInputPrecisionAtPort(INDICES_ID);
     if (input_precision != Precision::I32) {
-        IE_THROW() << errorPrefix << " has incorrect input precision for the input. Only I32 is supported!";
+        THROW_CPU_NODE_ERR << " has incorrect input precision for the input. Only I32 is supported!";
     }
     output_precision = getOriginalOutputPrecisionAtPort(0);
 

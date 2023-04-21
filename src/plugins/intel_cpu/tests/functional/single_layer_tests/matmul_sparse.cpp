@@ -194,7 +194,7 @@ protected:
 
         auto matrixB = builder::makeDynamicInputLayer(element::f32, helpers::InputLayerType::CONSTANT, inShapeB);
 
-        auto weiData = generateSparseVector(ngraph::shape_size(inShapeB.get_shape()), weiSparseRate);
+        auto weiData = generateSparseVector(ov::shape_size(inShapeB.get_shape()), weiSparseRate);
         auto matMul = makeMatMulRelaxed(paramOuts[0], inShapeB, weiType, transpA, transpB, weiData);
 
         function = makeNgraphFunction(element::f32, params, matMul, cpuNodeType);
@@ -202,8 +202,8 @@ protected:
         checkFusingPosition = false;
 
         functionRefs = ov::clone_model(*function);
-        ngraph::pass::ConvertPrecision<ngraph::element::Type_t::i8, ngraph::element::Type_t::f32>().run_on_model(functionRefs);
-        ngraph::pass::ConvertPrecision<ngraph::element::Type_t::u8, ngraph::element::Type_t::f32>().run_on_model(functionRefs);
+        ngraph::pass::ConvertPrecision<ov::element::Type_t::i8, ov::element::Type_t::f32>().run_on_model(functionRefs);
+        ngraph::pass::ConvertPrecision<ov::element::Type_t::u8, ov::element::Type_t::f32>().run_on_model(functionRefs);
         functionRefs->validate_nodes_and_infer_types();
     }
 };

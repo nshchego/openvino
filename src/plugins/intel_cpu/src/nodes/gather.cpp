@@ -90,7 +90,7 @@ private:
 
 class GatherShapeInferFactory : public ShapeInferFactory {
 public:
-    GatherShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    GatherShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         static constexpr size_t GATHER_INDICES = 1, GATHER_AXIS = 2;
 
@@ -112,7 +112,7 @@ private:
 };
 } // namespace
 
-Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, GatherShapeInferFactory(op)),
       batchDims(0) {
     std::string errorMessage;

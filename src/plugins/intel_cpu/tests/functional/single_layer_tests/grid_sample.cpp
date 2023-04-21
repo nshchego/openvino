@@ -27,7 +27,7 @@ typedef std::tuple<
 class GridSampleLayerTestCPU : public testing::WithParamInterface<GridSampleLayerTestCPUParams>,
                                virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<GridSampleLayerTestCPUParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<GridSampleLayerTestCPUParams> &obj) {
         std::vector<InputShape> inputShapes;
         GridSample::InterpolationMode interpolateMode;
         GridSample::PaddingMode paddingMode;

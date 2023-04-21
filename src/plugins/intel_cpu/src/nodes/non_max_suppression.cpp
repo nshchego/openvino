@@ -554,7 +554,7 @@ private:
 };
 #endif
 
-bool NonMaxSuppression::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool NonMaxSuppression::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         using NonMaxSuppressionV9 = ngraph::op::v9::NonMaxSuppression;
         if (!one_of(op->get_type_info(), NonMaxSuppressionV9::get_type_info_static(),
@@ -576,7 +576,7 @@ bool NonMaxSuppression::isSupportedOperation(const std::shared_ptr<const ngraph:
     return true;
 }
 
-NonMaxSuppression::NonMaxSuppression(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+NonMaxSuppression::NonMaxSuppression(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, InternalDynShapeInferFactory()),
       isSoftSuppressedByIOU(false) {
     std::string errorMessage;
@@ -584,15 +584,14 @@ NonMaxSuppression::NonMaxSuppression(const std::shared_ptr<ngraph::Node>& op, co
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "NMS layer with name '" + op->get_friendly_name() + "' ";
     if (one_of(op->get_type_info(), ov::op::internal::NonMaxSuppressionIEInternal::get_type_info_static()))
         m_outStaticShape = true;
 
     if (getOriginalInputsNumber() < 2 || getOriginalInputsNumber() > 6)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getOriginalInputsNumber();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getOriginalInputsNumber();
 
     if (getOriginalOutputsNumber() != 3)
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getOriginalOutputsNumber();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getOriginalOutputsNumber();
 
     if (const auto nms9 = std::dynamic_pointer_cast<const ngraph::op::v9::NonMaxSuppression>(op)) {
         boxEncodingType = static_cast<NMSBoxEncodeType>(nms9->get_box_encoding());
@@ -602,24 +601,24 @@ NonMaxSuppression::NonMaxSuppression(const std::shared_ptr<ngraph::Node>& op, co
             sortResultDescending = nmsIe->m_sort_result_descending;
         } else {
             const auto &typeInfo = op->get_type_info();
-            IE_THROW() << errorPrefix << " doesn't support NMS: " << typeInfo.name << " v" << typeInfo.version_id;
+            THROW_CPU_NODE_ERR << " doesn't support NMS: " << typeInfo.name << " v" << typeInfo.version_id;
         }
 
         const auto &boxes_dims = getInputShapeAtPort(NMS_BOXES).getDims();
         if (boxes_dims.size() != 3)
-            IE_THROW() << errorPrefix << "has unsupported 'boxes' input rank: " << boxes_dims.size();
+            THROW_CPU_NODE_ERR << "has unsupported 'boxes' input rank: " << boxes_dims.size();
         if (boxes_dims[2] != 4)
-            IE_THROW() << errorPrefix << "has unsupported 'boxes' input 3rd dimension size: " << boxes_dims[2];
+            THROW_CPU_NODE_ERR << "has unsupported 'boxes' input 3rd dimension size: " << boxes_dims[2];
 
         const auto &scores_dims = getInputShapeAtPort(NMS_SCORES).getDims();
         if (scores_dims.size() != 3)
-            IE_THROW() << errorPrefix << "has unsupported 'scores' input rank: " << scores_dims.size();
+            THROW_CPU_NODE_ERR << "has unsupported 'scores' input rank: " << scores_dims.size();
 
         const Shape valid_outputs_shape = getOutputShapeAtPort(NMS_VALIDOUTPUTS);
         if (valid_outputs_shape.getRank() != 1)
-            IE_THROW() << errorPrefix << "has unsupported 'valid_outputs' output rank: " << valid_outputs_shape.getRank();
+            THROW_CPU_NODE_ERR << "has unsupported 'valid_outputs' output rank: " << valid_outputs_shape.getRank();
         if (valid_outputs_shape.getDims()[0] != 1)
-            IE_THROW() << errorPrefix << "has unsupported 'valid_outputs' output 1st dimension size: " << valid_outputs_shape.getDims()[1];
+            THROW_CPU_NODE_ERR << "has unsupported 'valid_outputs' output 1st dimension size: " << valid_outputs_shape.getDims()[1];
 }
 
 void NonMaxSuppression::initSupportedPrimitiveDescriptors() {
@@ -689,9 +688,9 @@ void NonMaxSuppression::prepareParams() {
     numBoxes = boxesDims[1];
     numClasses = scoresDims[1];
     if (numBatches != scoresDims[0])
-        IE_THROW() << errorPrefix << " numBatches is different in 'boxes' and 'scores' inputs";
+        THROW_CPU_NODE_ERR << " numBatches is different in 'boxes' and 'scores' inputs";
     if (numBoxes != scoresDims[2])
-        IE_THROW() << errorPrefix << " numBoxes is different in 'boxes' and 'scores' inputs";
+        THROW_CPU_NODE_ERR << " numBoxes is different in 'boxes' and 'scores' inputs";
 
     numFiltBox.resize(numBatches);
     for (auto & i : numFiltBox)
@@ -1082,7 +1081,7 @@ void NonMaxSuppression::nmsWithoutSoftSigma(const float *boxes, const float *sco
 void NonMaxSuppression::checkPrecision(const Precision& prec, const std::vector<Precision>& precList,
                                                            const std::string& name, const std::string& type) {
     if (std::find(precList.begin(), precList.end(), prec) == precList.end())
-        IE_THROW() << errorPrefix << "has unsupported '" << name << "' " << type << " precision: " << prec;
+        THROW_CPU_NODE_ERR << "has unsupported '" << name << "' " << type << " precision: " << prec;
 }
 
 void NonMaxSuppression::check1DInput(const Shape& shape, const std::vector<Precision>& precList,
@@ -1090,10 +1089,10 @@ void NonMaxSuppression::check1DInput(const Shape& shape, const std::vector<Preci
     checkPrecision(getOriginalInputPrecisionAtPort(port), precList, name, inType);
 
     if (shape.getRank() != 0 && shape.getRank() != 1)
-        IE_THROW() << errorPrefix << "has unsupported '" << name << "' input rank: " << shape.getRank();
+        THROW_CPU_NODE_ERR << "has unsupported '" << name << "' input rank: " << shape.getRank();
     if (shape.getRank() == 1)
         if (shape.getDims()[0] != 1)
-            IE_THROW() << errorPrefix << "has unsupported '" << name << "' input 1st dimension size: " << MemoryDescUtils::dim2str(shape.getDims()[0]);
+            THROW_CPU_NODE_ERR << "has unsupported '" << name << "' input 1st dimension size: " << MemoryDescUtils::dim2str(shape.getDims()[0]);
 }
 
 void NonMaxSuppression::checkOutput(const Shape& shape, const std::vector<Precision>& precList,
@@ -1101,9 +1100,9 @@ void NonMaxSuppression::checkOutput(const Shape& shape, const std::vector<Precis
     checkPrecision(getOriginalOutputPrecisionAtPort(port), precList, name, outType);
 
     if (shape.getRank() != 2)
-        IE_THROW() << errorPrefix << "has unsupported '" << name << "' output rank: " << shape.getRank();
+        THROW_CPU_NODE_ERR << "has unsupported '" << name << "' output rank: " << shape.getRank();
     if (shape.getDims()[1] != 3)
-        IE_THROW() << errorPrefix << "has unsupported '" << name << "' output 2nd dimension size: " << MemoryDescUtils::dim2str(shape.getDims()[1]);
+        THROW_CPU_NODE_ERR << "has unsupported '" << name << "' output 2nd dimension size: " << MemoryDescUtils::dim2str(shape.getDims()[1]);
 }
 
 }   // namespace node

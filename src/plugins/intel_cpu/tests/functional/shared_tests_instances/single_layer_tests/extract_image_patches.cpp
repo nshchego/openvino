@@ -7,7 +7,7 @@
 #include "single_layer_tests/extract_image_patches.hpp"
 
 using namespace LayerTestsDefinitions;
-using ngraph::op::PadType;
+using ov::op::PadType;
 
 namespace {
 

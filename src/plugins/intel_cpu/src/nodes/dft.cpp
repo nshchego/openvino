@@ -25,7 +25,7 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool DFT::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool DFT::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (isDynamicNgraphNode(op)) {
             errorMessage = "Doesn't support op with dynamic shapes";
@@ -44,36 +44,35 @@ bool DFT::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, st
     return true;
 }
 
-DFT::DFT(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+DFT::DFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
                Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    layerErrorPrefix = "DFT layer with name '" + op->get_name() + "'";
     const size_t inputsNumber = getOriginalInputsNumber();
     if (inputsNumber != 2 && inputsNumber != 3) {
-        IE_THROW() << layerErrorPrefix << " has invalid number of input/output edges: " << inputsNumber;
+        THROW_CPU_NODE_ERR << " has invalid number of input/output edges: " << inputsNumber;
     }
 
     /* Data */
     inputShape = inputShapes[DATA_INDEX].getStaticDims();
     if (inputShape.size() < 2) {
-        IE_THROW() << layerErrorPrefix << " has invalid 'data' input tensor with rank: " << inputShape.size();
+        THROW_CPU_NODE_ERR << " has invalid 'data' input tensor with rank: " << inputShape.size();
     }
 
     /* Axes */
     const auto axesRank = inputShapes[AXES_INDEX].getRank();
     if (axesRank != 1) {
-        IE_THROW() << layerErrorPrefix << " has invalid 'axes' input tensor with rank: " << axesRank;
+        THROW_CPU_NODE_ERR << " has invalid 'axes' input tensor with rank: " << axesRank;
     }
 
     /* Signal size */
     if (inputsNumber > SIGNAL_SIZE_INDEX) {
         const auto signalSizeRank = inputShapes[SIGNAL_SIZE_INDEX].getRank();
         if (signalSizeRank != 1) {
-            IE_THROW() << layerErrorPrefix << " has invalid 'signal_size' input tensor with rank: " << signalSizeRank;
+            THROW_CPU_NODE_ERR << " has invalid 'signal_size' input tensor with rank: " << signalSizeRank;
         }
     }
 
@@ -89,18 +88,18 @@ void DFT::initSupportedPrimitiveDescriptors() {
 
     const auto& dataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
     if (!dataPrecision.is_float()) {
-        IE_THROW() << layerErrorPrefix << " has unsupported 'data' input precision: " << dataPrecision.name();
+        THROW_CPU_NODE_ERR << " has unsupported 'data' input precision: " << dataPrecision.name();
     }
 
     const auto& axesPrecision = getOriginalInputPrecisionAtPort(AXES_INDEX);
     if (axesPrecision != Precision::I32 && axesPrecision != Precision::I64) {
-        IE_THROW() << layerErrorPrefix << " has unsupported 'axes' input precision: " << axesPrecision.name();
+        THROW_CPU_NODE_ERR << " has unsupported 'axes' input precision: " << axesPrecision.name();
     }
 
     if (inputShapes.size() > SIGNAL_SIZE_INDEX) {
         const auto& signalSizeTensorPrec = getOriginalInputPrecisionAtPort(SIGNAL_SIZE_INDEX);
         if (signalSizeTensorPrec != Precision::I32 && signalSizeTensorPrec != Precision::I64) {
-            IE_THROW() << layerErrorPrefix << " has unsupported 'signal_size' input precision: " << signalSizeTensorPrec.name();
+            THROW_CPU_NODE_ERR << " has unsupported 'signal_size' input precision: " << signalSizeTensorPrec.name();
         }
     }
 

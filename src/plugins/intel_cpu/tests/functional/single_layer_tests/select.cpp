@@ -15,17 +15,17 @@ namespace CPULayerTestsDefinitions {
 
 using selectParams = std::tuple<std::vector<InputShape>,         // input shapes
                                 ElementType,                     // Then/Else precision
-                                ngraph::op::AutoBroadcastSpec,   // broadcast
+                                ov::op::AutoBroadcastSpec,   // broadcast
                                 fusingSpecificParams>;
 
 class SelectLayerCPUTest : public testing::WithParamInterface<selectParams>,
                            virtual public SubgraphBaseTest,
                            public CpuTestWithFusing {
 public:
-   static std::string getTestCaseName(testing::TestParamInfo<selectParams> obj) {
+   static std::string getTestCaseName(const testing::TestParamInfo<selectParams> &obj) {
        std::vector<InputShape> shapes;
        ElementType precision;
-       ngraph::op::AutoBroadcastSpec broadcast;
+       ov::op::AutoBroadcastSpec broadcast;
        fusingSpecificParams fusingParams;
        std::tie(shapes, precision, broadcast, fusingParams) = obj.param;
 
@@ -53,7 +53,7 @@ protected:
         targetDevice = CommonTestUtils::DEVICE_CPU;
         std::vector<InputShape> shapes;
         ElementType precision;
-        ngraph::op::AutoBroadcastSpec broadcast;
+        ov::op::AutoBroadcastSpec broadcast;
         fusingSpecificParams fusingParams;
         std::tie(shapes, precision, broadcast, fusingParams) = this->GetParam();
         init_input_shapes(shapes);
@@ -61,7 +61,7 @@ protected:
         selectedType = makeSelectedTypeStr(getPrimitiveType(), ov::element::i8);
 
         auto parameters = ngraph::builder::makeDynamicParams(ov::element::TypeVector{ov::element::boolean, precision, precision}, inputDynamicShapes);
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(parameters));
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(parameters));
         auto select = ngraph::builder::makeSelect(paramOuts, broadcast);
 
         function = makeNgraphFunction(precision, parameters, select, "Eltwise");
@@ -170,7 +170,7 @@ const std::vector<std::vector<InputShape>> inShapesDynamicNumpy = {
 
 const auto numpyCases = ::testing::Combine(::testing::ValuesIn(inShapesDynamicNumpy),
                                            ::testing::ValuesIn(precisions),
-                                           ::testing::Values(ngraph::op::AutoBroadcastType::NUMPY),
+                                           ::testing::Values(ov::op::AutoBroadcastType::NUMPY),
                                            ::testing::ValuesIn(fusingParamsSet));
 
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefsNumpy_dynamic, SelectLayerCPUTest, numpyCases, SelectLayerCPUTest::getTestCaseName);
@@ -197,7 +197,7 @@ const std::vector<std::vector<InputShape>> inShapesDynamicNone = {
 
 const auto noneCases = ::testing::Combine(::testing::ValuesIn(inShapesDynamicNone),
                                           ::testing::ValuesIn(precisions),
-                                          ::testing::Values(ngraph::op::AutoBroadcastType::NONE),
+                                          ::testing::Values(ov::op::AutoBroadcastType::NONE),
                                           ::testing::ValuesIn(fusingParamsSet));
 
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefsNone_dynamic, SelectLayerCPUTest, noneCases, SelectLayerCPUTest::getTestCaseName);

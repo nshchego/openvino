@@ -21,19 +21,19 @@ using NormalizeL2LayerCPUTestParamSet = std::tuple<
         ElementType,                        // input element type
         std::vector<int64_t>,               // axes
         float,                              // eps
-        ngraph::op::EpsMode,                // eps_mode
+        ov::op::EpsMode,                // eps_mode
         CPUSpecificParams,
         fusingSpecificParams>;
 
 class NormalizeL2LayerCPUTest : public testing::WithParamInterface<NormalizeL2LayerCPUTestParamSet>,
                                 virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<NormalizeL2LayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<NormalizeL2LayerCPUTestParamSet> &obj) {
         InputShape shapes;
         ElementType inType;
         std::vector<int64_t> axes;
         float eps;
-        ngraph::op::EpsMode epsMode;
+        ov::op::EpsMode epsMode;
         CPUSpecificParams cpuParams;
         fusingSpecificParams fusingParams;
         std::tie(shapes, inType, axes, eps, epsMode, cpuParams, fusingParams) = obj.param;
@@ -60,7 +60,7 @@ protected:
         ElementType inType;
         std::vector<int64_t> axes;
         float eps;
-        ngraph::op::EpsMode epsMode;
+        ov::op::EpsMode epsMode;
         CPUSpecificParams cpuParams;
         fusingSpecificParams fusingParams;
         std::tie(shapes, inType, axes, eps, epsMode, cpuParams, fusingParams) = this->GetParam();
@@ -79,7 +79,7 @@ protected:
         function = makeNgraphFunction(inType, params, normalize, "Normalize");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {

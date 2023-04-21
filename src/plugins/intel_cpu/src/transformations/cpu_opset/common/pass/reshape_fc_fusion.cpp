@@ -44,7 +44,7 @@ ov::intel_cpu::ReshapeFullyConnectedFusion::ReshapeFullyConnectedFusion() {
             return false;
         }
 
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
         auto weightInput = fc->input(1).get_source_output();
         ngraph::Shape newWeightsShape;
         const auto outShape = fc->get_shape();
@@ -62,7 +62,7 @@ ov::intel_cpu::ReshapeFullyConnectedFusion::ReshapeFullyConnectedFusion() {
             new_ops.push_back(weightInput.get_node_shared_ptr());
         }
 
-        std::shared_ptr<ngraph::Node> new_fc;
+        std::shared_ptr<ov::Node> new_fc;
         if (fc->get_input_size() == 2) {
             new_fc = std::make_shared<ov::intel_cpu::FullyConnectedNode>(reshape->input_value(0),
                                                                         weightInput,

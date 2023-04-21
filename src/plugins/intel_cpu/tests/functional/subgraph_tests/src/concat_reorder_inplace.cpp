@@ -34,26 +34,26 @@ class ConcatReorderInPlaceTest : virtual public LayerTestsUtils::LayerTestsCommo
 public:
     void SetUp() override {
         const std::vector<size_t> inputShape = {1, 100, 1, 1};
-        auto inputParams = ngraph::builder::makeParams(ngraph::element::f32, {inputShape, inputShape});
-        auto concat = ngraph::builder::makeConcat(ngraph::OutputVector{inputParams[0], inputParams[1]}, 1);
+        auto inputParams = ngraph::builder::makeParams(ov::element::f32, {inputShape, inputShape});
+        auto concat = ngraph::builder::makeConcat(ov::OutputVector{inputParams[0], inputParams[1]}, 1);
         const auto targetFormat = nhwc;
         auto mul1 = std::make_shared<ngraph::opset8::Multiply>(
             concat,
-            ngraph::builder::makeConstant(ngraph::element::f32, Shape{1}, std::vector<float>{4}));
+            ngraph::builder::makeConstant(ov::element::f32, Shape{1}, std::vector<float>{4}));
         mul1->get_rt_info() = CPUTestsBase::makeCPUInfo({targetFormat}, {targetFormat}, {});
         auto mul2 = std::make_shared<ngraph::opset8::Multiply>(
             concat,
-            ngraph::builder::makeConstant(ngraph::element::f32, Shape{1}, std::vector<float>{5}));
+            ngraph::builder::makeConstant(ov::element::f32, Shape{1}, std::vector<float>{5}));
         mul2->get_rt_info() = CPUTestsBase::makeCPUInfo({targetFormat}, {targetFormat}, {});
         auto mul3 = std::make_shared<ngraph::opset8::Multiply>(
             concat,
-            ngraph::builder::makeConstant(ngraph::element::f32, Shape{1}, std::vector<float>{6}));
+            ngraph::builder::makeConstant(ov::element::f32, Shape{1}, std::vector<float>{6}));
         mul3->get_rt_info() = CPUTestsBase::makeCPUInfo({targetFormat}, {targetFormat}, {});
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset8::Result>(mul1),
+        ov::ResultVector results{std::make_shared<ngraph::opset8::Result>(mul1),
                                      std::make_shared<ngraph::opset8::Result>(mul2),
                                      std::make_shared<ngraph::opset8::Result>(mul3)};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "ConcatReorderInPlace");
+        function = std::make_shared<ov::Model>(results, inputParams, "ConcatReorderInPlace");
         targetDevice = CommonTestUtils::DEVICE_CPU;
     }
 };

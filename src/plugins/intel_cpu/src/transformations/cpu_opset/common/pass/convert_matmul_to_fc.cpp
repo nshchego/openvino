@@ -91,9 +91,9 @@ ov::intel_cpu::ConvertMatMulToFC::ConvertMatMulToFC() {
          *  sequence starting from 0 and replace last two dimension. For example for length = 4  the
          *  order will be [0, 1, 3, 2] that emulates transpose_a or transpose_b attribute.
          */
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
-        auto create_transpose = [this, &new_ops ](const ngraph::Output<ngraph::Node>& node, const std::string& transpose_name) {
+        auto create_transpose = [this, &new_ops ](const ngraph::Output<ov::Node>& node, const std::string& transpose_name) {
             auto rank = node.get_partial_shape().rank();
             std::vector<size_t> transpose_order(rank.get_length());
             std::iota(transpose_order.begin(), transpose_order.end(), 0);

@@ -47,11 +47,11 @@ public:
     }
 
     template<typename NET>
-    void CreateGraph(NET &network, const GraphContext::CPtr ctx);
+    void CreateGraph(NET &network, const GraphContext::CPtr& ctx);
 
     void CreateGraph(const std::vector<NodePtr> &graphNodes,
                      const std::vector<EdgePtr> &graphEdges,
-                     const GraphContext::CPtr ctx,
+                     const GraphContext::CPtr& ctx,
                      std::string name);
 
     bool hasMeanImageFor(const std::string& name) {

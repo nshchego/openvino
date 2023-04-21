@@ -15,9 +15,9 @@ namespace node {
 
 class Convert : public Node {
 public:
-    Convert(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
     Convert(const Shape &shape, const InferenceEngine::Precision &inPrc, const InferenceEngine::Precision &outPrc,
-                      const std::string &nodeName, const GraphContext::CPtr context);
+                      const std::string &nodeName, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -42,7 +42,7 @@ public:
 
     bool needPrepareParams() const override { return false; }
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     static bool isSupportedDesc(const MemoryDesc &desc);
 
@@ -50,8 +50,6 @@ private:
     MemoryDescPtr input;
     MemoryDescPtr output;
     InferenceEngine::Precision origPrc;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

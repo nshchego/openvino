@@ -30,7 +30,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest1) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 2, 2 }, { 1 });
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, true, false);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -40,7 +40,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest1) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 2, 2 }, { 1 });
         auto matmul = std::make_shared<FullyConnectedNode>(transpose, input2, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
     }
 }
 
@@ -50,7 +50,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest2) {
         auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{3, 2, 1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, false);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1, input2});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1, input2});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -58,7 +58,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest2) {
         auto input2 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{3, 2, 1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, false);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1, input2});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1, input2});
     }
 }
 
@@ -68,7 +68,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest3) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 2}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -76,7 +76,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest3) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 2}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -86,7 +86,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest4) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 2}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -94,7 +94,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest4) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 2}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -103,7 +103,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest5) {
     auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 3, 2, 2 }, { 1 });
     auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
     manager.register_pass<ConvertMatMulToFC>();
 }
 
@@ -112,7 +112,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest6) {
     auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 3, 1, 2 }, { 1 });
     auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
     manager.register_pass<ConvertMatMulToFC>();
 }
 
@@ -122,7 +122,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest7) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{3, 2}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -130,7 +130,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest7) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{3, 2}, {1});
         auto fc = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(2));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{fc}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{fc}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -140,7 +140,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest8) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{3, 2}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -154,7 +154,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest8) {
         auto O = ngraph::opset1::Constant::create(ngraph::element::i64, { 1 }, { 3 });
         auto output_shape = std::make_shared<ngraph::opset1::Concat>(ngraph::OutputVector{I, O}, 0);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{fc}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{fc}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -164,7 +164,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest9) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 2}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -172,7 +172,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest9) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 2}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -181,7 +181,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest10) {
     auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 2, 2 }, { 1 });
     auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
     manager.register_pass<ConvertMatMulToFC>();
 }
 
@@ -190,7 +190,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest11) {
     auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{18, 80, 1}, {1});
     auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     manager.register_pass<ConvertMatMulToFC>();
 }
 
@@ -199,7 +199,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest12) {
     auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 80, 1}, {1});
     auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     manager.register_pass<ConvertMatMulToFC>();
 }
 
@@ -209,7 +209,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest13) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{1, 80, 1}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -217,7 +217,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest13) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{80, 1}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -233,7 +233,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest14) {
             false,
             true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -241,7 +241,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest14) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::i8, ngraph::Shape{80, 1}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(3), ngraph::element::f32);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -254,7 +254,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest1) {
         auto const_bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto add = std::make_shared<ngraph::opset1::Add>(fc, const_bias);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input1});
         manager.register_pass<FullyConnectedBiasFusion>();
     }
     {
@@ -263,7 +263,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest1) {
         auto bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto fc = std::make_shared<FullyConnectedNode>(input1, weights, bias, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{fc}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{fc}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -276,7 +276,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest2) {
         auto const_bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto add = std::make_shared<ngraph::opset1::Add>(fc, const_bias);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input1});
         manager.register_pass<FullyConnectedBiasFusion>();
     }
     {
@@ -285,7 +285,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest2) {
         auto bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto fc = std::make_shared<FullyConnectedNode>(input1, weights, bias, ngraph::Rank(3));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{fc}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{fc}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -298,7 +298,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest3) {
         auto const_bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{1, 786}, {1});
         auto add = std::make_shared<ngraph::opset1::Add>(fc, const_bias);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input1});
         manager.register_pass<FullyConnectedBiasFusion>();
     }
     {
@@ -307,7 +307,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest3) {
         auto bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto fc = std::make_shared<FullyConnectedNode>(input1, weights, bias, ngraph::Rank(2));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{fc}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{fc}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -320,7 +320,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest4) {
         auto const_bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{1, 786}, {1});
         auto add = std::make_shared<ngraph::opset1::Add>(fc, const_bias);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input1});
         manager.register_pass<FullyConnectedBiasFusion>();
     }
     {
@@ -329,7 +329,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest4) {
         auto bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto fc = std::make_shared<FullyConnectedNode>(input1, weights, bias, ngraph::Rank(2));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{fc}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{fc}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -341,7 +341,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest5) {
     auto const_bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 786 }, { 1 });
     auto add = std::make_shared<ngraph::opset1::Add>(fc, const_bias);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ add }, ngraph::ParameterVector{ input1 });
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{ add }, ngraph::ParameterVector{ input1 });
     manager.register_pass<FullyConnectedBiasFusion>();
 }
 
@@ -354,7 +354,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest6) {
         auto const_bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 786 }, { 1 });
         auto add = std::make_shared<ngraph::opset1::Add>(fc, const_bias);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ add }, ngraph::ParameterVector{ input1 });
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{ add }, ngraph::ParameterVector{ input1 });
         manager.register_pass<FullyConnectedBiasFusion>();
     }
     {
@@ -363,7 +363,7 @@ TEST_F(TransformationTestsF, FullyConnectedBiasFusionTest6) {
         auto bias = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{786}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, weights, bias, ngraph::Rank(2), ngraph::element::f32);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -373,14 +373,14 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest_second_input_rank_adj_1) {
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{1, 2, 3}, {1});
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, input2, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
         auto input1 = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{5, 2, 3});
         auto input2 = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{2, 3}, {1});
         auto matmul = std::make_shared<FullyConnectedNode>(input1, input2, ngraph::Rank(2));
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{matmul}, ngraph::ParameterVector{input1});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{matmul}, ngraph::ParameterVector{input1});
     }
 }
 
@@ -390,7 +390,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest_second_input_rank_adj_2) {
         auto weights = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 2, 3 }, { 1 });
         auto matmul = std::make_shared<ngraph::opset1::MatMul>(input1, weights, false, true);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
         manager.register_pass<ConvertMatMulToFC>();
     }
     {
@@ -398,7 +398,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest_second_input_rank_adj_2) {
         auto weights = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 2, 3 }, { 1 });
         auto matmul = std::make_shared<FullyConnectedNode>(input1, weights, ngraph::Rank(2));
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
     }
 }
 
@@ -410,7 +410,7 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest_second_input_rank_adj_3) {
         auto biases = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 1, 2 }, { 1 });
         auto add = std::make_shared<ngraph::opset1::Add>(matmul, biases);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{ add }, ngraph::ParameterVector{ input1 });
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{ add }, ngraph::ParameterVector{ input1 });
         manager.register_pass<ConvertMatMulToFC>();
         manager.register_pass<FullyConnectedBiasFusion>();
     }
@@ -423,6 +423,6 @@ TEST_F(TransformationTestsF, ConvertMatMulToFCTest_second_input_rank_adj_3) {
         auto matmul = std::make_shared<FullyConnectedNode>(input1, weights, biases, ngraph::Rank(2));
         auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, { 4 }, { 1, 5, 2, 2 });
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{ matmul }, ngraph::ParameterVector{ input1 });
     }
 }

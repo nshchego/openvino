@@ -149,14 +149,14 @@ void CPUTestsBase::CheckPluginRelatedResultsImpl(const std::shared_ptr<const ov:
             IE_ASSERT(rtInfo.end() != it);
             return it->second.as<std::string>();
         };
-        auto getExecValueOutputsLayout = [] (const std::shared_ptr<ngraph::Node>& node) -> std::string {
+        auto getExecValueOutputsLayout = [] (const std::shared_ptr<ov::Node>& node) -> std::string {
             auto rtInfo = node->get_rt_info();
             auto it = rtInfo.find(ExecGraphInfoSerialization::OUTPUT_LAYOUTS);
             IE_ASSERT(rtInfo.end() != it);
             return it->second.as<std::string>();
         };
         // skip policy
-        auto should_be_skipped = [] (const ngraph::PartialShape &partialShape, cpu_memory_format_t fmt) {
+        auto should_be_skipped = [] (const ov::PartialShape &partialShape, cpu_memory_format_t fmt) {
             if (partialShape.is_dynamic()) {
                 return false;
             }
@@ -326,25 +326,25 @@ CPUTestsBase::makeCPUInfo(const std::vector<cpu_memory_format_t>& inFmts,
     return cpuInfo;
 }
 
-std::shared_ptr<ngraph::Function>
-CPUTestsBase::makeNgraphFunction(const ngraph::element::Type &ngPrc, ngraph::ParameterVector &params,
-                                 const std::shared_ptr<ngraph::Node> &lastNode, std::string name) {
+std::shared_ptr<ov::Model>
+CPUTestsBase::makeNgraphFunction(const ov::element::Type &ngPrc, ov::ParameterVector &params,
+                                 const std::shared_ptr<ov::Node> &lastNode, std::string name) {
    auto newLastNode = modifyGraph(ngPrc, params, lastNode);
-   ngraph::ResultVector results;
+   ov::ResultVector results;
 
    for (int i = 0; i < newLastNode->get_output_size(); i++)
-        results.push_back(std::make_shared<ngraph::opset1::Result>(newLastNode->output(i)));
+        results.push_back(std::make_shared<ov::op::v0::Result>(newLastNode->output(i)));
 
-   return std::make_shared<ngraph::Function>(results, params, name);
+   return std::make_shared<ov::Model>(results, params, name);
 }
 
-std::shared_ptr<ngraph::Node>
-CPUTestsBase::modifyGraph(const ngraph::element::Type &ngPrc, ngraph::ParameterVector &params, const std::shared_ptr<ngraph::Node> &lastNode) {
+std::shared_ptr<ov::Node>
+CPUTestsBase::modifyGraph(const ov::element::Type &ngPrc, ov::ParameterVector &params, const std::shared_ptr<ov::Node> &lastNode) {
     lastNode->get_rt_info() = getCPUInfo();
     return lastNode;
 }
 
-std::string CPUTestsBase::makeSelectedTypeStr(std::string implString, ngraph::element::Type_t elType) {
+std::string CPUTestsBase::makeSelectedTypeStr(std::string implString, ov::element::Type_t elType) {
     implString.push_back('_');
     implString += InferenceEngine::details::convertPrecision(elType).name();
     return implString;

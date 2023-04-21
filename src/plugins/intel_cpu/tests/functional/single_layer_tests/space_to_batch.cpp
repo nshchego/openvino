@@ -16,7 +16,7 @@ namespace CPULayerTestsDefinitions  {
 
 namespace {
     std::vector<int64_t> blockShape, padsBegin, padsEnd;
-    ngraph::Shape paramShape;
+    ov::Shape paramShape;
 }  // namespace
 
 using SpaceToBatchLayerTestCPUParams = std::tuple<
@@ -108,17 +108,17 @@ protected:
             selectedType = std::string("ref_any_") + netPrecision.name();
 
         auto params = ngraph::builder::makeDynamicParams(ngPrec, {inputDynamicShapes.front()});
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         paramShape = {paramOuts[0].get_partial_shape().size()};
 
         std::shared_ptr<ov::Node> in2, in3, in4;
-        auto blockShapeParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, paramShape);
+        auto blockShapeParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
         in2 = blockShapeParam;
         params.push_back(blockShapeParam);
-        auto padsBeginParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, paramShape);
+        auto padsBeginParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
         in3 = padsBeginParam;
         params.push_back(padsBeginParam);
-        auto padsEndParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, paramShape);
+        auto padsEndParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
         in4 = padsEndParam;
         params.push_back(padsEndParam);
 

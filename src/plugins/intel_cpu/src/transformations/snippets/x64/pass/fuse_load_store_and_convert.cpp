@@ -34,7 +34,7 @@ ov::intel_cpu::pass::FuseLoadConvert::FuseLoadConvert() {
         if (transformation_callback(convert))
             return false;
 
-        std::shared_ptr<ngraph::Node> load_convert = nullptr;
+        std::shared_ptr<ov::Node> load_convert = nullptr;
         if (const auto convert_saturation =
                 std::dynamic_pointer_cast<ngraph::snippets::op::ConvertSaturation>(convert)) {
             load_convert = std::make_shared<ov::intel_cpu::LoadConvertSaturation>(load->input_value(0),
@@ -83,7 +83,7 @@ ov::intel_cpu::pass::FuseStoreConvert::FuseStoreConvert() {
         if (convert->output(0).get_target_inputs().size() != 1 || transformation_callback(convert))
             return false;
 
-        std::shared_ptr<ngraph::Node> store_convert = nullptr;
+        std::shared_ptr<ov::Node> store_convert = nullptr;
         if (const auto convert_saturation =
                 std::dynamic_pointer_cast<ngraph::snippets::op::ConvertSaturation>(convert)) {
             store_convert = std::make_shared<ov::intel_cpu::StoreConvertSaturation>(input,

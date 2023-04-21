@@ -7,7 +7,7 @@
 #include "functional_test_utils/ov_plugin_cache.hpp"
 
 using namespace ngraph;
-using namespace ngraph::op;
+using namespace ov::op;
 using namespace InferenceEngine;
 using namespace CPUTestUtils;
 

@@ -17,7 +17,7 @@ ov::intel_cpu::NonQuantizedFullyConnectedBiasFusion::NonQuantizedFullyConnectedB
     MATCHER_SCOPE(FullyConnectedBiasFusion);
     auto input = ngraph::pattern::any_input();
     auto weights = ngraph::pattern::any_input(ngraph::pattern::has_static_shape());
-    auto m_fc = ngraph::pattern::wrap_type<ov::intel_cpu::FullyConnectedNode>({ input, weights }, [](ngraph::Output<ngraph::Node> output) {
+    auto m_fc = ngraph::pattern::wrap_type<ov::intel_cpu::FullyConnectedNode>({ input, weights }, [](ngraph::Output<ov::Node> output) {
         return ngraph::pattern::consumers_count(1)(output) && ngraph::pattern::has_static_rank()(output);
     });
     auto m_bias = ngraph::pattern::any_input(ngraph::pattern::has_static_shape());
@@ -49,9 +49,9 @@ ov::intel_cpu::NonQuantizedFullyConnectedBiasFusion::NonQuantizedFullyConnectedB
             return false;
         }
 
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
-        std::shared_ptr<ngraph::Node> final_bias = bias;
+        std::shared_ptr<ov::Node> final_bias = bias;
         if (bias_shape.size() >= 2) {
             auto reshape_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 1 }, { -1 });
             final_bias = ov::op::util::make_try_fold<ngraph::opset1::Reshape>(final_bias, reshape_const, true);
@@ -82,7 +82,7 @@ ov::intel_cpu::QuantizedFullyConnectedBiasFusion::QuantizedFullyConnectedBiasFus
     MATCHER_SCOPE(FullyConnectedBiasFusion);
     auto input = ngraph::pattern::any_input();
     auto weights = ngraph::pattern::any_input(ngraph::pattern::has_static_shape());
-    auto m_fc = ngraph::pattern::wrap_type<ov::intel_cpu::FullyConnectedNode>({ input, weights }, [](ngraph::Output<ngraph::Node> output) {
+    auto m_fc = ngraph::pattern::wrap_type<ov::intel_cpu::FullyConnectedNode>({ input, weights }, [](ngraph::Output<ov::Node> output) {
         return ngraph::pattern::consumers_count(1)(output) && ngraph::pattern::has_static_rank()(output);
     });
 
@@ -123,9 +123,9 @@ ov::intel_cpu::QuantizedFullyConnectedBiasFusion::QuantizedFullyConnectedBiasFus
             return false;
         }
 
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
-        std::shared_ptr<ngraph::Node> final_bias = bias;
+        std::shared_ptr<ov::Node> final_bias = bias;
         if (bias_shape.size() >= 2) {
             auto reshape_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 1 }, { -1 });
             final_bias = ov::op::util::make_try_fold<ngraph::opset1::Reshape>(final_bias, reshape_const, true);
@@ -139,7 +139,7 @@ ov::intel_cpu::QuantizedFullyConnectedBiasFusion::QuantizedFullyConnectedBiasFus
                                                                          fc->get_output_type());
         new_ops.push_back(new_fc);
 
-        std::shared_ptr<ngraph::Node> final_scale = scale;
+        std::shared_ptr<ov::Node> final_scale = scale;
         auto new_mul = std::make_shared<ngraph::opset1::Multiply>(new_fc, final_scale, mul->get_autob());
         new_ops.push_back(new_mul);
 

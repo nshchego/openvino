@@ -21,7 +21,7 @@ typedef std::tuple<
 class EltwiseLayerCPUTest : public testing::WithParamInterface<EltwiseLayerCPUTestParamsSet>,
                             virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<EltwiseLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<EltwiseLayerCPUTestParamsSet> &obj) {
         subgraph::EltwiseTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         fusingSpecificParams fusingParams;
@@ -37,7 +37,7 @@ public:
     }
 
 protected:
-    ov::Tensor generate_eltwise_input(const ov::element::Type& type, const ngraph::Shape& shape) {
+    ov::Tensor generate_eltwise_input(const ov::element::Type& type, const ov::Shape& shape) {
         struct gen_params {
             uint32_t range;
             int32_t start_from;
@@ -72,7 +72,7 @@ protected:
         return ov::test::utils::create_and_fill_tensor(type, shape, params.range, params.start_from, params.resolution);
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {
@@ -109,7 +109,7 @@ protected:
         shapes.resize(2);
         switch (opType) {
             case CommonTestUtils::OpType::SCALAR: {
-                std::vector<ngraph::Shape> identityShapes(shapes[0].second.size(), {1});
+                std::vector<ov::Shape> identityShapes(shapes[0].second.size(), {1});
                 shapes[1] = {{}, identityShapes};
                 break;
             }
@@ -127,13 +127,13 @@ protected:
         configuration.insert(additional_config.begin(), additional_config.end());
         auto parameters = ngraph::builder::makeDynamicParams(netType, {inputDynamicShapes.front()});
 
-        std::shared_ptr<ngraph::Node> secondaryInput;
+        std::shared_ptr<ov::Node> secondaryInput;
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             secondaryInput = ngraph::builder::makeDynamicParams(netType, {inputDynamicShapes.back()}).front();
-            parameters.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(secondaryInput));
+            parameters.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(secondaryInput));
         } else {
             auto pShape = inputDynamicShapes.back();
-            ngraph::Shape shape;
+            ov::Shape shape;
             if (pShape.is_static()) {
                 shape = pShape.get_shape();
             } else {
@@ -149,12 +149,12 @@ protected:
             if (netType == ElementType::i32) {
                 auto data_tensor = generate_eltwise_input(ElementType::i32, shape);
                 auto data_ptr = reinterpret_cast<int32_t*>(data_tensor.data());
-                std::vector<int32_t> data(data_ptr, data_ptr + ngraph::shape_size(shape));
+                std::vector<int32_t> data(data_ptr, data_ptr + ov::shape_size(shape));
                 secondaryInput = ngraph::builder::makeConstant(netType, shape, data);
             } else {
                 auto data_tensor = generate_eltwise_input(ElementType::f32, shape);
                 auto data_ptr = reinterpret_cast<float*>(data_tensor.data());
-                std::vector<float> data(data_ptr, data_ptr + ngraph::shape_size(shape));
+                std::vector<float> data(data_ptr, data_ptr + ov::shape_size(shape));
                 secondaryInput = ngraph::builder::makeConstant(netType, shape, data);
             }
         }
@@ -447,7 +447,7 @@ const auto params_5D_Blocked_Planar = ::testing::Combine(
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_5D_Blocked_Planar, EltwiseLayerCPUTest, params_5D_Blocked_Planar, EltwiseLayerCPUTest::getTestCaseName);
 
 
-std::vector<std::vector<ngraph::Shape>> inShapes_5D_Planar_Blocked = {
+std::vector<std::vector<ov::Shape>> inShapes_5D_Planar_Blocked = {
         {{2, 1, 31, 1, 3}, {2, 17, 31, 4, 3}},
         {{2, 1, 1, 3, 4}, {2, 17, 5, 3, 1}},
 };
@@ -473,7 +473,7 @@ const auto params_5D_Planar_Blocked = ::testing::Combine(
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_5D_Planar_Blocked, EltwiseLayerCPUTest, params_5D_Planar_Blocked, EltwiseLayerCPUTest::getTestCaseName);
 
 
-std::vector<std::vector<ngraph::Shape>> inShapes_4D_1D = {
+std::vector<std::vector<ov::Shape>> inShapes_4D_1D = {
         {{2, 17, 5, 4}, {4}},
         {{1, 3, 3, 3}, {3}},
 };
@@ -520,7 +520,7 @@ const auto params_4D_1D_parameter_mode = ::testing::Combine(
 
 INSTANTIATE_TEST_SUITE_P(smoke_CompareWithRefs_4D_1D_Parameter, EltwiseLayerCPUTest, params_4D_1D_parameter_mode, EltwiseLayerCPUTest::getTestCaseName);
 
-std::vector<std::vector<ngraph::Shape>> inShapes_5D_1D = {
+std::vector<std::vector<ov::Shape>> inShapes_5D_1D = {
         {{2, 17, 5, 4, 10}, {10}},
         {{1, 3, 3, 3, 3}, {3}},
 };

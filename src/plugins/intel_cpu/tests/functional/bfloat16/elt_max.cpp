@@ -27,7 +27,7 @@ namespace LayerTestsDefinitions {
 
 class Elt_max : public BasicBF16Test  {
 protected:
-    std::shared_ptr<ngraph::Function> createGraph(InferenceEngine::Precision netPrecision) override {
+    std::shared_ptr<ov::Model> createGraph(InferenceEngine::Precision netPrecision) override {
 //         Power (FP32)
 //              |
 //           Conv(BF16)  Const(FP32)
@@ -37,14 +37,14 @@ protected:
 //            Conv(BF16)
 
         // STAGE1: construction of the GRAPH
-        ngraph::element::Type ntype = (netPrecision == Precision::FP32) ? ngraph::element::f32 : ngraph::element::bf16;
+        ov::element::Type ntype = (netPrecision == Precision::FP32) ? ov::element::f32 : ov::element::bf16;
         auto channelsCount = inputShapes[1];
         const size_t conv0OutputChannels = 1;
 
         // add
-        auto input1 = std::make_shared<opset1::Parameter>(ntype, ngraph::Shape{inputShapes});
+        auto input1 = std::make_shared<opset1::Parameter>(ntype, ov::Shape{inputShapes});
         input1->set_friendly_name("Input_1");
-        std::shared_ptr<ngraph::opset1::Constant> powerConst = nullptr;
+        std::shared_ptr<ov::op::v0::Constant> powerConst = nullptr;
         if (netPrecision == Precision::FP32) {
             powerConst = opset1::Constant::create(ntype, Shape{1}, { 2.0f });
         } else {
@@ -54,38 +54,38 @@ protected:
         powerNode0->set_friendly_name("Power_0");
 
         // convolution
-        std::shared_ptr<ngraph::opset1::Constant> weightsNode0 = nullptr, weightsNode1 = nullptr;
-        ngraph::Shape convFilterShape0 = { conv0OutputChannels, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
-        ngraph::Shape convFilterShape1 = { 1, conv0OutputChannels, 3, 3 };  // out channel, /input channels, kernel h, kernel w
+        std::shared_ptr<ov::op::v0::Constant> weightsNode0 = nullptr, weightsNode1 = nullptr;
+        ov::Shape convFilterShape0 = { conv0OutputChannels, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
+        ov::Shape convFilterShape1 = { 1, conv0OutputChannels, 3, 3 };  // out channel, /input channels, kernel h, kernel w
         if (netPrecision == Precision::FP32) {
             std::vector<float> weightValuesFP32_0, weightValuesFP32_1;
             weightValuesFP32_0.resize(conv0OutputChannels * channelsCount * 3 * 3);
             weightValuesFP32_1.resize(1 * conv0OutputChannels * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesFP32_0.data(), weightValuesFP32_0.size());
             FuncTestUtils::fillInputsBySinValues(weightValuesFP32_1.data(), weightValuesFP32_1.size());
-            weightsNode0 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape0, weightValuesFP32_0);
-            weightsNode1 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape1, weightValuesFP32_1);
+            weightsNode0 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape0, weightValuesFP32_0);
+            weightsNode1 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape1, weightValuesFP32_1);
         } else {
             std::vector<short> weightValuesBF16_0, weightValuesBF16_1;
             weightValuesBF16_0.resize(conv0OutputChannels * channelsCount * 3 * 3);
             weightValuesBF16_1.resize(1 * conv0OutputChannels * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesBF16_0.data(), weightValuesBF16_0.size());
             FuncTestUtils::fillInputsBySinValues(weightValuesBF16_1.data(), weightValuesBF16_1.size());
-            weightsNode0 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape0, weightValuesBF16_0.data());
-            weightsNode1 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape1, weightValuesBF16_1.data());
+            weightsNode0 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape0, weightValuesBF16_0.data());
+            weightsNode1 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape1, weightValuesBF16_1.data());
         }
 
-        std::shared_ptr<ngraph::Node> convNode0 = std::make_shared<ngraph::opset1::Convolution>(
+        std::shared_ptr<ov::Node> convNode0 = std::make_shared<ov::op::v1::Convolution>(
                 powerNode0, weightsNode0,
                 ngraph::Strides({ 1, 1 }),   // strides
                 ngraph::CoordinateDiff({ 1, 1 }),  // pad begin
                 ngraph::CoordinateDiff({ 1, 1 }),   // pad end
                 ngraph::Strides({ 1, 1 }),        // dilation
-                ngraph::op::PadType::EXPLICIT);   // pad type
+                ov::op::PadType::EXPLICIT);   // pad type
         convNode0->set_friendly_name("Convolution_0");
 
         // Eltwise, i.e. Max
-        std::shared_ptr<ngraph::opset1::Constant> maxConst = nullptr;
+        std::shared_ptr<ov::op::v0::Constant> maxConst = nullptr;
         auto batchSize = inputShapes[0];
         auto heightSize = inputShapes[2];
         auto widthSize = inputShapes[3];
@@ -99,16 +99,16 @@ protected:
         auto eltMaxNode = std::make_shared<opset1::Maximum>(convNode0, maxConst);
         eltMaxNode->set_friendly_name("Elt_max");
 
-        std::shared_ptr<ngraph::Node> convNode1 = std::make_shared<ngraph::opset1::Convolution>(
+        std::shared_ptr<ov::Node> convNode1 = std::make_shared<ov::op::v1::Convolution>(
                 eltMaxNode, weightsNode1,
                 ngraph::Strides({ 1, 1 }),   // strides
                 ngraph::CoordinateDiff({ 1, 1 }),  // pad begin
                 ngraph::CoordinateDiff({ 1, 1 }),   // pad end
                 ngraph::Strides({ 1, 1 }),        // dilation
-                ngraph::op::PadType::EXPLICIT);   // pad type
+                ov::op::PadType::EXPLICIT);   // pad type
         convNode1->set_friendly_name("Convolution_1");
 
-        return std::make_shared<ngraph::Function>(convNode1, ngraph::ParameterVector{input1});
+        return std::make_shared<ov::Model>(convNode1, ov::ParameterVector{input1});
     }
     void SetUp() override {
         std::tie(inputPrecision, netPrecision, inputShapes, newInputShapes, targetDevice) = this->GetParam();

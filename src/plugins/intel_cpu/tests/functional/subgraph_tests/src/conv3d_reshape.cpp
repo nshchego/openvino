@@ -74,7 +74,7 @@ protected:
             results.push_back(std::make_shared<opset5::Result>(mockNode));
         }
 
-        function = std::make_shared<ngraph::Function>(results, inputParams, "Conv3dReshape");
+        function = std::make_shared<ov::Model>(results, inputParams, "Conv3dReshape");
     }
 };
 

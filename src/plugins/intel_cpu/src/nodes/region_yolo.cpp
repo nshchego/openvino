@@ -230,7 +230,7 @@ private:
 };
 #endif
 
-bool RegionYolo::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool RegionYolo::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto regionYolo = std::dynamic_pointer_cast<const ngraph::opset1::RegionYolo>(op);
         if (!regionYolo) {
@@ -247,16 +247,15 @@ bool RegionYolo::needPrepareParams() const {
     return false;
 }
 
-RegionYolo::RegionYolo(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+RegionYolo::RegionYolo(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string(op->get_type_name()) + " node with name '" + op->get_friendly_name() + "'";
     if (op->get_input_size() != 1 || op->get_output_size() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
     const auto regionYolo = std::dynamic_pointer_cast<const ngraph::opset1::RegionYolo>(op);
     classes = regionYolo->get_num_classes();

@@ -11,7 +11,7 @@
 
 class CustomAbsKernel : public InferenceEngine::ILayerExecImpl {
 public:
-    explicit CustomAbsKernel(const std::shared_ptr<ngraph::Node>& node): node(node) {}
+    explicit CustomAbsKernel(const std::shared_ptr<ov::Node>& node): node(node) {}
 
     InferenceEngine::StatusCode
     init(InferenceEngine::LayerConfig& /*config*/, InferenceEngine::ResponseDesc* /*resp*/) noexcept override {
@@ -70,21 +70,21 @@ public:
     }
 
 private:
-    const std::shared_ptr<ngraph::Node> node;
+    const std::shared_ptr<ov::Node> node;
 };
 
-class CustomAbs : public ngraph::op::Op {
+class CustomAbs : public ov::op::Op {
 public:
     OPENVINO_RTTI("CustomAbs", "custom_opset");
 
     CustomAbs() = default;
-    CustomAbs(const ngraph::Output<ngraph::Node>& arg): ngraph::op::Op({arg}) {
+    CustomAbs(const ov::Output<ov::Node>& arg): ov::op::Op({arg}) {
         constructor_validate_and_infer_types();
     }
     void validate_and_infer_types() override {
         set_output_type(0, get_input_element_type(0), get_input_partial_shape(0));
     }
-    std::shared_ptr<ngraph::Node> clone_with_new_inputs(const ngraph::OutputVector& new_args) const override {
+    std::shared_ptr<ov::Node> clone_with_new_inputs(const ov::OutputVector& new_args) const override {
         return std::make_shared<CustomAbs>(new_args.at(0));
     }
     bool visit_attributes(ngraph::AttributeVisitor&) override {
@@ -106,13 +106,13 @@ public:
         return opsets;
     }
 
-    std::vector<std::string> getImplTypes(const std::shared_ptr<ngraph::Node>& node) override {
+    std::vector<std::string> getImplTypes(const std::shared_ptr<ov::Node>& node) override {
         if (node->description() != CustomAbs::get_type_info_static().name)
             return {};
         return {"CPU"};
     }
 
-    InferenceEngine::ILayerImpl::Ptr getImplementation(const std::shared_ptr<ngraph::Node>& node, const std::string& implType) override {
+    InferenceEngine::ILayerImpl::Ptr getImplementation(const std::shared_ptr<ov::Node>& node, const std::string& implType) override {
         return std::make_shared<CustomAbsKernel>(node);
     }
 };

@@ -70,7 +70,7 @@ public:
     static constexpr int CUBIC_GRID_LEN = 4;
 
 public:
-    Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -83,7 +83,7 @@ public:
     }
     bool canFuse(const NodePtr& node) const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     bool needShapeInfer() const override;
     bool needPrepareParams() const override;
@@ -212,8 +212,6 @@ private:
     std::vector<int32_t> lastSizes;
 
     VectorDims lastOutputDims;
-
-    std::string errorPrefix;
 
     bool canUseAclExecutor = false;
     std::shared_ptr<InterpolateExecutor> aclExecPtr = nullptr;

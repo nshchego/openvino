@@ -32,7 +32,7 @@ using DeconvLayerCPUTestParamsSet = std::tuple<DeconvSpecParams,
 class DeconvolutionLayerCPUTest : public testing::WithParamInterface<DeconvLayerCPUTestParamsSet>,
                                   virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<DeconvLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<DeconvLayerCPUTestParamsSet> &obj) {
         DeconvSpecParams basicParamsSet;
         DeconvInputData inputData;
         ElementType prec;
@@ -41,7 +41,7 @@ public:
         std::map<std::string, std::string> additionalConfig;
         std::tie(basicParamsSet, inputData, prec, fusingParams, cpuParams, additionalConfig) = obj.param;
 
-        ngraph::op::PadType padType;
+        ov::op::PadType padType;
         InferenceEngine::SizeVector kernel, stride, dilation;
         std::vector<ptrdiff_t> padBegin, padEnd, outPadding;
         size_t convOutChannels;
@@ -91,7 +91,7 @@ public:
         return result.str();
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {
@@ -171,11 +171,11 @@ public:
         if (!outShapeData.empty()) {
             if (outShapeType == ngraph::helpers::InputLayerType::PARAMETER) {
                 IE_ASSERT(inputDynamicShapes.size() == 2);
-                auto outShapeParam = std::make_shared<ngraph::opset8::Parameter>(ngraph::element::i32, inputDynamicShapes.back());
+                auto outShapeParam = std::make_shared<ngraph::opset8::Parameter>(ov::element::i32, inputDynamicShapes.back());
                 params.push_back(outShapeParam);
                 outShapeNode = outShapeParam;
             } else {
-                outShapeNode = ngraph::opset8::Constant::create(ngraph::element::i32, {outShapeData[inferRequestNum].size()}, outShapeData[inferRequestNum]);
+                outShapeNode = ngraph::opset8::Constant::create(ov::element::i32, {outShapeData[inferRequestNum].size()}, outShapeData[inferRequestNum]);
             }
         }
 
@@ -244,7 +244,7 @@ protected:
 
 private:
     ElementType prec;
-    ngraph::op::PadType padType;
+    ov::op::PadType padType;
     InferenceEngine::SizeVector dilation;
     std::vector<ptrdiff_t> padBegin, padEnd, outPadding;
     size_t convOutChannels;
@@ -319,7 +319,7 @@ const auto convParams_ExplicitPadding_Planar_2D = ::testing::Combine(
     ::testing::ValuesIn(padEnds2d),
     ::testing::ValuesIn(dilations2d),
     ::testing::ValuesIn(numOutChannels_Planar),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -435,7 +435,7 @@ const auto convParams_ExplicitPadding_Planar_3D = ::testing::Combine(
     ::testing::ValuesIn(padEnds3d),
     ::testing::ValuesIn(dilations3d),
     ::testing::ValuesIn(numOutChannels_Planar),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -503,7 +503,7 @@ const auto convParams_ExplicitPadding_Blocked_2D_nightly = ::testing::Combine(
     ::testing::ValuesIn(padEnds2d),
     ::testing::ValuesIn(dilations2d),
     ::testing::ValuesIn(numOutChannels_Blocked),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -532,7 +532,7 @@ const auto convParams_ExplicitPadding_Blocked_2D = ::testing::Combine(
     ::testing::ValuesIn(padEnds2d),
     ::testing::ValuesIn(dilations2d),
     ::testing::ValuesIn(numOutChannels_Blocked),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -543,7 +543,7 @@ const auto convParams_ExplicitPadding_AMX_2D = ::testing::Combine(
     ::testing::ValuesIn(padEnds2d),
     ::testing::ValuesIn(dilations2d),
     ::testing::ValuesIn(numOutChannels_Blocked),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -628,7 +628,7 @@ const auto convParams_ExplicitPadding_Blocked_3D_nightly = ::testing::Combine(
     ::testing::ValuesIn(padEnds3d),
     ::testing::ValuesIn(dilations3d),
     ::testing::Values(32),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -657,7 +657,7 @@ const auto convParams_ExplicitPadding_Blocked_3D = ::testing::Combine(
     ::testing::ValuesIn(padEnds3d),
     ::testing::ValuesIn(dilations3d),
     ::testing::Values(32),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -668,7 +668,7 @@ const auto convParams_ExplicitPadding_AMX_3D = ::testing::Combine(
     ::testing::ValuesIn(padEnds3d),
     ::testing::ValuesIn(dilations3d),
     ::testing::Values(32),
-    ::testing::Values(ngraph::op::PadType::EXPLICIT),
+    ::testing::Values(ov::op::PadType::EXPLICIT),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -741,7 +741,7 @@ const auto convParams_ExplicitPadding_1x1_2D = ::testing::Combine(
         ::testing::Values(std::vector<ptrdiff_t>({0, 0})),
         ::testing::Values(InferenceEngine::SizeVector({1, 1})),
         ::testing::ValuesIn(numOutChannels_Blocked),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::ValuesIn(emptyOutputPadding)
 );
 
@@ -774,7 +774,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_reorder_Deconv_2D, DeconvolutionLayerCPUTest,
                            ::testing::ValuesIn(padEnds2d),
                            ::testing::ValuesIn(dilations2d),
                            ::testing::ValuesIn(numOutChannels_Blocked),
-                           ::testing::Values(ngraph::op::PadType::EXPLICIT),
+                           ::testing::Values(ov::op::PadType::EXPLICIT),
                            ::testing::ValuesIn(emptyOutputPadding)),
         ::testing::Values(DeconvInputData{InputShape{{-1, 67, -1, -1}, {{ 1, 67, 7, 7}, { 1, 67, 9, 4}, { 1, 67, 5, 7}, { 1, 67, 7, 7}, { 1, 67, 9, 4}}},
                                                      ngraph::helpers::InputLayerType::PARAMETER,
@@ -816,7 +816,7 @@ const auto deconvParams_AutoPadding_2D = ::testing::Combine(
     ::testing::ValuesIn(padEnds2d),
     ::testing::ValuesIn(dilations2d),
     ::testing::ValuesIn(numOutChannels_Blocked),
-    ::testing::Values(ngraph::op::PadType::SAME_UPPER, ngraph::op::PadType::SAME_LOWER),
+    ::testing::Values(ov::op::PadType::SAME_UPPER, ov::op::PadType::SAME_LOWER),
     ::testing::ValuesIn(emptyOutputPadding)
 );
 

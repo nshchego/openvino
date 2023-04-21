@@ -50,7 +50,7 @@ private:
 
 class PriorBoxShapeInferFactory : public ShapeInferFactory {
 public:
-    explicit PriorBoxShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    explicit PriorBoxShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         auto priorBox = ov::as_type_ptr<const ngraph::opset1::PriorBox>(m_op);
         if (!priorBox) {
@@ -75,7 +75,7 @@ float clip_less(float x, float threshold) {
 
 }   // namespace
 
-bool PriorBox::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool PriorBox::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto priorBox = std::dynamic_pointer_cast<const ngraph::opset1::PriorBox>(op);
         if (!priorBox) {
@@ -88,7 +88,7 @@ bool PriorBox::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
     return true;
 }
 
-PriorBox::PriorBox(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+PriorBox::PriorBox(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, PriorBoxShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

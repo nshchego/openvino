@@ -18,7 +18,7 @@
 
 namespace {
 
-int getConstPort(const std::shared_ptr<ngraph::Node> &node) {
+int getConstPort(const std::shared_ptr<ov::Node> &node) {
     const auto const1 = std::dynamic_pointer_cast<ngraph::opset1::Constant>(node->get_input_node_shared_ptr(0));
     const auto const2 = std::dynamic_pointer_cast<ngraph::opset1::Constant>(node->get_input_node_shared_ptr(1));
     int constPort = -1;
@@ -70,7 +70,7 @@ bool isConvertableToPowerStatic(const std::shared_ptr<ngraph::opset1::Power> &no
 }
 
 template <class BaseOp>
-std::shared_ptr<ngraph::Node> convert(const std::shared_ptr<BaseOp> &node) {
+std::shared_ptr<ov::Node> convert(const std::shared_ptr<BaseOp> &node) {
     const int constPort = getConstPort(node);
     const int nonConstPort = 1 - constPort;
     std::shared_ptr<ngraph::opset1::Constant> powerNode = std::dynamic_pointer_cast<ngraph::opset1::Constant>(node->get_input_node_shared_ptr(constPort));
@@ -114,7 +114,7 @@ ov::intel_cpu::ConvertToPowerStatic::ConvertToPowerStatic() {
     ngraph::matcher_pass_callback callback = [](ngraph::pattern::Matcher &m) {
         auto node = m.get_match_root();
 
-        std::shared_ptr<ngraph::Node> toReplace = node;
+        std::shared_ptr<ov::Node> toReplace = node;
         if (auto power = std::dynamic_pointer_cast<ngraph::opset1::Power>(node)) {
             if (!isConvertableToPowerStatic(power))
                 return false;

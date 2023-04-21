@@ -85,13 +85,13 @@ protected:
         InputShape inputShapes{{-1, -1, -1}, {{10, 5, 3}, {16, 24, 16}, {4, 8, 12}}};
 
         init_input_shapes({inputShapes});
-        auto ngPrc = ngraph::element::f32;
+        auto ngPrc = ov::element::f32;
         auto inputParams = ngraph::builder::makeDynamicParams(ngPrc, inputDynamicShapes);
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(inputParams));
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
         auto customOp = std::make_shared<CustomOp>(paramOuts);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(customOp)};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "customOpTest");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(customOp)};
+        function = std::make_shared<ov::Model>(results, inputParams, "customOpTest");
     }
 
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {

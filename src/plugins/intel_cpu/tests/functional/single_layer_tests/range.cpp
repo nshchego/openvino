@@ -12,7 +12,7 @@
 //
 //namespace CPULayerTestsDefinitions {
 //typedef std::tuple<
-//        std::pair<std::vector<ngraph::PartialShape>, std::vector<std::vector<ngraph::Shape>>>,  // input shape
+//        std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>,  // input shape
 //        std::tuple<float, float, float>,  // start, limit, delta
 //        Precision  // output type
 //> RangeSpecificParams;
@@ -33,13 +33,13 @@
 //    float stop = 0;
 //    float step = 0;
 //public:
-//    static std::string getTestCaseName(testing::TestParamInfo<RangeLayerCPUTestParamsSet> obj) {
+//    static std::string getTestCaseName(const testing::TestParamInfo<RangeLayerCPUTestParamsSet> &obj) {
 //        CPULayerTestsDefinitions::RangeLayerTestParams basicParamsSet;
 //        CPUSpecificParams cpuParams;
 //        std::tie(basicParamsSet, cpuParams) = obj.param;
 //        std::string td;
 //        Precision netPrc = Precision::FP32;
-//        std::pair<std::vector<ngraph::PartialShape>, std::vector<std::vector<ngraph::Shape>>> shapes;
+//        std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>> shapes;
 //
 //        RangeSpecificParams rangePar;
 //        std::tie(rangePar, netPrc, td) = basicParamsSet;
@@ -99,7 +99,7 @@
 //        std::tie(basicParamsSet, cpuParams) = this->GetParam();
 //        std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
 //        CPULayerTestsDefinitions::RangeSpecificParams rangeParams;
-//        std::pair<std::vector<ngraph::PartialShape>, std::vector<std::vector<ngraph::Shape>>> shapes;
+//        std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>> shapes;
 //        std::tie(rangeParams, inPrc, targetDevice) = basicParamsSet;
 //        std::tuple<float, float, float> rangeInputs;
 //
@@ -112,9 +112,9 @@
 //        step = std::get<2>(rangeInputs);
 //        auto ngOutPr = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(outPrc);
 //        auto ngNetPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(inPrc);
-//        auto startPar = std::make_shared<ngraph::opset5::Parameter>(ngNetPrc, ngraph::Shape{});
-//        auto stopPar = std::make_shared<ngraph::opset5::Parameter>(ngNetPrc, ngraph::Shape{});
-//        auto stepPar = std::make_shared<ngraph::opset5::Parameter>(ngNetPrc, ngraph::Shape{});
+//        auto startPar = std::make_shared<ngraph::opset5::Parameter>(ngNetPrc, ov::Shape{});
+//        auto stopPar = std::make_shared<ngraph::opset5::Parameter>(ngNetPrc, ov::Shape{});
+//        auto stepPar = std::make_shared<ngraph::opset5::Parameter>(ngNetPrc, ov::Shape{});
 //        auto range = std::make_shared<ngraph::opset4::Range>(startPar, stopPar, stepPar, ngOutPr);
 //        range->get_rt_info() = getCPUInfo();
 //        selectedType = std::string("ref_any_") + (inPrc == outPrc ? inPrc.name() : "FP32");
@@ -122,8 +122,8 @@
 //        stopPar->set_friendly_name("stop");
 //        stepPar->set_friendly_name("step");
 //
-//        const ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(range)};
-//        function = std::make_shared<ngraph::Function>(results, ngraph::ParameterVector {
+//        const ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(range)};
+//        function = std::make_shared<ov::Model>(results, ov::ParameterVector {
 //            startPar, stopPar, stepPar}, "Range");
 //        functionRefs = ngraph::clone_function(*function);
 //    }
@@ -150,12 +150,12 @@
 //        InferenceEngine::Precision::I32
 //};
 //
-//std::vector<std::pair<std::vector<ngraph::PartialShape>, std::vector<std::vector<ngraph::Shape>>>> inShapesDynamic = {
-//        {{ngraph::PartialShape(), ngraph::PartialShape(), ngraph::PartialShape()},
-//         {{ngraph::Shape{}, ngraph::Shape{}, ngraph::Shape{}}, {ngraph::Shape{}, ngraph::Shape{}, ngraph::Shape{}}}}
+//std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>> inShapesDynamic = {
+//        {{ov::PartialShape(), ov::PartialShape(), ov::PartialShape()},
+//         {{ov::Shape{}, ov::Shape{}, ov::Shape{}}, {ov::Shape{}, ov::Shape{}, ov::Shape{}}}}
 //};
-//std::vector<std::pair<std::vector<ngraph::PartialShape>, std::vector<std::vector<ngraph::Shape>>>> inShapesPseudoStatic = {
-//        {{}, {{ngraph::Shape{}, ngraph::Shape{}, ngraph::Shape{}}}}
+//std::vector<std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>> inShapesPseudoStatic = {
+//        {{}, {{ov::Shape{}, ov::Shape{}, ov::Shape{}}}}
 //};
 //
 //const std::vector<std::tuple<float, float, float>> rangeInputValues = {

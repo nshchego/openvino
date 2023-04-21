@@ -28,7 +28,7 @@ protected:
         const auto add2 = ngraph::builder::makeEltwise(tile->output(0), const2, ngraph::helpers::EltwiseTypes::ADD);
 
         NodeVector results{add1, add2};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "TileWithTwoOutputEdges");
+        function = std::make_shared<ov::Model>(results, inputParams, "TileWithTwoOutputEdges");
     }
 };
 

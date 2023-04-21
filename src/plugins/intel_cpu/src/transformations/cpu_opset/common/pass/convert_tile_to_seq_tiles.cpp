@@ -65,7 +65,7 @@ ov::intel_cpu::ConvertTileToSeqTiles::ConvertTileToSeqTiles() {
             friendly_name += ":";
         }
 
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
         auto tiles_it = tiles.rbegin();
         while (tiles_it != tiles.rend()) {

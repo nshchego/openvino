@@ -22,7 +22,7 @@ using extractImagePatchesParams = typename std::tuple<
 class ExtractImagePatchesLayerCPUTest : public testing::WithParamInterface<extractImagePatchesParams>,
                                         virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<extractImagePatchesParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<extractImagePatchesParams> &obj) {
         InputShape inputShapes;
         ElementType inputPrecision;
         ov::Shape kernelSize;

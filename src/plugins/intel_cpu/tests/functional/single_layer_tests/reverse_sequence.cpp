@@ -24,7 +24,7 @@ using ReverseSequenceCPUTestParams = typename std::tuple<
 class ReverseSequenceLayerCPUTest : public testing::WithParamInterface<ReverseSequenceCPUTestParams>,
                                     virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ReverseSequenceCPUTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ReverseSequenceCPUTestParams> &obj) {
         int64_t batchAxisIndex;
         int64_t seqAxisIndex;
         InferenceEngine::Precision netPrecision;
@@ -72,20 +72,20 @@ protected:
         const auto ngPrc = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(netPrecision);
         auto paramsIn = ngraph::builder::makeDynamicParams(ngPrc, {inputDynamicShapes[0]});
 
-        constexpr auto seqLengthsPrc = ngraph::element::Type_t::i32; //according to the specification
-        std::shared_ptr<ngraph::Node> seqLengthsInput;
+        constexpr auto seqLengthsPrc = ov::element::Type_t::i32; //according to the specification
+        std::shared_ptr<ov::Node> seqLengthsInput;
 
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             seqLengthsInput = ngraph::builder::makeDynamicInputLayer(seqLengthsPrc, secondaryInputType, inputDynamicShapes[1]);
-            paramsIn.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(seqLengthsInput));
+            paramsIn.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(seqLengthsInput));
         } else {
             const auto maxSeqLength = dataInputShape.second.front().at(seqAxisIndex);
             seqLengthsInput = ngraph::builder::makeConstant<float>(seqLengthsPrc, seqLengthsShape.second.front(), {}, true, maxSeqLength);
         }
 
         const auto reverse = std::make_shared<ngraph::opset1::ReverseSequence>(paramsIn.front(), seqLengthsInput, batchAxisIndex, seqAxisIndex);
-        const ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(reverse)};
-        function = std::make_shared<ngraph::Function>(results, paramsIn, "ReverseSequence");
+        const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(reverse)};
+        function = std::make_shared<ov::Model>(results, paramsIn, "ReverseSequence");
     }
 
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {

@@ -19,8 +19,8 @@ class ReshapeChain : public SubgraphBaseTest {
         InputShape inputShapes{{-1, -1, -1, -1}, {{10, 20, 30, 40}, {16, 24, 16, 24}, {4, 8, 12, 16}}};
 
         init_input_shapes({inputShapes});
-        auto ngPrc = ngraph::element::f32;
-        const auto secondInPrc = ngraph::element::Type_t::i32;
+        auto ngPrc = ov::element::f32;
+        const auto secondInPrc = ov::element::Type_t::i32;
         auto inputParams = ngraph::builder::makeDynamicParams(ngPrc, inputDynamicShapes);
         auto reshapeParam1 = ngraph::builder::makeConstant<int>(secondInPrc, {3}, {0, 0, -1});
         auto reshape1 = std::make_shared<ngraph::opset1::Reshape>(inputParams.front(), reshapeParam1, true);
@@ -31,8 +31,8 @@ class ReshapeChain : public SubgraphBaseTest {
         auto reshapeParam4 = ngraph::builder::makeConstant<int>(secondInPrc, {2}, {4, -1});
         auto reshape4 = std::make_shared<ngraph::opset1::Reshape>(reshape3, reshapeParam4, true);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(reshape4)};
-        function = std::make_shared<ngraph::Function>(results, inputParams, "reshapeChain");
+        ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(reshape4)};
+        function = std::make_shared<ov::Model>(results, inputParams, "reshapeChain");
     }
 };
 

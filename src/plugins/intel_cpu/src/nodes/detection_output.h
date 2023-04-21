@@ -14,7 +14,7 @@ namespace node {
 
 class DetectionOutput : public Node {
 public:
-    DetectionOutput(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context);
+    DetectionOutput(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -106,8 +106,6 @@ private:
     std::vector<float> bboxSizes;
     std::vector<int> numPriorsActual;
     std::vector<int> confInfoForPrior;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

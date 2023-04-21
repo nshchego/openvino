@@ -22,7 +22,7 @@ ov::intel_cpu::FullyConnectedNode::FullyConnectedNode(const ngraph::Output<Node>
     validate_and_infer_types();
 }
 
-std::shared_ptr<ngraph::Node> ov::intel_cpu::FullyConnectedNode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
+std::shared_ptr<ov::Node> ov::intel_cpu::FullyConnectedNode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
     INTERNAL_OP_SCOPE(FullyConnectedNode_clone_with_new_inputs);
     check_new_args_count(this, new_args);
     if (new_args.size() == 2) {

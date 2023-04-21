@@ -54,7 +54,7 @@ protected:
             const std::vector<size_t> padEnd = {0, 0};
             const op::PadType paddingType = op::PadType::EXPLICIT;
             ngraph::helpers::PoolingTypes poolType = ngraph::helpers::PoolingTypes::MAX;
-            ngraph::op::RoundingType roundingType = ngraph::op::RoundingType::CEIL;
+            ov::op::RoundingType roundingType = ov::op::RoundingType::CEIL;
             pooling = builder::makePooling(conv, strides, padBegin, padEnd, kernelSize, roundingType, paddingType, false, poolType);
         }
 

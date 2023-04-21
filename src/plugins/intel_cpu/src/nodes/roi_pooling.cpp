@@ -367,7 +367,7 @@ bool jit_roi_pooling_params::operator==(const jit_roi_pooling_params &rhs) const
            alg == rhs.alg;
 }
 
-bool ROIPooling::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ROIPooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         auto roiPooling = ngraph::as_type_ptr<const ngraph::opset2::ROIPooling>(op);
         if (!roiPooling) {
@@ -385,14 +385,12 @@ bool ROIPooling::isSupportedOperation(const std::shared_ptr<const ngraph::Node>&
     return true;
 }
 
-ROIPooling::ROIPooling(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ROIPooling::ROIPooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-
-    std::string errorPrefix = "ROIPooling layer with name '" + getName() + "' ";
 
     auto roiPooling = ngraph::as_type_ptr<const ngraph::opset2::ROIPooling>(op);
     refParams.pooled_h = roiPooling->get_output_roi()[0];
@@ -411,25 +409,25 @@ void ROIPooling::getSupportedDescriptors() {
         return;
 
     if (getParentEdges().size() != 2)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 
     if (getInputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
     }
 
     if (getInputShapeAtPort(1).getRank() != 2) {
-        IE_THROW() << errorPrefix << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
     }
 
     if (getOutputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
     }
 
     const auto& dims = getInputShapeAtPort(1).getDims();
     if (dims[1] != 5) {
-        IE_THROW() << errorPrefix << "has invalid shape on 1st input: [" << dims[0] << "," << dims[1] << "]";
+        THROW_CPU_NODE_ERR << "has invalid shape on 1st input: [" << dims[0] << "," << dims[1] << "]";
     }
 }
 

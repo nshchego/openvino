@@ -19,7 +19,7 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool CumSum::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool CumSum::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto cumsum = std::dynamic_pointer_cast<const ngraph::opset3::CumSum>(op);
         if (!cumsum) {
@@ -32,21 +32,19 @@ bool CumSum::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
     return true;
 }
 
-CumSum::CumSum(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+CumSum::CumSum(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "CumSum layer with name '" + op->get_friendly_name() + "' ";
-
     if ((getOriginalInputsNumber() != numOfInputs && getOriginalInputsNumber() != (numOfInputs - 1)) || getOriginalOutputsNumber() != 1)
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
     const auto &dataShape = getInputShapeAtPort(CUM_SUM_DATA);
     numOfDims = dataShape.getRank();
     if (numOfDims < 1) {
-        IE_THROW() << errorPrefix << " doesn't support 'data' input tensor with rank: " << numOfDims;
+        THROW_CPU_NODE_ERR << " doesn't support 'data' input tensor with rank: " << numOfDims;
     }
 
     const auto cumsum = std::dynamic_pointer_cast<const ngraph::opset3::CumSum>(op);
@@ -60,11 +58,11 @@ CumSum::CumSum(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr
     if (getOriginalInputsNumber() == numOfInputs) {
         const auto axis_shape = cumsum->get_input_partial_shape(AXIS);
         if (axis_shape.is_dynamic() || !ngraph::is_scalar(axis_shape.to_shape()))
-            IE_THROW() << errorPrefix << " doesn't support 'axis' input tensor with non scalar rank";
+            THROW_CPU_NODE_ERR << " doesn't support 'axis' input tensor with non scalar rank";
     }
 
     if (dataShape != getOutputShapeAtPort(0))
-        IE_THROW() << errorPrefix << " has different 'data' input and output dimensions";
+        THROW_CPU_NODE_ERR << " has different 'data' input and output dimensions";
 }
 
 void CumSum::initSupportedPrimitiveDescriptors() {
@@ -73,12 +71,12 @@ void CumSum::initSupportedPrimitiveDescriptors() {
 
     dataPrecision = getOriginalInputPrecisionAtPort(CUM_SUM_DATA);
     if (!one_of(dataPrecision, Precision::I8, Precision::U8, Precision::I16, Precision::BF16, Precision::I32, Precision::FP32, Precision::I64, Precision::U64))
-        IE_THROW() << errorPrefix << " has unsupported 'data' input precision: " << dataPrecision.name();
+        THROW_CPU_NODE_ERR << " has unsupported 'data' input precision: " << dataPrecision.name();
 
     if (inputShapes.size() == numOfInputs) {
         const auto &axisTensorPrec = getOriginalInputPrecisionAtPort(AXIS);
         if (axisTensorPrec != Precision::I32 && axisTensorPrec != Precision::I64)
-            IE_THROW() << errorPrefix << " has unsupported 'axis' input precision: " << axisTensorPrec.name();
+            THROW_CPU_NODE_ERR << " has unsupported 'axis' input precision: " << axisTensorPrec.name();
     }
 
     std::vector<PortConfigurator> inDataConf;
@@ -242,11 +240,11 @@ size_t CumSum::getAxis(const Memory& _axis, const Memory& _data) const {
             break;
         }
         default : {
-            IE_THROW() << errorPrefix << "  doesn't support 'axis' input with precision: " << axisPrecision.name();
+            THROW_CPU_NODE_ERR << "  doesn't support 'axis' input with precision: " << axisPrecision.name();
         }
     }
     if (axisValueFromBlob < -dataShapeSize || axisValueFromBlob > dataShapeSize - 1)
-        IE_THROW() << errorPrefix << "  has axis with a value out of range: " << axisValueFromBlob;
+        THROW_CPU_NODE_ERR << "  has axis with a value out of range: " << axisValueFromBlob;
     return axisValueFromBlob >= 0 ? axisValueFromBlob : (axisValueFromBlob + dataShapeSize);
 }
 

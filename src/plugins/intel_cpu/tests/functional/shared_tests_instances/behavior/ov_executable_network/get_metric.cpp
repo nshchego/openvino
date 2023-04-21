@@ -22,7 +22,7 @@ namespace {
 //
 class OVClassConfigTestCPU : public ::testing::Test {
 public:
-    std::shared_ptr<ngraph::Function> model;
+    std::shared_ptr<ov::Model> model;
     const std::string deviceName = "CPU";
 
     void SetUp() override {

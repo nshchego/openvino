@@ -15,14 +15,14 @@ public:
 
     PowerStaticNode() = default;
 
-    PowerStaticNode(const ngraph::Output<ngraph::Node> &data, const float &power, const float &scale, const float &shift,
+    PowerStaticNode(const ngraph::Output<ov::Node> &data, const float &power, const float &scale, const float &shift,
                     const ngraph::element::Type output_type = ngraph::element::undefined);
 
     void validate_and_infer_types() override;
 
     bool visit_attributes(ngraph::AttributeVisitor &visitor) override;
 
-    std::shared_ptr<ngraph::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
+    std::shared_ptr<ov::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
 
     float get_power() const { return power; }
     float get_scale() const { return scale; }

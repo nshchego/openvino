@@ -39,8 +39,8 @@ const std::vector<std::vector<size_t >> padBegins3D = {{0, 0, 0}};
 const std::vector<std::vector<size_t >> padEnds = {{0, 0},
                                                           {0, 2}};
 const std::vector<std::vector<size_t >> padEnds3D = {{0, 0, 0}};
-const std::vector<ngraph::op::RoundingType> roundingTypes = {ngraph::op::RoundingType::CEIL,
-                                                             ngraph::op::RoundingType::FLOOR};
+const std::vector<ov::op::RoundingType> roundingTypes = {ov::op::RoundingType::CEIL,
+                                                             ov::op::RoundingType::FLOOR};
 ////* ========== Max Polling ========== */
 /* +========== Explicit Pad Floor Rounding ========== */
 const auto maxPool_ExplicitPad_FloorRounding_Params = ::testing::Combine(
@@ -49,8 +49,8 @@ const auto maxPool_ExplicitPad_FloorRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(strides),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -73,8 +73,8 @@ const auto maxPool_SameUpperPad_FloorRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(strides),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_UPPER),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_UPPER),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -97,8 +97,8 @@ const auto maxPool_SameLowerPad_FloorRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(strides),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_LOWER),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_LOWER),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -121,8 +121,8 @@ const auto maxPool_ExplicitPad_FloorRounding_5Dinput_Params = ::testing::Combine
         ::testing::ValuesIn(strides3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -145,8 +145,8 @@ const auto maxPool_SameUpperPad_FloorRounding_5Dinput_Params = ::testing::Combin
         ::testing::ValuesIn(strides3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_UPPER),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_UPPER),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -169,8 +169,8 @@ const auto maxPool_SameLowerPad_CeilRounding_5Dinput_Params = ::testing::Combine
         ::testing::ValuesIn(strides3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::op::RoundingType::CEIL),
-        ::testing::Values(ngraph::op::PadType::SAME_LOWER),
+        ::testing::Values(ov::op::RoundingType::CEIL),
+        ::testing::Values(ov::op::PadType::SAME_LOWER),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -193,8 +193,8 @@ const auto maxPool_ExplicitPad_CeilRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(strides),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::op::RoundingType::CEIL),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::RoundingType::CEIL),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -220,8 +220,8 @@ const auto avgPoolExplicitPadCeilRoundingParams = ::testing::Combine(
         ::testing::ValuesIn(strides),
         ::testing::ValuesIn(std::vector<std::vector<size_t>>({{0, 0}, {1, 1}, {0, 1}})),
         ::testing::ValuesIn(std::vector<std::vector<size_t>>({{0, 0}, {1, 1}, {0, 1}})),
-        ::testing::Values(ngraph::op::RoundingType::CEIL),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::RoundingType::CEIL),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::Values(true, false)
 );
 
@@ -238,9 +238,9 @@ INSTANTIATE_TEST_SUITE_P(smoke_AvgPool_ExplicitPad_CeilRounding, PoolingLayerTes
                         PoolingLayerTest::getTestCaseName);
 
 std::vector<poolSpecificParams> psParams({poolSpecificParams(ngraph::helpers::PoolingTypes::AVG, {2, 2}, {2, 2}, {0, 0}, {0, 0},
-                        ngraph::op::RoundingType::CEIL, ngraph::op::PadType::EXPLICIT, false),
+                        ov::op::RoundingType::CEIL, ov::op::PadType::EXPLICIT, false),
     poolSpecificParams(ngraph::helpers::PoolingTypes::AVG, {7, 7}, {1, 1}, {0, 0}, {1, 1},
-                        ngraph::op::RoundingType::CEIL, ngraph::op::PadType::EXPLICIT, false)});
+                        ov::op::RoundingType::CEIL, ov::op::PadType::EXPLICIT, false)});
 
 INSTANTIATE_TEST_SUITE_P(smoke_AvgPool_ExplicitPad_CeilRounding_corner, PoolingLayerTest,
                         ::testing::Combine(
@@ -261,8 +261,8 @@ const auto avgPoolExplicitPadFloorRoundingParams = ::testing::Combine(
         ::testing::ValuesIn(strides),
         ::testing::ValuesIn(std::vector<std::vector<size_t>>({{0, 0}, {1, 1}})),
         ::testing::ValuesIn(std::vector<std::vector<size_t>>({{0, 0}, {1, 1}})),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::Values(true, false)
 );
 
@@ -286,8 +286,8 @@ const auto avgPool_ExplicitPad_FloorRounding_5Dinput_Params = ::testing::Combine
         ::testing::ValuesIn(strides3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::EXPLICIT),
         ::testing::Values(true, false)
 );
 
@@ -310,8 +310,8 @@ const auto avgPool_SameUpperPad_FloorRounding_5Dinput_Params = ::testing::Combin
         ::testing::ValuesIn(strides3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_UPPER),
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_UPPER),
         ::testing::Values(true)
 );
 
@@ -334,8 +334,8 @@ const auto avgPool_SameLowerPad_CeilRounding_5Dinput_Params = ::testing::Combine
         ::testing::ValuesIn(strides3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::op::RoundingType::CEIL),
-        ::testing::Values(ngraph::op::PadType::SAME_LOWER),
+        ::testing::Values(ov::op::RoundingType::CEIL),
+        ::testing::Values(ov::op::PadType::SAME_LOWER),
         ::testing::Values(true)
 );
 
@@ -363,10 +363,10 @@ const auto maxPoolv8_ExplicitPad_FloorRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(dilation),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT)
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::EXPLICIT)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolV8_ExplicitPad_FloorRounding, MaxPoolingV8LayerTest,
@@ -388,10 +388,10 @@ const auto maxPoolv8_SameUpperPad_FloorRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(dilation),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_UPPER)
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_UPPER)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolv8_SameUpperPad_FloorRounding, MaxPoolingV8LayerTest,
@@ -413,10 +413,10 @@ const auto maxPoolv8_SameLowerPad_FloorRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(dilation),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_LOWER)
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_LOWER)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolv8_SameLowerPad_FloorRounding, MaxPoolingV8LayerTest,
@@ -438,10 +438,10 @@ const auto maxPoolv8_ExplicitPad_FloorRounding_5Dinput_Params = ::testing::Combi
         ::testing::Values(dilation3D[0]),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT)
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::EXPLICIT)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolv8_ExplicitPad_FloorRounding_5Dinput, MaxPoolingV8LayerTest,
@@ -463,10 +463,10 @@ const auto maxPoolv8_SameUpperPad_FloorRounding_5Dinput_Params = ::testing::Comb
         ::testing::ValuesIn(dilation3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),
-        ::testing::Values(ngraph::op::PadType::SAME_UPPER)
+        ::testing::Values(ov::op::RoundingType::FLOOR),
+        ::testing::Values(ov::op::PadType::SAME_UPPER)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolv8_SameUpperPad_FloorRounding_5Dinput, MaxPoolingV8LayerTest,
@@ -488,10 +488,10 @@ const auto maxPoolv8_SameLowerPad_CeilRounding_5Dinput_Params = ::testing::Combi
         ::testing::ValuesIn(dilation3D),
         ::testing::ValuesIn(padBegins3D),
         ::testing::ValuesIn(padEnds3D),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::CEIL),
-        ::testing::Values(ngraph::op::PadType::SAME_LOWER)
+        ::testing::Values(ov::op::RoundingType::CEIL),
+        ::testing::Values(ov::op::PadType::SAME_LOWER)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolv8_SameLowerPad_CeilRounding_5Dinput, MaxPoolingV8LayerTest,
@@ -513,10 +513,10 @@ const auto maxPoolv8_ExplicitPad_CeilRounding_Params = ::testing::Combine(
         ::testing::ValuesIn(dilation),
         ::testing::ValuesIn(padBegins),
         ::testing::ValuesIn(padEnds),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::CEIL),
-        ::testing::Values(ngraph::op::PadType::EXPLICIT)
+        ::testing::Values(ov::op::RoundingType::CEIL),
+        ::testing::Values(ov::op::PadType::EXPLICIT)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MaxPoolv8_ExplicitPad_CeilRounding, MaxPoolingV8LayerTest,
@@ -540,8 +540,8 @@ const auto allPools_ValidPad_Params = ::testing::Combine(
         ::testing::Values(std::vector<size_t>({0, 0})),
         ::testing::Values(std::vector<size_t>({0, 0})),
         ::testing::Values(
-                ngraph::op::RoundingType::FLOOR),  // placeholder value - Rounding Type not applicable for Valid pad type
-        ::testing::Values(ngraph::op::PadType::VALID),
+                ov::op::RoundingType::FLOOR),  // placeholder value - Rounding Type not applicable for Valid pad type
+        ::testing::Values(ov::op::PadType::VALID),
         ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
 
@@ -563,10 +563,10 @@ const auto maxPoolv8_ValidPad_Params = ::testing::Combine(
         ::testing::ValuesIn(dilation),
         ::testing::Values(std::vector<size_t>({0, 0})),
         ::testing::Values(std::vector<size_t>({0, 0})),
-        ::testing::Values(ngraph::element::Type_t::i32),
+        ::testing::Values(ov::element::Type_t::i32),
         ::testing::Values(0),
-        ::testing::Values(ngraph::op::RoundingType::FLOOR),  // placeholder value - Rounding Type not applicable for Valid pad type
-        ::testing::Values(ngraph::op::PadType::VALID)
+        ::testing::Values(ov::op::RoundingType::FLOOR),  // placeholder value - Rounding Type not applicable for Valid pad type
+        ::testing::Values(ov::op::PadType::VALID)
 );
 
 INSTANTIATE_TEST_SUITE_P(smoke_MAXPoolv8_ValidPad, MaxPoolingV8LayerTest,

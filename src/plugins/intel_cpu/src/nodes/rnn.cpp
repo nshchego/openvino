@@ -280,7 +280,7 @@ bool RNN::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::s
     return true;
 }
 
-bool RNN::isCell(const std::shared_ptr<const ngraph::Node>& op) {
+bool RNN::isCell(const std::shared_ptr<const ov::Node>& op) {
     return one_of(op->get_type_info(),
             ov::op::v0::RNNCell::get_type_info_static(),
             ov::op::v3::GRUCell::get_type_info_static(),
@@ -289,7 +289,7 @@ bool RNN::isCell(const std::shared_ptr<const ngraph::Node>& op) {
             ov::op::v4::LSTMCell::get_type_info_static());
 }
 
-bool RNN::testNativeOrder(const std::shared_ptr<const ngraph::Node>& op) {
+bool RNN::testNativeOrder(const std::shared_ptr<const ov::Node>& op) {
     if (isCell(op)) {
         return true;
     }
@@ -308,7 +308,7 @@ namespace {
  */
 class RnnShapeInfer : public NgraphShapeInfer {
 public:
-    RnnShapeInfer(std::shared_ptr<ov::Node> op) :
+    RnnShapeInfer(const std::shared_ptr<ov::Node>& op) :
         NgraphShapeInfer(make_shape_inference(op), EMPTY_PORT_MASK) {
             is_sequence = !(RNN::isCell(op));
 
@@ -338,7 +338,7 @@ private:
 };
 class RnnShapeInferFactory final : public ShapeInferFactory {
 public:
-    RnnShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    RnnShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         return std::make_shared<RnnShapeInfer>(m_op);
     }
@@ -348,7 +348,7 @@ private:
 
 } // namespace
 
-RNN::RNN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context) :
+RNN::RNN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, RnnShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

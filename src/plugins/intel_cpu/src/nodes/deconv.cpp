@@ -120,7 +120,7 @@ bool DeconvKey::operator==(const DeconvKey &rhs) const {
  */
 class DeconfolutionShapeInferFactory : public ShapeInferFactory {
 public:
-    DeconfolutionShapeInferFactory(std::shared_ptr<ngraph::Node> op) : m_op(op) {}
+    DeconfolutionShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         if (m_op->get_input_size() > 2) {
             return std::make_shared<NgraphShapeInfer>(make_shape_inference(m_op), PortMask(2));
@@ -128,11 +128,11 @@ public:
         return std::make_shared<NgraphShapeInfer>(make_shape_inference(m_op), EMPTY_PORT_MASK);
     }
 private:
-    std::shared_ptr<ngraph::Node> m_op;
+    std::shared_ptr<ov::Node> m_op;
 };
 } // namespace
 
-bool Deconvolution::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Deconvolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (std::dynamic_pointer_cast<const ngraph::opset1::ConvolutionBackpropData>(op) == nullptr &&
                 std::dynamic_pointer_cast<const ngraph::opset1::GroupConvolutionBackpropData>(op) == nullptr) {
@@ -154,12 +154,10 @@ bool Deconvolution::isSupportedOperation(const std::shared_ptr<const ngraph::Nod
     return true;
 }
 
-Deconvolution::Deconvolution(const std::shared_ptr<ngraph::Node>& op,
-                             const GraphContext::CPtr context) : Node(op, context, DeconfolutionShapeInferFactory(op)) {
+Deconvolution::Deconvolution(const std::shared_ptr<ov::Node>& op,
+                             const GraphContext::CPtr& context) : Node(op, context, DeconfolutionShapeInferFactory(op)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "Deconvolution node with name '" + getName() + "'";
-
         auto convBackprop = std::dynamic_pointer_cast<const ngraph::opset1::ConvolutionBackpropData>(op);
         auto groupConvBackprop = std::dynamic_pointer_cast<const ngraph::opset1::GroupConvolutionBackpropData>(op);
         const auto& weightDims = getWeightDims();
@@ -399,7 +397,7 @@ void Deconvolution::getSupportedDescriptors() {
     //ONEDNN convolution_data_bwd_t can't support bias fusing.
     //Current only int8 precision choose deconvolution_fwd_t.
     if (withBiases && !isInt8) {
-        IE_THROW() << errorPrefix << " supports bias fusing only for int8 execution precision";
+        THROW_CPU_NODE_ERR << " supports bias fusing only for int8 execution precision";
     }
 
     InferenceEngine::Precision inPrecision = getOriginalInputPrecisionAtPort(0);
@@ -424,10 +422,10 @@ void Deconvolution::getSupportedDescriptors() {
         outputDataType = DnnlExtensionUtils::IEPrecisionToDataType(fusedWith[fusedWith.size() - 1]->getOriginalOutputPrecisionAtPort(0));
     }
     if (getParentEdges().size() != (withBiases ? (biasPort + 1) : biasPort)) {
-        IE_THROW() << errorPrefix << " has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges";
     }
     if (getChildEdges().empty()) {
-        IE_THROW() << errorPrefix << " has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of output edges";
     }
     VectorDims inDims, outDims;
     std::tie(inDims, outDims) = makeDummyInOutShape();

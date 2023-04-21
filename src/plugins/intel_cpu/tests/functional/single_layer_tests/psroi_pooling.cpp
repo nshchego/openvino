@@ -46,7 +46,7 @@ typedef std::tuple<
 class PSROIPoolingLayerCPUTest : public testing::WithParamInterface<PSROIPoolingLayerCPUTestParamsSet>,
                              virtual public LayerTestsUtils::LayerTestsCommon, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<PSROIPoolingLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<PSROIPoolingLayerCPUTestParamsSet> &obj) {
         CPULayerTestsDefinitions::PSROIPoolingLayerTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -84,19 +84,19 @@ protected:
                  spatialScale, spatialBinsX, spatialBinsY, mode) = psroiPoolingParams;
 
 
-        ngraph::Shape proposalShape = { proposal.size() / 5, 5 };
+        ov::Shape proposalShape = { proposal.size() / 5, 5 };
 
-        auto coords = ngraph::builder::makeConstant<float>(ngraph::element::f32, proposalShape, proposal);
-        auto params = ngraph::builder::makeParams(ngraph::element::f32, {featureMapShape});
+        auto coords = ngraph::builder::makeConstant<float>(ov::element::f32, proposalShape, proposal);
+        auto params = ngraph::builder::makeParams(ov::element::f32, {featureMapShape});
 
-        auto psroi = std::make_shared<ngraph::op::v0::PSROIPooling>(params[0], coords, outputDim, groupSize,
+        auto psroi = std::make_shared<ov::op::v0::PSROIPooling>(params[0], coords, outputDim, groupSize,
                                                        spatialScale, spatialBinsX, spatialBinsY, mode);
         psroi->get_rt_info() = getCPUInfo();
         selectedType = getPrimitiveType() + "_" + inPrc.name();
 
         threshold = 1e-2f;
-        const ngraph::ResultVector results{std::make_shared<ngraph::opset3::Result>(psroi)};
-        function = std::make_shared<ngraph::Function>(results, params, "PSROIPooling");
+        const ov::ResultVector results{std::make_shared<ngraph::opset3::Result>(psroi)};
+        function = std::make_shared<ov::Model>(results, params, "PSROIPooling");
     }
 };
 

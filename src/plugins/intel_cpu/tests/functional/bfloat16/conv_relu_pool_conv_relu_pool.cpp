@@ -27,7 +27,7 @@ namespace LayerTestsDefinitions {
 
 class ConvReLUPoolConvReLUPool : public BasicBF16Test  {
 protected:
-    std::shared_ptr<ngraph::Function> createGraph(InferenceEngine::Precision netPrecision) override {
+    std::shared_ptr<ov::Model> createGraph(InferenceEngine::Precision netPrecision) override {
         //    Convolution1  (FP32)
         //        |
         //       ReLU1      (Fused)
@@ -45,35 +45,35 @@ protected:
 
         // STAGE1: construction of the GRAPH
 
-        ngraph::element::Type ntype = (netPrecision == Precision::FP32) ? ngraph::element::f32 : ngraph::element::bf16;
+        ov::element::Type ntype = (netPrecision == Precision::FP32) ? ov::element::f32 : ov::element::bf16;
         auto channelsCount = inputShapes[1];
 
         // multiply
-        auto input1 = std::make_shared<opset1::Parameter>(ntype, ngraph::Shape{inputShapes});
+        auto input1 = std::make_shared<opset1::Parameter>(ntype, ov::Shape{inputShapes});
         input1->set_friendly_name("Input_1");
 
         // convolution1
-        std::shared_ptr<ngraph::opset1::Constant> weightsNode = nullptr;
-        ngraph::Shape convFilterShape = { channelsCount, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
+        std::shared_ptr<ov::op::v0::Constant> weightsNode = nullptr;
+        ov::Shape convFilterShape = { channelsCount, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
         if (netPrecision == Precision::FP32) {
             std::vector<float> weightValuesFP32;
             weightValuesFP32.resize(channelsCount * channelsCount * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesFP32.data(), weightValuesFP32.size());
-            weightsNode = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape, weightValuesFP32);
+            weightsNode = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape, weightValuesFP32);
         } else {
             std::vector<short> weightValuesBF16;
             weightValuesBF16.resize(channelsCount * channelsCount * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesBF16.data(), weightValuesBF16.size());
-            weightsNode = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape, weightValuesBF16.data());
+            weightsNode = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape, weightValuesBF16.data());
         }
 
-        std::shared_ptr<ngraph::Node> convNode = std::make_shared<ngraph::opset1::Convolution>(
+        std::shared_ptr<ov::Node> convNode = std::make_shared<ov::op::v1::Convolution>(
             input1, weightsNode,
             ngraph::Strides({ 1, 1 }),   // strides
             ngraph::CoordinateDiff({ 0, 0 }),  // pad begin
             ngraph::CoordinateDiff({ 0, 0 }),   // pad end
             ngraph::Strides({ 1, 1 }),        // dilation
-            ngraph::op::PadType::EXPLICIT);   // pad type
+            ov::op::PadType::EXPLICIT);   // pad type
         convNode->set_friendly_name("Convolution_1");
 
         // ReLU
@@ -91,27 +91,27 @@ protected:
         avgpoolNode->set_friendly_name("AvgPool_1");
 
         // convolution2
-        std::shared_ptr<ngraph::opset1::Constant> weightsNode2 = nullptr;
-        ngraph::Shape convFilterShape2 = { channelsCount, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
+        std::shared_ptr<ov::op::v0::Constant> weightsNode2 = nullptr;
+        ov::Shape convFilterShape2 = { channelsCount, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
         if (netPrecision == Precision::FP32) {
             std::vector<float> weightValuesFP32;
             weightValuesFP32.resize(channelsCount * channelsCount * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesFP32.data(), weightValuesFP32.size());
-            weightsNode2 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape2, weightValuesFP32);
+            weightsNode2 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape2, weightValuesFP32);
         } else {
             std::vector<short> weightValuesBF16;
             weightValuesBF16.resize(channelsCount * channelsCount * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesBF16.data(), weightValuesBF16.size());
-            weightsNode2 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape2, weightValuesBF16.data());
+            weightsNode2 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape2, weightValuesBF16.data());
         }
 
-        std::shared_ptr<ngraph::Node> convNode2 = std::make_shared<ngraph::opset1::Convolution>(
+        std::shared_ptr<ov::Node> convNode2 = std::make_shared<ov::op::v1::Convolution>(
             avgpoolNode, weightsNode2,
             ngraph::Strides({ 1, 1 }),   // strides
             ngraph::CoordinateDiff({ 0, 0 }),  // pad begin
             ngraph::CoordinateDiff({ 0, 0 }),   // pad end
             ngraph::Strides({ 1, 1 }),        // dilation
-            ngraph::op::PadType::EXPLICIT);   // pad type
+            ov::op::PadType::EXPLICIT);   // pad type
         convNode2->set_friendly_name("Convolution_2");
 
         // ReLU
@@ -128,30 +128,30 @@ protected:
         maxpoolNode2->set_friendly_name("MaxPool_2");
 
         // convolution3
-        std::shared_ptr<ngraph::opset1::Constant> weightsNode3 = nullptr;
-        ngraph::Shape convFilterShape3 = { channelsCount, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
+        std::shared_ptr<ov::op::v0::Constant> weightsNode3 = nullptr;
+        ov::Shape convFilterShape3 = { channelsCount, channelsCount, 3, 3 };  // out channel, /input channels, kernel h, kernel w
         if (netPrecision == Precision::FP32) {
             std::vector<float> weightValuesFP32;
             weightValuesFP32.resize(channelsCount * channelsCount * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesFP32.data(), weightValuesFP32.size());
-            weightsNode3 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape3, weightValuesFP32);
+            weightsNode3 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape3, weightValuesFP32);
         } else {
             std::vector<short> weightValuesBF16;
             weightValuesBF16.resize(channelsCount * channelsCount * 3 * 3);
             FuncTestUtils::fillInputsBySinValues(weightValuesBF16.data(), weightValuesBF16.size());
-            weightsNode3 = std::make_shared<ngraph::opset1::Constant>(ntype, convFilterShape3, weightValuesBF16.data());
+            weightsNode3 = std::make_shared<ov::op::v0::Constant>(ntype, convFilterShape3, weightValuesBF16.data());
         }
 
-        std::shared_ptr<ngraph::Node> convNode3 = std::make_shared<ngraph::opset1::Convolution>(
+        std::shared_ptr<ov::Node> convNode3 = std::make_shared<ov::op::v1::Convolution>(
             maxpoolNode2, weightsNode3,
             ngraph::Strides({ 1, 1 }),   // strides
             ngraph::CoordinateDiff({ 0, 0 }),  // pad begin
             ngraph::CoordinateDiff({ 0, 0 }),   // pad end
             ngraph::Strides({ 1, 1 }),        // dilation
-            ngraph::op::PadType::EXPLICIT);   // pad type
+            ov::op::PadType::EXPLICIT);   // pad type
         convNode3->set_friendly_name("Convolution_3");
 
-        return std::make_shared<ngraph::Function>(ngraph::NodeVector{convNode3}, ngraph::ParameterVector{input1});
+        return std::make_shared<ov::Model>(ov::NodeVector{convNode3}, ov::ParameterVector{input1});
     }
     void SetUp() override {
         std::tie(inputPrecision, netPrecision, inputShapes, newInputShapes, targetDevice) = this->GetParam();

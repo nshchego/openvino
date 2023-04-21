@@ -41,7 +41,7 @@ public:
 };
 } // namespace
 
-bool ShapeOf::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ShapeOf::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!one_of(op->get_type_info(),
                     ngraph::op::v0::ShapeOf::get_type_info_static(),
@@ -55,13 +55,12 @@ bool ShapeOf::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op
     return true;
 }
 
-ShapeOf::ShapeOf(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ShapeOf::ShapeOf(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, ShapeOfShapeInferFactory()) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "ShapeOf layer with name '" + getName() + "' ";
         if (op->get_input_partial_shape(0).size() == 0)
-            IE_THROW() << errorPrefix << "gets unsupported input 0D tensor (scalar)";
+            THROW_CPU_NODE_ERR << "gets unsupported input 0D tensor (scalar)";
     } else {
         IE_THROW(NotImplemented) << errorMessage;
     }
@@ -71,9 +70,9 @@ void ShapeOf::getSupportedDescriptors() {
     if (!descs.empty())
         return;
     if (getParentEdges().size() != 1)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 }
 
 void ShapeOf::initSupportedPrimitiveDescriptors() {
@@ -100,7 +99,7 @@ void ShapeOf::execute(dnnl::stream strm) {
     auto inDims = inPtr->getStaticDims();
     size_t dimsCount = inDims.size();
     if (outPtr->getStaticDims().size() != 1 || dimsCount != outPtr->getStaticDims()[0])
-        IE_THROW() << errorPrefix << "has inconsistent input shape and output size";
+        THROW_CPU_NODE_ERR << "has inconsistent input shape and output size";
 
     auto *dst = reinterpret_cast<int *>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());
 

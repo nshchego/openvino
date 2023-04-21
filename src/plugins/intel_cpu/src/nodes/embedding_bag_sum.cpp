@@ -18,7 +18,7 @@ namespace intel_cpu {
 namespace node {
 
 EmbeddingBagSum::EmbeddingBagSum(
-            const std::shared_ptr<ngraph::Node>& op,
+            const std::shared_ptr<ov::Node>& op,
             size_t requiredInputNum,
             size_t indicesIdx,
             size_t perSampleWeightsIdx,

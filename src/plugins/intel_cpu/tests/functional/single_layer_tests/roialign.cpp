@@ -39,7 +39,7 @@ using ROIAlignLayerCPUTestParamsSet = std::tuple<
 class ROIAlignLayerCPUTest : public testing::WithParamInterface<ROIAlignLayerCPUTestParamsSet>,
                              public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ROIAlignLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ROIAlignLayerCPUTestParamsSet> &obj) {
         CPULayerTestsDefinitions::ROIAlignLayerTestParams basicParamsSet;
         CPUSpecificParams cpuParams;
         std::tie(basicParamsSet, cpuParams) = obj.param;
@@ -82,7 +82,7 @@ public:
         return result.str();
     }
 protected:
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
 
@@ -148,7 +148,7 @@ protected:
         init_input_shapes(inputShapes);
 
         auto float_params = ngraph::builder::makeDynamicParams(inputPrecision, { inputDynamicShapes[0], inputDynamicShapes[1] });
-        auto int_params = ngraph::builder::makeDynamicParams(ngraph::element::i32, { inputDynamicShapes[2] });
+        auto int_params = ngraph::builder::makeDynamicParams(ov::element::i32, { inputDynamicShapes[2] });
         auto pooling_mode = ngraph::EnumNames<ngraph::opset9::ROIAlign::PoolingMode>::as_enum(mode);
         auto aligned_mode = ngraph::EnumNames<ngraph::opset9::ROIAlign::AlignedMode>::as_enum(alignedMode);
 
@@ -160,7 +160,7 @@ protected:
             rel_threshold = 1e-2;
         }
 
-        ngraph::ParameterVector params{ float_params[0], float_params[1], int_params[0] };
+        ov::ParameterVector params{ float_params[0], float_params[1], int_params[0] };
         function = makeNgraphFunction(inputPrecision, params, roialign, "ROIAlign");
     }
 };

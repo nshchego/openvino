@@ -27,7 +27,7 @@ namespace LayerTestsDefinitions {
 
 class Gather_multiply : public BasicBF16Test  {
 protected:
-    std::shared_ptr<ngraph::Function> createGraph(InferenceEngine::Precision netPrecision) override {
+    std::shared_ptr<ov::Model> createGraph(InferenceEngine::Precision netPrecision) override {
 //                   Add (FP32)
 //                    |
 //                  FC (BF16)
@@ -38,14 +38,14 @@ protected:
 //                   Mul(FP32)
 
         // STAGE1: construction of the GRAPH
-        ngraph::element::Type ntype = (netPrecision == Precision::FP32) ? ngraph::element::f32 : ngraph::element::bf16;
+        ov::element::Type ntype = (netPrecision == Precision::FP32) ? ov::element::f32 : ov::element::bf16;
         auto inputSize = inputShapes[1];
 
         // add
-        auto input1 = std::make_shared<opset1::Parameter>(ntype, ngraph::Shape{inputShapes});
+        auto input1 = std::make_shared<opset1::Parameter>(ntype, ov::Shape{inputShapes});
 
         input1->set_friendly_name("Input_1");
-        std::shared_ptr<ngraph::opset1::Constant> addConst = nullptr;
+        std::shared_ptr<ov::op::v0::Constant> addConst = nullptr;
         if (netPrecision == Precision::FP32) {
             addConst = opset1::Constant::create(ntype, Shape{1}, { 2.0f });
         } else {
@@ -55,7 +55,7 @@ protected:
         addNode0->set_friendly_name("Add_1");
 
         // matmul
-        std::shared_ptr<ngraph::opset1::Constant> matmulConst0 = nullptr;
+        std::shared_ptr<ov::op::v0::Constant> matmulConst0 = nullptr;
         if (netPrecision == Precision::FP32) {
             matmulConst0 = opset1::Constant::create(ntype, Shape{inputSize, inputSize}, { 2.0f });
         } else {
@@ -66,17 +66,17 @@ protected:
         matmulNode->set_friendly_name("Matmul_0");
 
         // gather
-        auto axesConst = opset1::Constant::create(ngraph::element::i64, Shape{1}, { 1 });
+        auto axesConst = opset1::Constant::create(ov::element::i64, Shape{1}, { 1 });
         std::vector<size_t> gatherArray;
         for (size_t i = 0; i < inputSize; i++) {
             gatherArray.push_back(i);
         }
-        auto indexesConst = opset1::Constant::create(ngraph::element::i64, Shape{inputSize}, gatherArray);
+        auto indexesConst = opset1::Constant::create(ov::element::i64, Shape{inputSize}, gatherArray);
         auto gatherNode = std::make_shared<opset1::Gather>(matmulNode, indexesConst, axesConst);
         gatherNode->set_friendly_name("Gather_1");
 
         // multiply
-        std::shared_ptr<ngraph::opset1::Constant> mulConst = nullptr;
+        std::shared_ptr<ov::op::v0::Constant> mulConst = nullptr;
         if (netPrecision == Precision::FP32) {
             mulConst = opset1::Constant::create(ntype, Shape{inputShapes}, { 2.0f });
         } else {
@@ -86,7 +86,7 @@ protected:
         auto mulNode = std::make_shared<opset1::Multiply>(gatherNode, mulConst);
         mulNode->set_friendly_name("Mul_1");
 
-        return std::make_shared<ngraph::Function>(mulNode, ngraph::ParameterVector{input1});
+        return std::make_shared<ov::Model>(mulNode, ov::ParameterVector{input1});
     }
     void SetUp() override {
         std::tie(inputPrecision, netPrecision, inputShapes, newInputShapes, targetDevice) = this->GetParam();

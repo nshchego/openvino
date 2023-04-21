@@ -37,7 +37,7 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
 
         auto last_node = data_node;
 
-        ngraph::NodeVector new_ops;
+        ov::NodeVector new_ops;
 
         // In case if input_shape and output_shape differ we insert Reshape to align shapes
         if (input_shape.size() != dims_count) {

@@ -28,7 +28,7 @@ using PadLayerCPUTestParamSet = std::tuple<
 class PadLayerCPUTest : public testing::WithParamInterface<PadLayerCPUTestParamSet>,
                         virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<PadLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<PadLayerCPUTestParamSet> &obj) {
         InputShape shapes;
         ngraph::helpers::InputLayerType secondaryInputType;
         ElementType elementType;
@@ -58,7 +58,7 @@ public:
     }
 
 protected:
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         std::vector<void*> inputValues = {padsBegin.data(), padsEnd.data(), &padValue};
 
         inputs.clear();
@@ -95,18 +95,18 @@ protected:
             targetShapes.push_back({});
         }
         auto params = ngraph::builder::makeDynamicParams(dataType, inputDynamicShapes);
-        std::shared_ptr<ngraph::Node> pad;
+        std::shared_ptr<ov::Node> pad;
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             ov::Shape inShape = {padsBegin.size()};
 
             auto beginNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
             auto endNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
             std::shared_ptr<ngraph::opset1::Parameter> valueNode = nullptr;
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(beginNode));
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(endNode));
+            params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(beginNode));
+            params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(endNode));
             if (padMode == ngraph::helpers::PadMode::CONSTANT) {
                 valueNode = std::make_shared<ngraph::opset1::Parameter>(dataType, ov::Shape{});
-                params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(valueNode));
+                params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(valueNode));
                 params.back()->set_friendly_name("pad_value");
             }
             pad = ngraph::builder::makePad(params[0], beginNode, endNode, valueNode, padMode);

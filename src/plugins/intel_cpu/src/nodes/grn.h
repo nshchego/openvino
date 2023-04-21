@@ -13,7 +13,7 @@ namespace node {
 
 class GRN : public Node {
 public:
-    GRN(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    GRN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -23,7 +23,7 @@ public:
     void prepareParams() override;
     void executeDynamicImpl(dnnl::stream strm) override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
     float bias = 1.0f;
@@ -31,8 +31,6 @@ private:
     int C = 1;
     int H = 1;
     int W = 1;
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

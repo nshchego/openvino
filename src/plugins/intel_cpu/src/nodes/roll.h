@@ -14,7 +14,7 @@ namespace node {
 
 class Roll : public Node {
 public:
-    Roll(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Roll(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -24,7 +24,7 @@ public:
     void prepareParams() override;
     void executeDynamicImpl(dnnl::stream strm) override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
     struct RollExecutor {
@@ -45,8 +45,6 @@ private:
 
     using ExecutorPtr = std::shared_ptr<RollExecutor>;
     ExecutorPtr execPtr = nullptr;
-
-    std::string layerErrorPrefix;
 
     static constexpr std::array<size_t, 3> supportedPrecisionSizes{1, 2, 4};
     static constexpr size_t DATA_INDEX = 0ul;

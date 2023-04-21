@@ -1486,7 +1486,7 @@ using ngInterpCoordTransf = ngraph::opset4::Interpolate::CoordinateTransformMode
 using ngInterpNearMode = ngraph::opset4::Interpolate::NearestMode;
 using ngInterpShapeCalcMode = ngraph::opset4::Interpolate::ShapeCalcMode;
 
-bool Interpolate::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Interpolate::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto interp = std::dynamic_pointer_cast<const ngraph::opset4::Interpolate>(op);
         if (!interp) {
@@ -1556,7 +1556,7 @@ namespace {
  */
 class InterpolateShapeInferFactory : public ShapeInferFactory {
 public:
-    InterpolateShapeInferFactory(std::shared_ptr<ngraph::Node> op) : m_op(op) {}
+    InterpolateShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         IShapeInfer::port_mask_t port_mask = 0x00;
         auto interp = ov::as_type_ptr<ngraph::opset4::Interpolate>(m_op);
@@ -1576,23 +1576,21 @@ public:
         return std::make_shared<NgraphShapeInfer>(make_shape_inference(m_op), port_mask);
     }
 private:
-    std::shared_ptr<ngraph::Node> m_op;
+    std::shared_ptr<ov::Node> m_op;
 };
 } // namespace
 
-Interpolate::Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, InterpolateShapeInferFactory(op)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "Interpolate node with name '" + getName() + "'";
-
         const auto interp = std::dynamic_pointer_cast<const ngraph::opset4::Interpolate>(op);
 
         const auto numInputs = inputShapes.size();
         if (numInputs != 3 && numInputs != 4)
-            IE_THROW() << errorPrefix << " has incorrect number of input edges";
+            THROW_CPU_NODE_ERR << " has incorrect number of input edges";
         if (outputShapes.size() != 1)
-            IE_THROW() << errorPrefix << " has incorrect number of output edges";
+            THROW_CPU_NODE_ERR << " has incorrect number of output edges";
         isAxesSpecified = numInputs != 3;
 
         const auto &interpAttr = interp->get_attrs();
@@ -1612,7 +1610,7 @@ Interpolate::Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphCon
         } else if (interpMode == ngInterpMode::CUBIC) {
             interpAttrs.mode = InterpolateMode::cubic;
         } else {
-            IE_THROW() << errorPrefix << " has unsupported interpolate mode";
+            THROW_CPU_NODE_ERR << " has unsupported interpolate mode";
         }
 
         const auto &interpCoordTransMode = interpAttr.coordinate_transformation_mode;
@@ -1627,7 +1625,7 @@ Interpolate::Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphCon
         } else if (interpCoordTransMode == ngInterpCoordTransf::ALIGN_CORNERS) {
             interpAttrs.coordTransMode = InterpolateCoordTransMode::align_corners;
         } else {
-            IE_THROW() << errorPrefix << " has unsupported coordination transformation mode";
+            THROW_CPU_NODE_ERR << " has unsupported coordination transformation mode";
         }
 
         if (interpAttrs.mode == InterpolateMode::nearest) {
@@ -1643,7 +1641,7 @@ Interpolate::Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphCon
             } else if (interpNearestMode == ngInterpNearMode::SIMPLE) {
                 interpAttrs.nearestMode = InterpolateNearestMode::simple;
             } else {
-                IE_THROW() << errorPrefix << " has unsupported nearest mode";
+                THROW_CPU_NODE_ERR << " has unsupported nearest mode";
             }
         } else if (interpAttrs.mode == InterpolateMode::cubic) {
             interpAttrs.cubeCoeff = static_cast<float>(interpAttr.cube_coeff);
@@ -1656,7 +1654,7 @@ Interpolate::Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphCon
         } else if (interpShapeCalcMode == ngInterpShapeCalcMode::SIZES) {
             shapeCalcMode = InterpolateShapeCalcMode::sizes;
         } else {
-            IE_THROW() << errorPrefix << " has unsupported shape calculation mode";
+            THROW_CPU_NODE_ERR << " has unsupported shape calculation mode";
         }
 
         if (interpAttr.pads_begin.empty()) {
@@ -1697,9 +1695,9 @@ Interpolate::Interpolate(const std::shared_ptr<ngraph::Node>& op, const GraphCon
 void Interpolate::getSupportedDescriptors() {
     if (getParentEdges().size() != 3 && getParentEdges().size() != 4)
         // data, target_shape, scale, axis(optional).
-        IE_THROW() << errorPrefix << " has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges";
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << " has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of output edges";
 
     int dataRank = getInputShapeAtPort(DATA_ID).getRank();
 
@@ -1900,19 +1898,19 @@ void Interpolate::prepareParams() {
     if (getParentEdges().size() > 3) {
         auto &axesMemPtr = getParentEdgeAt(AXES_ID)->getMemoryPtr();
         if (!axesMemPtr || !axesMemPtr->isAllocated())
-            IE_THROW() << errorPrefix << " did not allocate axes memory";
+            THROW_CPU_NODE_ERR << " did not allocate axes memory";
     }
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate destination memory";
+        THROW_CPU_NODE_ERR << " did not allocate destination memory";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate input memory";
+        THROW_CPU_NODE_ERR << " did not allocate input memory";
     if (!tsMemPtr || !tsMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate target shape memory";
+        THROW_CPU_NODE_ERR << " did not allocate target shape memory";
     if (!scaleMemPtr || !scaleMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate scales memory";
+        THROW_CPU_NODE_ERR << " did not allocate scales memory";
     const NodeDesc *selected_pd = getSelectedPrimitiveDescriptor();
     if (selected_pd == nullptr)
-        IE_THROW() << errorPrefix << " did not set preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << " did not set preferable primitive descriptor";
 
     const auto &srcDims = srcMemPtr->getStaticDims();
     const auto &dstDims = dstMemPtr->getStaticDims();
@@ -1979,9 +1977,9 @@ void Interpolate::createPrimitive() {
     auto& srcMemPtr = getParentEdgeAt(DATA_ID)->getMemoryPtr();
     auto& dstMemPtr = getChildEdgesAtPort(0)[0]->getMemoryPtr();
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate input memory";
+        THROW_CPU_NODE_ERR << " did not allocate input memory";
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate destination memory";
+        THROW_CPU_NODE_ERR << " did not allocate destination memory";
 
     if (dstMemPtr->getDesc().hasLayoutType(LayoutType::ncsp)) {
         interpAttrs.layout = InterpolateLayoutType::planar;

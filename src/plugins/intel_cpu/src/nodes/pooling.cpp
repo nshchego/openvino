@@ -161,7 +161,7 @@ bool Pooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
     return true;
 }
 
-Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

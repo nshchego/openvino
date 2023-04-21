@@ -26,7 +26,7 @@ typedef std::tuple<
 class VariadicSplitLayerCPUTest : public testing::WithParamInterface<varSplitCPUTestParams>,
                                   virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<varSplitCPUTestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<varSplitCPUTestParams> &obj) {
         InputShape shapes;
         int64_t axis;
         LengthsPerInfer splitLengths;
@@ -92,10 +92,10 @@ protected:
         ov::ResultVector results;
         for (const auto& out : varSplit->outputs())
             results.push_back(std::make_shared<ov::opset10::Result>(out));
-        function = std::make_shared<ngraph::Function>(results, params, "VariadicSplitCPU");
+        function = std::make_shared<ov::Model>(results, params, "VariadicSplitCPU");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
 

@@ -37,7 +37,7 @@ typedef std::tuple<
 class StridedSliceLayerCPUTest : public testing::WithParamInterface<StridedSliceLayerCPUTestParamSet>,
                                  virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<StridedSliceLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<StridedSliceLayerCPUTestParamSet> &obj) {
         InputShape shapes;
         StridedSliceParams params;
         ngraph::helpers::InputLayerType secondaryInputType;
@@ -67,7 +67,7 @@ public:
     }
 
 protected:
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         std::vector<void*> inputValues = {ssParams.begin.data(), ssParams.end.data(), ssParams.strides.data()};
 
         inputs.clear();
@@ -104,7 +104,7 @@ protected:
         }
 
         auto params = ngraph::builder::makeDynamicParams(dataType, inputDynamicShapes);
-        std::shared_ptr<ngraph::Node> ss;
+        std::shared_ptr<ov::Node> ss;
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             ov::Shape inShape = {ssParams.begin.size()};
 
@@ -112,9 +112,9 @@ protected:
             auto endNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
             auto strideNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
 
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(beginNode));
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(endNode));
-            params.push_back(std::dynamic_pointer_cast<ngraph::opset3::Parameter>(strideNode));
+            params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(beginNode));
+            params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(endNode));
+            params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(strideNode));
 
             ss = ngraph::builder::makeStridedSlice(params[0], beginNode, endNode, strideNode, inType, ssParams.beginMask,
                                                    ssParams.endMask, ssParams.newAxisMask, ssParams.shrinkAxisMask, ssParams.ellipsisAxisMask);

@@ -272,7 +272,7 @@ void fill_output_blobs(const float* proposals, const int* roi_indices,
 }  // namespace
 
 bool ExperimentalDetectronGenerateProposalsSingleImage::isSupportedOperation
-            (const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+            (const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto proposalOp = ngraph::as_type_ptr<const ngraph::op::v6::ExperimentalDetectronGenerateProposalsSingleImage>(op);
         if (!proposalOp) {
@@ -286,8 +286,8 @@ bool ExperimentalDetectronGenerateProposalsSingleImage::isSupportedOperation
 }
 
 ExperimentalDetectronGenerateProposalsSingleImage::ExperimentalDetectronGenerateProposalsSingleImage(
-    const std::shared_ptr<ngraph::Node>& op,
-    const GraphContext::CPtr context)
+    const std::shared_ptr<ov::Node>& op,
+    const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

@@ -159,13 +159,12 @@ private:
     std::unordered_map<size_t, std::unique_ptr<jit_emitter>> emitters;
 };
 
-Interaction::Interaction(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Interaction::Interaction(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    errorPrefix = "Interaction node with name '" + getName() + "'";
     const auto interaction = std::dynamic_pointer_cast<const InteractionNode>(op);
     const std::vector<float>& scales = interaction->get_output_scales();
     if (!scales.empty()) {
@@ -357,7 +356,7 @@ bool Interaction::isExecutable() const {
     return true;
 }
 
-bool Interaction::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op,
+bool Interaction::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
         std::string& errorMessage) noexcept {
     try {
         const auto interaction = std::dynamic_pointer_cast<const InteractionNode>(op);

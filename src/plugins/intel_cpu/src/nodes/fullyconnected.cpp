@@ -124,18 +124,18 @@ private:
 
 class FCShapeInferFactory : public ShapeInferFactory {
 public:
-    FCShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
+    FCShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         return std::make_shared<FCShapeInfer>(m_op->get_output_partial_shape(0).rank().get_length());
     }
 
 private:
-    std::shared_ptr<const ngraph::Node> m_op;
+    std::shared_ptr<const ov::Node> m_op;
 };
 
 } // namespace
 
-bool FullyConnected::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool FullyConnected::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto fc = std::dynamic_pointer_cast<const FullyConnectedNode>(op);
         if (!fc) {
@@ -163,12 +163,10 @@ bool FullyConnected::isSupportedOperation(const std::shared_ptr<const ngraph::No
     return true;
 }
 
-FullyConnected::FullyConnected(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+FullyConnected::FullyConnected(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, FCShapeInferFactory(op)), withBiases(false) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "FullyConnected node with name '" + getName() + "'";
-
         withBiases = inputShapes.size() == 3;
 
         if (context->getConfig().fcSparseWeiDecompressionRate < 1.0f)
@@ -223,9 +221,9 @@ VectorDims FullyConnected::makeDummyOutputDims(const VectorDims& inDims) const {
 
 void FullyConnected::getSupportedDescriptors() {
     if (getParentEdges().size() != 2 && getParentEdges().size() != 3)
-        IE_THROW() << errorPrefix << " has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges";
     if (getChildEdges().empty())
-        IE_THROW()<< errorPrefix << " has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of output edges";
 
     useSparseWeights = useSparseWeightsDecompression();
 

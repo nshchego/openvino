@@ -24,7 +24,7 @@ std::string ConvConcatSubgraphTest::getTestCaseName(testing::TestParamInfo<convC
     SizeVector kernelSize, strides, dilation;
     std::vector<ptrdiff_t> padBegin, padEnd;
     size_t numOutChannels, numOfGroups;
-    ngraph::op::PadType paddingType;
+    ov::op::PadType paddingType;
     std::tie(kernelSize, strides, padBegin, padEnd, dilation, numOutChannels, paddingType, numOfGroups) = convParams;
 
     result << "IS=" << CommonTestUtils::vec2str(inputShapes) << "_";
@@ -57,42 +57,42 @@ void ConvConcatSubgraphTest::SetUp() {
     SizeVector kernelSize, strides, dilation;
     std::vector<ptrdiff_t> padBegin, padEnd;
     size_t numOutChannels, numOfGroups;
-    ngraph::op::PadType paddingType;
+    ov::op::PadType paddingType;
 
     std::tie(kernelSize, strides, padBegin, padEnd, dilation, numOutChannels, paddingType, numOfGroups) = convParams;
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
 
     selectedType += "_FP32";
 
-    auto inputParams = ngraph::builder::makeParams(ngraph::element::f32, {inputShapes, inputShapes});
-    auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(inputParams));
+    auto inputParams = ngraph::builder::makeParams(ov::element::f32, {inputShapes, inputShapes});
+    auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(inputParams));
 
-    std::vector<std::shared_ptr<ngraph::Node>> convolutionNodes(2);
+    std::vector<std::shared_ptr<ov::Node>> convolutionNodes(2);
     switch (type) {
         case nodeType::convolution : {
             for (size_t conv = 0; conv < convolutionNodes.size(); conv++) {
-                convolutionNodes[conv] = ngraph::builder::makeConvolution(paramOuts[conv], ngraph::element::f32, kernelSize, strides, padBegin,
+                convolutionNodes[conv] = ngraph::builder::makeConvolution(paramOuts[conv], ov::element::f32, kernelSize, strides, padBegin,
                                                                           padEnd, dilation, paddingType, numOutChannels);
             }
             break;
         }
         case nodeType::convolutionBackpropData : {
             for (size_t conv = 0; conv < convolutionNodes.size(); conv++) {
-                convolutionNodes[conv] = ngraph::builder::makeConvolutionBackpropData(paramOuts[conv], ngraph::element::f32, kernelSize, strides, padBegin,
+                convolutionNodes[conv] = ngraph::builder::makeConvolutionBackpropData(paramOuts[conv], ov::element::f32, kernelSize, strides, padBegin,
                                                                                       padEnd, dilation, paddingType, numOutChannels);
             }
             break;
         }
         case nodeType::groupConvolution : {
             for (size_t conv = 0; conv < convolutionNodes.size(); conv++) {
-                convolutionNodes[conv] = ngraph::builder::makeGroupConvolution(paramOuts[conv], ngraph::element::f32, kernelSize, strides, padBegin,
+                convolutionNodes[conv] = ngraph::builder::makeGroupConvolution(paramOuts[conv], ov::element::f32, kernelSize, strides, padBegin,
                                                                                            padEnd, dilation, paddingType, numOutChannels, numOfGroups);
             }
             break;
         }
         case nodeType::groupConvolutionBackpropData : {
             for (size_t conv = 0; conv < convolutionNodes.size(); conv++) {
-                convolutionNodes[conv] = ngraph::builder::makeGroupConvolutionBackpropData(paramOuts[conv], ngraph::element::f32, kernelSize, strides, padBegin,
+                convolutionNodes[conv] = ngraph::builder::makeGroupConvolutionBackpropData(paramOuts[conv], ov::element::f32, kernelSize, strides, padBegin,
                                                                                            padEnd, dilation, paddingType, numOutChannels, numOfGroups);
             }
             break;
@@ -105,10 +105,10 @@ void ConvConcatSubgraphTest::SetUp() {
         convolutionNodes[conv]->get_rt_info() = getCPUInfo();
     }
 
-    auto concat = ngraph::builder::makeConcat(ngraph::OutputVector{convolutionNodes[0], convolutionNodes[1]}, axis);
+    auto concat = ngraph::builder::makeConcat(ov::OutputVector{convolutionNodes[0], convolutionNodes[1]}, axis);
 
-    ngraph::ResultVector results{std::make_shared<ngraph::opset4::Result>(concat)};
-    function = std::make_shared<ngraph::Function>(results, inputParams, "convolutionConcat");
+    ov::ResultVector results{std::make_shared<ngraph::opset4::Result>(concat)};
+    function = std::make_shared<ov::Model>(results, inputParams, "convolutionConcat");
 }
 
 TEST_P(ConvConcatSubgraphTest, CompareWithRefs) {
@@ -118,7 +118,7 @@ TEST_P(ConvConcatSubgraphTest, CompareWithRefs) {
 };
 
 /* ============= Common Convolution Params ============= */
-const ngraph::op::PadType paddingType{ngraph::op::PadType::EXPLICIT};
+const ov::op::PadType paddingType{ov::op::PadType::EXPLICIT};
 const size_t numOutChannels{32};
 const int axis{1};
 

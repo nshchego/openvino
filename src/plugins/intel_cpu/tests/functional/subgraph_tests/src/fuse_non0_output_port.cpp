@@ -18,7 +18,7 @@ class FuseNon0OuputPort : public SubgraphBaseTest {
         const ov::Shape x_shape = {1, 10};
         const ov::Shape y_shape = {1};
         const ov::Shape z_shape = {1};
-        ngraph::ParameterVector params(3);
+        ov::ParameterVector params(3);
         targetStaticShapes = {{x_shape, y_shape, z_shape}};
         targetDevice = CommonTestUtils::DEVICE_CPU;
         params[0] = ngraph::builder::makeParams(ov::element::f32, {x_shape})[0];
@@ -27,14 +27,14 @@ class FuseNon0OuputPort : public SubgraphBaseTest {
 
         // make a sub function
         const auto cond = ov::opset8::Constant::create(ov::element::boolean, {1}, {true});
-        ngraph::ParameterVector sub_params(3);
+        ov::ParameterVector sub_params(3);
         sub_params[0] = ngraph::builder::makeParams(ov::element::f32, {x_shape})[0];
         sub_params[1] = ngraph::builder::makeParams(ov::element::i32, {y_shape})[0];
         sub_params[2] = ngraph::builder::makeParams(ov::element::boolean, {y_shape})[0];
-        ngraph::ResultVector sub_results(3);
-        sub_results[0] = std::make_shared<ngraph::opset1::Result>(sub_params[0]);
-        sub_results[1] = std::make_shared<ngraph::opset1::Result>(sub_params[1]);
-        sub_results[2] = std::make_shared<ngraph::opset1::Result>(sub_params[2]);
+        ov::ResultVector sub_results(3);
+        sub_results[0] = std::make_shared<ov::op::v0::Result>(sub_params[0]);
+        sub_results[1] = std::make_shared<ov::op::v0::Result>(sub_params[1]);
+        sub_results[2] = std::make_shared<ov::op::v0::Result>(sub_params[2]);
         const auto sub_model = std::make_shared<ov::Model>(sub_results, sub_params);
 
         // loop ops

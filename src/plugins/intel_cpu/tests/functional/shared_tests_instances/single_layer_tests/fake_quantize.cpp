@@ -11,13 +11,13 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 
-const ngraph::op::AutoBroadcastSpec numpyBroadcast = ngraph::op::AutoBroadcastType::NUMPY;
+const ov::op::AutoBroadcastSpec numpyBroadcast = ov::op::AutoBroadcastType::NUMPY;
 
-const ngraph::op::AutoBroadcastSpec noneBroadcast = ngraph::op::AutoBroadcastType::NONE;
+const ov::op::AutoBroadcastSpec noneBroadcast = ov::op::AutoBroadcastType::NONE;
 
-const std::vector<ngraph::op::AutoBroadcastSpec> broadcasts = {
-    {ngraph::op::AutoBroadcastType::NUMPY},
-    {ngraph::op::AutoBroadcastType::PDPD, -1},
+const std::vector<ov::op::AutoBroadcastSpec> broadcasts = {
+    {ov::op::AutoBroadcastType::NUMPY},
+    {ov::op::AutoBroadcastType::PDPD, -1},
 };
 
 const std::vector<InferenceEngine::Precision>

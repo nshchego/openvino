@@ -32,7 +32,7 @@ typedef std::tuple<
 class ReduceCPULayerTest : public testing::WithParamInterface<ReduceLayerCPUTestParamSet>,
                            virtual public SubgraphBaseTest, public CpuTestWithFusing {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ReduceLayerCPUTestParamSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ReduceLayerCPUTestParamSet> &obj) {
         basicReduceParams basicParams;
         CPUSpecificParams cpuParams;
         fusingSpecificParams fusingParams;
@@ -99,7 +99,7 @@ protected:
 
         auto params = ngraph::builder::makeDynamicParams(netPrecision, inputDynamicShapes);
         auto paramOuts = ngraph::helpers::convert2OutputVector(
-                ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+                ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
 
         std::vector<size_t> shapeAxes;
         switch (opType) {
@@ -113,8 +113,9 @@ protected:
             default:
                 FAIL() << "Reduce op doesn't support operation type: " << opType;
         }
-        auto reductionAxesNode = std::dynamic_pointer_cast<ngraph::Node>(
-                std::make_shared<ngraph::opset3::Constant>(ngraph::element::Type_t::i64, ngraph::Shape(shapeAxes), axes));
+
+        auto reductionAxesNode = std::dynamic_pointer_cast<ov::Node>(
+                std::make_shared<ov::op::v0::Constant>(ov::element::Type_t::i64, ov::Shape(shapeAxes), axes));
 
         const auto reduce = ngraph::builder::makeReduce(paramOuts[0], reductionAxesNode, keepDims, reductionType);
 
@@ -146,7 +147,7 @@ protected:
         function = makeNgraphFunction(netPrecision, params, reduce, "Reduce");
     }
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         for (int i = 0; i < funcInputs.size(); ++i) {

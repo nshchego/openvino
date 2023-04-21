@@ -24,7 +24,7 @@ typedef std::tuple<
 class UniqueLayerTestCPU : public testing::WithParamInterface<UniqueLayerTestCPUParams>,
                            virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<UniqueLayerTestCPUParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<UniqueLayerTestCPUParams> &obj) {
         std::vector<InputShape> inputShapes;
         std::tuple<bool, int> flatOrAxis;
         bool sorted;
@@ -119,19 +119,22 @@ protected:
             ov::runtime::Tensor tensor;
 
             if (funcInput.get_node()->get_friendly_name() == "data") {
-                if (targetInputStaticShapes[0] == ov::Shape{8}) {
-                    tensor = ov::Tensor{funcInput.get_element_type(), targetInputStaticShapes[0]};
-                    auto data = tensor.data<int32_t>();
-                    int idx = 0;
-                    for (auto val : {3, 4, 0, 2, 4, 4, 3, 3}) {
-                        data[idx++] = val;
-                    }
-                } else {
-                    int32_t range = std::accumulate(targetInputStaticShapes[0].begin(),
-                                                    targetInputStaticShapes[0].end(), 1, std::multiplies<size_t>());
-                    tensor = utils::create_and_fill_tensor(
-                            funcInput.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
-                }
+                int32_t range = std::accumulate(targetInputStaticShapes[0].begin(), targetInputStaticShapes[0].end(), 1, std::multiplies<size_t>());
+                tensor = utils::create_and_fill_tensor(
+                        funcInput.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
+//                if (targetInputStaticShapes[0] == ov::Shape{8}) {
+//                    tensor = ov::Tensor{funcInput.get_element_type(), targetInputStaticShapes[0]};
+//                    auto data = tensor.data<int32_t>();
+//                    int idx = 0;
+//                    for (auto val : {3, 4, 0, 2, 4, 4, 3, 3}) {
+//                        data[idx++] = val;
+//                    }
+//                } else {
+//                    int32_t range = std::accumulate(targetInputStaticShapes[0].begin(),
+//                                                    targetInputStaticShapes[0].end(), 1, std::multiplies<size_t>());
+//                    tensor = utils::create_and_fill_tensor(
+//                            funcInput.get_element_type(), targetInputStaticShapes[0], range, -range / 2, 1);
+//                }
             }
             inputs.insert({funcInput.get_node_shared_ptr(), tensor});
         }

@@ -18,7 +18,7 @@ namespace node {
 
 class MatMul : public Node {
 public:
-    MatMul(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    MatMul(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void createDescriptor(const std::vector<MemoryDescPtr>& inputDesc,
@@ -42,7 +42,7 @@ public:
     void execute(dnnl::stream strm) override;
     void executeDynamicImpl(dnnl::stream strm) override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     const std::vector<impl_desc_type>& getPrimitivesPriority() override;
 
 protected:
@@ -58,8 +58,6 @@ private:
     bool withBiases;
 
     void setPostOps(dnnl::primitive_attr &attr, const VectorDims& dims, bool initWeights);
-
-    std::string errorPrefix;
 
     /* whether to transpose input */
     std::array<bool, 2> transposeIn;

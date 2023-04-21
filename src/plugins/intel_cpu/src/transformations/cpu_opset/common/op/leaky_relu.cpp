@@ -5,14 +5,14 @@
 #include "leaky_relu.hpp"
 #include "transformations/itt.hpp"
 
-ov::intel_cpu::LeakyReluNode::LeakyReluNode(const ngraph::Output<ngraph::Node> &data,
+ov::intel_cpu::LeakyReluNode::LeakyReluNode(const ngraph::Output<ov::Node> &data,
                                            const float &negative_slope,
                                            const ngraph::element::Type output_type)
     : Op({data}), m_negative_slope(negative_slope), m_output_type(output_type) {
     validate_and_infer_types();
 }
 
-std::shared_ptr<ngraph::Node> ov::intel_cpu::LeakyReluNode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
+std::shared_ptr<ov::Node> ov::intel_cpu::LeakyReluNode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
     INTERNAL_OP_SCOPE(LeakyReluNode_clone_with_new_inputs);
     check_new_args_count(this, new_args);
     return std::make_shared<ov::intel_cpu::LeakyReluNode>(new_args.at(0), m_negative_slope, m_output_type);

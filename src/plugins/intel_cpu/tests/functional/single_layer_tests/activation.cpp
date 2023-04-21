@@ -60,7 +60,7 @@ public:
 
         return result.str();
     }
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         int32_t startFrom;
         uint32_t range;
         int32_t resolution;
@@ -116,7 +116,7 @@ protected:
         auto params = ngraph::builder::makeDynamicParams(ngPrc, {inputDynamicShapes.front()});
         auto activation = ngraph::builder::makeActivation(params[0], ngPrc, activationType, activationShapes, constantsValue);
         activation->get_rt_info() = getCPUInfo();
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{activation}, params, "Activation");
+        function = std::make_shared<ov::Model>(ov::NodeVector{activation}, params, "Activation");
     }
 
     InferenceEngine::Precision netPrecision;

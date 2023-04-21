@@ -9,11 +9,11 @@
 
 using namespace LayerTestsDefinitions;
 
-const std::vector<ngraph::Shape> inShapes_caffe_yolov2 = {
+const std::vector<ov::Shape> inShapes_caffe_yolov2 = {
     {1, 64, 26, 26},
 };
 
-const std::vector<ngraph::Shape> inShapes = {
+const std::vector<ov::Shape> inShapes = {
     {1, 4, 4, 4},
     {1, 8, 4, 4},
     {1, 9, 3, 3},

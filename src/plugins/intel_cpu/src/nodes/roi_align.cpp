@@ -649,7 +649,7 @@ private:
     }
 };
 #endif
-bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         auto roiAlign = ngraph::as_type_ptr<const ngraph::opset9::ROIAlign>(op);
         if (!roiAlign) {
@@ -674,12 +674,10 @@ bool ROIAlign::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& o
     return true;
 }
 
-ROIAlign::ROIAlign(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+ROIAlign::ROIAlign(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "ROIPooling layer with name '" + getName() + "' ";
-
         auto roiAlign = ngraph::as_type_ptr<const ngraph::opset9::ROIAlign>(op);
         pooledH = roiAlign->get_pooled_h();
         pooledW = roiAlign->get_pooled_w();
@@ -709,34 +707,34 @@ void ROIAlign::getSupportedDescriptors() {
         return;
 
     if (getParentEdges().size() != 3)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges: " << getParentEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getParentEdges().size();
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges: " << getChildEdges().size();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getChildEdges().size();
 
     if (getInputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
     }
 
     if (getInputShapeAtPort(1).getRank() != 2) {
-        IE_THROW() << errorPrefix << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
     }
 
     if (getInputShapeAtPort(2).getRank() != 1) {
-        IE_THROW() << errorPrefix << "doesn't support 2nd input with rank: " << getInputShapeAtPort(2).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 2nd input with rank: " << getInputShapeAtPort(2).getRank();
     }
 
     if (getOutputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
     }
 
     const auto& proposalsDims = getInputShapeAtPort(1).getDims();
     if (proposalsDims[1] != 4) {
-        IE_THROW() << errorPrefix << "has invalid shape on 1st input: [" << proposalsDims[0] << "," << proposalsDims[1] << "]";
+        THROW_CPU_NODE_ERR << "has invalid shape on 1st input: [" << proposalsDims[0] << "," << proposalsDims[1] << "]";
     }
 
     const auto& indexesDims = getInputShapeAtPort(2).getDims();
     if (!dimsEqualWeak(proposalsDims[0], indexesDims[0])) {
-        IE_THROW() << errorPrefix << "has different sizes of inputs for proposals ("
+        THROW_CPU_NODE_ERR << "has different sizes of inputs for proposals ("
                    << proposalsDims[0] << ") and indexes (" << indexesDims[0] << ")";
     }
 }
@@ -818,9 +816,9 @@ void ROIAlign::createPrimitive() {
     auto& srcMemPtr = getParentEdgeAt(0)->getMemoryPtr();
     auto& dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate input memory";
+        THROW_CPU_NODE_ERR << " did not allocate input memory";
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate destination memory";
+        THROW_CPU_NODE_ERR << " did not allocate destination memory";
 
     if (!roi_align_kernel) {
         ROIAlignLayoutType selectedLayout = ROIAlignLayoutType::nspc;

@@ -32,7 +32,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleUnaryEltwise) {
 
         auto sigmoid = std::make_shared<ngraph::opset8::Sigmoid>(unsqueeze);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{sigmoid}, ngraph::ParameterVector{input});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{sigmoid}, ngraph::ParameterVector{input});
         manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
     }
     {
@@ -46,7 +46,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleUnaryEltwise) {
         auto unsqueeze_const = ngraph::opset8::Constant::create(ngraph::element::i64, ngraph::Shape{}, {unsqueeze_axis});
         auto unsqueeze = std::make_shared<ngraph::opset8::Unsqueeze>(transpose, unsqueeze_const);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
     }
 }
 
@@ -64,7 +64,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, TypeRelaxedEltwise) {
         auto mul_const = ngraph::opset8::Constant::create(ngraph::element::f32, {}, {2.f});
         auto multiply = std::make_shared<ov::op::TypeRelaxed<ngraph::opset8::Multiply>>(transpose, mul_const);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{multiply}, ngraph::ParameterVector{input});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{multiply}, ngraph::ParameterVector{input});
         manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
     }
     {
@@ -78,7 +78,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, TypeRelaxedEltwise) {
         auto transpose = std::make_shared<ngraph::opset8::Transpose>(multiply, transpose_const);
 
         function_ref =
-            std::make_shared<ngraph::Function>(ngraph::NodeVector{transpose}, ngraph::ParameterVector{input});
+            std::make_shared<ngraph::Function>(ov::NodeVector{transpose}, ngraph::ParameterVector{input});
     }
 }
 
@@ -102,7 +102,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, EltwiseSequence) {
 
         auto sigmoid = std::make_shared<ngraph::opset8::Sigmoid>(unsqueeze);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{sigmoid}, ngraph::ParameterVector{input_left, input_right});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{sigmoid}, ngraph::ParameterVector{input_left, input_right});
         manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
     }
     {
@@ -121,7 +121,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, EltwiseSequence) {
         auto unsqueeze_const = ngraph::opset8::Constant::create(ngraph::element::i64, ngraph::Shape{}, {unsqueeze_axis});
         auto unsqueeze = std::make_shared<ngraph::opset8::Unsqueeze>(transpose, unsqueeze_const);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{unsqueeze}, ngraph::ParameterVector{input_left, input_right});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{unsqueeze}, ngraph::ParameterVector{input_left, input_right});
     }
 }
 
@@ -146,7 +146,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, DataMovementTwoConsumers) {
 
     auto relu = std::make_shared<ngraph::opset8::Relu>(transpose);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{sigmoid, relu}, ngraph::ParameterVector{input_left, input_right});
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{sigmoid, relu}, ngraph::ParameterVector{input_left, input_right});
     manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
 }
 
@@ -167,7 +167,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleBinaryEltwiseWithScalarOnSecondBra
         auto add = std::make_shared<ngraph::opset8::Add>(unsqueeze, ngraph::opset8::Constant::create(ngraph::element::f32, {}, {scalar_value}));
 
         manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input});
     }
     {
         auto input = std::make_shared<ngraph::opset8::Parameter>(ngraph::element::f32, shape);
@@ -180,7 +180,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleBinaryEltwiseWithScalarOnSecondBra
         auto unsqueeze_const = ngraph::opset8::Constant::create(ngraph::element::i64, ngraph::Shape{}, {unsqueeze_axis});
         auto unsqueeze = std::make_shared<ngraph::opset8::Unsqueeze>(transpose, unsqueeze_const);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
     }
 }
 
@@ -198,7 +198,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleEltwiseWith5ScalarOnSecondBranch) 
         auto add = std::make_shared<ngraph::opset8::Add>(unsqueeze, ngraph::opset8::Constant::create(ngraph::element::f32, {1, 1, 1, 1, 1}, {scalar_value}));
 
         manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input});
     }
     {
         auto input = std::make_shared<ngraph::opset8::Parameter>(ngraph::element::f32, shape);
@@ -208,7 +208,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleEltwiseWith5ScalarOnSecondBranch) 
         auto unsqueeze_const = ngraph::opset8::Constant::create(ngraph::element::i64, ngraph::Shape{}, {unsqueeze_axis});
         auto unsqueeze = std::make_shared<ngraph::opset8::Unsqueeze>(add, unsqueeze_const);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
     }
 }
 
@@ -228,7 +228,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleBinaryEltwiseWithNotScalarOnSecond
     auto add_scalar = ngraph::opset8::Constant::create(ngraph::element::f32, {1, 1, 1, 3}, {0.5, 0.2, 0.3});
     auto add = std::make_shared<ngraph::opset8::Add>(unsqueeze, add_scalar);
 
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{add}, ngraph::ParameterVector{input});
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{add}, ngraph::ParameterVector{input});
     manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
 }
 
@@ -243,7 +243,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleUnaryEltwiseDynamicShape) {
 
         auto sigmoid = std::make_shared<ngraph::opset8::Sigmoid>(unsqueeze);
 
-        function = std::make_shared<ngraph::Function>(ngraph::NodeVector{sigmoid}, ngraph::ParameterVector{input});
+        function = std::make_shared<ngraph::Function>(ov::NodeVector{sigmoid}, ngraph::ParameterVector{input});
         manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
     }
 
@@ -255,7 +255,7 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleUnaryEltwiseDynamicShape) {
         auto unsqueeze_const = ngraph::opset8::Constant::create(ngraph::element::i64, ngraph::Shape{}, {unsqueeze_axis});
         auto unsqueeze = std::make_shared<ngraph::opset8::Unsqueeze>(sigmoid, unsqueeze_const);
 
-        function_ref = std::make_shared<ngraph::Function>(ngraph::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
+        function_ref = std::make_shared<ngraph::Function>(ov::NodeVector{unsqueeze}, ngraph::ParameterVector{input});
     }
 }
 
@@ -268,6 +268,6 @@ TEST_F(MoveEltwiseUpThroughDataMovTest, SingleUnaryEltwiseDynamicRank) {
     auto unsqueeze_const = ngraph::opset8::Constant::create(ngraph::element::i64, ngraph::Shape{}, {unsqueeze_axis});
     auto unsqueeze = std::make_shared<ngraph::opset8::Unsqueeze>(input, unsqueeze_const);
     auto sigmoid = std::make_shared<ngraph::opset8::Sigmoid>(unsqueeze);
-    function = std::make_shared<ngraph::Function>(ngraph::NodeVector{sigmoid}, ngraph::ParameterVector{input});
+    function = std::make_shared<ngraph::Function>(ov::NodeVector{sigmoid}, ngraph::ParameterVector{input});
     manager.register_pass<ov::intel_cpu::MoveEltwiseUpThroughDataMov>();
 }

@@ -60,18 +60,18 @@ public:
         return result.str();
     }
 
-    virtual ngraph::ParameterVector makeParams() {
-        return ngraph::builder::makeDynamicParams(ngraph::element::f32, inputDynamicShapes);
+    virtual ov::ParameterVector makeParams() {
+        return ngraph::builder::makeDynamicParams(ov::element::f32, inputDynamicShapes);
     }
 
-    virtual std::shared_ptr<ngraph::Node> makeConv(const ngraph::ParameterVector& inputParams) {
-        auto conv = ngraph::builder::makeConvolution(inputParams[0], ngraph::element::f32, _kernel, _stride, _padBegin,
-                                                     _padEnd, _dilation, ngraph::op::PadType::EXPLICIT, _convOutChannels);
+    virtual std::shared_ptr<ov::Node> makeConv(const ov::ParameterVector& inputParams) {
+        auto conv = ngraph::builder::makeConvolution(inputParams[0], ov::element::f32, _kernel, _stride, _padBegin,
+                                                     _padEnd, _dilation, ov::op::PadType::EXPLICIT, _convOutChannels);
 
         return conv;
     }
 
-    virtual std::shared_ptr<ngraph::Node> addSum(std::shared_ptr<ngraph::Node> lastNode, const ngraph::ParameterVector& inputParams) {
+    virtual std::shared_ptr<ov::Node> addSum(std::shared_ptr<ov::Node> lastNode, const ov::ParameterVector& inputParams) {
         auto sum = std::make_shared<ngraph::opset3::Add>(lastNode, inputParams[1]);
 
         fusedOps.insert(fusedOps.begin(), "Add"); // as we always fuse the sum first
@@ -102,7 +102,7 @@ public:
         auto conv = makeConv(inputParams);
 
         if (bias) {
-            auto biasNode = ngraph::builder::makeConstant<float>(ngraph::element::Type_t::f32, ngraph::Shape({1, _convOutChannels, 1, 1}), {}, true);
+            auto biasNode = ngraph::builder::makeConstant<float>(ov::element::Type_t::f32, ov::Shape({1, _convOutChannels, 1, 1}), {}, true);
             conv = std::make_shared<ngraph::opset3::Add>(conv, biasNode);
         }
 
@@ -111,11 +111,11 @@ public:
         runtimeType = getNetType();
         if (configuration.count(PluginConfigParams::KEY_ENFORCE_BF16) &&
             PluginConfigParams::YES == configuration[PluginConfigParams::KEY_ENFORCE_BF16].as<std::string>()) {
-            runtimeType = ngraph::element::Type_t::bf16;
+            runtimeType = ov::element::Type_t::bf16;
         }
 
-        if (inputParams.front()->get_element_type() == ngraph::element::i8 || inputParams.front()->get_element_type() == ngraph::element::u8) {
-            runtimeType = ngraph::element::i8;
+        if (inputParams.front()->get_element_type() == ov::element::i8 || inputParams.front()->get_element_type() == ov::element::u8) {
+            runtimeType = ov::element::i8;
         }
 
         selectedType = "?";
@@ -153,20 +153,20 @@ TEST_P(ConcatConvSumInPlaceTest, CompareWithRefs) {
 
 class ConcatConvSumInPlaceTestInt8 : public ConcatConvSumInPlaceTest {
 public:
-    ngraph::ParameterVector makeParams() override {
-        ngraph::ParameterVector outs(2);
-        outs[0] = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::u8, inputDynamicShapes[0]);
-        outs[1] = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, inputDynamicShapes[1]);
+    ov::ParameterVector makeParams() override {
+        ov::ParameterVector outs(2);
+        outs[0] = std::make_shared<ngraph::opset1::Parameter>(ov::element::u8, inputDynamicShapes[0]);
+        outs[1] = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, inputDynamicShapes[1]);
         return outs;
     }
 
-    std::shared_ptr<ngraph::Node> makeConv(const ngraph::ParameterVector& inputParams) override {
+    std::shared_ptr<ov::Node> makeConv(const ov::ParameterVector& inputParams) override {
         using namespace ngraph;
         auto inputParamsFP32 = builder::makeDynamicParams(element::f32, { inputParams.front()->get_partial_shape() });
 
         auto convolutionNodeRelaxed = std::make_shared<ov::op::TypeRelaxed<opset1::Convolution>>(
                 *as_type_ptr<opset1::Convolution>(builder::makeConvolution(inputParamsFP32.front(), element::f32, _kernel, _stride, _padBegin,
-                                                                          _padEnd, _dilation, ngraph::op::PadType::EXPLICIT, _convOutChannels)),
+                                                                          _padEnd, _dilation, ov::op::PadType::EXPLICIT, _convOutChannels)),
                 element::f32);
 
         auto inpShape = inputParams.front()->get_partial_shape();
@@ -179,17 +179,17 @@ public:
         return conv;
     }
 
-    std::shared_ptr<ngraph::Node> addSum(std::shared_ptr<ngraph::Node> lastNode, const ngraph::ParameterVector& inputParams) override {
+    std::shared_ptr<ov::Node> addSum(std::shared_ptr<ov::Node> lastNode, const ov::ParameterVector& inputParams) override {
         std::vector<std::string> additionalFusedOps;
 
-        lastNode = ngraph::builder::makeActivation(lastNode, ngraph::element::f32, ngraph::helpers::Relu);
+        lastNode = ngraph::builder::makeActivation(lastNode, ov::element::f32, ngraph::helpers::Relu);
         //additionalFusedOps.push_back("Relu");
 
-        auto fqShape = ngraph::Shape(lastNode->get_output_partial_shape(0).size(), 1);
-        lastNode = ngraph::builder::makeFakeQuantize(lastNode, ngraph::element::f32, 256, fqShape);
+        auto fqShape = ov::Shape(lastNode->get_output_partial_shape(0).size(), 1);
+        lastNode = ngraph::builder::makeFakeQuantize(lastNode, ov::element::f32, 256, fqShape);
         additionalFusedOps.push_back("FakeQuantize");
 
-        auto secondTerm = ngraph::builder::makeFakeQuantize(inputParams[1], ngraph::element::f32, 256, fqShape);
+        auto secondTerm = ngraph::builder::makeFakeQuantize(inputParams[1], ov::element::f32, 256, fqShape);
 
         auto sum = std::make_shared<ngraph::opset3::Add>(lastNode, secondTerm);
         additionalFusedOps.push_back("Add");
@@ -203,8 +203,8 @@ public:
         using ngraph::pass::ConvertPrecision;
         ConcatConvSumInPlaceTest::SetUp();
         functionRefs = function->clone();
-        ngraph::pass::ConvertPrecision<ngraph::element::Type_t::i8, ngraph::element::Type_t::f32>().run_on_model(functionRefs);
-        ngraph::pass::ConvertPrecision<ngraph::element::Type_t::u8, ngraph::element::Type_t::f32>().run_on_model(functionRefs);
+        ngraph::pass::ConvertPrecision<ov::element::Type_t::i8, ov::element::Type_t::f32>().run_on_model(functionRefs);
+        ngraph::pass::ConvertPrecision<ov::element::Type_t::u8, ov::element::Type_t::f32>().run_on_model(functionRefs);
         functionRefs->validate_nodes_and_infer_types();
     }
 };
@@ -217,11 +217,11 @@ TEST_P(ConcatConvSumInPlaceTestInt8, CompareWithRefs) {
 
 class ConcatConvSumInPlaceTestSeveralConsumers : public ConcatConvSumInPlaceTest {
 public:
-    std::shared_ptr<ngraph::Node> addSum(std::shared_ptr<ngraph::Node> lastNode, const ngraph::ParameterVector& inputParams) override {
+    std::shared_ptr<ov::Node> addSum(std::shared_ptr<ov::Node> lastNode, const ov::ParameterVector& inputParams) override {
         auto sum = std::make_shared<ngraph::opset3::Add>(lastNode, inputParams[1]);
         fusedOps.insert(fusedOps.begin(), "Add");
 
-        auto shapeOf = std::make_shared<ngraph::opset3::ShapeOf>(sum);
+        auto shapeOf = std::make_shared<ov::op::v3::ShapeOf>(sum);
         return std::make_shared<ngraph::opset3::Reshape>(sum, shapeOf, true);
     }
 };
@@ -237,45 +237,45 @@ TEST_P(ConcatConvSumInPlaceTestSeveralConsumers, CompareWithRefs) {
 namespace {
 const auto fusingMulAddFQMullAdd = fusingSpecificParams{ std::make_shared<postNodesMgr>(std::vector<postNodeBuilder>{
         {[](postNodeConfig& cfg) {
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             auto constNode = ngraph::builder::makeConstant(cfg.type, newShape, std::vector<float>{}, true);
             return std::make_shared<ngraph::opset1::Multiply>(cfg.input, constNode);
         }, "Multiply(PerChannel)"},
         {[](postNodeConfig& cfg) {
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             auto constNode = ngraph::builder::makeConstant(cfg.type, newShape, std::vector<float>{}, true);
             return std::make_shared<ngraph::opset1::Add>(cfg.input, constNode);
         }, "Add(PerChannel)"},
         {[](postNodeConfig& cfg){
             auto localPrc = cfg.input->get_element_type();
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             return ngraph::builder::makeFakeQuantize(cfg.input, localPrc, 256, newShape);
         }, "FakeQuantize(PerChannel)"},
         {[](postNodeConfig& cfg) {
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             auto constNode = ngraph::builder::makeConstant(cfg.type, newShape, std::vector<float>{}, true);
             return std::make_shared<ngraph::opset1::Multiply>(cfg.input, constNode);
         }, "Multiply(PerChannel)"},
         {[](postNodeConfig& cfg) {
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             auto constNode = ngraph::builder::makeConstant(cfg.type, newShape, std::vector<float>{}, true);
             return std::make_shared<ngraph::opset1::Add>(cfg.input, constNode);
         }, "Add(PerChannel)"}}), {"Add"} };
 
 const auto fusingDivSubFQ = fusingSpecificParams{ std::make_shared<postNodesMgr>(std::vector<postNodeBuilder>{
         {[](postNodeConfig& cfg){
-            ngraph::Shape secondMultInShape = generatePerChannelShape(cfg.input);
+            ov::Shape secondMultInShape = generatePerChannelShape(cfg.input);
             auto secondMultInput = ngraph::builder::makeConstant(cfg.type, secondMultInShape, std::vector<float>{}, true);
             return std::make_shared<ngraph::opset1::Divide>(cfg.input, secondMultInput);
         }, "Divide(PerChannel)"},
         {[](postNodeConfig& cfg){
-            ngraph::Shape secondMultInShape = generatePerChannelShape(cfg.input);
+            ov::Shape secondMultInShape = generatePerChannelShape(cfg.input);
             auto secondMultInput = ngraph::builder::makeConstant(cfg.type, secondMultInShape, std::vector<float>{}, true);
             return std::make_shared<ngraph::opset1::Subtract>(cfg.input, secondMultInput);
         }, "Subtract(PerChannel)"},
         {[](postNodeConfig& cfg){
             auto localPrc = cfg.input->get_element_type();
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             return ngraph::builder::makeFakeQuantize(cfg.input, localPrc, 256, newShape);
         }, "FakeQuantize(PerChannel)"}}), {"FakeQuantize"} };
 
@@ -285,12 +285,12 @@ const auto fusingSigmoidFQFQ = fusingSpecificParams{ std::make_shared<postNodesM
         }, "Sigmoid"},
         {[](postNodeConfig& cfg){
             auto localPrc = cfg.input->get_element_type();
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             return ngraph::builder::makeFakeQuantize(cfg.input, localPrc, 256, newShape);
         }, "FakeQuantize(PerChannel)"},
         {[](postNodeConfig& cfg){
             auto localPrc = cfg.input->get_element_type();
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             return ngraph::builder::makeFakeQuantize(cfg.input, localPrc, 256, newShape);
         }, "FakeQuantize(PerChannel)"}}), {"Sigmoid", "FakeQuantize", "FakeQuantize"} };
 
@@ -300,7 +300,7 @@ const auto fusingClampFQ = fusingSpecificParams{ std::make_shared<postNodesMgr>(
         }, "Clamp"},
         {[](postNodeConfig& cfg){
             auto localPrc = cfg.input->get_element_type();
-            ngraph::Shape newShape = generatePerChannelShape(cfg.input);
+            ov::Shape newShape = generatePerChannelShape(cfg.input);
             return ngraph::builder::makeFakeQuantize(cfg.input, localPrc, 256, newShape);
         }, "FakeQuantize(PerChannel)"}}), {"FakeQuantize"} };
 

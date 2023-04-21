@@ -14,7 +14,7 @@ ov::intel_cpu::PowerStaticNode::PowerStaticNode(const ngraph::Output<Node> &data
     validate_and_infer_types();
 }
 
-std::shared_ptr<ngraph::Node> ov::intel_cpu::PowerStaticNode::clone_with_new_inputs(const ngraph::OutputVector &new_args) const {
+std::shared_ptr<ov::Node> ov::intel_cpu::PowerStaticNode::clone_with_new_inputs(const ngraph::OutputVector &new_args) const {
     INTERNAL_OP_SCOPE(PowerStaticNode_clone_with_new_inputs);
     if (new_args.size() != 1) {
         throw ngraph::ngraph_error("Incorrect number of new arguments");

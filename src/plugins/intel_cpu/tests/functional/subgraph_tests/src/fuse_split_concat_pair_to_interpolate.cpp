@@ -56,7 +56,7 @@ protected:
         const auto param = std::make_shared<opset6::Parameter>(inputPrecision, inputShape);
         const auto split = builder::makeSplit(param, inputPrecision, num_splits, static_cast<int64_t>(axis));
 
-        ngraph::OutputVector concat_inputs_vec(num_of_concat_inputs);
+        ov::OutputVector concat_inputs_vec(num_of_concat_inputs);
         for (size_t split_output_port = 0; split_output_port < num_splits; ++split_output_port) {
             for (size_t j = 0; j < scale_factor; ++j) {
                 concat_inputs_vec[split_output_port * scale_factor + j] = split->output(split_output_port);
@@ -65,8 +65,8 @@ protected:
 
         const auto concat = builder::makeConcat(concat_inputs_vec, axis);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset6::Result>(concat)};
-        function = std::make_shared<ngraph::Function>(results, ngraph::ParameterVector{param}, "FuseSplitConcatPairToInterpolate");
+        ov::ResultVector results{std::make_shared<ngraph::opset6::Result>(concat)};
+        function = std::make_shared<ov::Model>(results, ov::ParameterVector{param}, "FuseSplitConcatPairToInterpolate");
     }
 };
 

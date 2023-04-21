@@ -80,9 +80,9 @@ public:
         init_input_shapes({ inputShapes });
 
         auto emb_table_node = std::make_shared<ngraph::opset1::Parameter>(inType, inputShapes.first);
-        ngraph::ParameterVector params = {emb_table_node};
+        ov::ParameterVector params = {emb_table_node};
 
-        auto embBag = std::dynamic_pointer_cast<ngraph::opset3::EmbeddingBagOffsetsSum>(ngraph::builder::makeEmbeddingBagOffsetsSum(
+        auto embBag = ov::as_type_ptr<ngraph::opset3::EmbeddingBagOffsetsSum>(ngraph::builder::makeEmbeddingBagOffsetsSum(
             inType,
             indPrecision,
             emb_table_node,
@@ -91,8 +91,8 @@ public:
             defaultIndex,
             withWeights,
             withDefIndex));
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(embBag)};
-        function = std::make_shared<ngraph::Function>(results, params, "embeddingBagOffsetsSum");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(embBag)};
+        function = std::make_shared<ov::Model>(results, params, "embeddingBagOffsetsSum");
     }
 };
 

@@ -16,7 +16,7 @@ namespace CPULayerTestsDefinitions  {
 
 namespace {
     std::vector<int64_t> blockShape, cropsBegin, cropsEnd;
-    ngraph::Shape paramShape;
+    ov::Shape paramShape;
 }  // namespace
 
 using BatchToSpaceLayerTestCPUParams = std::tuple<
@@ -110,23 +110,23 @@ protected:
             selectedType = std::string("ref_any_") + netPrecision.name();
 
         auto params = ngraph::builder::makeDynamicParams(ngPrec, {inputDynamicShapes.front()});
-        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ngraph::op::Parameter>(params));
+        auto paramOuts = ngraph::helpers::convert2OutputVector(ngraph::helpers::castOps2Nodes<ov::op::v0::Parameter>(params));
         paramShape = {paramOuts[0].get_partial_shape().size()};
 
         std::shared_ptr<ov::Node> in2, in3, in4;
-        auto blockShapeParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, paramShape);
+        auto blockShapeParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
         in2 = blockShapeParam;
         params.push_back(blockShapeParam);
-        auto cropsBeginParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, paramShape);
+        auto cropsBeginParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
         params.push_back(cropsBeginParam);
         in3 = cropsBeginParam;
-        auto cropsEndParam = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::i64, paramShape);
+        auto cropsEndParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
         params.push_back(cropsEndParam);
         in4 = cropsEndParam;
         auto btsNode = std::make_shared<ngraph::opset2::BatchToSpace>(paramOuts[0], in2, in3, in4);
         btsNode->get_rt_info() = getCPUInfo();
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(btsNode)};
-        function = std::make_shared<ngraph::Function>(results, params, "BatchToSpace");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(btsNode)};
+        function = std::make_shared<ov::Model>(results, params, "BatchToSpace");
     }
 };
 

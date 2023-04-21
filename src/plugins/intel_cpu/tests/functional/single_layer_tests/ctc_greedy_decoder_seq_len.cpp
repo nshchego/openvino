@@ -33,9 +33,9 @@ using CTCGreedyDecoderSeqLenLayerCPUTestParams = std::tuple<InputShapeParams,   
                                                             ElementType,         // Index Type
                                                             bool                 // mergeRepeated
                                                             >;
-inline ngraph::ParameterVector makeDynamicParams(const std::vector<ElementType>& types,
+inline ov::ParameterVector makeDynamicParams(const std::vector<ElementType>& types,
                                           const std::vector<ov::PartialShape>& shapes) {
-    ngraph::ParameterVector outs;
+    ov::ParameterVector outs;
     NGRAPH_CHECK(types.size() == shapes.size());
     for (size_t i = 0; i < types.size(); i++) {
         auto paramNode = std::make_shared<ov::op::v0::Parameter>(types[i], shapes[i]);
@@ -115,11 +115,11 @@ protected:
                                                                                            indexType,
                                                                                            indexType);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(ctcGreedyDecoderSeqLen)};
-        function = std::make_shared<ngraph::Function>(results, params, "CTCGreedyDecoderSeqLenCPU");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(ctcGreedyDecoderSeqLen)};
+        function = std::make_shared<ov::Model>(results, params, "CTCGreedyDecoderSeqLenCPU");
     };
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         const auto& dataShape = targetInputStaticShapes[0];

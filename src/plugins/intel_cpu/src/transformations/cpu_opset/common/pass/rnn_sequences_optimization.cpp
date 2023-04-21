@@ -14,7 +14,7 @@
 #include "itt.hpp"
 
 namespace {
-    int64_t getSeqAxis(const std::shared_ptr<ngraph::Node>& sequenceOp) {
+    int64_t getSeqAxis(const std::shared_ptr<ov::Node>& sequenceOp) {
         // Optimization.
         // Plug-ins support seqAxis attribute (value 1 or 0) for Seq ops, but according to the spec we don't
         // support this attribute and should insert Transpose layer before and after Seq op in TI to Sequences
@@ -47,11 +47,11 @@ namespace {
         return seqAxis;
     }
 
-    bool transform(const std::shared_ptr<ngraph::Node>& sequenceOp) {
+    bool transform(const std::shared_ptr<ov::Node>& sequenceOp) {
         // Detect pattern: Transpose_before -> Seq -> Transpose_after
         auto seqAxis = getSeqAxis(sequenceOp);
         if (seqAxis == 0) {
-            ngraph::Output<ngraph::Node> in_0 = sequenceOp->get_input_node_shared_ptr(0)->input_value(0);
+            ngraph::Output<ov::Node> in_0 = sequenceOp->get_input_node_shared_ptr(0)->input_value(0);
 
             auto shapeBeforeTranspose = ov::op::util::make_try_fold<ngraph::opset1::ShapeOf>(in_0);
             auto newInShape = ov::op::util::make_try_fold<ngraph::opset8::Gather>(shapeBeforeTranspose,
@@ -128,7 +128,7 @@ ov::intel_cpu::OptimizeLSTMSequenceTransposes::OptimizeLSTMSequenceTransposes() 
     auto lstmSequenceNgraph = ngraph::pattern::wrap_type<ngraph::opset1::LSTMSequence, ngraph::opset5::LSTMSequence>();
 
     ngraph::matcher_pass_callback callback = [](ngraph::pattern::Matcher &m) {
-        auto checkSequence = [](const std::shared_ptr<ngraph::Node>& node) {
+        auto checkSequence = [](const std::shared_ptr<ov::Node>& node) {
             if (auto lstm5 = ngraph::as_type_ptr<ngraph::opset5::LSTMSequence>(node)) {
                 return lstm5->get_direction() != ngraph::op::RecurrentSequenceDirection::BIDIRECTIONAL;
             } else if (auto lstm1 = ngraph::as_type_ptr<ngraph::opset1::LSTMSequence>(node)) {
@@ -138,7 +138,7 @@ ov::intel_cpu::OptimizeLSTMSequenceTransposes::OptimizeLSTMSequenceTransposes() 
             }
         };
 
-        std::shared_ptr<ngraph::Node> lstmSequence = m.get_match_root();
+        std::shared_ptr<ov::Node> lstmSequence = m.get_match_root();
         return checkSequence(lstmSequence) ? transform(lstmSequence) : false;
     };
 

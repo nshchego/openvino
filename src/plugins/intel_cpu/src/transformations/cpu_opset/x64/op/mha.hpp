@@ -15,18 +15,18 @@ public:
 
     MHANode() = default;
 
-    MHANode(const ngraph::Output<ngraph::Node> &in0,
-            const ngraph::Output<ngraph::Node> &in1,
-            const ngraph::Output<ngraph::Node> &in2,
-            const ngraph::Output<ngraph::Node> &in3,
+    MHANode(const ngraph::Output<ov::Node> &in0,
+            const ngraph::Output<ov::Node> &in1,
+            const ngraph::Output<ov::Node> &in2,
+            const ngraph::Output<ov::Node> &in3,
             const std::vector<float> &mul_scales,
             bool is_mul_first,
             const ngraph::element::Type output_type);
 
-    MHANode(const ngraph::Output<ngraph::Node> &in0,
-            const ngraph::Output<ngraph::Node> &in1,
-            const ngraph::Output<ngraph::Node> &in2,
-            const ngraph::Output<ngraph::Node> &in3,
+    MHANode(const ngraph::Output<ov::Node> &in0,
+            const ngraph::Output<ov::Node> &in1,
+            const ngraph::Output<ov::Node> &in2,
+            const ngraph::Output<ov::Node> &in3,
             const std::vector<float> &mul_scales,
             bool is_mul_first,
             const std::vector<float> &fq_scales0,
@@ -42,7 +42,7 @@ public:
 
     bool visit_attributes(ngraph::AttributeVisitor &visitor) override;
 
-    std::shared_ptr<ngraph::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
+    std::shared_ptr<ov::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
 
     ngraph::element::Type get_output_type() const { return m_output_type; }
 

@@ -875,7 +875,7 @@ private:
     }
 };
 #endif
-bool BinaryConvolution::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool BinaryConvolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (isDynamicNgraphNode(op)) {
             errorMessage = "Doesn't support op with dynamic shapes";
@@ -897,11 +897,10 @@ bool BinaryConvolution::isSupportedOperation(const std::shared_ptr<const ngraph:
     return true;
 }
 
-BinaryConvolution::BinaryConvolution(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+BinaryConvolution::BinaryConvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        errorPrefix = "BinaryConvolution node with name '" + getName() + "' ";
         const auto binConv = std::dynamic_pointer_cast<const ngraph::opset1::BinaryConvolution>(op);
 
         pad_value = binConv->get_pad_value();
@@ -944,21 +943,21 @@ void BinaryConvolution::getSupportedDescriptors() {
     }
 
     if (getParentEdges().size() != expectedInputEdgesNum)
-        IE_THROW() << errorPrefix << "has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges";
 
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << "has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges";
 
     if (getInputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 0th input with rank: " << getInputShapeAtPort(0).getRank();
     }
 
     if (getInputShapeAtPort(1).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support 1st input with rank: " << getInputShapeAtPort(1).getRank();
     }
 
     if (getOutputShapeAtPort(0).getRank() != 4) {
-        IE_THROW() << errorPrefix << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
+        THROW_CPU_NODE_ERR << "doesn't support output with rank: " << getOutputShapeAtPort(0).getRank();
     }
 }
 

@@ -25,7 +25,7 @@ namespace node {
 using ngNmsSortResultType = ngraph::op::v8::MatrixNms::SortResultType;
 using ngNmseDcayFunction = ngraph::op::v8::MatrixNms::DecayFunction;
 
-bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto nms = std::dynamic_pointer_cast<const ngraph::op::v8::MatrixNms>(op);
         if (!nms) {
@@ -49,23 +49,21 @@ bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& 
     return true;
 }
 
-MatrixNms::MatrixNms(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+MatrixNms::MatrixNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, InternalDynShapeInferFactory()) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    m_errorPrefix = "MatrixNMS layer with name '" + getName() + "' ";
-
     if (one_of(op->get_type_info(), ov::op::internal::NmsStaticShapeIE<ngraph::op::v8::MatrixNms>::get_type_info_static()))
         m_outStaticShape = true;
 
     if (getOriginalInputsNumber() != 2)
-        IE_THROW() << m_errorPrefix << "has incorrect number of input edges: " << getOriginalInputsNumber();
+        THROW_CPU_NODE_ERR << "has incorrect number of input edges: " << getOriginalInputsNumber();
 
     if (getOriginalOutputsNumber() != 3)
-        IE_THROW() << m_errorPrefix << "has incorrect number of output edges: " << getOriginalOutputsNumber();
+        THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getOriginalOutputsNumber();
 
     const auto matrix_nms = std::dynamic_pointer_cast<const ngraph::op::v8::MatrixNms>(op);
 
@@ -103,12 +101,12 @@ MatrixNms::MatrixNms(const std::shared_ptr<ngraph::Node>& op, const GraphContext
 
     const auto& boxes_dims = getInputShapeAtPort(NMS_BOXES).getDims();
     if (boxes_dims.size() != 3)
-        IE_THROW() << m_errorPrefix << "has unsupported 'boxes' input rank: " << boxes_dims.size();
+        THROW_CPU_NODE_ERR << "has unsupported 'boxes' input rank: " << boxes_dims.size();
     if (boxes_dims[2] != 4)
-        IE_THROW() << m_errorPrefix << "has unsupported 'boxes' input 3rd dimension size: " << boxes_dims[2];
+        THROW_CPU_NODE_ERR << "has unsupported 'boxes' input 3rd dimension size: " << boxes_dims[2];
     const auto& scores_dims = getInputShapeAtPort(NMS_SCORES).getDims();
     if (scores_dims.size() != 3)
-        IE_THROW() << m_errorPrefix << "has unsupported 'scores' input rank: " << scores_dims.size();
+        THROW_CPU_NODE_ERR << "has unsupported 'scores' input rank: " << scores_dims.size();
 }
 
 void MatrixNms::initSupportedPrimitiveDescriptors() {
@@ -252,7 +250,7 @@ void MatrixNms::prepareParams() {
     const auto& boxes_dims = getParentEdgeAt(NMS_BOXES)->getMemory().getStaticDims();
     const auto& scores_dims = getParentEdgeAt(NMS_SCORES)->getMemory().getStaticDims();
     if (!(boxes_dims[0] == scores_dims[0] && boxes_dims[1] == scores_dims[2])) {
-        IE_THROW() << m_errorPrefix << "has incompatible 'boxes' and 'scores' input dmensions";
+        THROW_CPU_NODE_ERR << "has incompatible 'boxes' and 'scores' input dmensions";
     }
 
     m_numBatches = boxes_dims[0];
@@ -416,7 +414,7 @@ void MatrixNms::execute(dnnl::stream strm) {
 
 void MatrixNms::checkPrecision(const Precision prec, const std::vector<Precision> precList, const std::string name, const std::string type) {
     if (std::find(precList.begin(), precList.end(), prec) == precList.end())
-        IE_THROW() << m_errorPrefix << "has unsupported '" << name << "' " << type << " precision: " << prec;
+        THROW_CPU_NODE_ERR << "has unsupported '" << name << "' " << type << " precision: " << prec;
 }
 
 }   // namespace node

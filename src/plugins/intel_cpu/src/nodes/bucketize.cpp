@@ -17,7 +17,7 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool Bucketize::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool Bucketize::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         const auto bucketsize = std::dynamic_pointer_cast<const ngraph::opset3::Bucketize>(op);
         if (!bucketsize) {
@@ -30,21 +30,20 @@ bool Bucketize::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& 
     return true;
 }
 
-Bucketize::Bucketize(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+Bucketize::Bucketize(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, PassThroughShapeInferFactory()) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = "Bucketize layer with name '" + op->get_friendly_name() + "' ";
     const auto bucketsize = std::dynamic_pointer_cast<const ngraph::opset3::Bucketize>(op);
     if (bucketsize == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of Bucketize from opset3.";
 
     if (getOriginalInputsNumber() != 2 || getOriginalOutputsNumber() != 1) {
-        IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
     }
 
     // check one attribute
@@ -172,7 +171,7 @@ void Bucketize::execute(dnnl::stream strm) {
                     PrecisionTrait<Precision::I64>::value_type>();
             break;
         default:
-            IE_THROW() << errorPrefix << " has unsupported precision: " << precision_mask;
+            THROW_CPU_NODE_ERR << " has unsupported precision: " << precision_mask;
     }
 }
 
@@ -192,11 +191,11 @@ void Bucketize::prepareParams() {
     // update with_bins/num_values/num_bin_values
     auto input_tensor_dims = inputTensorMemPtr->getStaticDims();
     if (input_tensor_dims.size() < 1) {
-        IE_THROW() << errorPrefix << " has incorrect dimensions of the input.";
+        THROW_CPU_NODE_ERR << " has incorrect dimensions of the input.";
     }
     auto input_bin_dims = inputBinsMemPtr->getStaticDims();
     if (input_bin_dims.size() != 1) {
-        IE_THROW() << errorPrefix << " has incorrect dimensions of the boundaries tensor.";
+        THROW_CPU_NODE_ERR << " has incorrect dimensions of the boundaries tensor.";
     }
     if (input_bin_dims[0] != 0) {
         with_bins = true;

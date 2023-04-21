@@ -15,13 +15,13 @@ public:
 
     LeakyReluNode() = default;
 
-    LeakyReluNode(const ngraph::Output<ngraph::Node> &data, const float &negative_slope, const ngraph::element::Type output_type);
+    LeakyReluNode(const ngraph::Output<ov::Node> &data, const float &negative_slope, const ngraph::element::Type output_type);
 
     void validate_and_infer_types() override;
 
     bool visit_attributes(ngraph::AttributeVisitor &visitor) override;
 
-    std::shared_ptr<ngraph::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
+    std::shared_ptr<ov::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
 
     float get_slope() { return m_negative_slope; }
 

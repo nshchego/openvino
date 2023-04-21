@@ -24,8 +24,8 @@ ngraph::matcher_pass_callback ov::intel_cpu::ConvertReduceMultiAxisBase::convert
             return false;
         }
         auto axes = reduction_axes->cast_vector<int64_t>();
-        ngraph::NodeVector new_ops;
-        std::shared_ptr<ngraph::Node> node = reduce->input_value(0).get_node_shared_ptr();
+        ov::NodeVector new_ops;
+        std::shared_ptr<ov::Node> node = reduce->input_value(0).get_node_shared_ptr();
         for (auto axis : axes) {
             auto reduction_axis = ov::opset8::Constant::create<int64_t>(ngraph::element::i64, ngraph::Shape{}, {axis});
             node = std::make_shared<T>(node, reduction_axis, true);

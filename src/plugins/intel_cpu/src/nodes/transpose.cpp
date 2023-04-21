@@ -101,7 +101,7 @@ private:
 };
 } // namespace
 
-Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
+Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, TransposeShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

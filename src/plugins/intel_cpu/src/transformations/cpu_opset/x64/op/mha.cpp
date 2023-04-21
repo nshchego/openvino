@@ -7,10 +7,10 @@
 #include <ngraph/opsets/opset3.hpp>
 #include <matmul_shape_inference.hpp>
 
-ov::intel_cpu::MHANode::MHANode(const ngraph::Output<ngraph::Node> &in0,
-                                const ngraph::Output<ngraph::Node> &in1,
-                                const ngraph::Output<ngraph::Node> &in2,
-                                const ngraph::Output<ngraph::Node> &in3,
+ov::intel_cpu::MHANode::MHANode(const ngraph::Output<ov::Node> &in0,
+                                const ngraph::Output<ov::Node> &in1,
+                                const ngraph::Output<ov::Node> &in2,
+                                const ngraph::Output<ov::Node> &in3,
                                 const std::vector<float> &mul_scales,
                                 bool is_mul_first,
                                 const ngraph::element::Type output_type)
@@ -23,10 +23,10 @@ ov::intel_cpu::MHANode::MHANode(const ngraph::Output<ngraph::Node> &in0,
     validate_and_infer_types();
 }
 
-ov::intel_cpu::MHANode::MHANode(const ngraph::Output<ngraph::Node> &in0,
-                                const ngraph::Output<ngraph::Node> &in1,
-                                const ngraph::Output<ngraph::Node> &in2,
-                                const ngraph::Output<ngraph::Node> &in3,
+ov::intel_cpu::MHANode::MHANode(const ngraph::Output<ov::Node> &in0,
+                                const ngraph::Output<ov::Node> &in1,
+                                const ngraph::Output<ov::Node> &in2,
+                                const ngraph::Output<ov::Node> &in3,
                                 const std::vector<float> &mul_scales,
                                 bool is_mul_first,
                                 const std::vector<float> &fq_scales0,
@@ -50,7 +50,7 @@ ov::intel_cpu::MHANode::MHANode(const ngraph::Output<ngraph::Node> &in0,
     validate_and_infer_types();
 }
 
-std::shared_ptr<ngraph::Node> ov::intel_cpu::MHANode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
+std::shared_ptr<ov::Node> ov::intel_cpu::MHANode::clone_with_new_inputs(const ngraph::OutputVector& new_args) const {
     INTERNAL_OP_SCOPE(MHANode_clone_with_new_inputs);
     check_new_args_count(this, new_args);
     return std::make_shared<ov::intel_cpu::MHANode>(new_args.at(0), new_args.at(1), new_args.at(2), new_args.at(3),

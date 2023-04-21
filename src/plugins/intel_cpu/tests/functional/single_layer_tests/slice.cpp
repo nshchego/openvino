@@ -29,7 +29,7 @@ typedef std::tuple<
 class Slice8LayerCPUTest : public testing::WithParamInterface<Slice8LayerTestCPUParam>,
                                  virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<Slice8LayerTestCPUParam> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<Slice8LayerTestCPUParam> &obj) {
         std::vector<InputShape> shapes;
         Slice8SpecificParams
         params;

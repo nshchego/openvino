@@ -87,7 +87,7 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
         const auto& activation   = pattern_map.at(X_m);
         const auto  hidden_state_it = pattern_map.find(H_m);
 
-        ngraph::Output<ngraph::Node> hidden_state;
+        ngraph::Output<ov::Node> hidden_state;
         if (hidden_state_it != pattern_map.end()) { // is it H(i8/u8) -> dequantized -> RNN pattern?
             hidden_state = hidden_state_it->second;
         } else {
@@ -98,7 +98,7 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
         const auto& r_weights    = pattern_map.at(R_m);
         const auto& bias         = pattern_map.at(B_m);
 
-        std::shared_ptr<ngraph::Node> rnn_quantized;
+        std::shared_ptr<ov::Node> rnn_quantized;
 
         if (const auto lstm_seq = ngraph::as_type_ptr<ngraph::opset9::LSTMSequence>(rnn)) {
             const auto& cell_state = pattern_map.at(cell_state_m);

@@ -77,7 +77,7 @@ struct jit_uni_bin_conv_kernel {
 
 class BinaryConvolution : public Node {
 public:
-    BinaryConvolution(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    BinaryConvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void createPrimitive() override;
@@ -90,7 +90,7 @@ public:
     void setPostOps(dnnl::primitive_attr &attr);
     bool canFuse(const NodePtr& node) const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     impl_desc_type getImplType() { return implType; }
 
@@ -118,8 +118,6 @@ private:
                           const std::vector<size_t>& s_str, const std::vector<size_t>& w_str, const std::vector<size_t>& d_str);
     void executeReference(const uint8_t* src, const uint8_t* weights, uint8_t* dst,
                           const std::vector<size_t>& s_str, const std::vector<size_t>& w_str, const std::vector<size_t>& d_str);
-
-    std::string errorPrefix;
 };
 
 }   // namespace node

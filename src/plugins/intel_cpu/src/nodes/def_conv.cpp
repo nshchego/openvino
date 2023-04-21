@@ -672,7 +672,7 @@ private:
     }
 };
 #endif
-bool DeformableConvolution::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool DeformableConvolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!one_of(op->get_type_info(),
                 ngraph::op::v1::DeformableConvolution::get_type_info_static(),
@@ -744,16 +744,15 @@ bool DefConvKey::operator==(const DefConvKey &rhs) const {
 
 } // namespace
 
-DeformableConvolution::DeformableConvolution(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+DeformableConvolution::DeformableConvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    errorPrefix = "Deformable convolution with name '" + op->get_friendly_name() + "'";
     auto defConvNodeBase = std::dynamic_pointer_cast<ngraph::op::util::DeformableConvolutionBase>(op);
     if (defConvNodeBase == nullptr)
-        IE_THROW() << errorPrefix << " is not an instance of DeformableConvolutionBase.";
+        THROW_CPU_NODE_ERR << " is not an instance of DeformableConvolutionBase.";
 
     defConvAttr.group = defConvNodeBase->get_group();
     defConvAttr.deformable_group = defConvNodeBase->get_deformable_group();
@@ -774,7 +773,7 @@ DeformableConvolution::DeformableConvolution(const std::shared_ptr<ngraph::Node>
     if (op->get_type_info() == ngraph::op::v8::DeformableConvolution::get_type_info_static()) {
         auto defConvNode = std::dynamic_pointer_cast<ngraph::op::v8::DeformableConvolution>(op);
         if (defConvNode == nullptr)
-            IE_THROW() << errorPrefix << " is not an instance of DeformableConvolution from opset8.";
+            THROW_CPU_NODE_ERR << " is not an instance of DeformableConvolution from opset8.";
         defConvAttr.with_bilinear_pad = defConvNode->get_bilinear_interpolation_pad();
     } else {
         defConvAttr.with_bilinear_pad = false;
@@ -783,20 +782,20 @@ DeformableConvolution::DeformableConvolution(const std::shared_ptr<ngraph::Node>
 
 void DeformableConvolution::getSupportedDescriptors() {
     if (getParentEdges().size() != 3 && getParentEdges().size() != 4)
-        IE_THROW() << errorPrefix << " has incorrect number of input edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input edges";
     if (getChildEdges().empty())
-        IE_THROW() << errorPrefix << " has incorrect number of output edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of output edges";
     if (getInputShapeAtPort(DATA_ID).getRank() != 4) {
-        IE_THROW() << errorPrefix << " has unsupported mode. Only 4D blobs are supported as input.";
+        THROW_CPU_NODE_ERR << " has unsupported mode. Only 4D blobs are supported as input.";
     }
     if (getInputShapeAtPort(OFF_ID).getRank() != 4) {
-        IE_THROW() << errorPrefix << " doesn't support 1st input with rank: " << getInputShapeAtPort(OFF_ID).getRank();
+        THROW_CPU_NODE_ERR << " doesn't support 1st input with rank: " << getInputShapeAtPort(OFF_ID).getRank();
     }
     if (getInputShapeAtPort(WEI_ID).getRank() != 4) {
-        IE_THROW() << errorPrefix << " doesn't support 2nd input with rank: " << getInputShapeAtPort(WEI_ID).getRank();
+        THROW_CPU_NODE_ERR << " doesn't support 2nd input with rank: " << getInputShapeAtPort(WEI_ID).getRank();
     }
     if (getOutputShapeAtPort(DATA_ID).getRank() != 4) {
-        IE_THROW() << errorPrefix << " doesn't support output with rank: " << getOutputShapeAtPort(DATA_ID).getRank();
+        THROW_CPU_NODE_ERR << " doesn't support output with rank: " << getOutputShapeAtPort(DATA_ID).getRank();
     }
 }
 
@@ -1172,23 +1171,23 @@ void DeformableConvolution::prepareParams() {
     auto& weiMemPtr = getParentEdgeAt(WEI_ID)->getMemoryPtr();
 
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate destination memory";
+        THROW_CPU_NODE_ERR << " did not allocate destination memory";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate input memory";
+        THROW_CPU_NODE_ERR << " did not allocate input memory";
     if (!offMemPtr || !offMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate offsets shape memory";
+        THROW_CPU_NODE_ERR << " did not allocate offsets shape memory";
     if (!weiMemPtr || !weiMemPtr->isAllocated())
-        IE_THROW() << errorPrefix << " did not allocate weights memory";
+        THROW_CPU_NODE_ERR << " did not allocate weights memory";
 
     if (getOriginalInputsNumber() > 3) {
         auto& modMemPtr = getParentEdgeAt(MOD_ID)->getMemoryPtr();
         if (!modMemPtr || !modMemPtr->isAllocated())
-            IE_THROW() << errorPrefix << " did not allocate modulations memory";
+            THROW_CPU_NODE_ERR << " did not allocate modulations memory";
     }
 
     auto selectedPrimitiveDescriptor = getSelectedPrimitiveDescriptor();
     if (!selectedPrimitiveDescriptor)
-        IE_THROW() << errorPrefix << "' doesn't have primitive descriptors.";
+        THROW_CPU_NODE_ERR << "' doesn't have primitive descriptors.";
     auto config = selectedPrimitiveDescriptor->getConfig();
 
     bool withModulation = getParentEdges().size() > 3;

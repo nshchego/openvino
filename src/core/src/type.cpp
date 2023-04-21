@@ -17,6 +17,9 @@ namespace ov {
 size_t DiscreteTypeInfo::hash() const {
     if (hash_value != 0)
         return hash_value;
+// if (strcmp(name, "SwapConvertTranspose") == 0) {
+    // printf("DiscreteTypeInfo::hash() %s\n", name);
+// }
     size_t name_hash = name ? std::hash<std::string>()(std::string(name)) : 0;
     size_t version_id_hash = version_id ? std::hash<std::string>()(std::string(version_id)) : 0;
 
@@ -24,8 +27,12 @@ size_t DiscreteTypeInfo::hash() const {
 }
 
 size_t DiscreteTypeInfo::hash() {
-    if (hash_value == 0)
+    if (hash_value == 0) {
+// if (strcmp(name, "SwapConvertTranspose") == 0) {
+    // printf("DiscreteTypeInfo::hash() %s\n", name);
+// }
         hash_value = static_cast<const DiscreteTypeInfo*>(this)->hash();
+    }
     return hash_value;
 }
 

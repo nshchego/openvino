@@ -12,9 +12,9 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
         InferenceEngine::Precision::I32,
 };
 
-const std::vector<ngraph::element::Type> argDepthType_IC = { ngraph::element::i32 };
+const std::vector<ov::element::Type> argDepthType_IC = { ov::element::i32 };
 const std::vector<int64_t> argDepth_IC = { 1, 5, 1017 };
-const std::vector<ngraph::element::Type> argSetType_IC = { ngraph::element::i32 };
+const std::vector<ov::element::Type> argSetType_IC = { ov::element::i32 };
 const std::vector<float> argOnValue_IC = { 0, 1, -29 };
 const std::vector<float> argOffValue_IC = { 0, 1, -127 };
 const std::vector<int64_t> argAxis_IC = {0};
@@ -40,9 +40,9 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 
-const std::vector<ngraph::element::Type> argDepthType_Ax = { ngraph::element::i32 };
+const std::vector<ov::element::Type> argDepthType_Ax = { ov::element::i32 };
 const std::vector<int64_t> argDepth_Ax = { 3 };
-const std::vector<ngraph::element::Type> argSetType_Ax = { ngraph::element::i32, ngraph::element::f32 };
+const std::vector<ov::element::Type> argSetType_Ax = { ov::element::i32, ov::element::f32 };
 const std::vector<float> argOnValue_Ax = { 17 };
 const std::vector<float> argOffValue_Ax = { -3 };
 const std::vector<int64_t> argAxis_Ax = {0, 1, 3, 5, -4, -5};
@@ -68,10 +68,10 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 
-const std::vector<ngraph::element::Type> argDepthType_T = { ngraph::element::i8, ngraph::element::u8 };
+const std::vector<ov::element::Type> argDepthType_T = { ov::element::i8, ov::element::u8 };
 const std::vector<int64_t> argDepth_T = { 1 };
-const std::vector<ngraph::element::Type> argSetType_T = { ngraph::element::i8, ngraph::element::u8,
-                                                          ngraph::element::bf16, ngraph::element::f32 };
+const std::vector<ov::element::Type> argSetType_T = { ov::element::i8, ov::element::u8,
+                                                          ov::element::bf16, ov::element::f32 };
 const std::vector<float> argOnValue_T = { 1 };
 const std::vector<float> argOffValue_T = { 1 };
 const std::vector<int64_t> argAxis_T = {-1};

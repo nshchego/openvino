@@ -24,7 +24,7 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept {
+bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (isDynamicNgraphNode(op)) {
             errorMessage = "Doesn't support op with dynamic shapes";
@@ -57,29 +57,27 @@ bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ngraph::Node
     return true;
 }
 
-PSROIPooling::PSROIPooling(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context)
+PSROIPooling::PSROIPooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    errorPrefix = std::string(op->get_type_name()) + " node with name '" + op->get_friendly_name() + "'";
-
     const auto psroi = std::dynamic_pointer_cast<const ngraph::opset1::PSROIPooling>(op);
     const auto defPsroi = std::dynamic_pointer_cast<const ngraph::opset1::DeformablePSROIPooling>(op);
 
     noTrans = op->get_input_size() == 2;
     if (op->get_input_shape(0).size() != 4)
-        IE_THROW() << errorPrefix << " has first input with incorrect rank: " + std::to_string(op->get_input_shape(0).size());
+        THROW_CPU_NODE_ERR << " has first input with incorrect rank: " + std::to_string(op->get_input_shape(0).size());
     if (op->get_input_shape(1).size() != 2)
-        IE_THROW() << errorPrefix << " has second input with incorrect rank: " + std::to_string(op->get_input_shape(1).size());
+        THROW_CPU_NODE_ERR << " has second input with incorrect rank: " + std::to_string(op->get_input_shape(1).size());
     if (!noTrans && op->get_input_shape(2).size() != 4)
-        IE_THROW() << errorPrefix << " has third input with incorrect rank: " + std::to_string(op->get_input_shape(2).size());
+        THROW_CPU_NODE_ERR << " has third input with incorrect rank: " + std::to_string(op->get_input_shape(2).size());
 
     if (psroi) {
         if (psroi->get_input_size() != 2)
-            IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+            THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
         mode = psroi->get_mode();
         if (mode == "average") {
@@ -99,7 +97,7 @@ PSROIPooling::PSROIPooling(const std::shared_ptr<ngraph::Node>& op, const GraphC
 
     } else if (defPsroi) {
         if (defPsroi->get_input_size() != 2 && defPsroi->get_input_size() != 3)
-            IE_THROW() << errorPrefix << " has incorrect number of input/output edges!";
+            THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
         algorithm = Algorithm::PSROIPoolingBilinearDeformable;
 
@@ -202,10 +200,10 @@ void PSROIPooling::unpackParams(const BlockedMemoryDesc& srcDesc, const BlockedM
     auto inBlkDims = srcDesc.getBlockDims();
     auto outBlkDims = dstDesc.getBlockDims();
     if (inBlkDims.size() != expectedInBlockDimsSize)
-        IE_THROW() << errorPrefix << " has unexpected size of blocking dims in input (given " << inBlkDims.size() << ", expected "
+        THROW_CPU_NODE_ERR << " has unexpected size of blocking dims in input (given " << inBlkDims.size() << ", expected "
                           << expectedInBlockDimsSize << ")";
     if (outBlkDims.size() != expectedOutBlockDimsSize)
-        IE_THROW() << errorPrefix << " has unexpected size of blocking dims in output (given " << outBlkDims.size() << ", expected "
+        THROW_CPU_NODE_ERR << " has unexpected size of blocking dims in output (given " << outBlkDims.size() << ", expected "
                            << expectedOutBlockDimsSize << ")";
 
     inBlockSize = (inpIsBlk ? srcDesc.getBlockDims()[4] : 1);
@@ -546,7 +544,7 @@ void PSROIPooling::execute(dnnl::stream strm) {
 
     if (!((inputPrec == Precision::BF16 && outputPrec == Precision::BF16) ||
           (inputPrec == Precision::FP32 && outputPrec == Precision::FP32))) {
-            IE_THROW() << errorPrefix + " has different precisions on input: " + inputPrec.name() + " and output: " + outputPrec.name();
+        THROW_CPU_NODE_ERR << " has different precisions on input: " << inputPrec.name() << " and output: " << outputPrec.name();
     }
 
     PSROIPoolingContext ctx = {

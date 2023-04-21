@@ -20,15 +20,15 @@ using namespace ov::test;
 namespace CPULayerTestsDefinitions {
 
 // N,T,C
-using CTCLossShapeParams = std::pair<std::vector<ngraph::PartialShape>, std::vector<std::vector<ngraph::Shape>>>;
+using CTCLossShapeParams = std::pair<std::vector<ov::PartialShape>, std::vector<std::vector<ov::Shape>>>;
 
 using CTCLossLayerCPUTestParams = std::tuple<CTCLossShapeParams,            // [N, T, C]
                                             int,                            // blank value
                                             bool,                           // preprocessCollapseRepeated
                                             bool,                           // ctcMergeRepeated
                                             bool,                           // unique
-                                            ngraph::element::Type,          // fp precision for logits
-                                            ngraph::element::Type           // int precision for label and length
+                                            ov::element::Type,          // fp precision for logits
+                                            ov::element::Type           // int precision for label and length
                                             >;
 
 class CTCLossLayerCPUTest : public testing::WithParamInterface<CTCLossLayerCPUTestParams>, virtual public SubgraphBaseTest, public CPUTestsBase {
@@ -39,14 +39,14 @@ public:
         bool preprocessCollapseRepeated;
         bool ctcMergeRepeated;
         bool unique;
-        ngraph::element::Type fPrecision;
-        ngraph::element::Type iPrecision;
+        ov::element::Type fPrecision;
+        ov::element::Type iPrecision;
         std::tie(shapes, blank, preprocessCollapseRepeated, ctcMergeRepeated, unique, fPrecision, iPrecision) = obj.param;
         std::ostringstream results;
         results << "IS=" << CommonTestUtils::partialShape2str({shapes.first}) << "_";
         results << "TS=";
-        for (std::vector<ngraph::Shape>& staticShapes : shapes.second) {
-            for (ngraph::Shape& shape : staticShapes) {
+        for (std::vector<ov::Shape>& staticShapes : shapes.second) {
+            for (ov::Shape& shape : staticShapes) {
                 size_t N = shape[0];
                 size_t T = shape[1];
                 size_t C = shape[2];
@@ -71,15 +71,15 @@ protected:
         bool preprocessCollapseRepeated;
         bool ctcMergeRepeated;
         bool unique;
-        ngraph::element::Type fPrecision;
-        ngraph::element::Type iPrecision;
+        ov::element::Type fPrecision;
+        ov::element::Type iPrecision;
         std::tie(shapes, blank, preprocessCollapseRepeated, ctcMergeRepeated, unique, fPrecision, iPrecision) = GetParam();
 
         targetDevice = CommonTestUtils::DEVICE_CPU;
         selectedType = std::string("ref_any_FP32");
 
-        for (std::vector<ngraph::Shape>& staticShapes : shapes.second) {
-            for (ngraph::Shape& shape : staticShapes) {
+        for (std::vector<ov::Shape>& staticShapes : shapes.second) {
+            for (ov::Shape& shape : staticShapes) {
                 size_t N = shape[0];
                 size_t T = shape[1];
                 size_t C = shape[2];
@@ -93,27 +93,27 @@ protected:
         ov::PartialShape shapeNTC{inputDynamicShapesValues[0], inputDynamicShapesValues[1], inputDynamicShapesValues[2]};
         inputDynamicShapes = {shapeNTC, shapeN, shapeNT, shapeN};
 
-        std::vector<ngraph::element::Type> types{fPrecision, iPrecision, iPrecision, iPrecision};
+        std::vector<ov::element::Type> types{fPrecision, iPrecision, iPrecision, iPrecision};
         std::vector<ov::PartialShape> partialShapes{inputDynamicShapesValues, shapeN, shapeNT, shapeN};
 
         auto params = ngraph::builder::makeDynamicParams(types, partialShapes);
-        auto bankNode = ngraph::op::Constant::create(ngraph::element::i64, ngraph::Shape{ }, {blank});
+        auto bankNode = ov::op::v0::Constant::create(ov::element::i64, ov::Shape{ }, {blank});
 
         auto ctcLoss = std::make_shared<ngraph::opset4::CTCLoss>(params[0], params[1], params[2],
             params[3], bankNode, preprocessCollapseRepeated, ctcMergeRepeated, unique);
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(ctcLoss)};
-        function = std::make_shared<ngraph::Function>(results, params, "CTCLossLayerCPUTest");
+        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(ctcLoss)};
+        function = std::make_shared<ov::Model>(results, params, "CTCLossLayerCPUTest");
     };
 
-    void generate_inputs(const std::vector<ngraph::Shape>& targetInputStaticShapes) override {
+    void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
         const auto& dataShape = targetInputStaticShapes[0];
         const auto N = dataShape[0];
         const auto T = dataShape[1];
         const auto C = dataShape[2];
-        ngraph::Shape shapeN{N};
-        ngraph::Shape shapeNT{N, T};
+        ov::Shape shapeN{N};
+        ov::Shape shapeNT{N, T};
 
         std::mt19937 gen(42);
         std::uniform_int_distribution<unsigned long> dist(1, T);
@@ -191,14 +191,14 @@ TEST_P(CTCLossLayerCPUTest, CompareWithRefs) {
 }
 
 namespace {
-    const ngraph::element::TypeVector fPrecisions = {
-        ngraph::element::f32
-        // ngraph::element::f16
+    const ov::element::TypeVector fPrecisions = {
+        ov::element::f32
+        // ov::element::f16
     };
 
-    const ngraph::element::TypeVector iPrecisions = {
-        ngraph::element::i32,
-        ngraph::element::i64
+    const ov::element::TypeVector iPrecisions = {
+        ov::element::i32,
+        ov::element::i64
     };
 
     const std::vector<bool> preprocessCollapseRepeated = {true, false};

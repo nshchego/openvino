@@ -46,13 +46,13 @@ struct jit_uni_move_scale_kernel {
 
 class Interaction : public Node {
 public:
-    Interaction(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context);
+    Interaction(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
     void execute(dnnl::stream strm) override;
     bool created() const override;
 
-    static bool isSupportedOperation(const std::shared_ptr<const ngraph::Node>& op, std::string& errorMessage) noexcept;
+    static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     bool isExecutable() const override;
     void executeDynamicImpl(dnnl::stream strm) override;
@@ -66,7 +66,6 @@ private:
     size_t inputSizes = 0;
     size_t outputFeaturesLen = 0;
     size_t interactFeatureSize = 0;
-    std::string errorPrefix;
     MemoryPtr inputMemPtr;
     MemoryPtr flatMemPtr;
     MemoryPtr outputMemPtr;

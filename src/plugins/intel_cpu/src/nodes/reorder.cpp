@@ -29,12 +29,12 @@ bool Reorder::isExecutable() const {
     return Node::isExecutable() && !isOptimized;
 }
 
-Reorder::Reorder(const std::shared_ptr<ngraph::Node>& op, const GraphContext::CPtr context) :
+Reorder::Reorder(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
         Node(op, context, PassThroughShapeInferFactory()) {
     IE_THROW() << "Can't create reorder node from ngraph node";
 }
 
-Reorder::Reorder(const std::string& name, const GraphContext::CPtr context) :
+Reorder::Reorder(const std::string& name, const GraphContext::CPtr& context) :
         Node("Reorder", name, context) {}
 
 void Reorder::getSupportedDescriptors() {
@@ -352,8 +352,6 @@ void Reorder::execute(dnnl::stream strm) {
 }
 
 void Reorder::setDynamicBatchLim(int lim) {
-    std::cout << getName() << " setDynamicBatchLim" << "\n";
-
     dynBatchLim = lim;
 
     if (!prim)

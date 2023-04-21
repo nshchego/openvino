@@ -24,7 +24,7 @@ using ShuffleChannelsLayerCPUTestParamsSet = std::tuple<
 class ShuffleChannelsLayerCPUTest : public testing::WithParamInterface<ShuffleChannelsLayerCPUTestParamsSet>,
                                      virtual public SubgraphBaseTest, public CPUTestsBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<ShuffleChannelsLayerCPUTestParamsSet> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<ShuffleChannelsLayerCPUTestParamsSet> &obj) {
         InputShape shapes;
         ElementType inType;
         LayerTestsDefinitions::shuffleChannelsSpecificParams shuffleChannelsParams;
@@ -66,7 +66,7 @@ protected:
         init_input_shapes({shapes});
 
         auto params = ngraph::builder::makeDynamicParams(inType, inputDynamicShapes);
-        auto shuffleChannels = std::dynamic_pointer_cast<ngraph::opset3::ShuffleChannels>(
+        auto shuffleChannels = ov::as_type_ptr<ngraph::opset3::ShuffleChannels>(
                 ngraph::builder::makeShuffleChannels(params[0], axis, group));
         function = makeNgraphFunction(inType, params, shuffleChannels, "ShuffleChannels");
     }
