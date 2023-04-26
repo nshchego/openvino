@@ -5,24 +5,10 @@
 #include "subgraph.h"
 
 #include <ie_parallel.hpp>
-
-#include <vector>
-#include <algorithm>
-#include <array>
-#include <tuple>
-
-#include <dnnl_debug.h>
-#include <onednn/dnnl.h>
-#include <dnnl_extension_utils.h>
-
-#include <ngraph/opsets/opset1.hpp>
-#include <ngraph/pass/visualize_tree.hpp>
-#include <ngraph/rt_info.hpp>
-#include <ie_ngraph_utils.hpp>
-
-#include <snippets/op/subgraph.hpp>
+#include <openvino/op/parameter.hpp>
 #include "snippets/pass/matmul_to_brgemm.hpp"
 #include "utils/cpu_utils.hpp"
+
 #include "emitters/x64/cpu_generator.hpp"
 #include "transformations/snippets/x64/pass/fuse_load_store_and_convert.hpp"
 #include "transformations/snippets/x64/pass/mul_add_to_fma.hpp"
@@ -86,7 +72,7 @@ Snippet::Snippet(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
 void Snippet::copy_snippet() {
     ngraph::OutputVector subgraph_node_inputs;
     for (const auto &input : original_snippet->input_values()) {
-        auto new_input = std::make_shared<ngraph::opset1::Parameter>(input.get_element_type(), input.get_partial_shape());
+        auto new_input = std::make_shared<op::v0::Parameter>(input.get_element_type(), input.get_partial_shape());
         subgraph_node_inputs.push_back(new_input);
     }
     std::shared_ptr<ov::Model> new_body = nullptr;
@@ -328,7 +314,7 @@ ov::PartialShape Snippet::canonicalizeBody() {
             dims.emplace_back(d == Shape::UNDEFINED_DIM ? -1 : d);
         ngraph::PartialShape shape(dims);
         ngraph::AxisVector blocking(blockedDesc->getOrder());
-        ngraph::element::Type precision = InferenceEngine::details::convertPrecision(blockedDesc->getPrecision());
+        ov::element::Type precision = InferenceEngine::details::convertPrecision(blockedDesc->getPrecision());
         return ngraph::snippets::op::Subgraph::BlockedShape{shape, blocking, precision};
     };
     inputShapeIsBlocked.resize(inputShapes.size(), false);
@@ -560,14 +546,14 @@ void Snippet::generate(const jit_snippets_compile_args* jcp) {
     // LoadConvert uses Load emitter that support conversion from any type to only f32
     post_precision.get_pass_config()->set_callback<ov::intel_cpu::pass::FuseLoadConvert>(
             [](const std::shared_ptr<const ov::Node>& n) -> bool {
-                if (const auto& convert = std::dynamic_pointer_cast<const ov::op::v0::Convert>(n))
+                if (auto convert = ov::as_type<const ov::op::v0::Convert>(n.get()))
                     return convert->get_destination_type() != ov::element::f32;
                 return true;
             });
     // StoreConvert uses Store emitter that support conversion from only f32 to any types
     post_precision.get_pass_config()->set_callback<ov::intel_cpu::pass::FuseStoreConvert>(
             [](const std::shared_ptr<const ov::Node>& n) -> bool {
-                if (const auto& convert = std::dynamic_pointer_cast<const ov::op::v0::Convert>(n))
+                if (auto convert = ov::as_type<const ov::op::v0::Convert>(n.get()))
                     return convert->get_input_element_type(0) != ov::element::f32;
                 return true;
             });

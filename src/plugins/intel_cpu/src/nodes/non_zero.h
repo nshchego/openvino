@@ -5,12 +5,6 @@
 #pragma once
 
 #include <node.h>
-#include <string>
-#include <memory>
-#include <vector>
-#include <dnnl_extension_utils.h>
-
-#include <cpu/platform.hpp>
 
 namespace ov {
 namespace intel_cpu {

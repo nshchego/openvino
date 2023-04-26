@@ -2,14 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-#include <algorithm>
-
-#include <ngraph/opsets/opset6.hpp>
-#include "ie_parallel.hpp"
-#include "common/cpu_memcpy.h"
 #include "experimental_detectron_topkrois.h"
+
+#include <openvino/op/experimental_detectron_topkrois.hpp>
+#include "common/cpu_memcpy.h"
 
 using namespace InferenceEngine;
 
@@ -19,8 +15,7 @@ namespace node {
 
 bool ExperimentalDetectronTopKROIs::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto topKROI = std::dynamic_pointer_cast<const ngraph::opset6::ExperimentalDetectronTopKROIs>(op);
-        if (!topKROI) {
+        if (op->get_type_info() != ov::op::v6::ExperimentalDetectronTopKROIs::get_type_info_static()) {
             errorMessage = "Only opset6 ExperimentalDetectronTopKROIs operation is supported";
             return false;
         }
@@ -38,7 +33,7 @@ ExperimentalDetectronTopKROIs::ExperimentalDetectronTopKROIs(const std::shared_p
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto topKROI = std::dynamic_pointer_cast<const ngraph::opset6::ExperimentalDetectronTopKROIs>(op);
+    const auto topKROI = ov::as_type<const ov::op::v6::ExperimentalDetectronTopKROIs>(op.get());
     if (topKROI == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of ExperimentalDetectronTopKROIs from opset6.";

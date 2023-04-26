@@ -29,11 +29,11 @@ ngraph::matcher_pass_callback ov::intel_cpu::ConvertConv1DBase::convert_conv1d_t
         auto weights = conv->input_value(1);
         auto input2d_shape = input_shape;
         input2d_shape.push_back(1);
-        auto in2d_shape = std::make_shared<ov::opset8::Constant>(ngraph::element::i64, ngraph::Shape{4}, input2d_shape);
+        auto in2d_shape = std::make_shared<ov::opset8::Constant>(ov::element::i64, ngraph::Shape{4}, input2d_shape);
 
         auto weights2d_shape = weights.get_shape();
         weights2d_shape.push_back(1);
-        auto w_shape = std::make_shared<ov::opset8::Constant>(ngraph::element::i64, ngraph::Shape{weights2d_shape.size()}, weights2d_shape);
+        auto w_shape = std::make_shared<ov::opset8::Constant>(ov::element::i64, ngraph::Shape{weights2d_shape.size()}, weights2d_shape);
 
         auto input2d   = std::make_shared<ov::opset8::Reshape>(input, in2d_shape, true);
         auto weights2d = std::make_shared<ov::opset8::Reshape>(weights, w_shape, true);
@@ -46,7 +46,7 @@ ngraph::matcher_pass_callback ov::intel_cpu::ConvertConv1DBase::convert_conv1d_t
                                              ngraph::Strides{conv->get_dilations()[0], 1},
                                              conv->get_auto_pad());
 
-        auto in_shape = std::make_shared<ov::opset8::Constant>(ngraph::element::i64, ngraph::Shape{3}, conv->get_output_shape(0));
+        auto in_shape = std::make_shared<ov::opset8::Constant>(ov::element::i64, ngraph::Shape{3}, conv->get_output_shape(0));
         auto reshape = std::make_shared<ov::opset8::Reshape>(conv2d, in_shape, true);
 
         reshape->set_friendly_name(conv->get_friendly_name());

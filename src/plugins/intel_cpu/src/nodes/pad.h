@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
-#include <string>
 
 namespace ov {
 namespace intel_cpu {

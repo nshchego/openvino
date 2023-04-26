@@ -73,7 +73,7 @@ ov::intel_cpu::ConvertTileToSeqTiles::ConvertTileToSeqTiles() {
             if (tile_dim != 1) {
                 std::vector<int64_t> dims(input_shape_rank, 1);
                 dims[cur_dim_id] = tile_dim;
-                auto const_node = std::make_shared<ngraph::opset1::Constant>(ngraph::element::i64, ngraph::Shape{input_shape_rank}, dims);
+                auto const_node = std::make_shared<ngraph::opset1::Constant>(ov::element::i64, ngraph::Shape{input_shape_rank}, dims);
                 auto new_tile = std::make_shared<ngraph::opset1::Tile>(last_node, const_node);
                 new_tile->set_friendly_name(friendly_name);
                 friendly_name += "_" + std::to_string(cur_dim_id);

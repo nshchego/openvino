@@ -116,6 +116,7 @@
 
 #include "dnnl.hpp"
 #include <cpu/x64/cpu_isa_traits.hpp>
+#include "ie_parallel.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -134,7 +135,7 @@ bool Transformations::fuse_type_to_convert(const std::shared_ptr<ov::Node>& node
         // is converted to be 1 for boolean, but 0 for u8. Thus an Abs and Ceil node should be added before the
         // Convert node for this scenario.
         if (convert->input(0).get_element_type().is_real() &&
-            convert->get_convert_element_type() == ngraph::element::boolean && to.is_integral_number()) {
+            convert->get_convert_element_type() == ov::element::boolean && to.is_integral_number()) {
             auto abs = std::make_shared<ov::opset10::Abs>(convert->input_value(0).get_node_shared_ptr());
             auto ceil = std::make_shared<ov::opset10::Ceiling>(abs);
             auto new_convert = std::make_shared<ov::opset10::Convert>(ceil, to);

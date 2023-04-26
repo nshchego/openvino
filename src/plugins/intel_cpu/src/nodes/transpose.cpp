@@ -6,10 +6,11 @@
 #include "ie_parallel.hpp"
 #include "nodes/common/reorder_prim.h"
 
-#include <algorithm>
-#include <string>
 #include <dnnl_extension_utils.h>
 #include <common/primitive_hashing_utils.hpp>
+#include <openvino/op/constant.hpp>
+#include <openvino/op/transpose.hpp>
+#include "utils/debug_capabilities.h"
 
 using namespace dnnl;
 using namespace InferenceEngine;

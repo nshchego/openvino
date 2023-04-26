@@ -3,18 +3,14 @@
 //
 
 #include "scatter_update.h"
-#include <string>
-#include <vector>
-#include <onednn/dnnl.h>
-#include <dnnl_extension_utils.h>
-#include "ie_parallel.hpp"
-#include <algorithm>
+
 #include "common/cpu_memcpy.h"
+#include "ie_parallel.hpp"
 
-#include <ngraph/opsets/opset3.hpp>
-#include <ngraph/opsets/opset4.hpp>
+#include <openvino/op/scatter_elements_update.hpp>
+#include <openvino/op/scatter_nd_update.hpp>
+#include <openvino/op/scatter_update.hpp>
 
-using namespace dnnl;
 using namespace InferenceEngine;
 
 namespace ov {
@@ -23,10 +19,9 @@ namespace node {
 
 bool ScatterUpdate::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        auto scatterElemUpd = ngraph::as_type_ptr<const ngraph::opset3::ScatterElementsUpdate>(op);
-        auto scatterUpd = ngraph::as_type_ptr<const ngraph::opset3::ScatterUpdate>(op);
-        auto scatterNdUpd = ngraph::as_type_ptr<const ngraph::opset4::ScatterNDUpdate>(op);
-        if (!scatterElemUpd && !scatterUpd && !scatterNdUpd) {
+        if (!one_of(op->get_type_info(), op::v3::ScatterElementsUpdate::get_type_info_static(),
+                                         op::v3::ScatterUpdate::get_type_info_static(),
+                                         op::v3::ScatterNDUpdate::get_type_info_static())) {
             const std::string opType = op->get_type_name();
             errorMessage = "Only opset" + opType == "ScatterNDUpdate" ? "4 " : "3 " + opType + " operation is supported";
             return false;

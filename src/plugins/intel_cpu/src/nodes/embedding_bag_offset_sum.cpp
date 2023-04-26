@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
 #include "embedding_bag_offset_sum.h"
-#include <ngraph/opsets/opset3.hpp>
+
+#include <openvino/op/embeddingbag_offsets_sum.hpp>
 
 using namespace InferenceEngine;
 
@@ -16,7 +14,7 @@ namespace node {
 
 bool EmbeddingBagOffsetSum::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto embBagOffsetSumOp = ngraph::as_type_ptr<const ngraph::op::v3::EmbeddingBagOffsetsSum>(op);
+        const auto embBagOffsetSumOp = ov::as_type_ptr<const ov::op::v3::EmbeddingBagOffsetsSum>(op);
         if (!embBagOffsetSumOp) {
             errorMessage = "Node is not an instance of the EmbeddingBagOffsetsSum operation from opset v3.";
             return false;

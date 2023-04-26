@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include "utils/bfloat16.hpp"
-#include <selective_build.h>
-#include <ngraph/opsets/opset1.hpp>
 #include "psroi_pooling.h"
-#include <cpu/x64/jit_generator.hpp>
-#include <nodes/common/blocked_desc_creator.h>
+
+#include "ie_parallel.hpp"
+#include <openvino/op/deformable_psroi_pooling.hpp>
+#include <openvino/op/psroi_pooling.hpp>
+// #include <cpu/x64/jit_generator.hpp>
+#include "cpu/x64/cpu_isa_traits.hpp"
+#include "utils/bfloat16.hpp"
+#include <utils/ngraph_utils.hpp>
+#include "utils/debug_capabilities.h"
 
 using namespace InferenceEngine;
-using namespace dnnl;
-using namespace dnnl::impl;
-using namespace dnnl::impl::cpu::x64;
-using namespace dnnl::impl::utils;
+using namespace dnnl::impl::cpu;
+// using namespace dnnl;
+// using namespace dnnl::impl;
+// using namespace dnnl::impl::cpu::x64;
+// using namespace dnnl::impl::utils;
 
 namespace ov {
 namespace intel_cpu {
@@ -30,8 +30,8 @@ bool PSROIPooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& o
             errorMessage = "Doesn't support op with dynamic shapes";
             return false;
         }
-        const auto psroi = std::dynamic_pointer_cast<const ngraph::opset1::PSROIPooling>(op);
-        const auto defPsroi = std::dynamic_pointer_cast<const ngraph::opset1::DeformablePSROIPooling>(op);
+        const auto psroi = ov::as_type<const ov::op::v0::PSROIPooling>(op.get());
+        const auto defPsroi = ov::as_type<const ov::op::v1::DeformablePSROIPooling>(op.get());
         if (!psroi && !defPsroi) {
             errorMessage = "Only opset1 PSROIPooling and DeformablePSROIPooling operations are supported";
             return false;
@@ -64,8 +64,8 @@ PSROIPooling::PSROIPooling(const std::shared_ptr<ov::Node>& op, const GraphConte
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto psroi = std::dynamic_pointer_cast<const ngraph::opset1::PSROIPooling>(op);
-    const auto defPsroi = std::dynamic_pointer_cast<const ngraph::opset1::DeformablePSROIPooling>(op);
+    const auto psroi = ov::as_type<const ov::op::v0::PSROIPooling>(op.get());
+    const auto defPsroi = ov::as_type<const ov::op::v1::DeformablePSROIPooling>(op.get());
 
     noTrans = op->get_input_size() == 2;
     if (op->get_input_shape(0).size() != 4)
@@ -131,11 +131,11 @@ void PSROIPooling::initSupportedPrimitiveDescriptors() {
         return;
 
     impl_desc_type impl_type;
-    if (mayiuse(cpu::x64::avx512_core)) {
+    if (x64::mayiuse(x64::avx512_core)) {
         impl_type = impl_desc_type::jit_avx512;
-    } else if (mayiuse(cpu::x64::avx2)) {
+    } else if (x64::mayiuse(x64::avx2)) {
         impl_type = impl_desc_type::jit_avx2;
-    } else if (mayiuse(cpu::x64::sse41)) {
+    } else if (x64::mayiuse(x64::sse41)) {
         impl_type = impl_desc_type::jit_sse42;
     } else {
         impl_type = impl_desc_type::ref;

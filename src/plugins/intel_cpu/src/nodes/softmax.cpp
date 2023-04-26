@@ -4,13 +4,9 @@
 
 #include "softmax.h"
 
-#include <string>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
-#include <memory_desc/cpu_memory_desc_utils.h>
-#include <ngraph/opsets/opset1.hpp>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
+#include <openvino/op/softmax.hpp>
 #include <common/primitive_hashing_utils.hpp>
+#include "utils/debug_capabilities.h"
 #include <utils/shape_inference/shape_inference_pass_through.hpp>
 
 using namespace dnnl;
@@ -57,7 +53,7 @@ bool SoftmaxKey::operator==(const SoftmaxKey& rhs) const {
 
 bool SoftMax::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!std::dynamic_pointer_cast<const ngraph::opset1::Softmax>(op)) {
+        if (op->get_type_info() != op::v1::Softmax::get_type_info_static()) {
             errorMessage = "Only opset1 Softmax operation is supported";
             return false;
         }
@@ -73,7 +69,7 @@ SoftMax::SoftMax(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    axis = ngraph::as_type_ptr<ngraph::op::v1::Softmax>(op)->get_axis();
+    axis = ov::as_type_ptr<ov::op::v1::Softmax>(op)->get_axis();
 }
 
 void SoftMax::getSupportedDescriptors() {

@@ -4,29 +4,15 @@
 
 #include "fullyconnected.h"
 
+#include "common/primitive_hashing_utils.hpp"
+#include "cpu/x64/cpu_isa_traits.hpp"
 #include "eltwise.h"
-#include "input.h"
 #include "fake_quantize.h"
 #include "input.h"
-#include "reorder.h"
 #include "transformations/cpu_opset/common/op/fully_connected.hpp"
-#include "ngraph/opsets/opset1.hpp"
-#include "dnnl_extension_utils.h"
-#include "onednn/dnnl.h"
-#include "utils/general_utils.h"
-#include "memory_desc/cpu_memory_desc_utils.h"
-#include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "utils/cpu_utils.hpp"
+#include "openvino/op/constant.hpp"
+#include "utils/debug_capabilities.h"
 
-#include "onednn/dnnl.h"
-#include "oneapi/dnnl/dnnl.hpp"
-#include "cpu/x64/cpu_isa_traits.hpp"
-#include "common/primitive_hashing_utils.hpp"
-#include "common/primitive_desc.hpp"
-#include "common/primitive_desc_iface.hpp"
-
-#include <string>
-#include <vector>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -137,17 +123,16 @@ private:
 
 bool FullyConnected::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto fc = std::dynamic_pointer_cast<const FullyConnectedNode>(op);
-        if (!fc) {
+        if (op->get_type_info() != FullyConnectedNode::get_type_info_static()) {
             errorMessage = "Only legacy FullyConnected operation is supported";
             return false;
         }
-        if (fc->get_input_size() == 3 && std::dynamic_pointer_cast<const ngraph::opset1::Constant>(fc->get_input_node_shared_ptr(BIAS_ID)) == nullptr) {
+        if (op->get_input_size() == 3 && op->get_input_node_shared_ptr(BIAS_ID)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
             errorMessage = "Only Constant operation on 'bias' input is supported";
             return false;
         }
-        const auto inRank = fc->get_input_partial_shape(DATA_ID).size();
-        const auto weightRank = fc->get_input_partial_shape(WEIGHTS_ID).size();
+        const auto inRank = op->get_input_partial_shape(DATA_ID).size();
+        const auto weightRank = op->get_input_partial_shape(WEIGHTS_ID).size();
         if (!one_of(inRank, 2u, 3u, 4u)) {
             errorMessage = "Doesn't support 'data' input with rank: " + std::to_string(inRank);
             return false;

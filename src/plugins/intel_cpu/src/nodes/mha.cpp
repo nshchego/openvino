@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-
 #include "ie_parallel.hpp"
 #include "mha.h"
-#include <ngraph/opsets/opset1.hpp>
 #include "common/cpu_memcpy.h"
 #include <utils/general_utils.h>
 #include <cpu/x64/jit_generator.hpp>
@@ -17,6 +13,7 @@
 #include "transformations/cpu_opset/x64/op/mha.hpp"
 #include "dnnl_extension_utils.h"
 #include <ie_ngraph_utils.hpp>
+#include <utils/ngraph_utils.hpp>
 
 using namespace InferenceEngine;
 using namespace InferenceEngine::details;
@@ -25,7 +22,6 @@ using namespace dnnl::impl::cpu::x64;
 using namespace dnnl::impl::cpu::x64::matmul;
 using namespace Xbyak;
 
-#define THROW_ERROR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
 
 namespace ov {
 namespace intel_cpu {
@@ -665,7 +661,7 @@ private:
 
 bool MHA::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto mha = std::dynamic_pointer_cast<const MHANode>(op);
+        auto mha = ov::as_type<const MHANode>(op.get());
         if (!mha) {
             errorMessage = "Only MHA from CPU internal opset is supported";
             return false;
@@ -740,13 +736,13 @@ bool MHA::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::s
 }
 
 MHA::MHA(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto mha = std::dynamic_pointer_cast<const MHANode>(op);
+    auto mha = ov::as_type<const MHANode>(op.get());
     mulScales = mha->get_mul_scales();
     isMulFirst = mha->get_is_mul_first();
     fqScales0 = mha->get_fq_scales0();
@@ -763,7 +759,7 @@ void MHA::initSupportedPrimitiveDescriptors() {
     for (auto idx : {0, 1, 2, 3}) {
         inputPrecisions.push_back(getOriginalInputPrecisionAtPort(idx));
         if (!one_of(inputPrecisions[idx], Precision::FP32, Precision::BF16, Precision::I8))
-            THROW_ERROR << "doesn't support " << inputPrecisions[idx].name() << " precision on " << idx <<  " input port";
+            THROW_CPU_NODE_ERR << "doesn't support " << inputPrecisions[idx].name() << " precision on " << idx <<  " input port";
     }
 
     if ((inputPrecisions[0] != inputPrecisions[1]) &&
@@ -778,7 +774,7 @@ void MHA::initSupportedPrimitiveDescriptors() {
 
 
     if (!one_of(getOriginalOutputPrecisionAtPort(0), Precision::FP32, Precision::BF16, Precision::I8, Precision::U8))
-        THROW_ERROR << "doesn't support " << getOriginalOutputPrecisionAtPort(0).name() << " precision on output port";
+        THROW_CPU_NODE_ERR << "doesn't support " << getOriginalOutputPrecisionAtPort(0).name() << " precision on output port";
 
     addSupportedPrimDesc({{LayoutType::ncsp, inputPrecisions[0]},
                           {LayoutType::ncsp, inputPrecisions[1]},
@@ -799,7 +795,7 @@ void MHA::init_brgemm(brgemmCtx& ctx, std::unique_ptr<brgemm_kernel_t>& brgKerne
     auto status = brgemm_desc_init(&brgDesc, isa, brgemm_strd, ctx.dt_in0, ctx.dt_in1,
             false, false, brgemm_row_major, 1.f, ctx.beta, ctx.LDA, ctx.LDB, ctx.LDC, ctx.M, ctx.N, ctx.K, &strides);
     if (status != dnnl_success) {
-        THROW_ERROR << "cannot be executed due to invalid brgconv params";
+        THROW_CPU_NODE_ERR << "cannot be executed due to invalid brgconv params";
     }
 
     ctx.is_with_amx = use_amx;
@@ -813,7 +809,7 @@ void MHA::init_brgemm(brgemmCtx& ctx, std::unique_ptr<brgemm_kernel_t>& brgKerne
     brgemm_kernel_t* brgKernel_ = nullptr;
     status = brgemm_kernel_create(&brgKernel_, brgDesc);
     if (status != dnnl_success) {
-        THROW_ERROR << "cannot be executed due to invalid brgconv params";
+        THROW_CPU_NODE_ERR << "cannot be executed due to invalid brgconv params";
     }
     brgKernel.reset(brgKernel_);
 }
@@ -1086,7 +1082,7 @@ void MHA::prepareParams() {
         } else if (mayiuse(cpu_isa_t::sse41)) {
             mulAddSoftmaxKernel.reset(new jit_mul_add_softmax_kernel<cpu_isa_t::sse41>(jcp));
         } else {
-            THROW_ERROR << "cannot create jit eltwise kernel";
+            THROW_CPU_NODE_ERR << "cannot create jit eltwise kernel";
         }
     }
 
@@ -1107,7 +1103,7 @@ void MHA::prepareParams() {
         } else if (mayiuse(cpu_isa_t::sse41)) {
             convertReorderKernel.reset(new jit_convert_reorder_kernel<cpu_isa_t::sse41>(jcp));
         } else {
-            THROW_ERROR << "cannot create jit eltwise kernel";
+            THROW_CPU_NODE_ERR << "cannot create jit eltwise kernel";
         }
     }
 
@@ -1130,7 +1126,7 @@ void MHA::prepareParams() {
         } else if (mayiuse(cpu_isa_t::sse41)) {
             convertTransposeKernel.reset(new jit_convert_transpose_kernel<cpu_isa_t::sse41>(jcp));
         } else {
-            THROW_ERROR << "cannot create jit eltwise kernel";
+            THROW_CPU_NODE_ERR << "cannot create jit eltwise kernel";
         }
     }
 
@@ -1392,7 +1388,7 @@ void MHA::execute(dnnl::stream strm) {
     } else if (inputPrecisions[1] == Precision::I8) {
         mhaImpl<int8_t>();
     } else {
-        THROW_ERROR << "doesn't support provided input precisions";
+        THROW_CPU_NODE_ERR << "doesn't support provided input precisions";
     }
 }
 

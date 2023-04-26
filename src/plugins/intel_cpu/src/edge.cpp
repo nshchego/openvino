@@ -3,10 +3,12 @@
 //
 
 #include "edge.h"
+
 #include "node.h"
 #include "dnnl_extension_utils.h"
 #include <blob_factory.hpp>
 #include "nodes/input.h"
+#include "utils/debug_capabilities.h"
 
 using namespace dnnl;
 namespace ov {

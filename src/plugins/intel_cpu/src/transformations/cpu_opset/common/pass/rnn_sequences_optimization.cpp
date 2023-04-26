@@ -55,8 +55,8 @@ namespace {
 
             auto shapeBeforeTranspose = ov::op::util::make_try_fold<ngraph::opset1::ShapeOf>(in_0);
             auto newInShape = ov::op::util::make_try_fold<ngraph::opset8::Gather>(shapeBeforeTranspose,
-                ngraph::opset1::Constant::create(ngraph::element::i32, { 3 }, { 1, 0, 2 }),
-                ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
+                ngraph::opset1::Constant::create(ov::element::i32, { 3 }, { 1, 0, 2 }),
+                ngraph::opset1::Constant::create(ov::element::i32, {}, { 0 }));
             auto reshape1 = std::make_shared<ngraph::opset1::Reshape>(in_0, newInShape, false);
             ngraph::copy_runtime_info(sequenceOp->get_input_node_shared_ptr(0), reshape1);
             ngraph::replace_node(sequenceOp->get_input_node_shared_ptr(0), reshape1);
@@ -68,8 +68,8 @@ namespace {
 
             auto lstmOutShape = ov::op::util::make_try_fold<ngraph::opset1::ShapeOf>(sequenceOp->output(0));
             auto newOutShape = ov::op::util::make_try_fold<ngraph::opset8::Gather>(lstmOutShape,
-                ngraph::opset1::Constant::create(ngraph::element::i32, { 4 }, { 2, 1, 0, 3 }),
-                ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
+                ngraph::opset1::Constant::create(ov::element::i32, { 4 }, { 2, 1, 0, 3 }),
+                ngraph::opset1::Constant::create(ov::element::i32, {}, { 0 }));
 
             auto reshape2 = std::make_shared<ngraph::opset1::Reshape>(sequenceOp->output(0), newOutShape, false);
             reshape2->set_friendly_name(transposeAfter->get_friendly_name());

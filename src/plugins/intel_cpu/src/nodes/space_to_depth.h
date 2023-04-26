@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
-#include <string>
 #include "common/permute_kernel.h"
 
 namespace ov {

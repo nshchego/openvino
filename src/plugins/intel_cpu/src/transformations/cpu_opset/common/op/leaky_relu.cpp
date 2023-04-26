@@ -7,7 +7,7 @@
 
 ov::intel_cpu::LeakyReluNode::LeakyReluNode(const ngraph::Output<ov::Node> &data,
                                            const float &negative_slope,
-                                           const ngraph::element::Type output_type)
+                                           const ov::element::Type output_type)
     : Op({data}), m_negative_slope(negative_slope), m_output_type(output_type) {
     validate_and_infer_types();
 }
@@ -22,7 +22,7 @@ void ov::intel_cpu::LeakyReluNode::validate_and_infer_types() {
     INTERNAL_OP_SCOPE(LeakyReluNode_validate_and_infer_types);
     set_output_type(
         0,
-        m_output_type == ngraph::element::undefined ? get_input_element_type(0) : m_output_type,
+        m_output_type == ov::element::undefined ? get_input_element_type(0) : m_output_type,
         get_input_partial_shape(0));
 }
 

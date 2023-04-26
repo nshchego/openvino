@@ -4,10 +4,10 @@
 
 #include "non_zero.h"
 
-#include <nodes/common/cpu_memcpy.h>
-
+#include <cpu/platform.hpp>
 #include <ie_parallel.hpp>
-#include <ngraph/opsets/opset3.hpp>
+#include <nodes/common/cpu_memcpy.h>
+#include <openvino/op/non_zero.hpp>
 #include <utils/bfloat16.hpp>
 #include <utils/shape_inference/shape_inference_internal_dyn.hpp>
 
@@ -22,7 +22,7 @@ static constexpr int elementsStride = blockSize / sizeof(int);
 
 bool NonZero::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (op->get_type_info() != ngraph::op::v3::NonZero::get_type_info_static()) {
+        if (op->get_type_info() != ov::op::v3::NonZero::get_type_info_static()) {
             errorMessage = "Node is not an instance of NonZero from the operation set v3.";
             return false;
         }
@@ -38,7 +38,7 @@ NonZero::NonZero(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    if (op->get_output_element_type(0) != ngraph::element::i32) {
+    if (op->get_output_element_type(0) != ov::element::i32) {
         THROW_CPU_NODE_ERR << "doesn't support demanded output precision";
     }
 }

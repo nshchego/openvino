@@ -5,10 +5,6 @@
 #pragma once
 
 #include <node.h>
-#include <string>
-#include <memory>
-#include <vector>
-#include <tuple>
 #include "executors/mvn_list.hpp"
 
 namespace ov {

@@ -2,14 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include <selective_build.h>
 #include "batch_to_space.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset2.hpp>
+
+#include "ie_parallel.hpp"
+#include <openvino/op/batch_to_space.hpp>
 
 using namespace InferenceEngine;
 
@@ -19,8 +15,7 @@ namespace node {
 
 bool BatchToSpace::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto batchToSpace = std::dynamic_pointer_cast<const ngraph::opset2::BatchToSpace>(op);
-        if (!batchToSpace) {
+        if (op->get_type_info() != ov::op::v1::BatchToSpace::get_type_info_static()) {
             errorMessage = "Only opset2 BatchToSpace operation is supported";
             return false;
         }

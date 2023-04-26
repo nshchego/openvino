@@ -5,12 +5,6 @@
 #pragma once
 
 #include <node.h>
-
-#include <ie_common.h>
-#include <string>
-#include <memory>
-#include <vector>
-
 #include "common/dnnl_executor.h"
 
 namespace ov {

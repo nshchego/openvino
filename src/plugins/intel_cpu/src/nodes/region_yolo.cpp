@@ -2,18 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
 #include "region_yolo.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset1.hpp>
+
 #include "common/cpu_convert.h"
-#include <cpu/x64/jit_generator.hpp>
 #include "emitters/x64/jit_bf16_emitters.hpp"
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
+#include <openvino/op/region_yolo.hpp>
 #include "utils/bfloat16.hpp"
 
 using namespace InferenceEngine;
@@ -232,8 +226,7 @@ private:
 
 bool RegionYolo::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto regionYolo = std::dynamic_pointer_cast<const ngraph::opset1::RegionYolo>(op);
-        if (!regionYolo) {
+        if (op->get_type_info() != ov::op::v0::RegionYolo::get_type_info_static()) {
             errorMessage = "Only opset1 RegionYolo operation is supported";
             return false;
         }
@@ -248,7 +241,7 @@ bool RegionYolo::needPrepareParams() const {
 }
 
 RegionYolo::RegionYolo(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
@@ -257,7 +250,7 @@ RegionYolo::RegionYolo(const std::shared_ptr<ov::Node>& op, const GraphContext::
     if (op->get_input_size() != 1 || op->get_output_size() != 1)
         THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
-    const auto regionYolo = std::dynamic_pointer_cast<const ngraph::opset1::RegionYolo>(op);
+    auto regionYolo = ov::as_type<const ov::op::v0::RegionYolo>(op.get());
     classes = regionYolo->get_num_classes();
     coords = regionYolo->get_num_coords();
     num = regionYolo->get_num_regions();

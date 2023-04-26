@@ -2,16 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include "utils/bfloat16.hpp"
-#include <selective_build.h>
 #include "space_to_batch.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset2.hpp>
+
+#include "ie_parallel.hpp"
+#include <openvino/op/space_to_batch.hpp>
 
 using namespace InferenceEngine;
 
@@ -21,8 +15,7 @@ namespace node {
 
 bool SpaceToBatch::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto spaceToBatch = std::dynamic_pointer_cast<const ngraph::opset2::SpaceToBatch>(op);
-        if (!spaceToBatch) {
+        if (op->get_type_info() != ov::op::v1::SpaceToBatch::get_type_info_static()) {
             errorMessage = "Only opset2 SpaceToBatch operation is supported";
             return false;
         }
@@ -33,7 +26,7 @@ bool SpaceToBatch::isSupportedOperation(const std::shared_ptr<const ov::Node>& o
 }
 
 SpaceToBatch::SpaceToBatch(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, NgraphShapeInferFactory(op, PortMask(1, 2, 3))) {
+        : Node(op, context, NgraphShapeInferFactory(op, PortMask(1, 2, 3))) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
@@ -55,7 +48,7 @@ void SpaceToBatch::initSupportedPrimitiveDescriptors() {
         return;
 
     const auto &inDims = getInputShapeAtPort(0).getDims();
-    const auto precision = getOriginalInputPrecisionAtPort(0);
+    const auto &precision = getOriginalInputPrecisionAtPort(0);
     const std::set<size_t> supported_precision_sizes = {1, 2, 4, 8};
     if (supported_precision_sizes.find(precision.size()) == supported_precision_sizes.end())
         THROW_CPU_NODE_ERR << " has unsupported precision: " << precision.name();

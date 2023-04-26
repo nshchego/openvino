@@ -4,24 +4,11 @@
 
 #include "roi_pooling.h"
 
-#include <onednn/dnnl.h>
-#include <dnnl_extension_utils.h>
-#include <selective_build.h>
-
-#include <ngraph/opsets/opset2.hpp>
-
-#include "ie_parallel.hpp"
-#include "utils/bfloat16.hpp"
-#include "emitters/x64/jit_load_store_emitters.hpp"
-
-#include <cpu/x64/jit_generator.hpp>
 #include <common/primitive_hashing_utils.hpp>
-
-#include <string>
-#include <vector>
-#include <memory>
-#include <algorithm>
-#include <cmath>
+#include <cpu/x64/jit_generator.hpp>
+#include "emitters/x64/jit_load_store_emitters.hpp"
+#include "ie_parallel.hpp"
+#include <openvino/op/roi_pooling.hpp>
 
 using namespace InferenceEngine;
 using namespace dnnl;
@@ -369,7 +356,7 @@ bool jit_roi_pooling_params::operator==(const jit_roi_pooling_params &rhs) const
 
 bool ROIPooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        auto roiPooling = ngraph::as_type_ptr<const ngraph::opset2::ROIPooling>(op);
+        auto roiPooling = ov::as_type_ptr<const ov::op::v0::ROIPooling>(op);
         if (!roiPooling) {
             errorMessage = "Only opset2 ROIPooling operation is supported";
             return false;
@@ -392,7 +379,7 @@ ROIPooling::ROIPooling(const std::shared_ptr<ov::Node>& op, const GraphContext::
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto roiPooling = ngraph::as_type_ptr<const ngraph::opset2::ROIPooling>(op);
+    auto roiPooling = ov::as_type_ptr<const ov::op::v0::ROIPooling>(op);
     refParams.pooled_h = roiPooling->get_output_roi()[0];
     refParams.pooled_w = roiPooling->get_output_roi()[1];
     refParams.spatial_scale = roiPooling->get_spatial_scale();

@@ -4,9 +4,10 @@
 
 #pragma once
 
-#include "ngraph/opsets/opset5.hpp"
-#include "transformations/cpu_opset/common/op/swish_cpu.hpp"
 #include "jit_dnnl_emitters.hpp"
+#include "openvino/op/round.hpp"
+#include "transformations/cpu_opset/common/op/swish_cpu.hpp"
+#include "utils/ngraph_utils.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -169,12 +170,12 @@ public:
         InferenceEngine::Precision exec_prc = InferenceEngine::Precision::FP32) : jit_dnnl_emitter(host, host_isa, n, exec_prc) {
         const auto round = getNgraphOpAs<ngraph::op::v5::Round>(n);
         const auto mode = round->get_mode();
-        if ((mode != ngraph::opset5::Round::RoundMode::HALF_AWAY_FROM_ZERO) &&
-            (mode != ngraph::opset5::Round::RoundMode::HALF_TO_EVEN)) {
+        if ((mode != ngraph::op::v5::Round::RoundMode::HALF_AWAY_FROM_ZERO) &&
+            (mode != ngraph::op::v5::Round::RoundMode::HALF_TO_EVEN)) {
             IE_THROW(NotImplemented) << "Round emitter doesn't support ngraph operation Round with mode: " << static_cast<int>(mode);
         }
 
-        kind = mode == ngraph::opset5::Round::RoundMode::HALF_AWAY_FROM_ZERO ?
+        kind = mode == ngraph::op::v5::Round::RoundMode::HALF_AWAY_FROM_ZERO ?
             dnnl_eltwise_round_half_away_from_zero :
             dnnl_eltwise_round_half_to_even;
         set_injector();

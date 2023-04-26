@@ -4,16 +4,9 @@
 
 #pragma once
 
-#include <ie_common.h>
-
-#include <onednn/dnnl.h>
-#include <cpu/x64/jit_generator.hpp>
-#include "emitters/x64/jit_snippets_emitters.hpp"
-
 #include <node.h>
+#include "emitters/x64/jit_snippets_emitters.hpp"
 #include "snippets/op/subgraph.hpp"
-
-#include <array>
 
 namespace ov {
 namespace intel_cpu {

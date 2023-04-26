@@ -4,24 +4,18 @@
 
 #include "concat.h"
 
-#include <map>
-#include <utility>
-#include <vector>
 #include <dnnl_extension_utils.h>
-
 #include <onednn/dnnl.h>
 #include <onednn/iml_type_mapper.h>
-#include <edge.h>
 #include <cpu_memory.h>
 #include "ie_parallel.hpp"
-#include "conv.h"
-#include "fake_quantize.h"
-#include "pooling.h"
-#include "eltwise.h"
-#include <limits>
 #include "common/cpu_memcpy.h"
-#include "common/blocked_desc_creator.h"
-#include <memory_desc/cpu_memory_desc_utils.h>
+// #include "common/blocked_desc_creator.h"
+// #include <memory_desc/cpu_memory_desc_utils.h>
+#include "utils/debug_capabilities.h"
+
+#include <openvino/op/concat.hpp>
+
 using namespace dnnl;
 using namespace InferenceEngine;
 
@@ -38,8 +32,7 @@ bool Concat::isExecutable() const {
 
 bool Concat::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto concatOp = ngraph::as_type_ptr<const ngraph::op::v0::Concat>(op);
-        if (!concatOp) {
+        if (op->get_type_info() != ov::op::v0::Concat::get_type_info_static()) {
             errorMessage = "Node is not an instance of the Concat operation.";
             return false;
         }
@@ -57,7 +50,7 @@ Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     }
 
     const auto inRank = getInputShapeAtPort(0).getRank();
-    auto concatOp = ngraph::as_type_ptr<ngraph::op::v0::Concat>(op);
+    auto concatOp = ov::as_type_ptr<ov::op::v0::Concat>(op);
     auto axis = concatOp->get_axis();
     if (axis < 0) {
         axis += inRank;

@@ -24,25 +24,25 @@ using namespace ov::intel_cpu;
 TEST(TransformationTests, OptimizeLSTMSequenceTransposesTest) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 2, 1, 16 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
-        auto Z = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 2, 1, 16 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto Z = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(512 * 16, 0);
         auto r_val = std::vector<float>(512 * 128, 0);
         auto b_val = std::vector<float>(512, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512 }, b_val);
 
-        auto transpose_before_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
+        auto transpose_before_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
         auto transpose_before = std::make_shared<ngraph::opset1::Transpose>(X, transpose_before_const);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::LSTMSequence>(transpose_before, Y, Z, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto transpose_after_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
+        auto transpose_after_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
         auto transpose_after = std::make_shared<ngraph::opset1::Transpose>(lstm_seq->output(0), transpose_after_const);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(transpose_after);
@@ -61,25 +61,25 @@ TEST(TransformationTests, OptimizeLSTMSequenceTransposesTest) {
     }
 
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 2, 1, 16 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
-        auto Z = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 2, 1, 16 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto Z = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(512 * 16, 0);
         auto r_val = std::vector<float>(512 * 128, 0);
         auto b_val = std::vector<float>(512, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512 }, b_val);
 
-        auto reshape_before_const  = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 3 }, { 1, 2, 16 });
+        auto reshape_before_const  = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 3 }, { 1, 2, 16 });
         auto reshape_before = std::make_shared<ngraph::opset1::Reshape>(X, reshape_before_const, false);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::LSTMSequence>(reshape_before, Y, Z, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
+        auto reshape_after_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
         auto reshape_after = std::make_shared<ngraph::opset1::Reshape>(lstm_seq->output(0), reshape_after_const, false);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(reshape_after);
@@ -99,25 +99,25 @@ TEST(TransformationTests, OptimizeLSTMSequenceTransposesTest) {
 TEST(TransformationTests, OptimizeLSTMSequenceTransposesDynamicTest) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 2, -1, -1 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 1, 1, 128 });
-        auto Z = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 2, -1, -1 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 1, 1, 128 });
+        auto Z = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(512 * 16, 0);
         auto r_val = std::vector<float>(512 * 128, 0);
         auto b_val = std::vector<float>(512, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512 }, b_val);
 
-        auto transpose_before_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
+        auto transpose_before_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
         auto transpose_before = std::make_shared<ngraph::opset1::Transpose>(X, transpose_before_const);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::LSTMSequence>(transpose_before, Y, Z, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto transpose_after_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
+        auto transpose_after_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
         auto transpose_after = std::make_shared<ngraph::opset1::Transpose>(lstm_seq->output(0), transpose_after_const);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(transpose_after);
@@ -136,28 +136,28 @@ TEST(TransformationTests, OptimizeLSTMSequenceTransposesDynamicTest) {
     }
 
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 2, -1, -1 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 1, 1, 128 });
-        auto Z = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 2, -1, -1 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 1, 1, 128 });
+        auto Z = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(512 * 16, 0);
         auto r_val = std::vector<float>(512 * 128, 0);
         auto b_val = std::vector<float>(512, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 512 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 512 }, b_val);
 
         auto data = std::make_shared<ngraph::opset1::ShapeOf>(X);
         auto reshape_before_pattern = std::make_shared<ngraph::opset8::Gather>(data,
-            ngraph::opset1::Constant::create(ngraph::element::i32, { 3 }, { 1, 0, 2 }),
-            ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
+            ngraph::opset1::Constant::create(ov::element::i32, { 3 }, { 1, 0, 2 }),
+            ngraph::opset1::Constant::create(ov::element::i32, {}, { 0 }));
         auto reshape_before = std::make_shared<ngraph::opset1::Reshape>(X, reshape_before_pattern, false);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::LSTMSequence>(reshape_before, Y, Z, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
+        auto reshape_after_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
         auto reshape_after = std::make_shared<ngraph::opset1::Reshape>(lstm_seq->output(0), reshape_after_const, false);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(reshape_after);
@@ -177,24 +177,24 @@ TEST(TransformationTests, OptimizeLSTMSequenceTransposesDynamicTest) {
 TEST(TransformationTests, OptimizeRNNSequenceTransposesTest) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 2, 1, 16 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 2, 1, 16 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(128 * 16, 0);
         auto r_val = std::vector<float>(128 * 128, 0);
         auto b_val = std::vector<float>(128, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128 }, b_val);
 
-        auto transpose_before_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
+        auto transpose_before_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
         auto transpose_before = std::make_shared<ngraph::opset1::Transpose>(X, transpose_before_const);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::RNNSequence>(transpose_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto transpose_after_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
+        auto transpose_after_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
         auto transpose_after = std::make_shared<ngraph::opset1::Transpose>(lstm_seq->output(0), transpose_after_const);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(transpose_after);
@@ -211,24 +211,24 @@ TEST(TransformationTests, OptimizeRNNSequenceTransposesTest) {
     }
 
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 2, 1, 16 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 2, 1, 16 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(128 * 16, 0);
         auto r_val = std::vector<float>(128 * 128, 0);
         auto b_val = std::vector<float>(128, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128 }, b_val);
 
-        auto reshape_before_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 3 }, { 1, 2, 16 });
+        auto reshape_before_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 3 }, { 1, 2, 16 });
         auto reshape_before = std::make_shared<ngraph::opset1::Reshape>(X, reshape_before_const, false);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::RNNSequence>(reshape_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
+        auto reshape_after_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
         auto reshape_after = std::make_shared<ngraph::opset1::Reshape>(lstm_seq->output(0), reshape_after_const, false);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(reshape_after);
@@ -246,24 +246,24 @@ TEST(TransformationTests, OptimizeRNNSequenceTransposesTest) {
 TEST(TransformationTests, OptimizeRNNSequenceTransposesDynamicTest) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 2, -1, -1 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 2, -1, -1 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(128 * 16, 0);
         auto r_val = std::vector<float>(128 * 128, 0);
         auto b_val = std::vector<float>(128, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128 }, b_val);
 
-        auto transpose_before_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
+        auto transpose_before_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
         auto transpose_before = std::make_shared<ngraph::opset1::Transpose>(X, transpose_before_const);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::RNNSequence>(transpose_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto transpose_after_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
+        auto transpose_after_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
         auto transpose_after = std::make_shared<ngraph::opset1::Transpose>(lstm_seq->output(0), transpose_after_const);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(transpose_after);
@@ -280,27 +280,27 @@ TEST(TransformationTests, OptimizeRNNSequenceTransposesDynamicTest) {
     }
 
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 2, -1, -1 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 2, -1, -1 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(128 * 16, 0);
         auto r_val = std::vector<float>(128 * 128, 0);
         auto b_val = std::vector<float>(128, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 128 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 128 }, b_val);
 
         auto data = std::make_shared<ngraph::opset1::ShapeOf>(X);
         auto reshape_before_pattern = std::make_shared<ngraph::opset8::Gather>(data,
-            ngraph::opset1::Constant::create(ngraph::element::i32, { 3 }, { 1, 0, 2 }),
-            ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
+            ngraph::opset1::Constant::create(ov::element::i32, { 3 }, { 1, 0, 2 }),
+            ngraph::opset1::Constant::create(ov::element::i32, {}, { 0 }));
         auto reshape_before = std::make_shared<ngraph::opset1::Reshape>(X, reshape_before_pattern, false);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::RNNSequence>(reshape_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
+        auto reshape_after_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
         auto reshape_after = std::make_shared<ngraph::opset1::Reshape>(lstm_seq->output(0), reshape_after_const, false);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(reshape_after);
@@ -318,24 +318,24 @@ TEST(TransformationTests, OptimizeRNNSequenceTransposesDynamicTest) {
 TEST(TransformationTests, OptimizeGRUSequenceTransposesTest) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 2, 1, 16 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 2, 1, 16 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(384 * 16, 0);
         auto r_val = std::vector<float>(384 * 128, 0);
         auto b_val = std::vector<float>(384, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384 }, b_val);
 
-        auto transpose_before_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
+        auto transpose_before_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
         auto transpose_before = std::make_shared<ngraph::opset1::Transpose>(X, transpose_before_const);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::GRUSequence>(transpose_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto transpose_after_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
+        auto transpose_after_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
         auto transpose_after = std::make_shared<ngraph::opset1::Transpose>(lstm_seq->output(0), transpose_after_const);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(transpose_after);
@@ -352,24 +352,24 @@ TEST(TransformationTests, OptimizeGRUSequenceTransposesTest) {
     }
 
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 2, 1, 16 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 2, 1, 16 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(384 * 16, 0);
         auto r_val = std::vector<float>(384 * 128, 0);
         auto b_val = std::vector<float>(384, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384 }, b_val);
 
-        auto reshape_before_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 3 }, { 1, 2, 16 });
+        auto reshape_before_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 3 }, { 1, 2, 16 });
         auto reshape_before = std::make_shared<ngraph::opset1::Reshape>(X, reshape_before_const, false);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::GRUSequence>(reshape_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
+        auto reshape_after_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
         auto reshape_after = std::make_shared<ngraph::opset1::Reshape>(lstm_seq->output(0), reshape_after_const, false);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(reshape_after);
@@ -387,24 +387,24 @@ TEST(TransformationTests, OptimizeGRUSequenceTransposesTest) {
 TEST(TransformationTests, OptimizeGRUSequenceTransposesDynamicTest) {
     std::shared_ptr<ngraph::Function> f(nullptr), f_ref(nullptr);
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 2, -1, -1 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 2, -1, -1 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(384 * 16, 0);
         auto r_val = std::vector<float>(384 * 128, 0);
         auto b_val = std::vector<float>(384, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384 }, b_val);
 
-        auto transpose_before_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
+        auto transpose_before_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 3 }, { 1, 0, 2 });
         auto transpose_before = std::make_shared<ngraph::opset1::Transpose>(X, transpose_before_const);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::GRUSequence>(transpose_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto transpose_after_const = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
+        auto transpose_after_const = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 4 }, { 2, 1, 0, 3 });
         auto transpose_after = std::make_shared<ngraph::opset1::Transpose>(lstm_seq->output(0), transpose_after_const);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(transpose_after);
@@ -421,27 +421,27 @@ TEST(TransformationTests, OptimizeGRUSequenceTransposesDynamicTest) {
     }
 
     {
-        auto X = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::PartialShape{ 2, -1, -1 });
-        auto Y = std::make_shared<ngraph::opset1::Parameter>(ngraph::element::f32, ngraph::Shape{ 1, 1, 128 });
+        auto X = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::PartialShape{ 2, -1, -1 });
+        auto Y = std::make_shared<ngraph::opset1::Parameter>(ov::element::f32, ngraph::Shape{ 1, 1, 128 });
 
         auto w_val = std::vector<float>(384 * 16, 0);
         auto r_val = std::vector<float>(384 * 128, 0);
         auto b_val = std::vector<float>(384, 0);
-        auto W = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
-        auto R = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
-        auto B = ngraph::opset1::Constant::create(ngraph::element::f32, ngraph::Shape{ 1, 384 }, b_val);
+        auto W = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 16 }, w_val);
+        auto R = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384, 128 }, r_val);
+        auto B = ngraph::opset1::Constant::create(ov::element::f32, ngraph::Shape{ 1, 384 }, b_val);
 
         auto data = std::make_shared<ngraph::opset1::ShapeOf>(X);
         auto reshape_before_pattern = std::make_shared<ngraph::opset8::Gather>(data,
-            ngraph::opset1::Constant::create(ngraph::element::i32, { 3 }, { 1, 0, 2 }),
-            ngraph::opset1::Constant::create(ngraph::element::i32, {}, { 0 }));
+            ngraph::opset1::Constant::create(ov::element::i32, { 3 }, { 1, 0, 2 }),
+            ngraph::opset1::Constant::create(ov::element::i32, {}, { 0 }));
         auto reshape_before = std::make_shared<ngraph::opset1::Reshape>(X, reshape_before_pattern, false);
 
-        auto seq_lengths = ngraph::opset1::Constant::create(ngraph::element::i32, ngraph::Shape{ 1 }, { 2 });
+        auto seq_lengths = ngraph::opset1::Constant::create(ov::element::i32, ngraph::Shape{ 1 }, { 2 });
         auto lstm_seq = std::make_shared<ngraph::opset5::GRUSequence>(reshape_before, Y, seq_lengths, W, R, B, 128,
             ngraph::op::RecurrentSequenceDirection::FORWARD);
 
-        auto reshape_after_const = ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
+        auto reshape_after_const = ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{ 4 }, { 2, 1, 1, 128 });
         auto reshape_after = std::make_shared<ngraph::opset1::Reshape>(lstm_seq->output(0), reshape_after_const, false);
 
         const auto Y_out = std::make_shared<ngraph::opset1::Result>(reshape_after);

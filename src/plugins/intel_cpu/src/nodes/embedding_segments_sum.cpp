@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
 #include "embedding_segments_sum.h"
-#include <ngraph/opsets/opset3.hpp>
+#include <openvino/op/embedding_segments_sum.hpp>
 
 using namespace InferenceEngine;
 
@@ -16,7 +13,7 @@ namespace node {
 
 bool EmbeddingSegmentsSum::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto embBagSegSumOp = ngraph::as_type_ptr<const ngraph::op::v3::EmbeddingSegmentsSum>(op);
+        const auto embBagSegSumOp = ov::as_type_ptr<const ov::op::v3::EmbeddingSegmentsSum>(op);
         if (!embBagSegSumOp) {
             errorMessage = "Node is not an instance of the EmbeddingSegmentsSum operation from opset v3.";
             return false;

@@ -4,26 +4,18 @@
 
 #include "normalize.h"
 
-#include <ie_parallel.hpp>
 
-#include "fake_quantize.h"
 #include "eltwise.h"
-#include "utils/bfloat16.hpp"
-#include "utils/general_utils.h"
-#include <dnnl_extension_utils.h>
+#include "fake_quantize.h"
+#include <cpu/ref_eltwise.hpp>
+#include <ie_parallel.hpp>
+#include <openvino/op/normalize_l2.hpp>
+#include <utils/shape_inference/shape_inference_pass_through.hpp>
+
 #include "emitters/x64/jit_bf16_emitters.hpp"
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
-#include "common/cpu_memcpy.h"
-#include "nodes/common/cpu_convert.h"
-#include <selective_build.h>
-
-#include <ngraph/opsets/opset1.hpp>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "utils/cpu_utils.hpp"
-#include <common/primitive_hashing_utils.hpp>
-#include <utils/shape_inference/shape_inference_pass_through.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -35,7 +27,6 @@ using namespace Xbyak;
 #if defined(OPENVINO_ARCH_X86_64)
 #define GET_OFF(field) offsetof(jit_normalize_call_args, field)
 #endif
-#define THROW_ERROR IE_THROW() << "NormalizeL2 layer with name '" << getName() << "' "
 
 namespace ov {
 namespace intel_cpu {
@@ -699,7 +690,7 @@ private:
 #endif
 bool NormalizeL2::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        auto norm = ov::as_type_ptr<const ngraph::op::v0::NormalizeL2>(op);
+        auto norm = ov::as_type_ptr<const ov::op::v0::NormalizeL2>(op);
         if (!norm) {
             errorMessage = "Only opset1 NormalizeL2 operation is supported";
             return false;
@@ -711,7 +702,7 @@ bool NormalizeL2::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
             return false;
         }
 
-        auto axesNode = ov::as_type_ptr<const ngraph::op::v0::Constant>(norm->get_input_node_shared_ptr(AXES));
+        auto axesNode = ov::as_type_ptr<const ov::op::v0::Constant>(norm->get_input_node_shared_ptr(AXES));
         if (!axesNode) {
             errorMessage = "Supports only constant 'axes' input";
             return false;
@@ -745,8 +736,8 @@ bool NormalizeL2::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
         }
 
         const auto mode = norm->get_eps_mode();
-        if (!one_of(mode, ngraph::op::EpsMode::ADD, ngraph::op::EpsMode::MAX)) {
-            errorMessage = "Doesn't support eps_mode: " + ngraph::as_string(mode);
+        if (!one_of(mode, ov::op::EpsMode::ADD, ov::op::EpsMode::MAX)) {
+            errorMessage = "Doesn't support eps_mode: " + ov::as_string(mode);
             return false;
         }
     } catch (...) {
@@ -763,15 +754,15 @@ NormalizeL2::NormalizeL2(const std::shared_ptr<ov::Node>& op, const GraphContext
     }
 
     if (inputShapes.size() != 2 || outputShapes.size() != 1)
-        THROW_ERROR << " has incorrect number of input/output edges";
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges";
 
     if (getInputShapeAtPort(DATA).getRank() > 4 || getInputShapeAtPort(DATA).getRank() < 2) {
-        THROW_ERROR << "has invalid input shape. Normalize supports from 2D to 4D blobs.";
+        THROW_CPU_NODE_ERR << "has invalid input shape. Normalize supports from 2D to 4D blobs.";
     }
 
-    auto norm = ov::as_type_ptr<const ngraph::op::v0::NormalizeL2>(op);
+    auto norm = ov::as_type_ptr<const ov::op::v0::NormalizeL2>(op);
     attrs.eps = norm->get_eps();
-    attrs.epsMode = norm->get_eps_mode() == ngraph::op::EpsMode::MAX ? NormEpsMode::MAX : NormEpsMode::ADD;
+    attrs.epsMode = norm->get_eps_mode() == ov::op::EpsMode::MAX ? NormEpsMode::MAX : NormEpsMode::ADD;
     attrs.across_spatial = ngraph::shape_size(op->get_input_shape(AXES)) != 1;
     // One of the corner cases is when axes is an empty list,
     // then we divide each input element by itself resulting value 1 for all non-zero elements
@@ -797,10 +788,10 @@ void NormalizeL2::initSupportedPrimitiveDescriptors() {
     }
 
     if (!one_of(inputPrecision, Precision::FP32, Precision::BF16, Precision::I8, Precision::U8)) {
-        THROW_ERROR << "has unsupported input precision: " << inputPrecision;
+        THROW_CPU_NODE_ERR << "has unsupported input precision: " << inputPrecision;
     }
     if (!one_of(outputPrecision, Precision::FP32, Precision::BF16, Precision::I8, Precision::U8)) {
-        THROW_ERROR << "has unsupported output precision: " << outputPrecision;
+        THROW_CPU_NODE_ERR << "has unsupported output precision: " << outputPrecision;
     }
 
     attrs.input_prec = inputPrecision;
@@ -878,11 +869,11 @@ void NormalizeL2::createPrimitive() {
     auto& dstMemPtr = getChildEdgeAt(DATA)->getMemoryPtr();
     auto& srcMemPtr = getParentEdgeAt(DATA)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        THROW_ERROR << "can't get destination memory";
+        THROW_CPU_NODE_ERR << "can't get destination memory";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        THROW_ERROR << "can't get input memory";
+        THROW_CPU_NODE_ERR << "can't get input memory";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        THROW_ERROR << "has nullable preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << "has nullable preferable primitive descriptor";
 
     if (!attrs.cornerCase) {
         if (srcMemPtr->getDesc().hasLayoutType(LayoutType::ncsp)) {
@@ -894,7 +885,7 @@ void NormalizeL2::createPrimitive() {
         } else if (srcMemPtr->getDesc().hasLayoutType(LayoutType::nspc)) {
             attrs.layout = LayoutType::nspc;
         } else {
-            THROW_ERROR << "has selected layout which is not supported";
+            THROW_CPU_NODE_ERR << "has selected layout which is not supported";
         }
     }
 
@@ -936,7 +927,7 @@ void NormalizeL2::executeDynamicImpl(dnnl::stream strm) {
 
 void NormalizeL2::execute(dnnl::stream strm) {
     if (!execPtr)
-        THROW_ERROR << "doesn't have a compiled executor.";
+        THROW_CPU_NODE_ERR << "doesn't have a compiled executor.";
 
     const uint8_t *src_ptr = reinterpret_cast<const uint8_t *>(getParentEdgeAt(DATA)->getMemoryPtr()->GetPtr());
     uint8_t *dst_ptr = reinterpret_cast<uint8_t *>(getChildEdgeAt(DATA)->getMemoryPtr()->GetPtr());

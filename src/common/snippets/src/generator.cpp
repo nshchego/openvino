@@ -3,15 +3,12 @@
 //
 
 #include "snippets/generator.hpp"
-#include "snippets/pass/assign_registers.hpp"
 #include "snippets/pass/vector_to_scalar.hpp"
-#include "snippets/pass/insert_load_store.hpp"
 #include "snippets/op/loop.hpp"
-#include "snippets/op/subgraph.hpp"
 #include "snippets/op/kernel.hpp"
 #include <snippets/itt.hpp>
 
-#include <ngraph/pass/manager.hpp>
+#include <openvino/pass/manager.hpp>
 #include <openvino/core/type.hpp>
 
 namespace ngraph {

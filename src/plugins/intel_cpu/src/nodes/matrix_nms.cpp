@@ -3,17 +3,10 @@
 //
 
 #include "matrix_nms.h"
-#include "ov_ops/nms_static_shape_ie.hpp"
-
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <string>
-#include <vector>
 
 #include "ie_parallel.hpp"
-#include "ngraph/opsets/opset8.hpp"
-#include "utils/general_utils.h"
+#include "openvino/op/matrix_nms.hpp"
+#include "ov_ops/nms_static_shape_ie.hpp"
 #include <utils/shape_inference/shape_inference_internal_dyn.hpp>
 
 using namespace InferenceEngine;
@@ -22,12 +15,12 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-using ngNmsSortResultType = ngraph::op::v8::MatrixNms::SortResultType;
-using ngNmseDcayFunction = ngraph::op::v8::MatrixNms::DecayFunction;
+using ngNmsSortResultType = ov::op::v8::MatrixNms::SortResultType;
+using ngNmseDcayFunction = ov::op::v8::MatrixNms::DecayFunction;
 
 bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto nms = std::dynamic_pointer_cast<const ngraph::op::v8::MatrixNms>(op);
+        auto nms = ov::as_type<const ov::op::v8::MatrixNms>(op.get());
         if (!nms) {
             errorMessage = "Only MatrixNms operation is supported";
             return false;
@@ -35,12 +28,12 @@ bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, 
         const auto& attrs = nms->get_attrs();
         const auto& sortType = attrs.sort_result_type;
         if (!one_of(sortType, ngNmsSortResultType::NONE, ngNmsSortResultType::SCORE, ngNmsSortResultType::CLASSID)) {
-            errorMessage = "Does not support SortResultType mode: " + ngraph::as_string(sortType);
+            errorMessage = "Does not support SortResultType mode: " + ov::as_string(sortType);
             return false;
         }
         const auto& decayType = attrs.decay_function;
         if (!one_of(decayType, ngNmseDcayFunction::LINEAR, ngNmseDcayFunction::GAUSSIAN)) {
-            errorMessage = "Does not support DcayFunction " + ngraph::as_string(decayType);
+            errorMessage = "Does not support DcayFunction " + ov::as_string(decayType);
             return false;
         }
     } catch (...) {
@@ -50,13 +43,13 @@ bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, 
 }
 
 MatrixNms::MatrixNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, InternalDynShapeInferFactory()) {
+        : Node(op, context, InternalDynShapeInferFactory()) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    if (one_of(op->get_type_info(), ov::op::internal::NmsStaticShapeIE<ngraph::op::v8::MatrixNms>::get_type_info_static()))
+    if (one_of(op->get_type_info(), ov::op::internal::NmsStaticShapeIE<ov::op::v8::MatrixNms>::get_type_info_static()))
         m_outStaticShape = true;
 
     if (getOriginalInputsNumber() != 2)
@@ -65,19 +58,19 @@ MatrixNms::MatrixNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     if (getOriginalOutputsNumber() != 3)
         THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getOriginalOutputsNumber();
 
-    const auto matrix_nms = std::dynamic_pointer_cast<const ngraph::op::v8::MatrixNms>(op);
+    auto matrix_nms = ov::as_type<const ov::op::v8::MatrixNms>(op.get());
 
     auto& attrs = matrix_nms->get_attrs();
-    if (attrs.sort_result_type == ngraph::op::v8::MatrixNms::SortResultType::CLASSID)
+    if (attrs.sort_result_type == ov::op::v8::MatrixNms::SortResultType::CLASSID)
         m_sortResultType = MatrixNmsSortResultType::CLASSID;
-    else if (attrs.sort_result_type == ngraph::op::v8::MatrixNms::SortResultType::SCORE)
+    else if (attrs.sort_result_type == ov::op::v8::MatrixNms::SortResultType::SCORE)
         m_sortResultType = MatrixNmsSortResultType::SCORE;
-    else if (attrs.sort_result_type == ngraph::op::v8::MatrixNms::SortResultType::NONE)
+    else if (attrs.sort_result_type == ov::op::v8::MatrixNms::SortResultType::NONE)
         m_sortResultType = MatrixNmsSortResultType::NONE;
 
-    if (attrs.decay_function == ngraph::op::v8::MatrixNms::DecayFunction::GAUSSIAN)
+    if (attrs.decay_function == ov::op::v8::MatrixNms::DecayFunction::GAUSSIAN)
         m_decayFunction = GAUSSIAN;
-    else if (attrs.decay_function == ngraph::op::v8::MatrixNms::DecayFunction::LINEAR)
+    else if (attrs.decay_function == ov::op::v8::MatrixNms::DecayFunction::LINEAR)
         m_decayFunction = LINEAR;
 
     m_sortResultAcrossBatch = attrs.sort_result_across_batch;

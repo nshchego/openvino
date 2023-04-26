@@ -128,8 +128,8 @@ ov::intel_cpu::ConvertFqRnnToQuantizedRnn::ConvertFqRnnToQuantizedRnn() {
             const auto& sequence_length = pattern_map.at(sequence_length_m);
 
             auto rnn_quantized_tr = std::make_shared<op::TypeRelaxed<ngraph::opset9::GRUSequence>>(
-                std::vector<ngraph::element::Type>{ element::f32, element::f32, element::f32, element::f32, element::f32, element::f32},
-                std::vector<ngraph::element::Type>{ element::f32, element::f32 },
+                std::vector<ov::element::Type>{ element::f32, element::f32, element::f32, element::f32, element::f32, element::f32},
+                std::vector<ov::element::Type>{ element::f32, element::f32 },
                 op::TemporaryReplaceOutputType(activation, element::f32).get(),
                 op::TemporaryReplaceOutputType(hidden_state, element::f32).get(),
                 op::TemporaryReplaceOutputType(sequence_length, element::f32).get(),

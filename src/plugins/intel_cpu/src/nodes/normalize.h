@@ -5,14 +5,6 @@
 #pragma once
 
 #include <node.h>
-#include <onednn/dnnl.h>
-#include <cassert>
-
-#include <cpu/ref_eltwise.hpp>
-#include <cpu/ref_depthwise_injector.hpp>
-#include "utils/bfloat16.hpp"
-#include "utils/cpu_utils.hpp"
-#include "ie_parallel.hpp"
 
 namespace ov {
 namespace intel_cpu {

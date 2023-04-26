@@ -4,18 +4,9 @@
 
 #include "space_to_depth.h"
 
-#include <dnnl_extension_utils.h>
-#include <utils/general_utils.h>
-
-#include <cmath>
 #include <common/primitive_hashing_utils.hpp>
-#include <cpu/x64/jit_generator.hpp>
-#include <ngraph/opsets/opset1.hpp>
-#include <string>
-
-#include "common/blocked_desc_creator.h"
-
-#define THROW_ERROR IE_THROW() << "SpaceToDepth layer with name '" << getName() << "' "
+#include <cpu/x64/cpu_isa_traits.hpp>
+#include <openvino/op/space_to_depth.hpp>
 
 using namespace InferenceEngine;
 using namespace dnnl;
@@ -54,16 +45,16 @@ bool SpaceToDepth::SpaceToDepthAttrs::operator==(const SpaceToDepthAttrs& rhs) c
 bool SpaceToDepth::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                                   std::string& errorMessage) noexcept {
     try {
-        const auto spaceToDepth = ov::as_type_ptr<const ngraph::opset1::SpaceToDepth>(op);
+        const auto spaceToDepth = ov::as_type_ptr<const ov::op::v0::SpaceToDepth>(op);
         if (!spaceToDepth) {
             errorMessage = "Only opset1 SpaceToDepth operation is supported";
             return false;
         }
         const auto mode = spaceToDepth->get_mode();
         if (!one_of(mode,
-                    ngraph::op::v0::SpaceToDepth::SpaceToDepthMode::BLOCKS_FIRST,
-                    ngraph::op::v0::SpaceToDepth::SpaceToDepthMode::DEPTH_FIRST)) {
-            errorMessage = "Does not support mode: " + ngraph::as_string(mode);
+                    ov::op::v0::SpaceToDepth::SpaceToDepthMode::BLOCKS_FIRST,
+                    ov::op::v0::SpaceToDepth::SpaceToDepthMode::DEPTH_FIRST)) {
+            errorMessage = "Does not support mode: " + ov::as_string(mode);
             return false;
         }
     } catch (...) {
@@ -79,33 +70,33 @@ SpaceToDepth::SpaceToDepth(const std::shared_ptr<ov::Node>& op, const GraphConte
         IE_THROW(NotImplemented) << errorMessage;
     }
     if (inputShapes.size() != 1 || outputShapes.size() != 1)
-        THROW_ERROR << "has incorrect number of input/output edges!";
+        THROW_CPU_NODE_ERR << "has incorrect number of input/output edges!";
 
-    auto spaceToDepth = ov::as_type_ptr<const ngraph::opset1::SpaceToDepth>(op);
+    auto spaceToDepth = ov::as_type_ptr<const ov::op::v0::SpaceToDepth>(op);
     if (!spaceToDepth)
-        THROW_ERROR << "supports only opset1";
+        THROW_CPU_NODE_ERR << "supports only opset1";
 
     const auto modeNgraph = spaceToDepth->get_mode();
-    if (modeNgraph == ngraph::op::v0::SpaceToDepth::SpaceToDepthMode::BLOCKS_FIRST) {
+    if (modeNgraph == ov::op::v0::SpaceToDepth::SpaceToDepthMode::BLOCKS_FIRST) {
         attrs.mode = Mode::BLOCKS_FIRST;
-    } else if (modeNgraph == ngraph::op::v0::SpaceToDepth::SpaceToDepthMode::DEPTH_FIRST) {
+    } else if (modeNgraph == ov::op::v0::SpaceToDepth::SpaceToDepthMode::DEPTH_FIRST) {
         attrs.mode = Mode::DEPTH_FIRST;
     } else {
-        THROW_ERROR << "doesn't support mode: " << ngraph::as_string(modeNgraph);
+        THROW_CPU_NODE_ERR << "doesn't support mode: " << ov::as_string(modeNgraph);
     }
 
     attrs.blockSize = spaceToDepth->get_block_size();
     if (attrs.blockSize == 0)
-        THROW_ERROR << "has incorrect block_size parameter is zero!";
+        THROW_CPU_NODE_ERR << "has incorrect block_size parameter is zero!";
 
     const size_t srcRank = getInputShapeAtPort(0).getRank();
     const size_t dstRank = getOutputShapeAtPort(0).getRank();
     if (srcRank < 3)
-        THROW_ERROR << "has incorrect number of input dimensions";
+        THROW_CPU_NODE_ERR << "has incorrect number of input dimensions";
     if (srcRank > 5)
-        THROW_ERROR << "doesn't support dimensions with rank greater than 5";
+        THROW_CPU_NODE_ERR << "doesn't support dimensions with rank greater than 5";
     if (srcRank != dstRank)
-        THROW_ERROR << "has incorrect number of input/output dimensions";
+        THROW_CPU_NODE_ERR << "has incorrect number of input/output dimensions";
     attrs.nSpatialDims = srcRank - 2;
     attrs.blockStep = static_cast<size_t>(std::pow(attrs.blockSize, attrs.nSpatialDims));
 }
@@ -168,11 +159,11 @@ void SpaceToDepth::createPrimitive() {
     auto& dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     auto& srcMemPtr = getParentEdgeAt(0)->getMemoryPtr();
     if (!dstMemPtr || !dstMemPtr->isAllocated())
-        THROW_ERROR << "has not allocated destination memory";
+        THROW_CPU_NODE_ERR << "has not allocated destination memory";
     if (!srcMemPtr || !srcMemPtr->isAllocated())
-        THROW_ERROR << "has not allocated input memory";
+        THROW_CPU_NODE_ERR << "has not allocated input memory";
     if (getSelectedPrimitiveDescriptor() == nullptr)
-        THROW_ERROR << "has unidentified preferable primitive descriptor";
+        THROW_CPU_NODE_ERR << "has unidentified preferable primitive descriptor";
 
     const auto& memoryDesc = srcMemPtr->getDesc();
     attrs.dataSize = memoryDesc.getPrecision().size();
@@ -312,7 +303,7 @@ void SpaceToDepth::SpaceToDepthExecutor::exec(const uint8_t* srcData, uint8_t* d
 
 void SpaceToDepth::execute(dnnl::stream strm) {
     if (!execPtr) {
-        THROW_ERROR << "doesn't have a compiled executor.";
+        THROW_CPU_NODE_ERR << "doesn't have a compiled executor.";
     }
     const uint8_t* srcData = reinterpret_cast<const uint8_t *>(getParentEdgeAt(0)->getMemoryPtr()->GetPtr());
     uint8_t* dstData = reinterpret_cast<uint8_t *>(getChildEdgeAt(0)->getMemoryPtr()->GetPtr());

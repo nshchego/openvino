@@ -16,7 +16,7 @@ public:
     PowerStaticNode() = default;
 
     PowerStaticNode(const ngraph::Output<ov::Node> &data, const float &power, const float &scale, const float &shift,
-                    const ngraph::element::Type output_type = ngraph::element::undefined);
+                    const ov::element::Type output_type = ov::element::undefined);
 
     void validate_and_infer_types() override;
 
@@ -30,7 +30,7 @@ public:
 
 private:
     float scale, power, shift;
-    ngraph::element::Type m_output_type;
+    ov::element::Type m_output_type;
 };
 
 }   // namespace intel_cpu

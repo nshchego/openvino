@@ -2,20 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cstring>
-#include <string>
-#include <cmath>
-
-#include <ngraph/opsets/opset3.hpp>
-#include "ie_parallel.hpp"
 #include "extract_image_patches.h"
-#include <cpu/x64/jit_generator.hpp>
-#include "caseless.hpp"
+
 #include <common/primitive_hashing_utils.hpp>
+#include <cpu/x64/jit_generator.hpp>
+#include "ie_parallel.hpp"
+#include <openvino/op/extractimagepatches.hpp>
 
 using namespace InferenceEngine;
-
-using details::CaselessEq;
 
 using namespace dnnl::impl::cpu;
 using namespace dnnl::impl::cpu::x64;
@@ -274,14 +268,14 @@ private:
 
 bool ExtractImagePatches::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        auto extImgPatcher = ngraph::as_type_ptr<const ngraph::opset3::ExtractImagePatches>(op);
+        auto extImgPatcher = ov::as_type_ptr<const ov::op::v3::ExtractImagePatches>(op);
         if (!extImgPatcher) {
             errorMessage = "Only opset3 ExtractImagePatches operation is supported";
             return false;
         }
         const auto padValue = extImgPatcher->get_auto_pad();
-        if (!one_of(padValue, ngraph::op::PadType::VALID, ngraph::op::PadType::SAME_LOWER, ngraph::op::PadType::SAME_UPPER)) {
-            errorMessage = "Does not support pad type: " + ngraph::as_string(padValue);
+        if (!one_of(padValue, ov::op::PadType::VALID, ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER)) {
+            errorMessage = "Does not support pad type: " + ov::as_string(padValue);
             return false;
         }
         if (!everyone_is(2, extImgPatcher->get_sizes().size(), extImgPatcher->get_strides().size(), extImgPatcher->get_rates().size())) {
@@ -335,7 +329,7 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, co
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto extImgPatcher = ngraph::as_type_ptr<const ngraph::opset3::ExtractImagePatches>(op);
+    auto extImgPatcher = ov::as_type_ptr<const ov::op::v3::ExtractImagePatches>(op);
 
     if (inputShapes.size() != 1 || outputShapes.size() != 1)
         THROW_CPU_NODE_ERR << "has incorrect number of input or output edges!"
@@ -347,11 +341,11 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, co
     if (getOutputShapeAtPort(0).getRank() != 4)
         THROW_CPU_NODE_ERR << "must have 4D output tensor. Actual: " << getOutputShapeAtPort(0).getRank();
 
-    if (extImgPatcher->get_auto_pad() == ngraph::op::PadType::VALID) {
+    if (extImgPatcher->get_auto_pad() == ov::op::PadType::VALID) {
         _auto_pad = ExtImgPatcherPadType::VALID;
-    } else if (extImgPatcher->get_auto_pad() == ngraph::op::PadType::SAME_LOWER) {
+    } else if (extImgPatcher->get_auto_pad() == ov::op::PadType::SAME_LOWER) {
         _auto_pad = ExtImgPatcherPadType::SAME_LOWER;
-    } else if (extImgPatcher->get_auto_pad() == ngraph::op::PadType::SAME_UPPER) {
+    } else if (extImgPatcher->get_auto_pad() == ov::op::PadType::SAME_UPPER) {
         _auto_pad = ExtImgPatcherPadType::SAME_UPPER;
     } else {
         THROW_CPU_NODE_ERR << "has unsupported pad type: " << extImgPatcher->get_auto_pad();

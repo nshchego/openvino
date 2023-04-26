@@ -4,6 +4,7 @@
 
 #include "acl_pooling.hpp"
 #include "acl_utils.hpp"
+#include "utils/debug_capabilities.h"
 
 namespace ov {
 namespace intel_cpu {

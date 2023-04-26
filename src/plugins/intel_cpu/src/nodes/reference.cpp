@@ -3,12 +3,10 @@
 //
 
 #include "reference.h"
+
 #include <ie_ngraph_utils.hpp>
 #include <shape_util.hpp>
-#include <dnnl_extension_utils.h>
-#include "openvino/runtime/tensor.hpp"
-#include "common/blocked_desc_creator.h"
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/random_uniform.hpp>
 #include "common/cpu_memcpy.h"
 
 using namespace dnnl;
@@ -31,7 +29,7 @@ Reference::Reference(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     // RandomUniform should generate new sequence each run even if all inputs are constants. So that method Node::IsConstant()
     // doesn't return 'True' for RandomUniform with all constant inputs and the node generates new values for each inference,
     // we set 'NoConst' value for 'ConstantType' in ctor
-    if (ov::is_type<ngraph::op::v8::RandomUniform>(ngraphOp)) {
+    if (ov::is_type<ov::op::v8::RandomUniform>(ngraphOp)) {
         constant = ConstantType::NoConst;
     }
 }

@@ -4,23 +4,11 @@
 
 #include "matmul.h"
 
-#include "ie_precision.hpp"
-#include "memory_desc/cpu_blocked_memory_desc.h"
-#include "cpu_types.h"
-#include "eltwise.h"
-
-#include <numeric>
-#include <string>
-#include <vector>
-#include <memory>
-#include "common/cpu_memcpy.h"
-#include <ngraph/opsets/opset1.hpp>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "fake_quantize.h"
-#include "utils/general_utils.h"
-#include "memory_desc/cpu_memory_desc_utils.h"
-#include <dnnl_extension_utils.h>
 #include <common/primitive_hashing_utils.hpp>
+#include "eltwise.h"
+#include "fake_quantize.h"
+#include <openvino/op/matmul.hpp>
+#include "utils/debug_capabilities.h"
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -85,21 +73,20 @@ bool canBeExecutedInInt8(const Precision& firstInput, const Precision& secondInp
 
 bool MatMul::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto matMul = std::dynamic_pointer_cast<const ngraph::opset1::MatMul>(op);
-        if (!matMul) {
+        if (op->get_type_info() != op::v0::MatMul::get_type_info_static()) {
             errorMessage = "Only opset1 MatMul operation is supported";
             return false;
         }
 
-        for (size_t i = 0; i < matMul->get_input_size(); i++) {
-            const auto inShapeRank = matMul->get_input_partial_shape(i).rank().get_length();
+        for (size_t i = 0; i < op->get_input_size(); i++) {
+            const auto inShapeRank = op->get_input_partial_shape(i).rank().get_length();
             if (inShapeRank < 2) {
                 errorMessage = "Unsupported rank: " + std::to_string(inShapeRank) + " on " + std::to_string(i) + " input";
                 return false;
             }
         }
 
-        const auto outShapeRank = matMul->get_output_partial_shape(0).rank().get_length();
+        const auto outShapeRank = op->get_output_partial_shape(0).rank().get_length();
         if (outShapeRank < 2) {
             errorMessage = "Unsupported rank: " + std::to_string(outShapeRank) + " on output";
             return false;
@@ -170,7 +157,7 @@ class MMShapeInferFactory : public ShapeInferFactory {
 public:
     MMShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
-        if (const auto matmul = ov::as_type_ptr<const ngraph::opset1::MatMul>(m_op)) {
+        if (const auto matmul = ov::as_type_ptr<const op::v0::MatMul>(m_op)) {
             const auto output_rank = matmul->get_output_partial_shape(0).rank().get_length();
             const bool transpose_a = matmul->get_transpose_a();
             const bool transpose_b = matmul->get_transpose_b();
@@ -185,12 +172,12 @@ private:
 } // namespace
 
 MatMul::MatMul(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
-    Node(op, context, MMShapeInferFactory(op)), withBiases(false) {
+        Node(op, context, MMShapeInferFactory(op)), withBiases(false) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage))
         IE_THROW(NotImplemented) << errorMessage;
 
-    const auto matMul = std::dynamic_pointer_cast<const ngraph::opset1::MatMul>(op);
+    auto matMul = ov::as_type<const op::v0::MatMul>(op.get());
 
     if (!matMul) {
         IE_THROW(NotImplemented) << "Operation with name " << op->get_friendly_name() << ":" << op->get_type_name() <<

@@ -3,8 +3,8 @@
 //
 
 #include "shapeof.h"
-#include <ngraph/opsets/opset1.hpp>
-#include <utils/shape_inference/shape_inference_cpu.hpp>
+
+#include <openvino/op/shape_of.hpp>
 
 using namespace InferenceEngine;
 
@@ -44,8 +44,8 @@ public:
 bool ShapeOf::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!one_of(op->get_type_info(),
-                    ngraph::op::v0::ShapeOf::get_type_info_static(),
-                    ngraph::op::v3::ShapeOf::get_type_info_static())) {
+                    ov::op::v0::ShapeOf::get_type_info_static(),
+                    ov::op::v3::ShapeOf::get_type_info_static())) {
             errorMessage = "Node is not an instance of ShapeOf form the operation set v1 or v3.";
             return false;
         }

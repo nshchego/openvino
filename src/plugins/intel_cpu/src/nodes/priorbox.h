@@ -4,10 +4,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
-#include <ie_common.h>
 #include <node.h>
 
 namespace ov {

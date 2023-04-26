@@ -279,7 +279,7 @@ void fill_output_blobs(const float* proposals, const int* roi_indices,
 bool GenerateProposals::isSupportedOperation
             (const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!ngraph::as_type_ptr<const ngraph::op::v9::GenerateProposals>(op)) {
+        if (!ov::as_type_ptr<const ov::op::v9::GenerateProposals>(op)) {
             errorMessage = "Node is not an instance of the Proposal from the operations set v0.";
             return false;
         }
@@ -296,7 +296,7 @@ GenerateProposals::GenerateProposals(const std::shared_ptr<ov::Node>& op, const 
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto proposalOp = ngraph::as_type_ptr<const ngraph::op::v9::GenerateProposals>(op);
+    auto proposalOp = ov::as_type_ptr<const ov::op::v9::GenerateProposals>(op);
     auto proposalAttrs = proposalOp->get_attrs();
 
     min_size_ = proposalAttrs.min_size;

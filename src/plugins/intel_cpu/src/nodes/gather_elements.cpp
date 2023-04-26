@@ -2,15 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include "ie_parallel.hpp"
 #include "gather_elements.h"
-#include <ngraph/opsets/opset1.hpp>
-#include <precision_utils.h>
-#include <utils/general_utils.h>
-#include "common/cpu_memcpy.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/gather_elements.hpp>
 
 using namespace InferenceEngine;
 

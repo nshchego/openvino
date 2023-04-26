@@ -174,12 +174,12 @@ ov::intel_cpu::CPUGenerator::CPUGenerator(dnnl::impl::cpu::x64::cpu_isa_t isa_) 
 }
 
 ngraph::snippets::Generator::opRegType ov::intel_cpu::CPUGenerator::get_specific_op_reg_type(const std::shared_ptr<ov::Node>& op) const {
-    if (std::dynamic_pointer_cast<ov::intel_cpu::BrgemmCPU>(op) ||
-        std::dynamic_pointer_cast<ov::intel_cpu::BrgemmCopyB>(op))
+    if (ov::is_type<ov::intel_cpu::BrgemmCPU>(op) ||
+        ov::is_type<ov::intel_cpu::BrgemmCopyB>(op))
         return gpr2gpr;
     else if (
-        std::dynamic_pointer_cast<ov::intel_cpu::FusedMulAdd>(op) ||
-        std::dynamic_pointer_cast<ov::intel_cpu::SwishNode>(op))
+        ov::is_type<ov::intel_cpu::FusedMulAdd>(op) ||
+        ov::is_type<ov::intel_cpu::SwishNode>(op))
         return vec2vec;
     else
         throw ov::Exception("Register type of the operation " + std::string(op->get_type_name()) + " isn't determined!");

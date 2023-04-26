@@ -3,7 +3,11 @@
 //
 
 #include "tile.h"
+
 #include "common/cpu_memcpy.h"
+#include <openvino/op/constant.hpp>
+#include <openvino/op/tile.hpp>
+#include "utils/ngraph_utils.hpp"
 
 using namespace InferenceEngine;
 

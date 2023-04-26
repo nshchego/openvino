@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <ngraph/opsets/opset1.hpp>
-#include "ie_parallel.hpp"
 #include "range.h"
-#include <utils/general_utils.h>
+
+#include "ie_parallel.hpp"
+#include <openvino/op/range.hpp>
 #include <utils/shape_inference/shape_inference_internal_dyn.hpp>
 
 using namespace InferenceEngine;
@@ -17,7 +16,7 @@ namespace node {
 
 bool Range::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(), ngraph::op::v0::Range::get_type_info_static(), ngraph::op::v4::Range::get_type_info_static())) {
+        if (!one_of(op->get_type_info(), op::v0::Range::get_type_info_static(), op::v4::Range::get_type_info_static())) {
             errorMessage = "Only opset1 and opset4 Range operation is supported";
             return false;
         }

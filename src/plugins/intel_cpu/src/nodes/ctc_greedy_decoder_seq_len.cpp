@@ -17,7 +17,7 @@ namespace node {
 
 bool CTCGreedyDecoderSeqLen::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto greedyDecOp = ngraph::as_type_ptr<const ngraph::op::v6::CTCGreedyDecoderSeqLen>(op);
+        const auto greedyDecOp = ov::as_type_ptr<const ov::op::v6::CTCGreedyDecoderSeqLen>(op);
         if (!greedyDecOp) {
             errorMessage = "Node is not an instance of the CTCGreedyDecoderSeqLen operation from operation set v6.";
             return false;
@@ -46,7 +46,7 @@ CTCGreedyDecoderSeqLen::CTCGreedyDecoderSeqLen(const std::shared_ptr<ov::Node>& 
     if (!dimsEqualWeak(dataDims[0], seqDims[0]))
         THROW_CPU_NODE_ERR << "has invalid input shapes.";
 
-    auto greedyDecOp = ngraph::as_type_ptr<const ngraph::op::v6::CTCGreedyDecoderSeqLen>(op);
+    auto greedyDecOp = ov::as_type_ptr<const ov::op::v6::CTCGreedyDecoderSeqLen>(op);
     mergeRepeated = greedyDecOp->get_merge_repeated();
 }
 

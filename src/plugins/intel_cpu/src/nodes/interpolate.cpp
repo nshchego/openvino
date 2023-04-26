@@ -6,12 +6,9 @@
 
 #include "fake_quantize.h"
 #include "eltwise.h"
-#include <string>
-#include <vector>
 #include <onednn/dnnl.h>
 #include <dnnl_extension_utils.h>
 #include "ie_parallel.hpp"
-#include <algorithm>
 
 #include <cpu/x64/jit_generator.hpp>
 #include <cpu/x64/jit_uni_eltwise.hpp>
@@ -23,12 +20,10 @@
 #include "emitters/x64/jit_bf16_emitters.hpp"
 #include "emitters/x64/jit_load_store_emitters.hpp"
 
-#include <ngraph/opsets/opset1.hpp>
-#include <ngraph/opsets/opset4.hpp>
-#include <utils/shape_inference/static_shape.hpp>
-#include <utils/shape_inference/shape_inference.hpp>
-#include <ie_ngraph_utils.hpp>
+#include <openvino/op/interpolate.hpp>
+#include <openvino/op/constant.hpp>
 #include "utils/cpu_utils.hpp"
+#include <utils/ngraph_utils.hpp>
 #include <utils/shape_inference/shape_inference_ngraph.hpp>
 
 using namespace dnnl;
@@ -1481,29 +1476,29 @@ inline SizeVector to5Dim(SizeVector casesDim) {
     return dim5;
 }
 
-using ngInterpMode = ngraph::opset4::Interpolate::InterpolateMode;
-using ngInterpCoordTransf = ngraph::opset4::Interpolate::CoordinateTransformMode;
-using ngInterpNearMode = ngraph::opset4::Interpolate::NearestMode;
-using ngInterpShapeCalcMode = ngraph::opset4::Interpolate::ShapeCalcMode;
+using ngInterpMode = ov::op::v4::Interpolate::InterpolateMode;
+using ngInterpCoordTransf = ov::op::v4::Interpolate::CoordinateTransformMode;
+using ngInterpNearMode = ov::op::v4::Interpolate::NearestMode;
+using ngInterpShapeCalcMode = ov::op::v4::Interpolate::ShapeCalcMode;
 
 bool Interpolate::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto interp = std::dynamic_pointer_cast<const ngraph::opset4::Interpolate>(op);
-        if (!interp) {
-            errorMessage = "Only opset4 Interpolate operation is supported";
+        auto interp = ov::as_type<const ov::op::v4::Interpolate>(op.get());
+        if (op->get_type_info() != ov::op::v4::Interpolate::get_type_info_static()) {
+            errorMessage = "Only op::v4 Interpolate operation is supported";
             return false;
         }
         const auto &interpAttr = interp->get_attrs();
         const auto &interpMode = interpAttr.mode;
         if (!one_of(interpMode, ngInterpMode::NEAREST, ngInterpMode::LINEAR, ngInterpMode::LINEAR_ONNX, ngInterpMode::CUBIC)) {
-            errorMessage = "Does not support interpolate mode: " + ngraph::as_string(interpMode);
+            errorMessage = "Does not support interpolate mode: " + ov::as_string(interpMode);
             return false;
         }
 
         const auto &interpCoordTransMode = interpAttr.coordinate_transformation_mode;
         if (!one_of(interpCoordTransMode, ngInterpCoordTransf::HALF_PIXEL, ngInterpCoordTransf::PYTORCH_HALF_PIXEL, ngInterpCoordTransf::ASYMMETRIC,
                                           ngInterpCoordTransf::TF_HALF_PIXEL_FOR_NN, ngInterpCoordTransf::ALIGN_CORNERS)) {
-            errorMessage = "Does not support coordinate transformation mode: " + ngraph::as_string(interpCoordTransMode);
+            errorMessage = "Does not support coordinate transformation mode: " + ov::as_string(interpCoordTransMode);
             return false;
         }
 
@@ -1511,18 +1506,18 @@ bool Interpolate::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
             const auto &interpNearestMode = interpAttr.nearest_mode;
             if (!one_of(interpNearestMode, ngInterpNearMode::ROUND_PREFER_FLOOR, ngInterpNearMode::ROUND_PREFER_CEIL, ngInterpNearMode::FLOOR,
                                            ngInterpNearMode::CEIL, ngInterpNearMode::SIMPLE)) {
-                errorMessage = "Does not support nearest round mode: " + ngraph::as_string(interpNearestMode);
+                errorMessage = "Does not support nearest round mode: " + ov::as_string(interpNearestMode);
                 return false;
             }
         }
 
         const auto &interpShapeCalcMode = interpAttr.shape_calculation_mode;
         if (!one_of(interpShapeCalcMode, ngInterpShapeCalcMode::SCALES, ngInterpShapeCalcMode::SIZES)) {
-            errorMessage = "Does not support shape_calculation_mode: " + ngraph::as_string(interpShapeCalcMode);
+            errorMessage = "Does not support shape_calculation_mode: " + ov::as_string(interpShapeCalcMode);
             return false;
         }
 
-        const size_t dataRank = interp->get_input_partial_shape(DATA_ID).rank().get_length();
+        const size_t dataRank = op->get_input_partial_shape(DATA_ID).rank().get_length();
         if (dataRank < 1 || dataRank > 5) {
             errorMessage = "Does not support input tensor of rank : " + std::to_string(dataRank);
             return false;
@@ -1534,12 +1529,12 @@ bool Interpolate::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
         }
 
         if (!isDynamicNgraphNode(op) && interpShapeCalcMode == ngInterpShapeCalcMode::SCALES &&
-                !ngraph::is_type<ngraph::opset1::Constant>(op->get_input_node_ptr(2))) {
+                !ngraph::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(2))) {
             errorMessage = "Only const 'scales' input is supported for static shapes";
             return false;
         }
 
-        if (interp->get_input_size() > 3 && std::dynamic_pointer_cast<const ngraph::opset1::Constant>(interp->get_input_node_shared_ptr(AXES_ID)) == nullptr) {
+        if (op->get_input_size() > 3 && op->get_input_node_shared_ptr(AXES_ID)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
             errorMessage = "Only const 'axes' input is supported";
             return false;
         }
@@ -1559,7 +1554,7 @@ public:
     InterpolateShapeInferFactory(std::shared_ptr<ov::Node> op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
         IShapeInfer::port_mask_t port_mask = 0x00;
-        auto interp = ov::as_type_ptr<ngraph::opset4::Interpolate>(m_op);
+        auto interp = ov::as_type_ptr<ov::op::v4::Interpolate>(m_op);
         if (!interp) {
             IE_THROW(Unexpected) << "Wrong operation type";
         }
@@ -1584,7 +1579,7 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
         : Node(op, context, InterpolateShapeInferFactory(op)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        const auto interp = std::dynamic_pointer_cast<const ngraph::opset4::Interpolate>(op);
+        auto interp = ov::as_type<const ov::op::v4::Interpolate>(op.get());
 
         const auto numInputs = inputShapes.size();
         if (numInputs != 3 && numInputs != 4)
@@ -1673,14 +1668,13 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
                 interpAttrs.padEnd[i] = static_cast<int>(interpAttr.pads_end[i]);
         }
 
-        const auto scalesNode = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(interp->get_input_node_shared_ptr(SCALES_ID));
-        if (scalesNode) {
+        if (auto scalesNode = ov::as_type<const ov::op::v0::Constant>(op->get_input_node_ptr(SCALES_ID))) {
             scales = scalesNode->cast_vector<float>();
             isScaleConstant = true;
         }
 
         if (isAxesSpecified) {
-            axes = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(interp->get_input_node_shared_ptr(AXES_ID))->cast_vector<int>();
+            axes = ov::as_type<const ov::op::v0::Constant>(op->get_input_node_ptr(AXES_ID))->cast_vector<int>();
         } else {
             axes.resize(dataRank);
             for (int i = 0; i < dataRank; i++) {

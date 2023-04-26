@@ -60,7 +60,7 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
             } else {
                 return false;
             }
-            auto shape_const = std::make_shared<ngraph::opset1::Constant>(ngraph::element::i64, ngraph::Shape{shape.size()}, shape);
+            auto shape_const = std::make_shared<ngraph::opset1::Constant>(ov::element::i64, ngraph::Shape{shape.size()}, shape);
             auto reshape = std::make_shared<ngraph::opset1::Reshape>(data_node, shape_const, true);
             new_ops.push_back(reshape);
             last_node = reshape;
@@ -84,7 +84,7 @@ ov::intel_cpu::ConvertBroadcastToTiles::ConvertBroadcastToTiles() {
             ++input_shape_it;
         }
 
-        auto const_node = std::make_shared<ngraph::opset1::Constant>(ngraph::element::i64, ngraph::Shape{dims_count}, dims);
+        auto const_node = std::make_shared<ngraph::opset1::Constant>(ov::element::i64, ngraph::Shape{dims_count}, dims);
         auto tile = register_new_node<ngraph::opset1::Tile>(last_node, const_node);
         new_ops.push_back(tile);
         tile->set_friendly_name(broadcast->get_friendly_name());

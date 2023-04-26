@@ -14,9 +14,9 @@ NGRAPH_RTTI_DEFINITION(ov::intel_cpu::SwapConvertTranspose, "SwapConvertTranspos
 
 ov::intel_cpu::SwapConvertTranspose::SwapConvertTranspose() {
     MATCHER_SCOPE(SwapConvertTranspose);
-    ngraph::element::TypeVector param_precisions{ ngraph::element::i8, ngraph::element::u8 };
+    ov::element::TypeVector param_precisions{ ov::element::i8, ov::element::u8 };
     auto input_m = ngraph::pattern::wrap_type<ngraph::op::v0::Parameter>(ngraph::pattern::type_matches_any(param_precisions));
-    auto convert_m = ngraph::pattern::wrap_type<ngraph::op::v0::Convert>({input_m}, ngraph::pattern::type_matches(ngraph::element::f32));
+    auto convert_m = ngraph::pattern::wrap_type<ngraph::op::v0::Convert>({input_m}, ngraph::pattern::type_matches(ov::element::f32));
     auto transpose_m = ngraph::pattern::wrap_type<ngraph::op::v1::Transpose>({convert_m, ngraph::pattern::any_input()});
 
     ngraph::matcher_pass_callback callback = [=](ngraph::pattern::Matcher& m) {

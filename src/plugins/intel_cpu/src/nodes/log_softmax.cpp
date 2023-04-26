@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-
-#include <ngraph/opsets/opset5.hpp>
-#include "ie_parallel.hpp"
 #include "log_softmax.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/log_softmax.hpp>
 
 using namespace InferenceEngine;
 
@@ -16,8 +15,7 @@ namespace node {
 
 bool LogSoftmax::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto logSoftMax = std::dynamic_pointer_cast<const ngraph::opset5::LogSoftmax>(op);
-        if (!logSoftMax) {
+        if (op->get_type_info() != ov::op::v5::LogSoftmax::get_type_info_static()) {
             errorMessage = "Only opset5 LogSoftmax operation is supported";
             return false;
         }
@@ -34,7 +32,7 @@ LogSoftmax::LogSoftmax(const std::shared_ptr<ov::Node>& op, const GraphContext::
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto logSoftMax = std::dynamic_pointer_cast<const ngraph::opset5::LogSoftmax>(op);
+    auto logSoftMax = ov::as_type<const ov::op::v5::LogSoftmax>(op.get());
     if (logSoftMax == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of LogSoftmax from opset5.";

@@ -225,7 +225,7 @@ bool ExperimentalDetectronDetectionOutput::needPrepareParams() const {
 
 bool ExperimentalDetectronDetectionOutput::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto doOp = ngraph::as_type_ptr<const ngraph::op::v6::ExperimentalDetectronDetectionOutput>(op);
+        const auto doOp = ov::as_type_ptr<const ov::op::v6::ExperimentalDetectronDetectionOutput>(op);
         if (!doOp) {
             errorMessage = "Node is not an instance of the ExperimentalDetectronDetectionOutput from the operations set v6.";
             return false;
@@ -243,7 +243,7 @@ ExperimentalDetectronDetectionOutput::ExperimentalDetectronDetectionOutput(const
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
-    auto doOp = ngraph::as_type_ptr<const ngraph::op::v6::ExperimentalDetectronDetectionOutput>(op);
+    auto doOp = ov::as_type_ptr<const ov::op::v6::ExperimentalDetectronDetectionOutput>(op);
     auto attributes = doOp->get_attrs();
 
     score_threshold_ = attributes.score_threshold;

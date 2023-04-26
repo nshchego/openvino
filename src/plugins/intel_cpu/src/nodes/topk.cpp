@@ -4,22 +4,18 @@
 
 #include "topk.h"
 
-#include <string>
-#include <vector>
-#include <set>
 #include <onednn/dnnl.h>
 #include <dnnl_extension_utils.h>
 #include "emitters/x64/jit_load_store_emitters.hpp"
 #include "ie_parallel.hpp"
-#include <ngraph/op/topk.hpp>
-#include <ie_ngraph_utils.hpp>
 #include <algorithm>
 
 #include <cpu/x64/jit_generator.hpp>
 #include <cpu/x64/jit_uni_eltwise.hpp>
 #include "common/cpu_memcpy.h"
 
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/topk.hpp>
+#include <utils/ngraph_utils.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -1801,8 +1797,7 @@ bool TopK::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
 
         auto topKOp = ov::as_type_ptr<const ov::op::util::TopKBase>(op);
         if (!isDynamicNgraphNode(op)) {
-            auto topKConst = std::dynamic_pointer_cast<const ov::op::v0::Constant>(topKOp->get_input_node_shared_ptr(TOPK_K));
-            if (!topKConst) {
+            if (topKOp->get_input_node_shared_ptr(TOPK_K)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
                 errorMessage = "Second tensor is not constant in static shape mode";
                 return false;
             }
@@ -1837,8 +1832,7 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
         auto in_dims_size = in_dims.size();
 
         if (!isDynamicNgraphNode(op)) {
-            auto topKConst = std::dynamic_pointer_cast<const ov::op::v0::Constant>(topKOp->get_input_node_shared_ptr(TOPK_K));
-            if (!topKConst) {
+            if (topKOp->get_input_node_shared_ptr(TOPK_K)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
                 THROW_CPU_NODE_ERR <<  "gets non-constant second tensor in static shape mode!";
             }
         }
@@ -1849,7 +1843,7 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
 
         stable = false;
         if (!sort_index) {
-            const auto topKOpV11 = ngraph::as_type_ptr<const ov::op::v11::TopK>(op);
+            const auto topKOpV11 = ov::as_type_ptr<const ov::op::v11::TopK>(op);
             if (topKOpV11) {
                 stable = topKOpV11->get_stable();
             }

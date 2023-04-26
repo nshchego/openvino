@@ -133,6 +133,10 @@ public:
         return m_disabled.count(type_info);
     }
 
+    bool is_disabled(DiscreteTypeInfo& type_info) {
+        return m_disabled.count(type_info);
+    }
+
     /// \brief Check either transformation class type is disabled or not
     /// \return true if transformation type was disabled and false otherwise
     template <class T>

@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
+
 #include <memory>
 #include <string>
 #include <vector>

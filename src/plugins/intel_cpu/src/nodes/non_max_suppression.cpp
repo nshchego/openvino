@@ -2,23 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <utility>
-#include <queue>
-
 #include "non_max_suppression.h"
-#include "ie_parallel.hpp"
-#include <ngraph/opsets/opset5.hpp>
-#include <ov_ops/nms_ie_internal.hpp>
-#include "utils/general_utils.h"
 
-#include "cpu/x64/jit_generator.hpp"
+#include "ie_parallel.hpp"
+#include <openvino/op/non_max_suppression.hpp>
+#include <ov_ops/nms_ie_internal.hpp>
+
 #include "emitters/x64/jit_load_store_emitters.hpp"
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
 #include <utils/shape_inference/shape_inference_internal_dyn.hpp>
+
+#include <queue>
 
 using namespace InferenceEngine;
 using namespace dnnl;
@@ -556,14 +550,14 @@ private:
 
 bool NonMaxSuppression::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        using NonMaxSuppressionV9 = ngraph::op::v9::NonMaxSuppression;
+        using NonMaxSuppressionV9 = ov::op::v9::NonMaxSuppression;
         if (!one_of(op->get_type_info(), NonMaxSuppressionV9::get_type_info_static(),
                     ov::op::internal::NonMaxSuppressionIEInternal::get_type_info_static())) {
             errorMessage = "Only NonMaxSuppression v9 and NonMaxSuppressionIEInternal are supported";
             return false;
         }
 
-        if (const auto nms9 = std::dynamic_pointer_cast<const NonMaxSuppressionV9>(op)) {
+        if (auto nms9 = ov::as_type<const NonMaxSuppressionV9>(op.get())) {
             const auto boxEncoding = nms9->get_box_encoding();
             if (!one_of(boxEncoding, NonMaxSuppressionV9::BoxEncodingType::CENTER, NonMaxSuppressionV9::BoxEncodingType::CORNER)) {
                 errorMessage = "Supports only CENTER and CORNER box encoding type";
@@ -593,10 +587,10 @@ NonMaxSuppression::NonMaxSuppression(const std::shared_ptr<ov::Node>& op, const 
     if (getOriginalOutputsNumber() != 3)
         THROW_CPU_NODE_ERR << "has incorrect number of output edges: " << getOriginalOutputsNumber();
 
-    if (const auto nms9 = std::dynamic_pointer_cast<const ngraph::op::v9::NonMaxSuppression>(op)) {
+    if (auto nms9 = ov::as_type<const ov::op::v9::NonMaxSuppression>(op.get())) {
         boxEncodingType = static_cast<NMSBoxEncodeType>(nms9->get_box_encoding());
         sortResultDescending = nms9->get_sort_result_descending();
-        } else if (const auto nmsIe = std::dynamic_pointer_cast<const ov::op::internal::NonMaxSuppressionIEInternal>(op)) {
+        } else if (const auto nmsIe = ov::as_type<const ov::op::internal::NonMaxSuppressionIEInternal>(op.get())) {
             boxEncodingType = nmsIe->m_center_point_box ? NMSBoxEncodeType::CENTER : NMSBoxEncodeType::CORNER;
             sortResultDescending = nmsIe->m_sort_result_descending;
         } else {

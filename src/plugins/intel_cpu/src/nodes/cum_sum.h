@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
 
 namespace ov {

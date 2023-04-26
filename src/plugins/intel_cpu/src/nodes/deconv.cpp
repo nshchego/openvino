@@ -4,29 +4,15 @@
 
 #include "deconv.h"
 
+#include <cpu/x64/cpu_isa_traits.hpp>
 #include "eltwise.h"
 #include "fake_quantize.h"
 #include "input.h"
-#include <dnnl_extension_utils.h>
-#include "ie_parallel.hpp"
-#include "utils/general_utils.h"
-#include <cpu/x64/cpu_isa_traits.hpp>
 #include <nodes/common/cpu_memcpy.h>
-#include <memory_desc/cpu_memory_desc_utils.h>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "utils/cpu_utils.hpp"
-
-#include <ngraph/opsets/opset1.hpp>
-#include <ie_ngraph_utils.hpp>
-#include <common/primitive_hashing_utils.hpp>
-#include <common/primitive_desc.hpp>
-#include <common/primitive_desc_iface.hpp>
+#include <openvino/op/convolution.hpp>
+#include <openvino/op/group_conv.hpp>
+#include "utils/debug_capabilities.h"
 #include <utils/shape_inference/shape_inference_ngraph.hpp>
-
-#include <oneapi/dnnl/dnnl.hpp>
-
-#include <string>
-#include <vector>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -35,7 +21,7 @@ namespace ov {
 namespace intel_cpu {
 namespace node {
 
-using DefaultDeconvDescs = std::pair<dnnl::convolution_backward_data::primitive_desc,
+using DefaultDeconvDescs = std::pair<convolution_backward_data::primitive_desc,
                                      dnnl::convolution_forward::primitive_desc>;
 using Int8DeconvDesc = dnnl::deconvolution_forward::primitive_desc;
 
@@ -134,8 +120,8 @@ private:
 
 bool Deconvolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (std::dynamic_pointer_cast<const ngraph::opset1::ConvolutionBackpropData>(op) == nullptr &&
-                std::dynamic_pointer_cast<const ngraph::opset1::GroupConvolutionBackpropData>(op) == nullptr) {
+        if (!one_of(op->get_type_info(), ov::op::v1::ConvolutionBackpropData::get_type_info_static(),
+                                         ov::op::v1::GroupConvolutionBackpropData::get_type_info_static())) {
             errorMessage = "Only opset1 ConvolutionBackpropData and GroupConvolutionBackpropData operations are supported";
             return false;
         }
@@ -157,74 +143,74 @@ bool Deconvolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& 
 Deconvolution::Deconvolution(const std::shared_ptr<ov::Node>& op,
                              const GraphContext::CPtr& context) : Node(op, context, DeconfolutionShapeInferFactory(op)) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
-        auto convBackprop = std::dynamic_pointer_cast<const ngraph::opset1::ConvolutionBackpropData>(op);
-        auto groupConvBackprop = std::dynamic_pointer_cast<const ngraph::opset1::GroupConvolutionBackpropData>(op);
-        const auto& weightDims = getWeightDims();
-
-        if (convBackprop) {
-            algorithm = Algorithm::DeconvolutionCommon;
-
-            IC = weightDims[0];
-            OC = weightDims[1];
-            biasesDims = {OC};
-
-            groupNum = 1;
-            withGroups = false;
-
-            for (int i = 0; i < convBackprop->get_strides().size(); i++) {
-                stride.push_back(static_cast<ptrdiff_t>(convBackprop->get_strides()[i]));
-            }
-            for (int i = 0; i < convBackprop->get_dilations().size(); i++) {
-                dilation.push_back(static_cast<ptrdiff_t>(convBackprop->get_dilations()[i]) - 1);
-            }
-            paddingL = convBackprop->get_pads_begin();
-            paddingR = convBackprop->get_pads_end();
-
-            outputPadding = convBackprop->get_output_padding();
-
-            autoPad = one_of(convBackprop->get_auto_pad(), ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER);
-        } else if (groupConvBackprop) {
-            algorithm = Algorithm::DeconvolutionGrouped;
-
-            groupNum = weightDims[0];
-            IC = groupNum * weightDims[1];
-            OC = groupNum * weightDims[2];
-            biasesDims = {OC * groupNum};
-            withGroups = groupNum > 1;
-            isDW = withGroups && groupNum == OC && groupNum == IC;
-
-            for (int i = 0; i < groupConvBackprop->get_strides().size(); i++) {
-                stride.push_back(static_cast<ptrdiff_t>(groupConvBackprop->get_strides()[i]));
-            }
-            for (int i = 0; i < groupConvBackprop->get_dilations().size(); i++) {
-                dilation.push_back(static_cast<ptrdiff_t>(groupConvBackprop->get_dilations()[i]) - 1);
-            }
-            paddingL = groupConvBackprop->get_pads_begin();
-            paddingR = groupConvBackprop->get_pads_end();
-
-            outputPadding = groupConvBackprop->get_output_padding();
-
-            autoPad = one_of(groupConvBackprop->get_auto_pad(), ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER);
-        }
-        for (int i = 0; i < dilation.size(); i++) {
-            kernel.push_back(weightDims[withGroups + 2 + i]);
-        }
-
-        externOutShape = inputShapes.size() == 3;
-        biasPort = externOutShape ? 3 : 2;
-        if (externOutShape && isDynamicNode()) {
-            bool isConstOutShape = ngraph::is_type<ov::op::v0::Constant>(op->get_input_node_shared_ptr(2));
-            if (isConstOutShape) {
-                lastOutputSpatialDims = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(2))->cast_vector<int32_t>();
-            }
-            const auto spDimsNum = getInputShapeAtPort(0).getRank() - 2;
-            if (getInputShapeAtPort(2).getStaticDims()[0] != spDimsNum || (isConstOutShape && lastOutputSpatialDims.size() != spDimsNum)) {
-                IE_THROW() << "'output_shape' input has incorrect number of elements. Expected = " << spDimsNum;
-            }
-        }
-    } else {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
+    }
+
+    auto convBackprop = ov::as_type<const ov::op::v1::ConvolutionBackpropData>(op.get());
+    auto groupConvBackprop = ov::as_type<const ov::op::v1::GroupConvolutionBackpropData>(op.get());
+    const auto& weightDims = getWeightDims();
+
+    if (convBackprop) {
+        algorithm = Algorithm::DeconvolutionCommon;
+
+        IC = weightDims[0];
+        OC = weightDims[1];
+        biasesDims = {OC};
+
+        groupNum = 1;
+        withGroups = false;
+
+        for (int i = 0; i < convBackprop->get_strides().size(); i++) {
+            stride.push_back(static_cast<ptrdiff_t>(convBackprop->get_strides()[i]));
+        }
+        for (int i = 0; i < convBackprop->get_dilations().size(); i++) {
+            dilation.push_back(static_cast<ptrdiff_t>(convBackprop->get_dilations()[i]) - 1);
+        }
+        paddingL = convBackprop->get_pads_begin();
+        paddingR = convBackprop->get_pads_end();
+
+        outputPadding = convBackprop->get_output_padding();
+
+        autoPad = one_of(convBackprop->get_auto_pad(), ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER);
+    } else if (groupConvBackprop) {
+        algorithm = Algorithm::DeconvolutionGrouped;
+
+        groupNum = weightDims[0];
+        IC = groupNum * weightDims[1];
+        OC = groupNum * weightDims[2];
+        biasesDims = {OC * groupNum};
+        withGroups = groupNum > 1;
+        isDW = withGroups && groupNum == OC && groupNum == IC;
+
+        for (int i = 0; i < groupConvBackprop->get_strides().size(); i++) {
+            stride.push_back(static_cast<ptrdiff_t>(groupConvBackprop->get_strides()[i]));
+        }
+        for (int i = 0; i < groupConvBackprop->get_dilations().size(); i++) {
+            dilation.push_back(static_cast<ptrdiff_t>(groupConvBackprop->get_dilations()[i]) - 1);
+        }
+        paddingL = groupConvBackprop->get_pads_begin();
+        paddingR = groupConvBackprop->get_pads_end();
+
+        outputPadding = groupConvBackprop->get_output_padding();
+
+        autoPad = one_of(groupConvBackprop->get_auto_pad(), ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER);
+    }
+    for (int i = 0; i < dilation.size(); i++) {
+        kernel.push_back(weightDims[withGroups + 2 + i]);
+    }
+
+    externOutShape = inputShapes.size() == 3;
+    biasPort = externOutShape ? 3 : 2;
+    if (externOutShape && isDynamicNode()) {
+        bool isConstOutShape = ov::is_type<ov::op::v0::Constant>(op->get_input_node_shared_ptr(2));
+        if (isConstOutShape) {
+            lastOutputSpatialDims = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(2))->cast_vector<int32_t>();
+        }
+        const auto spDimsNum = getInputShapeAtPort(0).getRank() - 2;
+        if (getInputShapeAtPort(2).getStaticDims()[0] != spDimsNum || (isConstOutShape && lastOutputSpatialDims.size() != spDimsNum)) {
+            IE_THROW() << "'output_shape' input has incorrect number of elements. Expected = " << spDimsNum;
+        }
     }
 
     attr = std::make_shared<dnnl::primitive_attr>();
@@ -307,10 +293,10 @@ bool Deconvolution::canBeExecutedInInt8() const {
     if (!impl::cpu::x64::mayiuse(impl::cpu::x64::avx512_core) && stride.back() > 3)
         return false;
 
-    InferenceEngine::Precision inPrecision = getOriginalInputPrecisionAtPort(0);
+    const auto& inPrecision = getOriginalInputPrecisionAtPort(0);
     auto inputDataType = DnnlExtensionUtils::IEPrecisionToDataType(inPrecision);
 
-    InferenceEngine::Precision weiPrecision = getOriginalInputPrecisionAtPort(1);
+    const auto& weiPrecision = getOriginalInputPrecisionAtPort(1);
     auto weightsDataType = DnnlExtensionUtils::IEPrecisionToDataType(weiPrecision);
 
     if (isDW && (inputDataType == dnnl_s8 || dilation.size() == 3))

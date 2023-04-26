@@ -2,18 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include <selective_build.h>
 #include "one_hot.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset1.hpp>
-#include <ie_ngraph_utils.hpp>
-#include <utils/shape_inference/static_shape.hpp>
-#include <utils/shape_inference/shape_inference.hpp>
-#include "common/cpu_memcpy.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/constant.hpp>
+#include <openvino/op/one_hot.hpp>
 
 using namespace InferenceEngine;
 
@@ -53,7 +46,7 @@ class OneHotShapeInferFactory : public ShapeInferFactory {
 public:
     OneHotShapeInferFactory(const std::shared_ptr<ov::Node>& op) : m_op(op) {}
     ShapeInferPtr makeShapeInfer() const override {
-        auto oneHot = ov::as_type_ptr<const ngraph::opset1::OneHot>(m_op);
+        auto oneHot = ov::as_type_ptr<const ov::op::v1::OneHot>(m_op);
         if (!oneHot) {
             IE_THROW() << "Unexpected op type in OneHot shape inference factory: " << m_op->get_type_name();
         }
@@ -75,16 +68,15 @@ private:
 
 bool OneHot::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto oneHot = std::dynamic_pointer_cast<const ngraph::opset1::OneHot>(op);
-        if (!oneHot) {
+        if (op->get_type_info() != ov::op::v1::OneHot::get_type_info_static()) {
             errorMessage = "Only opset1 OneHot operation is supported";
             return false;
         }
-        if (std::dynamic_pointer_cast<const ngraph::opset1::Constant>(oneHot->get_input_node_shared_ptr(ON_VALUE_ID)) == nullptr) {
+        if (op->get_input_node_shared_ptr(ON_VALUE_ID)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
             errorMessage = "Only const 'on_value' input is supported";
             return false;
         }
-        if (std::dynamic_pointer_cast<const ngraph::opset1::Constant>(oneHot->get_input_node_shared_ptr(OFF_VALUEAXES_ID)) == nullptr) {
+        if (op->get_input_node_shared_ptr(OFF_VALUEAXES_ID)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
             errorMessage = "Only const 'off_value' input is supported";
             return false;
         }
@@ -101,8 +93,8 @@ OneHot::OneHot(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto oneHot = std::dynamic_pointer_cast<const ngraph::opset1::OneHot>(op);
-    const auto depthNode = std::dynamic_pointer_cast<const ngraph::opset1::Constant>(oneHot->get_input_node_shared_ptr(DEPTH_ID));
+    auto oneHot = ov::as_type<const ov::op::v1::OneHot>(op.get());
+    auto depthNode = ov::as_type<const ov::op::v0::Constant>(oneHot->get_input_node_ptr(DEPTH_ID));
     if (depthNode) {
         depth = depthNode->cast_vector<uint32_t>()[0];
     }

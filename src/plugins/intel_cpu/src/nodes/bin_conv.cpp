@@ -3,23 +3,14 @@
 //
 
 #include "bin_conv.h"
-#include "reorder.h"
-#include "input.h"
+
 #include "eltwise.h"
 #include "fake_quantize.h"
-#include "conv.h"
-#include <string>
-#include <vector>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
 #include "ie_parallel.hpp"
-#include "cpu/x64/jit_generator.hpp"
 #include "cpu/x64/injectors/jit_uni_eltwise_injector.hpp"
 #include "cpu/x64/injectors/jit_uni_depthwise_injector.hpp"
-#include "cpu/x64/cpu_isa_traits.hpp"
-#include "utils/general_utils.h"
-#include <ngraph/opsets/opset1.hpp>
-#include "utils/cpu_utils.hpp"
+#include <openvino/op/binary_convolution.hpp>
+#include "utils/ngraph_utils.hpp"
 
 // WA for xbyak.h
 #ifdef _WIN32
@@ -882,13 +873,13 @@ bool BinaryConvolution::isSupportedOperation(const std::shared_ptr<const ov::Nod
             return false;
         }
 
-        const auto binConv = std::dynamic_pointer_cast<const ngraph::opset1::BinaryConvolution>(op);
-        if (!binConv) {
+        if (auto binConv = ov::as_type<const ov::op::v1::BinaryConvolution>(op.get())) {
+            if (binConv->get_mode() != ov::op::v1::BinaryConvolution::BinaryConvolutionMode::XNOR_POPCOUNT) {
+                errorMessage = "Doesn't support mode: " + ov::as_string(binConv->get_mode());
+                return false;
+            }
+        } else {
             errorMessage = "Only opset1 BinaryConvolution operation is supported";
-            return false;
-        }
-        if (binConv->get_mode() != ngraph::op::v1::BinaryConvolution::BinaryConvolutionMode::XNOR_POPCOUNT) {
-            errorMessage = "Doesn't support mode: " + ngraph::as_string(binConv->get_mode());
             return false;
         }
     } catch (...) {
@@ -900,30 +891,30 @@ bool BinaryConvolution::isSupportedOperation(const std::shared_ptr<const ov::Nod
 BinaryConvolution::BinaryConvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
-        const auto binConv = std::dynamic_pointer_cast<const ngraph::opset1::BinaryConvolution>(op);
-
-        pad_value = binConv->get_pad_value();
-        for (int i = 0; i < binConv->get_strides().size(); i++) {
-            stride.push_back(static_cast<ptrdiff_t>(binConv->get_strides()[i]));
-        }
-        for (int i = 0; i < binConv->get_dilations().size(); i++) {
-            dilation.push_back(static_cast<ptrdiff_t>(binConv->get_dilations()[i]) - 1);
-        }
-        paddingL = binConv->get_pads_begin();
-        paddingR = binConv->get_pads_end();
-
-        if (mayiuse(x64::avx512_core)) {
-            implType = impl_desc_type::jit_avx512;
-        } else if (mayiuse(x64::avx2)) {
-            implType = impl_desc_type::jit_avx2;
-        } else if (mayiuse(x64::sse41)) {
-            implType = impl_desc_type::jit_sse42;
-        } else {
-            implType = impl_desc_type::ref;
-        }
-    } else {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
+    }
+
+    const auto binConv = ov::as_type<const ov::op::v1::BinaryConvolution>(op.get());
+
+    pad_value = binConv->get_pad_value();
+    for (int i = 0; i < binConv->get_strides().size(); i++) {
+        stride.push_back(static_cast<ptrdiff_t>(binConv->get_strides()[i]));
+    }
+    for (int i = 0; i < binConv->get_dilations().size(); i++) {
+        dilation.push_back(static_cast<ptrdiff_t>(binConv->get_dilations()[i]) - 1);
+    }
+    paddingL = binConv->get_pads_begin();
+    paddingR = binConv->get_pads_end();
+
+    if (mayiuse(x64::avx512_core)) {
+        implType = impl_desc_type::jit_avx512;
+    } else if (mayiuse(x64::avx2)) {
+        implType = impl_desc_type::jit_avx2;
+    } else if (mayiuse(x64::sse41)) {
+        implType = impl_desc_type::jit_sse42;
+    } else {
+        implType = impl_desc_type::ref;
     }
 }
 

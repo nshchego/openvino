@@ -5,10 +5,10 @@
 #pragma once
 
 #include <node.h>
-#include <string>
+
 #include <memory>
+#include <string>
 #include <vector>
-#include <dnnl_extension_utils.h>
 
 namespace ov {
 namespace intel_cpu {

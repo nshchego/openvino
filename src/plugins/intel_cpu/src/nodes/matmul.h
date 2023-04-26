@@ -5,11 +5,6 @@
 #pragma once
 
 #include <node.h>
-#include <ie_common.h>
-#include <string>
-#include <vector>
-#include <array>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
 #include "common/dnnl_executor.h"
 
 namespace ov {

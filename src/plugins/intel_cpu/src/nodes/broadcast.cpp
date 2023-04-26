@@ -2,17 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include "utils/bfloat16.hpp"
-#include <selective_build.h>
 #include "broadcast.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset1.hpp>
+
 #include "common/cpu_memcpy.h"
+#include "ie_parallel.hpp"
+#include <openvino/op/broadcast.hpp>
+#include <openvino/op/constant.hpp>
+#include "utils/ngraph_utils.hpp"
 
 using namespace InferenceEngine;
 
@@ -50,7 +46,7 @@ bool Broadcast::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, 
 }
 
 Broadcast::Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, NgraphShapeInferFactory(op, PortMask(TARGET_SHAPE_IDX, AXES_MAPPING_IDX))) {
+        : Node(op, context, NgraphShapeInferFactory(op, PortMask(TARGET_SHAPE_IDX, AXES_MAPPING_IDX))) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;

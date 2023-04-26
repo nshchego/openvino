@@ -3,20 +3,13 @@
 //
 
 #include "adaptive_pooling.h"
-#include "ie_parallel.hpp"
+
 #include <cpu/x64/cpu_isa_traits.hpp>
-#include <math.h>
-#include <onednn/dnnl.h>
-#include <dnnl_extension_utils.h>
-#include <selective_build.h>
-#include <ngraph/opsets/opset8.hpp>
-#include <string>
-#include <utils/bfloat16.hpp>
-#include <utils/general_utils.h>
-#include <vector>
+#include "ie_parallel.hpp"
+#include <openvino/op/adaptive_avg_pool.hpp>
+#include <openvino/op/adaptive_max_pool.hpp>
 
 using namespace InferenceEngine;
-using namespace dnnl;
 using namespace dnnl::impl::cpu::x64;
 
 namespace ov {
@@ -76,20 +69,9 @@ private:
 
 bool AdaptivePooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (one_of(op->get_type_info(), ngraph::op::v8::AdaptiveAvgPool::get_type_info_static())) {
-            auto adaPool = std::dynamic_pointer_cast<const ngraph::opset8::AdaptiveAvgPool>(op);
-            if (!adaPool) {
-                errorMessage = "Only opset8 AdaptiveAvgPooling operation is supported";
-                return false;
-            }
-        } else if (one_of(op->get_type_info(), ngraph::op::v8::AdaptiveMaxPool::get_type_info_static())) {
-            auto adaPool = std::dynamic_pointer_cast<const ngraph::opset8::AdaptiveMaxPool>(op);
-            if (!adaPool) {
-                errorMessage = "Only opset8 AdaptiveMaxPooling operation is supported";
-                return false;
-            }
-        } else {
-            errorMessage = "Unsupported Adaptive pooling mode";
+        if (!one_of(op->get_type_info(), ov::op::v8::AdaptiveAvgPool::get_type_info_static(),
+                                         ov::op::v8::AdaptiveMaxPool::get_type_info_static())) {
+            errorMessage = "Only AdaptiveAvgPooling and AdaptiveMaxPooling form opset8 operations are supported.";
             return false;
         }
     } catch (...) {
@@ -99,14 +81,15 @@ bool AdaptivePooling::isSupportedOperation(const std::shared_ptr<const ov::Node>
 }
 
 AdaptivePooling::AdaptivePooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, AdaptivePoolingShapeInferFactory(op)) {
+        : Node(op, context, AdaptivePoolingShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
       IE_THROW(NotImplemented) << errorMessage;
     }
-    if (one_of(op->get_type_info(), ngraph::op::v8::AdaptiveAvgPool::get_type_info_static())) {
+
+    if (op->get_type_info() == ov::op::v8::AdaptiveAvgPool::get_type_info_static()) {
         algorithm = Algorithm::AdaptivePoolingAvg;
-    } else if (one_of(op->get_type_info(), ngraph::op::v8::AdaptiveMaxPool::get_type_info_static())) {
+    } else if (op->get_type_info() == ov::op::v8::AdaptiveMaxPool::get_type_info_static()) {
         algorithm = Algorithm::AdaptivePoolingMax;
     }
     spatialDimsCount = getInputShapeAtPort(0).getRank() - 2;
@@ -156,7 +139,7 @@ void AdaptivePooling::initSupportedPrimitiveDescriptors() {
     // we supports only fp32 currently
     precision = Precision::FP32;
 
-    InferenceEngine::LayerConfig config;
+    LayerConfig config;
     config.dynBatchSupport = false;
     config.inConfs.resize(2);
     config.outConfs.resize((algorithm == Algorithm::AdaptivePoolingAvg ? 1 : 2));

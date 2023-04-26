@@ -57,7 +57,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
 
             auto unsqueeze = std::make_shared<ngraph::opset1::Unsqueeze>(
                 nodeFrom,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{unsqueeze_axes.size()}, unsqueeze_axes));
+                ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{unsqueeze_axes.size()}, unsqueeze_axes));
 
             unsqueeze->set_friendly_name(nodeFrom.get_node()->get_friendly_name() + "/Unsqueeze");
 
@@ -75,10 +75,10 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
             //                       to the right of the shape {S} -> {S, 1}
             const auto unsqueezeInput0 = std::make_shared<ngraph::opset1::Unsqueeze>(
                 input0,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{1}, {0}));
+                ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{1}, {0}));
             const auto unsqueezeInput1 = std::make_shared<ngraph::opset1::Unsqueeze>(
                 input1,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{1}, {1}));
+                ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{1}, {1}));
 
             matmul_new_inputs[0] = unsqueezeInput0;
             new_ops.push_back(unsqueezeInput0);
@@ -118,7 +118,7 @@ ov::intel_cpu::AlignMatMulInputRanks::AlignMatMulInputRanks() {
                 squeeze_axis = new_out_shape_size - 1;
             std::shared_ptr<ov::Node> squeeze_output = std::make_shared<ngraph::op::v0::Squeeze>(
                 matmul_new,
-                ngraph::opset1::Constant::create(ngraph::element::i64, ngraph::Shape{1}, {squeeze_axis}));
+                ngraph::opset1::Constant::create(ov::element::i64, ngraph::Shape{1}, {squeeze_axis}));
 
             new_ops.push_back(squeeze_output);
             matmul_new->set_friendly_name(matmul->get_friendly_name() + "/MM");

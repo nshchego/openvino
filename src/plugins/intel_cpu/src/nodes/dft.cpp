@@ -4,18 +4,14 @@
 
 #include "dft.h"
 
-#include <string>
-#include <thread>
-#include <vector>
-#include <cmath>
-#include <dnnl_extension_utils.h>
+//#include <dnnl_extension_utils.h>
 
 #include "ie_parallel.hpp"
-#include "ie_precision.hpp"
 #include <onednn/dnnl.h>
-#include "utils/general_utils.h"
 #include "common/cpu_memcpy.h"
-#include <ngraph/opsets/opset7.hpp>
+#include <openvino/op/dft.hpp>
+#include <openvino/op/idft.hpp>
+#include <utils/ngraph_utils.hpp>
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::cpu::x64;

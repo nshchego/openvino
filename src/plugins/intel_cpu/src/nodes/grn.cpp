@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-
-#include <ngraph/opsets/opset1.hpp>
-#include "ie_parallel.hpp"
 #include "grn.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/grn.hpp>
 
 using namespace InferenceEngine;
 
@@ -16,8 +15,7 @@ namespace node {
 
 bool GRN::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto grn = std::dynamic_pointer_cast<const ngraph::opset1::GRN>(op);
-        if (!grn) {
+        if (op->get_type_info() != ov::op::v0::GRN::get_type_info_static()) {
             errorMessage = "Only opset1 GRN operation is supported";
             return false;
         }
@@ -28,13 +26,13 @@ bool GRN::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::s
 }
 
 GRN::GRN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto grn = std::dynamic_pointer_cast<const ngraph::opset1::GRN>(op);
+    const auto grn = ov::as_type<const ov::op::v0::GRN>(op.get());
     if (grn == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of GRN from opset1.";

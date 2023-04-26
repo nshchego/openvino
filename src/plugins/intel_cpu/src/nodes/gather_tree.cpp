@@ -19,7 +19,7 @@ namespace node {
 
 bool GatherTree::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto gatherElementsOp = ngraph::as_type_ptr<const ngraph::op::v1::GatherTree>(op);
+        const auto gatherElementsOp = ov::as_type_ptr<const ov::op::v1::GatherTree>(op);
         if (!gatherElementsOp) {
             errorMessage = "Node is not an instance of the GatherTree operation from operation set v1.";
             return false;

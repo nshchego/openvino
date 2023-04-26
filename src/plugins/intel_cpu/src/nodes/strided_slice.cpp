@@ -6,12 +6,11 @@
 
 #include "ie_parallel.hpp"
 #include "common/cpu_memcpy.h"
-#include "input.h"
-#include <ngraph/opsets/opset1.hpp>
+#include <openvino/op/constant.hpp>
+#include <openvino/op/slice.hpp>
+#include <openvino/op/strided_slice.hpp>
 #include <utils/shape_inference/shape_inference_ngraph.hpp>
 #include "slice_shape_inference_utils.hpp"
-
-#include <string>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -248,7 +247,7 @@ StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphConte
         if (!isConstantInput[type])
             return;
 
-        const auto constNode = ov::as_type_ptr<const ngraph::opset1::Constant>(op->get_input_node_shared_ptr(type));
+        const auto constNode = ov::as_type_ptr<const ov::opset1::Constant>(op->get_input_node_shared_ptr(type));
         parameter = constNode->cast_vector<int>();
 
         auto size = constNode->get_shape()[0];

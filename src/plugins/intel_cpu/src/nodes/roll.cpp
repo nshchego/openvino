@@ -2,18 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-#include <cmath>
-#include <dnnl_extension_utils.h>
-
 #include "roll.h"
+
 #include "ie_parallel.hpp"
-#include "ie_precision.hpp"
-#include <onednn/dnnl.h>
-#include "utils/general_utils.h"
 #include "common/cpu_memcpy.h"
-#include <ngraph/opsets/opset7.hpp>
+#include <openvino/op/roll.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -24,8 +17,7 @@ namespace node {
 
 bool Roll::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto interp = std::dynamic_pointer_cast<const ngraph::opset7::Roll>(op);
-        if (!interp) {
+        if (op->get_type_info() == ov::op::v7::Roll::get_type_info_static()) {
             errorMessage = "Only opset7 Roll operation is supported";
             return false;
         }
@@ -39,46 +31,46 @@ Roll::Roll(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
                 Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
-        if (inputShapes.size() != 3 || outputShapes.size() != 1) {
-            THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
-        }
-
-        const auto &dataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
-
-        if (std::find(supportedPrecisionSizes.begin(), supportedPrecisionSizes.end(), dataPrecision.size()) == supportedPrecisionSizes.end())
-            THROW_CPU_NODE_ERR << "has unsupported precision: " << dataPrecision.name();
-
-        const auto dataRank = getInputShapeAtPort(DATA_INDEX).getRank();
-        if (dataRank < 1) {
-            THROW_CPU_NODE_ERR << " doesn't support 'data' input tensor with rank: " << dataRank;
-        }
-
-        if (dataRank != getOutputShapeAtPort(0).getRank())
-            THROW_CPU_NODE_ERR << " has input/output rank mismatch";
-
-        /* Axes */
-        const auto& axesTensorPrec = getOriginalInputPrecisionAtPort(AXES_INDEX);
-        if (axesTensorPrec != Precision::I32 && axesTensorPrec != Precision::I64) {
-            THROW_CPU_NODE_ERR << " has unsupported 'axes' input precision: " << axesTensorPrec.name();
-        }
-
-        const auto axesTensorRank = getInputShapeAtPort(AXES_INDEX).getRank();
-        if (axesTensorRank > 1) {
-            THROW_CPU_NODE_ERR << " doesn't support 'axes' input tensor with rank: " << axesTensorRank;
-        }
-
-        /* Shift */
-        const auto& shiftTensorPrec = getOriginalInputPrecisionAtPort(SHIFT_INDEX);
-        if (shiftTensorPrec != Precision::I32 && shiftTensorPrec != Precision::I64) {
-            THROW_CPU_NODE_ERR << " has unsupported 'shift' input precision: " << shiftTensorPrec.name();
-        }
-
-        const auto shiftTensorRank = getInputShapeAtPort(SHIFT_INDEX).getRank();
-        if (shiftTensorRank > 1) {
-            THROW_CPU_NODE_ERR << " doesn't support 'shift' input tensor with rank: " << shiftTensorRank;
-        }
-    } else {
         IE_THROW(NotImplemented) << errorMessage;
+    }
+
+    if (inputShapes.size() != 3 || outputShapes.size() != 1) {
+        THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
+    }
+
+    const auto &dataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
+
+    if (std::find(supportedPrecisionSizes.begin(), supportedPrecisionSizes.end(), dataPrecision.size()) == supportedPrecisionSizes.end())
+        THROW_CPU_NODE_ERR << "has unsupported precision: " << dataPrecision.name();
+
+    const auto dataRank = getInputShapeAtPort(DATA_INDEX).getRank();
+    if (dataRank < 1) {
+        THROW_CPU_NODE_ERR << " doesn't support 'data' input tensor with rank: " << dataRank;
+    }
+
+    if (dataRank != getOutputShapeAtPort(0).getRank())
+        THROW_CPU_NODE_ERR << " has input/output rank mismatch";
+
+    /* Axes */
+    const auto& axesTensorPrec = getOriginalInputPrecisionAtPort(AXES_INDEX);
+    if (axesTensorPrec != Precision::I32 && axesTensorPrec != Precision::I64) {
+        THROW_CPU_NODE_ERR << " has unsupported 'axes' input precision: " << axesTensorPrec.name();
+    }
+
+    const auto axesTensorRank = getInputShapeAtPort(AXES_INDEX).getRank();
+    if (axesTensorRank > 1) {
+        THROW_CPU_NODE_ERR << " doesn't support 'axes' input tensor with rank: " << axesTensorRank;
+    }
+
+    /* Shift */
+    const auto& shiftTensorPrec = getOriginalInputPrecisionAtPort(SHIFT_INDEX);
+    if (shiftTensorPrec != Precision::I32 && shiftTensorPrec != Precision::I64) {
+        THROW_CPU_NODE_ERR << " has unsupported 'shift' input precision: " << shiftTensorPrec.name();
+    }
+
+    const auto shiftTensorRank = getInputShapeAtPort(SHIFT_INDEX).getRank();
+    if (shiftTensorRank > 1) {
+        THROW_CPU_NODE_ERR << " doesn't support 'shift' input tensor with rank: " << shiftTensorRank;
     }
 }
 

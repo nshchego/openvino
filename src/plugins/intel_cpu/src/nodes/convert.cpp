@@ -2,16 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <dnnl_extension_utils.h>
 #include "convert.h"
+
 #include "common/cpu_convert.h"
-#include "common/blocked_desc_creator.h"
-#include <ngraph/opsets/opset1.hpp>
 #include <ie_ngraph_utils.hpp>
-#include <utils/ngraph_utils.hpp>
+#include <openvino/op/convert.hpp>
 #include <utils/shape_inference/shape_inference_pass_through.hpp>
 
-using namespace dnnl;
 using namespace InferenceEngine;
 
 namespace ov {
@@ -20,8 +17,7 @@ namespace node {
 
 bool Convert::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto convert = std::dynamic_pointer_cast<const ngraph::opset1::Convert>(op);
-        if (!convert) {
+        if (op->get_type_info() != ov::op::v0::Convert::get_type_info_static()) {
             errorMessage = "Only opset1 Convert operation is supported";
             return false;
         }
@@ -38,11 +34,11 @@ Convert::Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto convert = ov::as_type_ptr<const ngraph::opset1::Convert>(op);
+    auto convert = ov::as_type_ptr<const ov::op::v0::Convert>(op);
     origPrc = details::convertPrecision(convert->get_destination_type());
 }
 
-Convert::Convert(const Shape &shape, const InferenceEngine::Precision &inPrc, const InferenceEngine::Precision &outPrc,
+Convert::Convert(const Shape &shape, const Precision &inPrc, const Precision &outPrc,
                  const std::string &nodeName, const GraphContext::CPtr& context)
         : Node("Convert", nodeName, context)
         , origPrc(outPrc) {

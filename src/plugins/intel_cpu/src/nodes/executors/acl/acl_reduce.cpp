@@ -3,6 +3,7 @@
 //
 
 #include "acl_reduce.hpp"
+#include "utils/debug_capabilities.h"
 
 namespace ov {
 namespace intel_cpu {

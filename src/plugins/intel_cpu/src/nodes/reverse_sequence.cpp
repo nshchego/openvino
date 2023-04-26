@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-
-#include <ngraph/opsets/opset1.hpp>
-#include "ie_parallel.hpp"
 #include "reverse_sequence.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/reverse_sequence.hpp>
 
 using namespace InferenceEngine;
 
@@ -17,8 +15,7 @@ namespace node {
 
 bool ReverseSequence::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto revSeq = std::dynamic_pointer_cast<const ngraph::opset1::ReverseSequence>(op);
-        if (!revSeq) {
+        if (op->get_type_info() != op::v0::ReverseSequence::get_type_info_static()) {
             errorMessage = "Only opset1 ReverseSequence operation is supported";
             return false;
         }
@@ -29,13 +26,13 @@ bool ReverseSequence::isSupportedOperation(const std::shared_ptr<const ov::Node>
 }
 
 ReverseSequence::ReverseSequence(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    const auto revSeq = std::dynamic_pointer_cast<const ngraph::opset1::ReverseSequence>(op);
+    auto revSeq = ov::as_type<const op::v0::ReverseSequence>(op.get());
     if (revSeq == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of ReverseSequence from opset1.";

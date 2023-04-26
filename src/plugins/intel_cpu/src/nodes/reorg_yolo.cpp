@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-
-#include <ngraph/opsets/opset2.hpp>
-#include "ie_parallel.hpp"
 #include "reorg_yolo.h"
+
+#include <openvino/op/reorg_yolo.hpp>
 
 using namespace InferenceEngine;
 
@@ -16,8 +14,7 @@ namespace node {
 
 bool ReorgYolo::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto reorgYolo = std::dynamic_pointer_cast<const ngraph::opset2::ReorgYolo>(op);
-        if (!reorgYolo) {
+        if (op->get_type_info() != op::v0::ReorgYolo::get_type_info_static()) {
             errorMessage = "Only opset2 ReorgYolo operation is supported";
             return false;
         }
@@ -37,7 +34,7 @@ ReorgYolo::ReorgYolo(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     if (getOriginalInputsNumber() != 1 || getOriginalOutputsNumber() != 1)
         THROW_CPU_NODE_ERR << " has incorrect number of input/output edges!";
 
-    const auto reorgYolo = std::dynamic_pointer_cast<const ngraph::opset2::ReorgYolo>(op);
+    auto reorgYolo = ov::as_type<const ov::op::v0::ReorgYolo>(op.get());
     const auto strides = reorgYolo->get_strides();
     if (strides.empty())
         THROW_CPU_NODE_ERR << " has empty strides";

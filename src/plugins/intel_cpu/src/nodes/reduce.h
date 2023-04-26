@@ -4,11 +4,7 @@
 
 #pragma once
 
-#include <ie_common.h>
 #include <node.h>
-#include <string>
-#include <memory>
-#include <vector>
 #include "executors/reduce_list.hpp"
 
 namespace ov {

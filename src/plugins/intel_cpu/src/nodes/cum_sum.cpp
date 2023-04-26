@@ -2,15 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <string>
-#include <vector>
-
-#include <ngraph/opsets/opset1.hpp>
-#include <ngraph/opsets/opset3.hpp>
-#include "ie_parallel.hpp"
-#include "ie_precision.hpp"
-#include <ie_ngraph_utils.hpp>
 #include "cum_sum.h"
+
+#include "ie_parallel.hpp"
+#include <openvino/op/cum_sum.hpp>
 #include "utils/bfloat16.hpp"
 
 using namespace InferenceEngine;
@@ -21,8 +16,7 @@ namespace node {
 
 bool CumSum::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto cumsum = std::dynamic_pointer_cast<const ngraph::opset3::CumSum>(op);
-        if (!cumsum) {
+        if (op->get_type_info() != ov::op::v0::CumSum::get_type_info_static()) {
             errorMessage = "Only opset3 CumSum operation is supported";
             return false;
         }
@@ -47,7 +41,7 @@ CumSum::CumSum(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
         THROW_CPU_NODE_ERR << " doesn't support 'data' input tensor with rank: " << numOfDims;
     }
 
-    const auto cumsum = std::dynamic_pointer_cast<const ngraph::opset3::CumSum>(op);
+    const auto cumsum = ov::as_type_ptr<ov::op::v0::CumSum>(op);
     if (cumsum == nullptr)
         IE_THROW() << "Operation with name '" << op->get_friendly_name() <<
             "' is not an instance of CumSum from opset3.";
@@ -57,7 +51,7 @@ CumSum::CumSum(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
 
     if (getOriginalInputsNumber() == numOfInputs) {
         const auto axis_shape = cumsum->get_input_partial_shape(AXIS);
-        if (axis_shape.is_dynamic() || !ngraph::is_scalar(axis_shape.to_shape()))
+        if (axis_shape.is_dynamic() || !ov::is_scalar(axis_shape.to_shape()))
             THROW_CPU_NODE_ERR << " doesn't support 'axis' input tensor with non scalar rank";
     }
 

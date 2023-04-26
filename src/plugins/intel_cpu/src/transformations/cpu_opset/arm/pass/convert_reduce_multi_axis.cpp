@@ -27,13 +27,13 @@ ngraph::matcher_pass_callback ov::intel_cpu::ConvertReduceMultiAxisBase::convert
         ov::NodeVector new_ops;
         std::shared_ptr<ov::Node> node = reduce->input_value(0).get_node_shared_ptr();
         for (auto axis : axes) {
-            auto reduction_axis = ov::opset8::Constant::create<int64_t>(ngraph::element::i64, ngraph::Shape{}, {axis});
+            auto reduction_axis = ov::opset8::Constant::create<int64_t>(ov::element::i64, ngraph::Shape{}, {axis});
             node = std::make_shared<T>(node, reduction_axis, true);
             new_ops.push_back(node);
         }
 
         auto out_shape = reduce->get_output_shape(0);
-        auto dst_shape = std::make_shared<ov::opset8::Constant>(ngraph::element::i64, ngraph::Shape{out_shape.size()},
+        auto dst_shape = std::make_shared<ov::opset8::Constant>(ov::element::i64, ngraph::Shape{out_shape.size()},
                     std::vector<int64_t>(out_shape.begin(), out_shape.end()));
         auto reshape = std::make_shared<ov::opset8::Reshape>(node, dst_shape, true);
 
