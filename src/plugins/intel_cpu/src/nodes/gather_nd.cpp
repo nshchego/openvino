@@ -55,7 +55,7 @@ void GatherND::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inDataPrecision = getOriginalInputPrecisionAtPort(GATHERND_DATA);
+    const auto& inDataPrecision = getOriginalInputPrecisionAtPort(GATHERND_DATA);
     if (!one_of(inDataPrecision.size(),
                 sizeof(PrecisionTrait<Precision::I32>::value_type),
                 sizeof(PrecisionTrait<Precision::I16>::value_type),

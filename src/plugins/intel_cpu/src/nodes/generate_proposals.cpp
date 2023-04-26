@@ -312,7 +312,7 @@ void GenerateProposals::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    auto roiNumPrecision = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
+    const auto& roiNumPrecision = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
     addSupportedPrimDesc({{LayoutType::ncsp, Precision::FP32},
                           {LayoutType::ncsp, Precision::FP32},
                           {LayoutType::ncsp, Precision::FP32},
@@ -404,7 +404,7 @@ void GenerateProposals::execute(dnnl::stream strm) {
         std::vector<float> roi_item, score_item;
         std::vector<int64_t> roi_num(batch_size);
         uint8_t* p_roi_num = reinterpret_cast<uint8_t*>(&roi_num[0]);
-        auto roi_num_type = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
+        const auto& roi_num_type = getOriginalOutputPrecisionAtPort(OUTPUT_ROI_NUM);
         const auto roi_num_item_size = roi_num_type == Precision::I32 ? sizeof(int32_t) : sizeof(int64_t);
         for (size_t n = 0; n < batch_size; ++n) {
             // input image height & width

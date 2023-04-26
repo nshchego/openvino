@@ -71,7 +71,7 @@ void GatherElements::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inDataPrecision = getOriginalInputPrecisionAtPort(dataIndex_);
+    const auto& inDataPrecision = getOriginalInputPrecisionAtPort(dataIndex_);
     if (!one_of(inDataPrecision.size(),
                 sizeof(PrecisionTrait<Precision::I32>::value_type),
                 sizeof(PrecisionTrait<Precision::I16>::value_type),
@@ -79,7 +79,7 @@ void GatherElements::initSupportedPrimitiveDescriptors() {
         IE_THROW() << errorPrefix_ << " has unsupported 'inputData' input precision: " << inDataPrecision;
     }
 
-    Precision indicesPrecision = getOriginalInputPrecisionAtPort(indicesIndex_);
+    const auto& indicesPrecision = getOriginalInputPrecisionAtPort(indicesIndex_);
     if (!one_of(indicesPrecision, Precision::I32, Precision::I64)) {
         IE_THROW() << errorPrefix_ << " has unsupported 'indices' input precision: " << indicesPrecision;
     }

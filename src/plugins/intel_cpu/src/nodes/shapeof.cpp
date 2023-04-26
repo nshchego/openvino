@@ -79,7 +79,7 @@ void ShapeOf::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision precision = getOriginalInputPrecisionAtPort(0);
+    const auto& precision = getOriginalInputPrecisionAtPort(0);
 
     const LayoutType dataFormats[4] = { LayoutType::ncsp, LayoutType::nspc, LayoutType::nCsp16c, LayoutType::nCsp8c };
     for (const auto &df : dataFormats) {

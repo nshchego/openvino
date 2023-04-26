@@ -4,29 +4,29 @@
 
 #pragma once
 
-#include <ngraph/op/op.hpp>
+#include "openvino/op/op.hpp"
 
 namespace ov {
 namespace intel_cpu {
 
-class MHANode : public ngraph::op::Op {
+class MHANode : public op::Op {
 public:
     OPENVINO_OP("MHA", "cpu_plugin_opset");
 
     MHANode() = default;
 
-    MHANode(const ngraph::Output<ov::Node> &in0,
-            const ngraph::Output<ov::Node> &in1,
-            const ngraph::Output<ov::Node> &in2,
-            const ngraph::Output<ov::Node> &in3,
+    MHANode(const Output<ov::Node> &in0,
+            const Output<ov::Node> &in1,
+            const Output<ov::Node> &in2,
+            const Output<ov::Node> &in3,
             const std::vector<float> &mul_scales,
             bool is_mul_first,
             const ov::element::Type output_type);
 
-    MHANode(const ngraph::Output<ov::Node> &in0,
-            const ngraph::Output<ov::Node> &in1,
-            const ngraph::Output<ov::Node> &in2,
-            const ngraph::Output<ov::Node> &in3,
+    MHANode(const Output<ov::Node> &in0,
+            const Output<ov::Node> &in1,
+            const Output<ov::Node> &in2,
+            const Output<ov::Node> &in3,
             const std::vector<float> &mul_scales,
             bool is_mul_first,
             const std::vector<float> &fq_scales0,
@@ -40,9 +40,9 @@ public:
 
     void validate_and_infer_types() override;
 
-    bool visit_attributes(ngraph::AttributeVisitor &visitor) override;
+    bool visit_attributes(AttributeVisitor &visitor) override;
 
-    std::shared_ptr<ov::Node> clone_with_new_inputs(const ngraph::OutputVector &new_args) const override;
+    std::shared_ptr<ov::Node> clone_with_new_inputs(const OutputVector &new_args) const override;
 
     ov::element::Type get_output_type() const { return m_output_type; }
 

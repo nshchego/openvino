@@ -370,7 +370,7 @@ void ExtractImagePatches::prepareParams() {
 
     const auto& in_dims = getParentEdgeAt(0)->getMemory().getStaticDims();
     const auto& out_dims = getChildEdgesAtPort(0)[0]->getMemory().getStaticDims();
-    const auto prcSize = getOriginalInputPrecisionAtPort(0).size();
+    const auto& prcSize = getOriginalInputPrecisionAtPort(0).size();
     ExtractImagePatchesKey key = {in_dims, out_dims, _ksizes, _strides, _rates, _auto_pad, prcSize};
     const auto isJit = mayiuse(x64::sse41);
     auto buildExecutor = [&isJit](const ExtractImagePatchesKey& key) -> executorPtr {
@@ -401,7 +401,7 @@ void ExtractImagePatches::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    const auto precision = getOriginalInputPrecisionAtPort(0);
+    const auto& precision = getOriginalInputPrecisionAtPort(0);
     if (_supported_precisions_sizes.find(precision.size()) == _supported_precisions_sizes.end())
         THROW_CPU_NODE_ERR << "has unsupported precision: " << precision.name();
 

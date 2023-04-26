@@ -54,11 +54,11 @@ void CTCGreedyDecoderSeqLen::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inDataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
+    const auto& inDataPrecision = getOriginalInputPrecisionAtPort(DATA_INDEX);
     if (inDataPrecision != Precision::FP32 && inDataPrecision != Precision::BF16)
         THROW_CPU_NODE_ERR << "has unsupported 'data' input precision: " << inDataPrecision;
 
-    Precision seqLenPrecision = getOriginalInputPrecisionAtPort(SEQUENCE_LENGTH_INDEX);
+    const auto& seqLenPrecision = getOriginalInputPrecisionAtPort(SEQUENCE_LENGTH_INDEX);
     if (seqLenPrecision != Precision::I32 && seqLenPrecision != Precision::I64)
         THROW_CPU_NODE_ERR << "has unsupported 'sequence_length' input precision: " << seqLenPrecision;
 

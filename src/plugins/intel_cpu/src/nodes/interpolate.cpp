@@ -1484,7 +1484,7 @@ using ngInterpShapeCalcMode = ov::op::v4::Interpolate::ShapeCalcMode;
 bool Interpolate::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         auto interp = ov::as_type<const ov::op::v4::Interpolate>(op.get());
-        if (op->get_type_info() != ov::op::v4::Interpolate::get_type_info_static()) {
+        if (!interp) {
             errorMessage = "Only op::v4 Interpolate operation is supported";
             return false;
         }
@@ -1734,7 +1734,7 @@ void Interpolate::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inputPrecision = getOriginalInputPrecisionAtPort(DATA_ID);
+    auto inputPrecision = getOriginalInputPrecisionAtPort(DATA_ID);
     if ((inputPrecision != Precision::I8) && (inputPrecision != Precision::U8) && (inputPrecision != Precision::BF16)) {
         inputPrecision = Precision::FP32;
     }

@@ -21,7 +21,6 @@
 #endif
 #include <threading/ie_cpu_streams_executor.hpp>
 #include <ie_system_conf.h>
-#include <ngraph/opsets/opset1.hpp>
 #include <transformations/utils/utils.hpp>
 #include <ie_ngraph_utils.hpp>
 #include "cpp_interfaces/interface/ie_iplugin_internal.hpp"

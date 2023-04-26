@@ -48,7 +48,7 @@ void BatchToSpace::initSupportedPrimitiveDescriptors() {
         return;
 
     const auto &inDims = getInputShapeAtPort(0).getDims();
-    const auto precision = getOriginalInputPrecisionAtPort(0);
+    const auto& precision = getOriginalInputPrecisionAtPort(0);
     const std::set<size_t> supported_precision_sizes = {1, 2, 4, 8};
     if (supported_precision_sizes.find(precision.size()) == supported_precision_sizes.end())
         THROW_CPU_NODE_ERR << " has unsupported precision: " << precision.name();

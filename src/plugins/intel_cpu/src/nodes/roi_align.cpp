@@ -756,8 +756,8 @@ void ROIAlign::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    Precision inputPrec0 = getOriginalInputPrecisionAtPort(0);
-    Precision outputPrec = getOriginalOutputPrecisionAtPort(0);
+    auto inputPrec0 = getOriginalInputPrecisionAtPort(0);
+    auto outputPrec = getOriginalOutputPrecisionAtPort(0);
 
     if (inputPrec0 != Precision::FP32 || outputPrec != Precision::FP32) {
         if ((outputPrec == Precision::BF16 || inputPrec0 == Precision::BF16) && mayiuse(avx512_core)) {
