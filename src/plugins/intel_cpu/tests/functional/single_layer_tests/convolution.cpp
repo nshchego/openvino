@@ -11,6 +11,9 @@
 #include "openvino/core/visibility.hpp"
 #include <shared_test_classes/single_layer/convolution.hpp>
 
+#include <stdlib.h>
+#include <stdio.h>
+
 using namespace InferenceEngine;
 using namespace CPUTestUtils;
 using namespace ov::test;
@@ -48,11 +51,12 @@ public:
         InputShape inputShape;
         std::tie(convParams, netType, inType, outType, inputShape) = basicParamsSet;
         ov::op::PadType padType;
-        InferenceEngine::SizeVector kernel, stride, dilation;
+        SizeVector kernel, stride, dilation;
         std::vector<ptrdiff_t> padBegin, padEnd;
         size_t convOutChannels;
         std::tie(kernel, stride, padBegin, padEnd, dilation, convOutChannels, padType) = convParams;
 
+        // First approach.
 //        std::ostringstream TS, CTB;
 //        for (const auto& shape : inputShape.second) {
 //            TS << CommonTestUtils::vec2str(shape) << "_";
@@ -84,9 +88,86 @@ public:
 //
 //        return std::string(result);
 
+//        // Second approach.
+//        char resArr[1000];
+//        char num[10];
+//        char* buff = resArr;
+//
+//        memcpy(buff, "IS=", 3); buff += 3;
+//        // const auto& shape = inputShape.first;
+//        auto tmpStr = inputShape.first.to_string();
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//        // if (shape.m_rank_is_static) {
+//        //         str << "[";
+//        //         bool first = true;
+//        //         for (auto& d : shape.m_dimensions) {
+//        //         if (!first) {
+//        //                 str << ",";
+//        //         }
+//        //         if (const auto& l = ov::DimensionTracker::get_label(d))
+//        //                 str << "l<" << l << ">";
+//        //         str << d;
+//        //         first = false;
+//        //         }
+//        //         return (str << "]");
+//        // } else {
+//        //     memcpy(buff, "...]", 4); buff += 4;
+//        // }
+//        memcpy(buff, "_TS=(", 5); buff += 5;
+//        for (const auto& shape : inputShape.second) {
+//            const auto shapeStr = CommonTestUtils::vec2str(shape);
+//            memcpy(buff, shapeStr.c_str(), shapeStr.size()); buff += shapeStr.size();
+//            buff[0] = '_'; buff++;
+//        }
+//        memcpy(buff, ")_K", 3); buff += 3;
+//        tmpStr = CommonTestUtils::vec2str(kernel);
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_S", 2); buff += 2;
+//        tmpStr = CommonTestUtils::vec2str(stride);
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_PB", 3); buff += 3;
+//        tmpStr = CommonTestUtils::vec2str(padBegin);
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_PE", 3); buff += 3;
+//        tmpStr = CommonTestUtils::vec2str(padEnd);
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_D=", 3); buff += 3;
+//        tmpStr = CommonTestUtils::vec2str(dilation);
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_O=", 3); buff += 3;
+//        tmpStr = std::to_string(convOutChannels);
+//        memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_AP=", 4); buff += 4;
+//        auto copied = snprintf(buff, sizeof(buff), "%d", padType); buff += copied;
+//
+//        memcpy(buff, "_netPRC=", 7); buff += 7;
+//        // tmpStr = CommonTestUtils::vec2str(padBegin);netType.get_type_info(m_type).m_type_name
+//        copied = snprintf(buff, sizeof(buff), "%s", netType.get_type_info(m_type).m_type_name); buff += copied;
+//        // memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_inPRC=", 7); buff += 7;
+//        copied = snprintf(buff, sizeof(buff), "%s", inType.get_type_info(m_type).m_type_name); buff += copied;
+//        // tmpStr = CommonTestUtils::vec2str(padBegin);
+//        // memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//        memcpy(buff, "_outPRC=", 8); buff += 8;
+//        copied = snprintf(buff, sizeof(buff), "%s", outType.get_type_info(m_type).m_type_name); buff += copied;
+//        // tmpStr = CommonTestUtils::vec2str(padBegin);
+//        // memcpy(buff, tmpStr.c_str(), tmpStr.size()); buff += tmpStr.size();
+//
+//
+//        printf("resArr: '%s'\n", resArr);
+
+
         std::ostringstream result;
         result << "IS=";
-        result  << CommonTestUtils::partialShape2str({inputShape.first}) << "_";
+        result << CommonTestUtils::partialShape2str({inputShape.first}) << "_";
         result << "TS=(";
         for (const auto& shape : inputShape.second) {
             result << CommonTestUtils::vec2str(shape) << "_";
@@ -117,7 +198,7 @@ public:
     }
 protected:
     bool isBias = false;
-    InferenceEngine::SizeVector kernel, dilation;
+    SizeVector kernel, dilation;
 
     void checkBiasFusing(ov::CompiledModel &execNet) const {
         if (!execNet) return;
@@ -221,7 +302,7 @@ protected:
         }
 
         ov::op::PadType padType;
-        InferenceEngine::SizeVector stride;
+        SizeVector stride;
         std::vector<ptrdiff_t> padBegin, padEnd;
         size_t convOutChannels;
         std::tie(kernel, stride, padBegin, padEnd, dilation, convOutChannels, padType) = convParams;

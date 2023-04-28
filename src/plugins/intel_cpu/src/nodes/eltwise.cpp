@@ -16,14 +16,10 @@
 #include "ie_ngraph_utils.hpp"
 #include <utils/ngraph_utils.hpp>
 
-#include <openvino/op/constant.hpp>
+#include <openvino/op/ops.hpp>
 #include "transformations/cpu_opset/common/op/power_static.hpp"
 #include "transformations/cpu_opset/common/op/leaky_relu.hpp"
 #include "transformations/cpu_opset/common/op/swish_cpu.hpp"
-
-// #include <algorithm>
-// #include <cmath>
-// #include <functional>
 
 using namespace InferenceEngine;
 using namespace dnnl::impl::utils;

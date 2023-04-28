@@ -102,7 +102,7 @@ protected:
         const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
         ov::ParameterVector body_params;
         for (const auto &pshape : body_params_shapes) {
-            body_params.emplace_back(std::make_shared<ngraph::opset1::Parameter>(netType, pshape));
+            body_params.emplace_back(std::make_shared<ov::op::v0::Parameter>(netType, pshape));
         }
 
         auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, true);
@@ -181,13 +181,13 @@ protected:
 
         // Body parameters
         const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
-        ov::ParameterVector body_params = { std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{}) };
+        ov::ParameterVector body_params = { std::make_shared<ov::op::v0::Parameter>(ov::element::i64, ov::Shape{}) };
         for (const auto &pshape : body_params_shapes) {
-            body_params.emplace_back(std::make_shared<ngraph::opset1::Parameter>(inType, pshape));
+            body_params.emplace_back(std::make_shared<ov::op::v0::Parameter>(inType, pshape));
         }
 
         auto exec_condition = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{}, exec_cond);
-        auto trip_count_input = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, ov::Shape{});
+        auto trip_count_input = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, ov::Shape{});
         trip_count_input->set_friendly_name("trip_count");
         params.insert(params.begin(), trip_count_input);
 
@@ -253,7 +253,7 @@ protected:
         const std::vector<ov::PartialShape> body_params_shapes(shapes.size(), ov::PartialShape::dynamic());
         ov::ParameterVector body_params;
         for (const auto &pshape : body_params_shapes) {
-            body_params.emplace_back(std::make_shared<ngraph::opset1::Parameter>(inType, pshape));
+            body_params.emplace_back(std::make_shared<ov::op::v0::Parameter>(inType, pshape));
         }
 
         auto body_condition_const = std::make_shared<ngraph::opset5::Constant>(ov::element::boolean, ov::Shape{1}, true);

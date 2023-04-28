@@ -112,13 +112,13 @@ protected:
         paramShape = {paramOuts[0].get_partial_shape().size()};
 
         std::shared_ptr<ov::Node> in2, in3, in4;
-        auto blockShapeParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
+        auto blockShapeParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, paramShape);
         in2 = blockShapeParam;
         params.push_back(blockShapeParam);
-        auto padsBeginParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
+        auto padsBeginParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, paramShape);
         in3 = padsBeginParam;
         params.push_back(padsBeginParam);
-        auto padsEndParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
+        auto padsEndParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, paramShape);
         in4 = padsEndParam;
         params.push_back(padsEndParam);
 

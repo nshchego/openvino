@@ -72,7 +72,7 @@ protected:
 
         init_input_shapes({ inputShapes });
 
-        auto emb_table_node = std::make_shared<ngraph::opset1::Parameter>(inType, inputShapes.first);
+        auto emb_table_node = std::make_shared<ov::op::v0::Parameter>(inType, inputShapes.first);
         ov::ParameterVector params = {emb_table_node};
 
         auto embBag = ov::as_type_ptr<ngraph::opset3::EmbeddingBagPackedSum>(ngraph::builder::makeEmbeddingBagPackedSum(

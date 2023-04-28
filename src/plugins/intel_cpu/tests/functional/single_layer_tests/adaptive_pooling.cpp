@@ -108,7 +108,7 @@ protected:
         if (secondInputConst) {
             secondInput = ov::op::v0::Constant::create(ov::element::i32, ov::Shape{pooledVector.size()}, pooledVector);
         } else {
-            auto pooledParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i32, ov::Shape{pooledVector.size()});
+            auto pooledParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i32, ov::Shape{pooledVector.size()});
             pooledParam->set_friendly_name("ParamSecondInput");
             params.push_back(pooledParam);
             secondInput = pooledParam;

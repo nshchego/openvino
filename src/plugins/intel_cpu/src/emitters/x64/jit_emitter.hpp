@@ -7,8 +7,10 @@
 #include <ie_common.h>
 #include <cpu/x64/jit_generator.hpp>
 
-#include "snippets/snippets_isa.hpp"
-#include "snippets/generator.hpp"
+//#include "snippets/snippets_isa.hpp"
+//#include "snippets/generator.hpp"
+#include "openvino/core/node.hpp"
+#include "snippets/emitter.hpp"
 #include <node.h>
 
 #include <set>

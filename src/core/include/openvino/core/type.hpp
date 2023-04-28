@@ -85,7 +85,7 @@ typename std::enable_if<
     std::is_convertible<decltype(std::declval<Value>()->get_type_info().is_castable(Type::get_type_info_static())),
                         bool>::value,
     bool>::type
-is_type(Value value) {
+is_type(const Value& value) {
     return value->get_type_info().is_castable(Type::get_type_info_static());
 }
 

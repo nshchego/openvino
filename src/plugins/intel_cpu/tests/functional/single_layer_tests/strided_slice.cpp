@@ -108,9 +108,9 @@ protected:
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             ov::Shape inShape = {ssParams.begin.size()};
 
-            auto beginNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
-            auto endNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
-            auto strideNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
+            auto beginNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, inShape);
+            auto endNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, inShape);
+            auto strideNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, inShape);
 
             params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(beginNode));
             params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(endNode));

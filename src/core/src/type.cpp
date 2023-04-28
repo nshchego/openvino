@@ -20,9 +20,9 @@ namespace ov {
 size_t DiscreteTypeInfo::hash() const {
     if (hash_value != 0)
         return hash_value;
-if (strcmp(name, "SwapConvertTranspose") == 0) {
-    printf("DiscreteTypeInfo::hash()_1 %s\n", name);
-}
+//if (strcmp(name, "SwapConvertTranspose") == 0) {
+//    printf("DiscreteTypeInfo::hash()_1 %s\n", name);
+//}
     size_t name_hash = name ? std::hash<std::string>()(std::string(name)) : 0;
     size_t version_id_hash = version_id ? std::hash<std::string>()(std::string(version_id)) : 0;
 
@@ -31,9 +31,9 @@ if (strcmp(name, "SwapConvertTranspose") == 0) {
 
 size_t DiscreteTypeInfo::hash() {
     if (hash_value == 0) {
-if (strcmp(name, "SwapConvertTranspose") == 0) {
-    printf("DiscreteTypeInfo::hash()_0 %s\n", name);
-}
+//if (strcmp(name, "SwapConvertTranspose") == 0) {
+//    printf("DiscreteTypeInfo::hash()_0 %s\n", name);
+//}
         hash_value = static_cast<const DiscreteTypeInfo*>(this)->hash();
     }
     return hash_value;
@@ -86,7 +86,7 @@ bool DiscreteTypeInfo::operator==(const DiscreteTypeInfo& b) const {
     if (hash_value != 0 && b.hash_value != 0)
         return hash() == b.hash();
     if (name != nullptr && b.name != nullptr) {
-printf("DiscreteTypeInfo::operator==() %s\n", name);
+//printf("DiscreteTypeInfo::operator==() %s\n", name);
         if (strcmp(name, b.name) == 0) {
             std::string v_id(version_id == nullptr ? "" : version_id);
             std::string bv_id(b.version_id == nullptr ? "" : b.version_id);

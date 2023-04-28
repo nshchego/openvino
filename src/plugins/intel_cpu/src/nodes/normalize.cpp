@@ -17,6 +17,8 @@
 #include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
 
+#include <openvino/op/constant.hpp>
+
 using namespace dnnl;
 using namespace InferenceEngine;
 using namespace dnnl::impl;
@@ -702,13 +704,13 @@ bool NormalizeL2::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
             return false;
         }
 
-        auto axesNode = ov::as_type_ptr<const ov::op::v0::Constant>(norm->get_input_node_shared_ptr(AXES));
+        auto axesNode = ov::as_type_ptr<const op::v0::Constant>(norm->get_input_node_shared_ptr(AXES));
         if (!axesNode) {
             errorMessage = "Supports only constant 'axes' input";
             return false;
         }
 
-        if (axesNode->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+        if (axesNode->get_type_info() != op::v0::Constant::get_type_info_static()) {
             // TODO [DS]: Add 'axes' input dynamism support
             errorMessage = "Doesn't support dynamic 'axes' input";
             return false;
@@ -736,7 +738,7 @@ bool NormalizeL2::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
         }
 
         const auto mode = norm->get_eps_mode();
-        if (!one_of(mode, ov::op::EpsMode::ADD, ov::op::EpsMode::MAX)) {
+        if (!one_of(mode, op::EpsMode::ADD, op::EpsMode::MAX)) {
             errorMessage = "Doesn't support eps_mode: " + ov::as_string(mode);
             return false;
         }
@@ -760,9 +762,9 @@ NormalizeL2::NormalizeL2(const std::shared_ptr<ov::Node>& op, const GraphContext
         THROW_CPU_NODE_ERR << "has invalid input shape. Normalize supports from 2D to 4D blobs.";
     }
 
-    auto norm = ov::as_type_ptr<const ov::op::v0::NormalizeL2>(op);
+    auto norm = ov::as_type_ptr<const op::v0::NormalizeL2>(op);
     attrs.eps = norm->get_eps();
-    attrs.epsMode = norm->get_eps_mode() == ov::op::EpsMode::MAX ? NormEpsMode::MAX : NormEpsMode::ADD;
+    attrs.epsMode = norm->get_eps_mode() == op::EpsMode::MAX ? NormEpsMode::MAX : NormEpsMode::ADD;
     attrs.across_spatial = ngraph::shape_size(op->get_input_shape(AXES)) != 1;
     // One of the corner cases is when axes is an empty list,
     // then we divide each input element by itself resulting value 1 for all non-zero elements

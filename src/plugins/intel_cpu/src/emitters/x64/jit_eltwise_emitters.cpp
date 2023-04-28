@@ -4,6 +4,7 @@
 
 #include "jit_eltwise_emitters.hpp"
 #include "ie_ngraph_utils.hpp"
+#include "snippets/snippets_isa.hpp"
 
 using namespace InferenceEngine;
 using namespace dnnl::impl::utils;

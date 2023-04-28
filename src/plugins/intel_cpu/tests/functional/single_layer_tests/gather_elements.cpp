@@ -99,8 +99,8 @@ protected:
         init_input_shapes(shapes);
 
         ov::ParameterVector params = {
-            std::make_shared<ngraph::opset1::Parameter>(dPrecision, inputDynamicShapes[0]),
-            std::make_shared<ngraph::opset1::Parameter>(iPrecision, inputDynamicShapes[1]),
+            std::make_shared<ov::op::v0::Parameter>(dPrecision, inputDynamicShapes[0]),
+            std::make_shared<ov::op::v0::Parameter>(iPrecision, inputDynamicShapes[1]),
         };
 
         auto gather = std::make_shared<ov::op::v6::GatherElements>(

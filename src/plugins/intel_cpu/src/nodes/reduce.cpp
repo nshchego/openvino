@@ -7,13 +7,23 @@
 #include "eltwise.h"
 #include "fake_quantize.h"
 #include "ie_parallel.hpp"
-#include <openvino/op/reduce_l1.hpp>
 #include "utils/bfloat16.hpp"
 
 #include "emitters/x64/jit_bf16_emitters.hpp"
 #include <cpu/x64/injectors/jit_uni_depthwise_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
+
+#include <openvino/op/constant.hpp>
+#include <openvino/op/reduce_l1.hpp>
+#include <openvino/op/reduce_l2.hpp>
+#include <openvino/op/reduce_logical_and.hpp>
+#include <openvino/op/reduce_logical_or.hpp>
+#include <openvino/op/reduce_max.hpp>
+#include <openvino/op/reduce_mean.hpp>
+#include <openvino/op/reduce_min.hpp>
+#include <openvino/op/reduce_prod.hpp>
+#include <openvino/op/reduce_sum.hpp>
 
 using namespace dnnl;
 using namespace InferenceEngine;
@@ -1668,43 +1678,42 @@ private:
 #endif // OPENVINO_ARCH_X86_64
 
 const std::map<const ngraph::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ov::Node>&, Reduce&)>> Reduce::initializers = {
-    {ov::op::v4::ReduceL1::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v4::ReduceL1::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceL1;
     }},
-    {ov::op::v4::ReduceL2::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v4::ReduceL2::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceL2;
     }},
-    {ov::op::v1::ReduceLogicalAnd::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceLogicalAnd::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceAnd;
     }},
-    {ov::op::v1::ReduceLogicalOr::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceLogicalOr::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceOr;
     }},
-    {ov::op::v1::ReduceMax::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceMax::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceMax;
     }},
-    {ov::op::v1::ReduceMean::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceMean::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceMean;
     }},
-    {ov::op::v1::ReduceMin::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceMin::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceMin;
     }},
-    {ov::op::v1::ReduceProd::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceProd::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceProd;
     }},
-    {ov::op::v1::ReduceSum::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
+    {op::v1::ReduceSum::get_type_info_static(), [](const std::shared_ptr<ov::Node>& op, Reduce& node) {
         node.algorithm = Algorithm::ReduceSum;
     }}
 };
 
 bool Reduce::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(), ov::op::util::ArithmeticReductionKeepDims::get_type_info_static(),
-                                         ov::op::util::LogicalReductionKeepDims::get_type_info_static())) {
+        if (!is_type<op::util::ArithmeticReductionKeepDims>(op) && !is_type<op::util::LogicalReductionKeepDims>(op)) {
             errorMessage = "Reduce node with name " + op->get_friendly_name() + " is not derived from ArithmeticReductionKeepDims or LogicalReductionKeepDims";
             return false;
         }
-        if (op->get_input_node_ptr(REDUCE_INDEXES)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+        if (op->get_input_node_ptr(REDUCE_INDEXES)->get_type_info() != op::v0::Constant::get_type_info_static()) {
             errorMessage = "Only const 'reduce_indexes' input is supported.";
             return false;
         }
@@ -1721,26 +1730,26 @@ bool Reduce::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std
 Reduce::Reduce(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, NgraphShapeInferFactory(op, PortMask(REDUCE_INDEXES))) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
-        initializers.at(op->get_type_info())(op, *this);
-        if (auto reduce = ov::as_type<ov::op::util::ArithmeticReductionKeepDims>(op.get())) {
-            keep_dims = reduce->get_keep_dims();
-            auto reduceConst = ov::as_type<const ov::op::v0::Constant>(reduce->get_input_node_ptr(REDUCE_INDEXES));
-            if (!reduceConst)
-                THROW_CPU_NODE_ERR << " second tensor is not constant!";
-            raw_axes = reduceConst->cast_vector<int>();
-        } else if (auto reduce = ov::as_type<ov::op::util::LogicalReductionKeepDims>(op.get())) {
-            keep_dims = reduce->get_keep_dims();
-            auto reduceConst = ov::as_type<const ov::op::v0::Constant>(reduce->get_input_node_ptr(REDUCE_INDEXES));
-            if (!reduceConst)
-                THROW_CPU_NODE_ERR << " second tensor is not constant!";
-            raw_axes = reduceConst->cast_vector<int>();
-        }
-        vec_reduceDH_prc.clear();
-        setJITBeyond5D();
-    } else {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
+
+    initializers.at(op->get_type_info())(op, *this);
+    if (auto reduce = ov::as_type<op::util::ArithmeticReductionKeepDims>(op.get())) {
+        keep_dims = reduce->get_keep_dims();
+        auto reduceConst = ov::as_type<const op::v0::Constant>(reduce->get_input_node_ptr(REDUCE_INDEXES));
+        if (!reduceConst)
+            THROW_CPU_NODE_ERR << " second tensor is not constant!";
+        raw_axes = reduceConst->cast_vector<int>();
+    } else if (auto reduce = ov::as_type<op::util::LogicalReductionKeepDims>(op.get())) {
+        keep_dims = reduce->get_keep_dims();
+        auto reduceConst = ov::as_type<const op::v0::Constant>(reduce->get_input_node_ptr(REDUCE_INDEXES));
+        if (!reduceConst)
+            THROW_CPU_NODE_ERR << " second tensor is not constant!";
+        raw_axes = reduceConst->cast_vector<int>();
+    }
+    vec_reduceDH_prc.clear();
+    setJITBeyond5D();
 }
 
 void Reduce::getSupportedDescriptors() {

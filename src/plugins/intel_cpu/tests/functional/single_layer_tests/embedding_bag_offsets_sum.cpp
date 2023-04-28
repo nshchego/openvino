@@ -8,7 +8,7 @@
 
 #include <openvino/core/partial_shape.hpp>
 #include "ngraph_functions/builders.hpp"
-#include "shared_test_classes/base/layer_test_utils.hpp"
+//#include "shared_test_classes/base/layer_test_utils.hpp"
 #include "shared_test_classes/base/ov_subgraph.hpp"
 #include "test_utils/cpu_test_utils.hpp"
 
@@ -79,7 +79,7 @@ public:
 
         init_input_shapes({ inputShapes });
 
-        auto emb_table_node = std::make_shared<ngraph::opset1::Parameter>(inType, inputShapes.first);
+        auto emb_table_node = std::make_shared<ov::op::v0::Parameter>(inType, inputShapes.first);
         ov::ParameterVector params = {emb_table_node};
 
         auto embBag = ov::as_type_ptr<ngraph::opset3::EmbeddingBagOffsetsSum>(ngraph::builder::makeEmbeddingBagOffsetsSum(

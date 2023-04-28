@@ -99,13 +99,13 @@ protected:
         if (secondaryInputType == ngraph::helpers::InputLayerType::PARAMETER) {
             ov::Shape inShape = {padsBegin.size()};
 
-            auto beginNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
-            auto endNode = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, inShape);
-            std::shared_ptr<ngraph::opset1::Parameter> valueNode = nullptr;
+            auto beginNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, inShape);
+            auto endNode = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, inShape);
+            std::shared_ptr<ov::op::v0::Parameter> valueNode = nullptr;
             params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(beginNode));
             params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(endNode));
             if (padMode == ngraph::helpers::PadMode::CONSTANT) {
-                valueNode = std::make_shared<ngraph::opset1::Parameter>(dataType, ov::Shape{});
+                valueNode = std::make_shared<ov::op::v0::Parameter>(dataType, ov::Shape{});
                 params.push_back(ov::as_type_ptr<ngraph::opset3::Parameter>(valueNode));
                 params.back()->set_friendly_name("pad_value");
             }

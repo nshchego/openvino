@@ -17,7 +17,7 @@ namespace node {
 
 bool Roll::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (op->get_type_info() == ov::op::v7::Roll::get_type_info_static()) {
+        if (op->get_type_info() == op::v7::Roll::get_type_info_static()) {
             errorMessage = "Only opset7 Roll operation is supported";
             return false;
         }
@@ -30,7 +30,7 @@ bool Roll::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
 Roll::Roll(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) :
                 Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
     std::string errorMessage;
-    if (isSupportedOperation(op, errorMessage)) {
+    if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
     }
 

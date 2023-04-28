@@ -3,13 +3,12 @@
 //
 
 #include <common_test_utils/ov_tensor_utils.hpp>
-#include "shared_test_classes/base/ov_subgraph.hpp"
 #include "ngraph_functions/builders.hpp"
+#include "shared_test_classes/base/ov_subgraph.hpp"
 #include "test_utils/cpu_test_utils.hpp"
 
 using namespace InferenceEngine;
 using namespace CPUTestUtils;
-using namespace ngraph::opset3;
 using namespace ov::test;
 
 namespace CPULayerTestsDefinitions  {
@@ -114,13 +113,13 @@ protected:
         paramShape = {paramOuts[0].get_partial_shape().size()};
 
         std::shared_ptr<ov::Node> in2, in3, in4;
-        auto blockShapeParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
+        auto blockShapeParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, paramShape);
         in2 = blockShapeParam;
         params.push_back(blockShapeParam);
-        auto cropsBeginParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
+        auto cropsBeginParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, paramShape);
         params.push_back(cropsBeginParam);
         in3 = cropsBeginParam;
-        auto cropsEndParam = std::make_shared<ngraph::opset1::Parameter>(ov::element::i64, paramShape);
+        auto cropsEndParam = std::make_shared<ov::op::v0::Parameter>(ov::element::i64, paramShape);
         params.push_back(cropsEndParam);
         in4 = cropsEndParam;
         auto btsNode = std::make_shared<ngraph::opset2::BatchToSpace>(paramOuts[0], in2, in3, in4);

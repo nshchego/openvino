@@ -13,6 +13,7 @@
 #include <cpu/x64/injectors/jit_uni_quantization_injector.hpp>
 #include <cpu/x64/injectors/jit_uni_eltwise_injector.hpp>
 
+#include <openvino/op/constant.hpp>
 #include <openvino/op/mvn.hpp>
 
 using namespace dnnl;

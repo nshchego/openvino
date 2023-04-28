@@ -92,9 +92,9 @@ protected:
             inp3 = ngraph::builder::makeDynamicInputLayer(netPrecision, secondaryInputType, inputDynamicShapes[2]);
             inp4 = ngraph::builder::makeDynamicInputLayer(netPrecision, secondaryInputType, inputDynamicShapes[3]);
 
-            paramsIn.push_back(ov::as_type_ptr<ngraph::opset1::Parameter>(inp2));
-            paramsIn.push_back(ov::as_type_ptr<ngraph::opset1::Parameter>(inp3));
-            paramsIn.push_back(ov::as_type_ptr<ngraph::opset1::Parameter>(inp4));
+            paramsIn.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(inp2));
+            paramsIn.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(inp3));
+            paramsIn.push_back(ov::as_type_ptr<ov::op::v0::Parameter>(inp4));
         } else if (ngraph::helpers::InputLayerType::CONSTANT == secondaryInputType) {
             auto maxBeamIndex = inputShape.second.front().at(2) - 1;
 

@@ -16,6 +16,7 @@
 #include <cpu/x64/matmul/brgemm_matmul_copy_utils.hpp>
 #include <cpu/x64/matmul/brgemm_matmul_utils.hpp>
 #include <cpu/x64/amx_tile_configure.hpp>
+#include "snippets/snippets_isa.hpp"
 
 namespace ov {
 namespace intel_cpu {

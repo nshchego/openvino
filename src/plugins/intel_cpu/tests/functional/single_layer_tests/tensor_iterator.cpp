@@ -60,7 +60,7 @@ protected:
         for (size_t i = 0; i < shapes.size(); i++) {
             ov::PartialShape shape = shapes[i].first;
             shape[sequence_axis] = 1;
-            auto paramNode = std::make_shared<ngraph::opset1::Parameter>(inType, shape);
+            auto paramNode = std::make_shared<ov::op::v0::Parameter>(inType, shape);
             body_params.push_back(paramNode);
         }
         auto tanh = ngraph::builder::makeActivation(body_params[0], inType, ngraph::helpers::Tanh);
