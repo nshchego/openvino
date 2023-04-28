@@ -10,6 +10,7 @@
 #include <numeric>
 
 #include "ngraph/axis_vector.hpp"
+#include "ngraph/runtime/reference/reverse.hpp"
 #include "ngraph/runtime/reference/convolution.hpp"
 #include "ngraph/util.hpp"
 

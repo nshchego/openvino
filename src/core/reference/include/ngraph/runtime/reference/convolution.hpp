@@ -10,12 +10,6 @@
 #include <functional>
 #include <numeric>
 
-#include "ngraph/axis_vector.hpp"
-#include "ngraph/coordinate_transform.hpp"
-#include "ngraph/runtime/reference/concat.hpp"
-#include "ngraph/runtime/reference/helpers.hpp"
-#include "ngraph/runtime/reference/reverse.hpp"
-#include "ngraph/runtime/reference/split.hpp"
 #include "ngraph/util.hpp"
 
 namespace ngraph {
@@ -28,7 +22,6 @@ constexpr size_t filter_out_ch_axis = 0;
 constexpr size_t filter_in_ch_axis = 1;
 constexpr size_t out_batch_axis = 0;
 constexpr size_t out_channel_axis = 1;
-constexpr size_t spatial_axis = 2;
 
 struct ConvolutionParams {
     std::vector<int64_t> strides;
@@ -81,43 +74,53 @@ void convolve_3D_channels(const ConvolutionParams& p,
     const Shape input_channel_shape(++batch_shape.begin(), batch_shape.end());
     const size_t input_channel_size = shape_size(input_channel_shape);
     const Shape filter_channel_shape(++filter_shape.begin(), filter_shape.end());
-    const size_t filter_channel_size = shape_size(filter_channel_shape);
 
-    for (int i_z = static_cast<int>(-p.pads_begin[0]); i_z <= i_z_lim; i_z += static_cast<int>(p.strides[0])) {
-        for (int i_y = static_cast<int>(-p.pads_begin[1]); i_y <= i_y_lim; i_y += static_cast<int>(p.strides[1])) {
-            for (int i_x = static_cast<int>(-p.pads_begin[2]); i_x <= i_x_lim; i_x += static_cast<int>(p.strides[2])) {
+    const int pad_begin_0 = static_cast<int>(p.pads_begin[0]);
+    const int pad_begin_1 = static_cast<int>(p.pads_begin[1]);
+    const int pad_begin_2 = static_cast<int>(p.pads_begin[2]);
+
+    const int stride_0 = static_cast<int>(p.strides[0]);
+    const int stride_1 = static_cast<int>(p.strides[1]);
+    const int stride_2 = static_cast<int>(p.strides[2]);
+
+    const int dilation_0 = static_cast<int>(p.dilation[0]);
+    const int dilation_1 = static_cast<int>(p.dilation[1]);
+    const int dilation_2 = static_cast<int>(p.dilation[2]);
+
+    for (int i_z = -pad_begin_0; i_z <= i_z_lim; i_z += stride_0) {
+        for (int i_y = -pad_begin_1; i_y <= i_y_lim; i_y += stride_1) {
+            for (int i_x = -pad_begin_2; i_x <= i_x_lim; i_x += stride_2) {
                 auto input_channel = batch;
                 auto filter_channel = filter;
                 T sum = 0;
                 size_t filter_channels_count = filter_shape[0];
                 while (filter_channels_count--) {
-                    for (int f_z = 0; f_z < filter_size_z; ++f_z) {
-                        const int rel_i_z = i_z + (f_z * static_cast<int>(p.dilation[0]));
+                    int rel_i_z = i_z;
+                    for (int f_z = 0; f_z < filter_size_z; f_z++, rel_i_z += dilation_0) {
                         if (rel_i_z < 0 || rel_i_z >= input_size_z) {
+                            filter_channel += filter_size_yx;
                             continue;
                         }
-                        const int z_f_buf_idx = f_z * filter_size_yx;
                         const int z_i_buf_idx = rel_i_z * input_size_yx;
-                        for (int f_y = 0; f_y < filter_size_y; ++f_y) {
-                            const int rel_i_y = i_y + (f_y * static_cast<int>(p.dilation[1]));
+                        int rel_i_y = i_y;
+                        for (int f_y = 0; f_y < filter_size_y; f_y++, rel_i_y += dilation_1) {
                             if (rel_i_y < 0 || rel_i_y >= input_size_y) {
+                                filter_channel += filter_size_x;
                                 continue;
                             }
-                            const int y_f_buf_idx = z_f_buf_idx + f_y * filter_size_x;
                             const int y_i_buf_idx = z_i_buf_idx + rel_i_y * input_size_x;
-                            for (int f_x = 0; f_x < filter_size_x; ++f_x) {
-                                const int rel_i_x = i_x + (f_x * static_cast<int>(p.dilation[2]));
-                                if (rel_i_x < 0 || rel_i_x >= input_size_x) {
+                            const int low_bound = y_i_buf_idx, up_bound = input_size_x + y_i_buf_idx;
+                            int rel_i_x = y_i_buf_idx + i_x;
+                            for (int f_x = 0; f_x < filter_size_x; f_x++, rel_i_x += dilation_2, filter_channel++) {
+                                if (rel_i_x < low_bound || rel_i_x >= up_bound) {
                                     continue;
                                 }
 
-                                sum += static_cast<T>(input_channel[y_i_buf_idx + rel_i_x]) *
-                                       static_cast<T>(filter_channel[y_f_buf_idx + f_x]);
+                                sum += input_channel[rel_i_x] * filter_channel[0];
                             }
                         }
                     }
                     input_channel += input_channel_size;
-                    filter_channel += filter_channel_size;
                 }
                 *out = sum;
                 ++out;

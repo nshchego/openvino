@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ngraph/runtime/reference/convolution.hpp"
+#include "ngraph/runtime/reference/helpers.hpp"
 #include "ngraph/util.hpp"
 
 namespace {
