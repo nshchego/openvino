@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <cfenv>
 #include <cmath>
 #include <functional>
@@ -54,6 +53,10 @@ void convolve_3D_channels(const ConvolutionParams& p,
                           const T* filter,
                           const Shape& filter_shape,
                           T*& out) {
+static int counter = 0;
+counter++;
+// std::cout << "counter: " << counter << std::endl;
+
     const int input_size_z = static_cast<int>(batch_shape[1]);
     const int input_size_y = static_cast<int>(batch_shape[2]);
     const int input_size_x = static_cast<int>(batch_shape[3]);
@@ -66,13 +69,14 @@ void convolve_3D_channels(const ConvolutionParams& p,
 
     const int filter_size_yx = filter_size_y * filter_size_x;
     const int input_size_yx = input_size_y * input_size_x;
+    const int input_size_zyx = input_size_z * input_size_yx;
 
     const int i_z_lim = static_cast<int>(p.pads_end[0] + input_size_z - dilated_filter_size_z + p.output_padding[0]);
     const int i_y_lim = static_cast<int>(p.pads_end[1] + input_size_y - dilated_filter_size_y + p.output_padding[1]);
     const int i_x_lim = static_cast<int>(p.pads_end[2] + input_size_x - dilated_filter_size_x + p.output_padding[2]);
 
-    const Shape input_channel_shape(++batch_shape.begin(), batch_shape.end());
-    const size_t input_channel_size = shape_size(input_channel_shape);
+    // const Shape input_channel_shape(++batch_shape.begin(), batch_shape.end());
+    // const size_t input_channel_size = shape_size(input_channel_shape);
     const Shape filter_channel_shape(++filter_shape.begin(), filter_shape.end());
 
     const int pad_begin_0 = static_cast<int>(p.pads_begin[0]);
@@ -83,32 +87,40 @@ void convolve_3D_channels(const ConvolutionParams& p,
     const int stride_1 = static_cast<int>(p.strides[1]);
     const int stride_2 = static_cast<int>(p.strides[2]);
 
-    const int dilation_0 = static_cast<int>(p.dilation[0]);
+    // const int dilation_0 = static_cast<int>(p.dilation[0]);
     const int dilation_1 = static_cast<int>(p.dilation[1]);
     const int dilation_2 = static_cast<int>(p.dilation[2]);
 
+    // const int rel_i_z_max = input_size_z * input_size_yx;
+
+    const int in_size_yx_dil_0 = input_size_yx * p.dilation[0];
+    const int filter_z_shape_yx_dil_0 = filter_size_z * in_size_yx_dil_0;
+    const int filter_y_shape_x_dil_1  = filter_size_y * dilation_1 * input_size_x;
+    const int shape_x_dil_1 = dilation_1 * input_size_x;
+
     for (int i_z = -pad_begin_0; i_z <= i_z_lim; i_z += stride_0) {
+        const int i_z_m = i_z * input_size_yx;
+        const int filter_z_shape_yx_dil_0_shape_z = filter_z_shape_yx_dil_0 + i_z_m;
         for (int i_y = -pad_begin_1; i_y <= i_y_lim; i_y += stride_1) {
+            const int i_y_m = i_y * input_size_x;
             for (int i_x = -pad_begin_2; i_x <= i_x_lim; i_x += stride_2) {
                 auto input_channel = batch;
                 auto filter_channel = filter;
                 T sum = 0;
                 size_t filter_channels_count = filter_shape[0];
                 while (filter_channels_count--) {
-                    int rel_i_z = i_z;
-                    for (int f_z = 0; f_z < filter_size_z; f_z++, rel_i_z += dilation_0) {
-                        if (rel_i_z < 0 || rel_i_z >= input_size_z) {
+                    for (int rel_i_z = i_z_m; rel_i_z < filter_z_shape_yx_dil_0_shape_z; rel_i_z += in_size_yx_dil_0) {
+                        if (rel_i_z < 0 || rel_i_z >= input_size_zyx) {
                             filter_channel += filter_size_yx;
                             continue;
                         }
-                        const int z_i_buf_idx = rel_i_z * input_size_yx;
-                        int rel_i_y = i_y;
-                        for (int f_y = 0; f_y < filter_size_y; f_y++, rel_i_y += dilation_1) {
-                            if (rel_i_y < 0 || rel_i_y >= input_size_y) {
+                        const int y_up_bound = rel_i_z + input_size_yx;
+                        const int y_shift = rel_i_z + i_y_m;
+                        for (int y_i_buf_idx = y_shift; y_i_buf_idx < filter_y_shape_x_dil_1 + y_shift; y_i_buf_idx += shape_x_dil_1) {
+                            if (y_i_buf_idx < rel_i_z || y_i_buf_idx >= y_up_bound) {
                                 filter_channel += filter_size_x;
                                 continue;
                             }
-                            const int y_i_buf_idx = z_i_buf_idx + rel_i_y * input_size_x;
                             const int low_bound = y_i_buf_idx, up_bound = input_size_x + y_i_buf_idx;
                             int rel_i_x = y_i_buf_idx + i_x;
                             for (int f_x = 0; f_x < filter_size_x; f_x++, rel_i_x += dilation_2, filter_channel++) {
@@ -120,7 +132,7 @@ void convolve_3D_channels(const ConvolutionParams& p,
                             }
                         }
                     }
-                    input_channel += input_channel_size;
+                    input_channel += input_size_zyx;
                 }
                 *out = sum;
                 ++out;
