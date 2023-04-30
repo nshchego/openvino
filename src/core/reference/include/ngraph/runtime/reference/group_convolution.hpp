@@ -6,7 +6,6 @@
 
 #include "ngraph/runtime/reference/convolution.hpp"
 #include "ngraph/runtime/reference/helpers.hpp"
-// #include "ngraph/util.hpp"
 
 namespace {
 constexpr size_t filter_group_axis = 0;

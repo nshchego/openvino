@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <cfenv>
-#include <cmath>
-#include <functional>
-#include <numeric>
+// #include <cfenv>
+// #include <cmath>
+// #include <functional>
+// #include <numeric>
 
 #include "ngraph/util.hpp"
 
@@ -53,82 +53,85 @@ void convolve_3D_channels(const ConvolutionParams& p,
                           const T* filter,
                           const Shape& filter_shape,
                           T*& out) {
-static int counter = 0;
-counter++;
-// std::cout << "counter: " << counter << std::endl;
+// static int counter = 0;
+// static double total_time = 0.;
+// counter++;
+// auto t1 = std::chrono::high_resolution_clock::now();
+
+    const int dilation_z = static_cast<int>(p.dilation[0]);
+    const int dilation_y = static_cast<int>(p.dilation[1]);
+    const int dilation_x = static_cast<int>(p.dilation[2]);
+
+    const int pad_begin_z = static_cast<int>(p.pads_begin[0]);
+    const int pad_begin_y = static_cast<int>(p.pads_begin[1]);
+    const int pad_begin_x = static_cast<int>(p.pads_begin[2]);
+
+    const int stride_z = static_cast<int>(p.strides[0]);
+    const int stride_y = static_cast<int>(p.strides[1]);
+    const int stride_x = static_cast<int>(p.strides[2]);
 
     const int input_size_z = static_cast<int>(batch_shape[1]);
     const int input_size_y = static_cast<int>(batch_shape[2]);
     const int input_size_x = static_cast<int>(batch_shape[3]);
+
+    const int input_size_yx  = input_size_y * input_size_x;
+    const int input_size_zyx = input_size_z * input_size_yx;
+
+    const size_t f_channels = static_cast<int>(filter_shape[0]);
     const int filter_size_z = static_cast<int>(filter_shape[1]);
     const int filter_size_y = static_cast<int>(filter_shape[2]);
     const int filter_size_x = static_cast<int>(filter_shape[3]);
-    const int dilated_filter_size_z = static_cast<int>(filter_size_z + (filter_size_z - 1) * (p.dilation[0] - 1));
-    const int dilated_filter_size_y = static_cast<int>(filter_size_y + (filter_size_y - 1) * (p.dilation[1] - 1));
-    const int dilated_filter_size_x = static_cast<int>(filter_size_x + (filter_size_x - 1) * (p.dilation[2] - 1));
-
     const int filter_size_yx = filter_size_y * filter_size_x;
-    const int input_size_yx = input_size_y * input_size_x;
-    const int input_size_zyx = input_size_z * input_size_yx;
+
+    const int dilated_filter_size_z = static_cast<int>(filter_size_z + (filter_size_z - 1) * (dilation_z - 1));
+    const int dilated_filter_size_y = static_cast<int>(filter_size_y + (filter_size_y - 1) * (dilation_y - 1));
+    const int dilated_filter_size_x = static_cast<int>(filter_size_x + (filter_size_x - 1) * (dilation_x - 1));
 
     const int i_z_lim = static_cast<int>(p.pads_end[0] + input_size_z - dilated_filter_size_z + p.output_padding[0]);
     const int i_y_lim = static_cast<int>(p.pads_end[1] + input_size_y - dilated_filter_size_y + p.output_padding[1]);
     const int i_x_lim = static_cast<int>(p.pads_end[2] + input_size_x - dilated_filter_size_x + p.output_padding[2]);
 
-    // const Shape input_channel_shape(++batch_shape.begin(), batch_shape.end());
-    // const size_t input_channel_size = shape_size(input_channel_shape);
-    const Shape filter_channel_shape(++filter_shape.begin(), filter_shape.end());
+    const int f_z_increment = dilation_z * input_size_yx;
+    const int f_y_increment = dilation_y * input_size_x;
+    const int f_x_increment = dilation_x;
 
-    const int pad_begin_0 = static_cast<int>(p.pads_begin[0]);
-    const int pad_begin_1 = static_cast<int>(p.pads_begin[1]);
-    const int pad_begin_2 = static_cast<int>(p.pads_begin[2]);
+    const int f_z_block = filter_size_z * f_z_increment;
+    const int f_y_block = filter_size_y * f_y_increment;
+    const int f_x_block = filter_size_x * f_x_increment;
 
-    const int stride_0 = static_cast<int>(p.strides[0]);
-    const int stride_1 = static_cast<int>(p.strides[1]);
-    const int stride_2 = static_cast<int>(p.strides[2]);
+    for (int i_z = -pad_begin_z; i_z <= i_z_lim; i_z += stride_z) {
+        const int s_z_shift = i_z * input_size_yx;
+        const int f_z_up_bound = f_z_block + s_z_shift;
 
-    // const int dilation_0 = static_cast<int>(p.dilation[0]);
-    const int dilation_1 = static_cast<int>(p.dilation[1]);
-    const int dilation_2 = static_cast<int>(p.dilation[2]);
-
-    // const int rel_i_z_max = input_size_z * input_size_yx;
-
-    const int in_size_yx_dil_0 = input_size_yx * p.dilation[0];
-    const int filter_z_shape_yx_dil_0 = filter_size_z * in_size_yx_dil_0;
-    const int filter_y_shape_x_dil_1  = filter_size_y * dilation_1 * input_size_x;
-    const int shape_x_dil_1 = dilation_1 * input_size_x;
-
-    for (int i_z = -pad_begin_0; i_z <= i_z_lim; i_z += stride_0) {
-        const int i_z_m = i_z * input_size_yx;
-        const int filter_z_shape_yx_dil_0_shape_z = filter_z_shape_yx_dil_0 + i_z_m;
-        for (int i_y = -pad_begin_1; i_y <= i_y_lim; i_y += stride_1) {
+        for (int i_y = -pad_begin_y; i_y <= i_y_lim; i_y += stride_y) {
             const int i_y_m = i_y * input_size_x;
-            for (int i_x = -pad_begin_2; i_x <= i_x_lim; i_x += stride_2) {
+
+            for (int i_x = -pad_begin_x; i_x <= i_x_lim; i_x += stride_x) {
                 auto input_channel = batch;
                 auto filter_channel = filter;
                 T sum = 0;
-                size_t filter_channels_count = filter_shape[0];
+                size_t filter_channels_count = f_channels;
+
                 while (filter_channels_count--) {
-                    for (int rel_i_z = i_z_m; rel_i_z < filter_z_shape_yx_dil_0_shape_z; rel_i_z += in_size_yx_dil_0) {
-                        if (rel_i_z < 0 || rel_i_z >= input_size_zyx) {
+                    for (int f_z_i = s_z_shift; f_z_i < f_z_up_bound; f_z_i += f_z_increment) {
+                        if (f_z_i < 0 || f_z_i >= input_size_zyx) {
                             filter_channel += filter_size_yx;
                             continue;
                         }
-                        const int y_up_bound = rel_i_z + input_size_yx;
-                        const int y_shift = rel_i_z + i_y_m;
-                        for (int y_i_buf_idx = y_shift; y_i_buf_idx < filter_y_shape_x_dil_1 + y_shift; y_i_buf_idx += shape_x_dil_1) {
-                            if (y_i_buf_idx < rel_i_z || y_i_buf_idx >= y_up_bound) {
+                        const int y_up_bound = f_z_i + input_size_yx;
+                        const int y_shift = f_z_i + i_y_m;
+                        for (int f_y_i = y_shift; f_y_i < f_y_block + y_shift; f_y_i += f_y_increment) {
+                            if (f_y_i < f_z_i || f_y_i >= y_up_bound) {
                                 filter_channel += filter_size_x;
                                 continue;
                             }
-                            const int low_bound = y_i_buf_idx, up_bound = input_size_x + y_i_buf_idx;
-                            int rel_i_x = y_i_buf_idx + i_x;
-                            for (int f_x = 0; f_x < filter_size_x; f_x++, rel_i_x += dilation_2, filter_channel++) {
-                                if (rel_i_x < low_bound || rel_i_x >= up_bound) {
+                            const int x_up_bound = input_size_x + f_y_i;
+                            for (int f_x_i = f_y_i + i_x; f_x_i < f_x_block + f_y_i + i_x; f_x_i += f_x_increment, filter_channel++) {
+                                if (f_x_i < f_y_i || f_x_i >= x_up_bound) {
                                     continue;
                                 }
 
-                                sum += input_channel[rel_i_x] * filter_channel[0];
+                                sum += input_channel[f_x_i] * filter_channel[0];
                             }
                         }
                     }
@@ -139,6 +142,13 @@ counter++;
             }
         }
     }
+    
+// auto t2 = std::chrono::high_resolution_clock::now();
+// std::chrono::duration<double, std::milli> ms_double = t2 - t1;
+// total_time += ms_double.count();
+// if (counter == 745490) {
+//     std::cout << "AVG TIME: " << total_time / double(counter) << std::endl;
+// }
 }
 
 inline void extend_to_3D(ConvolutionParams& p, Shape& in_shape, Shape& filter_shape) {
