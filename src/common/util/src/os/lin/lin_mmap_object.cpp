@@ -58,6 +58,7 @@ public:
 class MapHolder : public MappedMemory {
     void* m_data = MAP_FAILED;
     size_t m_size = 0;
+    size_t m_offset = 0lu;
     HandleHolder m_handle;
 
 public:
@@ -99,6 +100,14 @@ public:
     size_t size() const noexcept override {
         return m_size;
     }
+
+    void set_offset(size_t offset) override {
+        m_offset = offset;
+    }
+
+    size_t get_offset() const override {
+        return m_offset;
+    }
 };
 
 std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::string& path) {
@@ -107,4 +116,12 @@ std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::string& path) {
     return holder;
 }
 
+#ifdef OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
+
+std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::wstring& path) {
+    auto s_path = ov::util::wstring_to_string(path);
+    return load_mmap_object(s_path);
+}
+
+#endif
 }  // namespace ov
