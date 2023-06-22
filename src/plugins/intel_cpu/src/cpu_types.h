@@ -145,7 +145,7 @@ enum class Algorithm {
     EltwiseMod,
     EltwiseMaximum,
     EltwiseMinimum,
-    EltwiseSquaredDifference,
+    EltwiseSquaredDifference, //20
     EltwisePowerDynamic,
     EltwisePowerStatic,
     EltwiseMulAdd,
@@ -155,7 +155,7 @@ enum class Algorithm {
     EltwiseGreaterEqual,
     EltwiseLess,
     EltwiseLessEqual,
-    EltwiseLogicalAnd,
+    EltwiseLogicalAnd, // 30
     EltwiseLogicalOr,
     EltwiseLogicalXor,
     EltwiseLogicalNot,

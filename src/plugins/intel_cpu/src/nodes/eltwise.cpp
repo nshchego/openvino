@@ -303,7 +303,7 @@ std::cout << "EXEC_PRC: " << exec_prc << std::endl;
 std::cout << "ELTW ALGO: " << int(eltwise_data_.front().algo) << std::endl;
         eltwise_emitter = create_eltwise_emitter(eltwise_data_.front(), exec_prc);
         for (size_t i = 1; i < eltwise_data_.size(); ++i) {
-std::cout << "ELTW ALGO: " << int(eltwise_data_[i].algo) << std::endl;
+std::cout << "ELTW ALGO ALL: " << int(eltwise_data_[i].algo) << std::endl;
             post_op_emitters.push_back(create_eltwise_emitter(eltwise_data_[i], exec_prc));
         }
 
@@ -783,7 +783,9 @@ private:
                         } else {
                             // TODO
                         }
-                    } else if (src_prc != Precision::FP32 && src_prc != Precision::BF16) {
+                    } else if (one_of(src_prc, Precision::U8, Precision::I8, Precision::I16, Precision::U16)) {
+                        uni_vcvtdq2ps(vmm_src, vmm_src);
+                    } else if (src_prc == Precision::I32) {
                         uni_vcvtdq2ps(vmm_src, op);
                     }
                     break;
