@@ -9,7 +9,7 @@ using namespace ov::intel_cpu::kernel;
 using namespace dnnl::impl::utils;
 using namespace dnnl::impl::cpu;
 using namespace Xbyak;
-using Precision = typename InferenceEngine::Precision;
+using Precision = typename InferenceEngine::Precision; // ->element_type
 
 #define GET_OFF(field) offsetof(JitReduceCallArgs, field)
 #define GET_OFF_POST(field) offsetof(JitReducePostCallArgs, field)
@@ -24,18 +24,19 @@ static inline bool isFloatCompatible(const Precision &type) {
 ///////////////////////////////
 
 template<typename CallArgs>
-JitReduceKernelBase<CallArgs>::JitReduceKernelBase(const JitReduceConfigParams& jcp, const char* name) : JitKernelBase(name), kernel_func(nullptr), jcp(jcp) {
+JitReduceKernelBase<CallArgs>::JitReduceKernelBase(const char* name, const JitReduceConfigParams& jcp, x64::cpu_isa_t isa)
+        : JitKernel<JitReduceConfigParams, CallArgs>(name, jcp, isa) {
     if (jcp.src_prc.size() <= 4) {
         exec_prc = Precision::FP32;
     } else if (jcp.src_prc.size() == 8) {
         exec_prc = jcp.src_prc;
     }
     if (exec_prc == Precision::I64) {
-        if (isValidIsa(x64::avx512_core)) {
+        if (isa == x64::avx512_core) {
             jit_multiply_i64.reset(new jit_multiply_emitter(this, x64::avx512_core));
-        } else if (isValidIsa(x64::avx2)) {
+        } else if (isa == x64::avx2) {
             jit_multiply_i64.reset(new jit_multiply_emitter(this, x64::avx2));
-        } else if (isValidIsa(x64::sse41)) {
+        } else if (isa == x64::sse41) {
             jit_multiply_i64.reset(new jit_multiply_emitter(this, x64::sse41));
         }
     }
@@ -44,9 +45,9 @@ JitReduceKernelBase<CallArgs>::JitReduceKernelBase(const JitReduceConfigParams& 
 ////////// FLOAT 32 //////////
 template<typename CallArgs>
 void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm &vmm, const Operand &op) {
-    switch (jcp.reduce_mode) {
+    switch (this->jcp.reduce_mode) {
         case Algorithm::ReduceAnd:
-            uni_vandps(vmm, vmm, op);
+            this->uni_vandps(vmm, vmm, op);
             break;
         case Algorithm::ReduceL1:
         case Algorithm::ReduceL2:
@@ -55,22 +56,22 @@ void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm &vmm, const Operand &op) 
         case Algorithm::ReduceSum:
         case Algorithm::ReduceSumSquare:
         case Algorithm::ReduceLogSumExp:
-            uni_vaddps(vmm, vmm, op);
+            this->uni_vaddps(vmm, vmm, op);
             break;
         case Algorithm::ReduceMax:
-            uni_vmaxps(vmm, vmm, op);
+            this->uni_vmaxps(vmm, vmm, op);
             break;
         case Algorithm::ReduceMin:
-            uni_vminps(vmm, vmm, op);
+            this->uni_vminps(vmm, vmm, op);
             break;
         case Algorithm::ReduceOr:
-            uni_vorps(vmm, vmm, op);
+            this->uni_vorps(vmm, vmm, op);
             break;
         case Algorithm::ReduceProd:
-            uni_vmulps(vmm, vmm, op);
+            this->uni_vmulps(vmm, vmm, op);
             break;
         default:
-            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+            IE_THROW() << "Unsupported reduce mode '" << algToString(this->jcp.reduce_mode) << "'";
     }
 }
 
@@ -81,61 +82,61 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_ps(const Xmm &vmm_dst, co
         auto zmm_dst = Zmm(vmm_dst.getIdx());
         auto ymm_dst = Ymm(vmm_dst.getIdx());
 
-        vextractf64x4(ymm_aux1, zmm_dst, 1);
-        horiz_ps(ymm_aux1, ymm_dst);
-        vextractf128(xmm_aux2, ymm_aux1, 1);
-        horiz_ps(xmm_aux1, xmm_aux2);
+        this->vextractf64x4(ymm_aux1, zmm_dst, 1);
+        this->horiz_ps(ymm_aux1, ymm_dst);
+        this->vextractf128(xmm_aux2, ymm_aux1, 1);
+        this->horiz_ps(xmm_aux1, xmm_aux2);
     } else if (isa == x64::avx2) {
         auto ymm_dst = Ymm(vmm_dst.getIdx());
         auto xmm_dst = Xmm(vmm_dst.getIdx());
 
-        vextractf128(xmm_aux1, ymm_aux1, 1);
-        horiz_ps(xmm_aux1, xmm_dst);
+        this->vextractf128(xmm_aux1, ymm_aux1, 1);
+        this->horiz_ps(xmm_aux1, xmm_dst);
     } else if (isa == x64::sse41) {
         auto xmm_dst = Xmm(vmm_dst.getIdx());
 
-        if (one_of(jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
-                                    Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
-            uni_vhaddps(xmm_aux1, xmm_dst, xmm_dst);
-            uni_vhaddps(xmm_aux1, xmm_aux1, xmm_aux1);
+        if (one_of(this->jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
+                                          Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
+            this->uni_vhaddps(xmm_aux1, xmm_dst, xmm_dst);
+            this->uni_vhaddps(xmm_aux1, xmm_aux1, xmm_aux1);
         } else {
-            uni_vshufps(xmm_aux1, xmm_dst, xmm_dst, 0b00001110);
-            horiz_ps(xmm_aux1, xmm_dst);
-            uni_vshufps(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
-            horiz_ps(xmm_aux1, xmm_aux2);
+            this->uni_vshufps(xmm_aux1, xmm_dst, xmm_dst, 0b00001110);
+            this->horiz_ps(xmm_aux1, xmm_dst);
+            this->uni_vshufps(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
+            this->horiz_ps(xmm_aux1, xmm_aux2);
         }
     }
 
     if (isa != x64::sse41) {
-        if (one_of(jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
+        if (one_of(this->jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
                                     Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
-            uni_vhaddps(xmm_aux1, xmm_aux1, xmm_aux1);
-            uni_vhaddps(xmm_aux1, xmm_aux1, xmm_aux1);
+            this->uni_vhaddps(xmm_aux1, xmm_aux1, xmm_aux1);
+            this->uni_vhaddps(xmm_aux1, xmm_aux1, xmm_aux1);
         } else {
-            uni_vshufps(xmm_aux2, xmm_aux1, xmm_aux1, 0b00001110);
-            horiz_ps(xmm_aux1, xmm_aux2);
-            uni_vshufps(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
-            horiz_ps(xmm_aux1, xmm_aux2);
+            this->uni_vshufps(xmm_aux2, xmm_aux1, xmm_aux1, 0b00001110);
+            this->horiz_ps(xmm_aux1, xmm_aux2);
+            this->uni_vshufps(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
+            this->horiz_ps(xmm_aux1, xmm_aux2);
         }
     }
 
     if (load_embedded) {
         if (isa == x64::avx512_core && exec_prc == dst_prc) {
-            horiz_ps(xmm_aux1, ptr_b[reg_dst]);
+            this->horiz_ps(xmm_aux1, this->ptr_b[reg_dst]);
         } else {
-            load_scalar(xmm_aux2, ptr[reg_dst], exec_prc, dst_prc);
-            horiz_ps(xmm_aux1, xmm_aux2);
+            this->load_scalar(xmm_aux2, this->ptr[reg_dst], exec_prc, dst_prc);
+            this->horiz_ps(xmm_aux1, xmm_aux2);
         }
     }
-    store_scalar(ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
+    this->store_scalar(this->ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
 }
 
 ////////// INTEGER 64 //////////
 template<typename CallArgs>
 void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm &vmm, const Operand &op) {
-    switch (jcp.reduce_mode) {
+    switch (this->jcp.reduce_mode) {
         case Algorithm::ReduceAnd:
-            uni_vandpd(vmm, vmm, op);
+            this->uni_vandpd(vmm, vmm, op);
             break;
         case Algorithm::ReduceL1:
         case Algorithm::ReduceL2:
@@ -144,23 +145,23 @@ void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm &vmm, const Operand &op) 
         case Algorithm::ReduceSum:
         case Algorithm::ReduceSumSquare:
         case Algorithm::ReduceLogSumExp:
-            uni_vpaddq(vmm, vmm, op);
+            this->uni_vpaddq(vmm, vmm, op);
             break;
         case Algorithm::ReduceMax:
-            vpmaxsq(vmm, vmm, op);
+            this->vpmaxsq(vmm, vmm, op);
             break;
         case Algorithm::ReduceMin:
-            vpminsq(vmm, vmm, op);
+            this->vpminsq(vmm, vmm, op);
             break;
         case Algorithm::ReduceOr:
-            uni_vorpd(vmm, vmm, op);
+            this->uni_vorpd(vmm, vmm, op);
             break;
         case Algorithm::ReduceProd:
-            vpmullq(vmm, vmm, op);
+            this->vpmullq(vmm, vmm, op);
 //            vcvtneps2bf16->emit_code({static_cast<size_t>(ymmSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
             break;
         default:
-            IE_THROW() << "Unsupported reduce mode '" << algToString(jcp.reduce_mode) << "'";
+            IE_THROW() << "Unsupported reduce mode '" << algToString(this->jcp.reduce_mode) << "'";
     }
 }
 
@@ -171,43 +172,44 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_qq(const Xmm &vmm_dst, co
         auto zmm_dst = Zmm(vmm_dst.getIdx());
         auto ymm_dst = Ymm(vmm_dst.getIdx());
 
-        vextractf64x4(ymm_aux1, zmm_dst, 1);
-        horiz_qq(ymm_aux1, ymm_dst);
-        vextractf128(xmm_aux2, ymm_aux1, 1);
-        horiz_qq(xmm_aux1, xmm_aux2);
-        vshufpd(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
-        horiz_qq(xmm_aux1, xmm_aux2);
+        this->vextractf64x4(ymm_aux1, zmm_dst, 1);
+        this->horiz_qq(ymm_aux1, ymm_dst);
+        this->vextractf128(xmm_aux2, ymm_aux1, 1);
+        this->horiz_qq(xmm_aux1, xmm_aux2);
+        this->vshufpd(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
+        this->horiz_qq(xmm_aux1, xmm_aux2);
     } else if (isa == x64::avx2) {
         auto ymm_dst = Ymm(vmm_dst.getIdx());
         auto xmm_dst = Xmm(vmm_dst.getIdx());
 
-        vextractf128(xmm_aux1, ymm_dst, 1);
-        horiz_qq(xmm_aux1, xmm_dst);
-        vshufpd(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
-        horiz_qq(xmm_aux1, xmm_aux2);
+        this->vextractf128(xmm_aux1, ymm_dst, 1);
+        this->horiz_qq(xmm_aux1, xmm_dst);
+        this->vshufpd(xmm_aux2, xmm_aux1, xmm_aux1, 0b00000001);
+        this->horiz_qq(xmm_aux1, xmm_aux2);
     } else if (isa == x64::sse41) {
         auto xmm_dst = Xmm(vmm_dst.getIdx());
 
-        vshufpd(xmm_aux1, xmm_dst, xmm_dst, 0b00000001);
-        horiz_qq(xmm_aux1, xmm_dst);
+        this->vshufpd(xmm_aux1, xmm_dst, xmm_dst, 0b00000001);
+        this->horiz_qq(xmm_aux1, xmm_dst);
     }
 
     if (load_embedded) {
         if (isa == x64::avx512_core && exec_prc == dst_prc) {
-            horiz_qq(xmm_aux1, ptr_b[reg_dst]);
+            this->horiz_qq(xmm_aux1, this->ptr_b[reg_dst]);
         } else {
-            load_scalar(xmm_aux2, ptr[reg_dst], exec_prc, dst_prc);
-            horiz_qq(xmm_aux1, xmm_aux2);
+            this->load_scalar(xmm_aux2, this->ptr[reg_dst], exec_prc, dst_prc);
+            this->horiz_qq(xmm_aux1, xmm_aux2);
         }
     }
-    store_scalar(ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
+    this->store_scalar(this->ptr[reg_dst], xmm_aux1, dst_prc, exec_prc);
 }
 
 ///////////////////////////////
 /////// JitReduceKernel ///////
 ///////////////////////////////
+
 template <x64::cpu_isa_t isa>
-JitReduceKernel<isa>::JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase<JitReduceCallArgs>(jcp, jit_name()) {
+JitReduceKernel<isa>::JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase<JitReduceCallArgs>(jit_name(), jcp, isa) {
     xmm_aux1 = Xmm(5);
     xmm_aux2 = Xmm(6);
 //    xmm_aux3 = Xmm(7);
@@ -1235,7 +1237,7 @@ void JitReduceKernel<isa>::prepare_aux_table() {
 
 template <x64::cpu_isa_t isa>
 JitReducePostKernel<isa>::JitReducePostKernel(const JitReduceConfigParams& jcp, const dnnl_primitive_attr& attr)
-        : JitReduceKernelBase<JitReducePostCallArgs>(jcp, jit_name()), attr(attr) {
+        : JitReduceKernelBase<JitReducePostCallArgs>(jit_name(), jcp, isa), attr(attr) {
     xmm_aux1 = Xmm(4);
     xmm_aux2 = Xmm(5);
 

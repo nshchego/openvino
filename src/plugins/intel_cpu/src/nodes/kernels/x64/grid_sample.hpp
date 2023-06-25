@@ -60,24 +60,13 @@ enum coord {
     w, h
 };
 
-class GridSampleKernelBase: public JitKernelBase {
+class GridSampleKernelBase: public JitKernel<GridSampleKernelConfParams, GridSamplesKernelExecArgs> {
 public:
-    void (*ker_)(const GridSamplesKernelExecArgs *);
-    void operator()(const GridSamplesKernelExecArgs *args) {
-        assert(ker_);
-        ker_(args);
-    }
-    explicit GridSampleKernelBase(const char* name, const GridSampleKernelConfParams& jcp) : JitKernelBase(name), ker_(nullptr), jcp(jcp) {}
+    explicit GridSampleKernelBase(const char* name, const GridSampleKernelConfParams& jcp, dnnl::impl::cpu::x64::cpu_isa_t isa)
+        : JitKernel(name, jcp, isa) {}
 
-    virtual void create_ker() = 0;
-    uint64_t getVecLen() {
-        return vlen;
-    }
     uint64_t getDataElPerVec() {
         return dataElPerVec;
-    }
-    uint64_t getGridElPerVec() {
-        return gridElPerVec;
     }
 
 protected:
@@ -96,7 +85,6 @@ public:
 
     explicit GridSampleKernel(const GridSampleKernelConfParams& jcp);
 
-    void create_ker() override;
     void generate() override;
 
     using Vmm   = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Zmm,

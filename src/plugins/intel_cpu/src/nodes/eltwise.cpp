@@ -725,10 +725,10 @@ private:
             //     load_scalar(xmm_src, op, src_prc, dst_prc, broadcast);
             // } else {
                 load_scalar(xmm_src, op, src_prc, dst_prc);
-                if (src_prc.size() == 4) {
-                    uni_vbroadcastss(vmm_src, xmm_src);
-                } else if (src_prc.size() == 8) {
+                if (src_prc.size() == 8) {
                     uni_vbroadcastsd(vmm_src, xmm_src);
+                } else {
+                    uni_vbroadcastss(vmm_src, xmm_src);
                 }
             // }
         } else {

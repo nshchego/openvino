@@ -50,36 +50,20 @@ struct JitReducePostCallArgs {
 
 
 template<typename CallArgs>
-struct JitReduceKernelBase : public JitKernelBase {
-    void (*kernel_func)(const CallArgs *);
-
-    void operator()(const CallArgs *args) {
-        assert(kernel_func);
-        kernel_func(args);
-    }
-
-    explicit JitReduceKernelBase(const JitReduceConfigParams& jcp, const char* name);
+class JitReduceKernelBase : public JitKernel<JitReduceConfigParams, CallArgs> {
+public:
+    explicit JitReduceKernelBase(const char* name, const JitReduceConfigParams& jcp, dnnl::impl::cpu::x64::cpu_isa_t isa);
 
     virtual ~JitReduceKernelBase() = default;
-
-    dnnl::impl::status_t create_kernel() override {
-        const auto code = jit_generator::create_kernel();
-        if (code != dnnl::impl::status::success) {
-            IE_THROW() << "Could not create kernel. Error code: " << std::to_string(code) << ". " <<
-                       "Xbyak error code: " << Xbyak::ConvertErrorToString(Xbyak::GetError());
-        }
-        kernel_func = (decltype(kernel_func))jit_ker();
-        return code;
-    }
 
     const InferenceEngine::Precision &get_exec_prc() {
         return exec_prc;
     }
 
 protected:
-    void horiz_ps(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+    void horiz_ps(const Xbyak::Xmm& xmm, const Xbyak::Operand& op);
 
-    void horiz_qq(const Xbyak::Xmm &xmm, const Xbyak::Operand &op);
+    void horiz_qq(const Xbyak::Xmm& xmm, const Xbyak::Operand& op);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void horiz_reduce_store_ps(const Xbyak::Xmm& vmm_dst, const InferenceEngine::Precision& dst_dt, bool load_embedded = false);
@@ -87,10 +71,9 @@ protected:
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void horiz_reduce_store_qq(const Xbyak::Xmm& vmm_dst, const InferenceEngine::Precision& dst_dt, bool load_embedded = false);
 
-    JitReduceConfigParams jcp;
     InferenceEngine::Precision exec_prc;
 
-    const Xbyak::Reg64 &reg_dst = r9;
+    const Xbyak::Reg64 &reg_dst = this->r9;
 
     Xbyak::Xmm xmm_aux1;
     Xbyak::Xmm xmm_aux2;

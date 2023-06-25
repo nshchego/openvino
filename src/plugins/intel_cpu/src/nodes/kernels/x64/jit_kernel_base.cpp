@@ -10,7 +10,8 @@ using namespace Xbyak;
 using Precision = typename InferenceEngine::Precision;
 
 
-JitKernelBase::JitKernelBase(const char* name) : x64::jit_generator(name) {
+JitKernelBase::JitKernelBase(const char* name, x64::cpu_isa_t max_cpu_isa) :
+        x64::jit_generator(name, nullptr, dnnl::impl::cpu::x64::MAX_CODE_SIZE, true, max_cpu_isa) {
     if (isValidIsa(x64::avx512_core)) {
         vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::avx512_core));
     } else if (isValidIsa(x64::avx2)) {
