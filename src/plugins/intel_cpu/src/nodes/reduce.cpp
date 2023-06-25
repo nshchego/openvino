@@ -8,8 +8,8 @@
 #include "fake_quantize.h"
 #include "ie_parallel.hpp"
 #include "utils/bfloat16.hpp"
+#include <ie_ngraph_utils.hpp>
 
-#include <openvino/opsets/opset1.hpp>
 #include <common/primitive_hashing_utils.hpp>
 
 using namespace ov::intel_cpu::node;
@@ -71,8 +71,8 @@ size_t ReduceKey::hash() const {
     size_t seed = 0;
     seed = hash_combine(seed, jcp.layout);
     seed = hash_combine(seed, jcp.reduce_mode);
-    seed = hash_combine(seed, Precision::ePrecision(jcp.src_prc));
-    seed = hash_combine(seed, Precision::ePrecision(jcp.dst_prc));
+    seed = hash_combine(seed, (ov::element::Type_t)jcp.src_el_type);
+    seed = hash_combine(seed, (ov::element::Type_t)jcp.dst_el_type);
     seed = get_post_op_hash(seed, *postOps.get());
 
     return seed;
@@ -80,7 +80,7 @@ size_t ReduceKey::hash() const {
 
 bool ReduceKey::operator==(const ReduceKey &rhs) const {
     return jcp.layout == rhs.jcp.layout && jcp.reduce_mode == rhs.jcp.reduce_mode &&
-           jcp.src_prc == rhs.jcp.src_prc && jcp.dst_prc == rhs.jcp.dst_prc && *postOps.get() == *rhs.postOps.get();
+           jcp.src_el_type == rhs.jcp.src_el_type && jcp.dst_el_type == rhs.jcp.dst_el_type && *postOps.get() == *rhs.postOps.get();
 }
 
 } // namespace
@@ -449,8 +449,8 @@ void Reduce::createPrimitive() {
 
     auto selectedPD = getSelectedPrimitiveDescriptor();
     jcp = JitReduceConfigParams();
-    jcp.src_prc = selectedPD->getConfig().inConfs[REDUCE_DATA].getMemDesc()->getPrecision();
-    jcp.dst_prc = selectedPD->getConfig().outConfs[0].getMemDesc()->getPrecision();
+    jcp.src_el_type = details::convertPrecision(selectedPD->getConfig().inConfs[REDUCE_DATA].getMemDesc()->getPrecision());
+    jcp.dst_el_type = details::convertPrecision(selectedPD->getConfig().outConfs[0].getMemDesc()->getPrecision());
     jcp.layout = layout;
     jcp.reduce_mode = getAlgorithm();
 
@@ -460,7 +460,7 @@ void Reduce::createPrimitive() {
     compile_post_kernel = false;
 #endif // OPENVINO_ARCH_X86_64
 
-    size_t prcDiv = jcp.src_prc.size() < 4 ? 4 : jcp.src_prc.size();
+    size_t prcDiv = jcp.src_el_type.size() < 4 ? 4 : jcp.src_el_type.size();
     if (x64::mayiuse(x64::avx512_core)) {
         blockLen = 64 / prcDiv;
     } else {
@@ -490,7 +490,7 @@ void Reduce::createPrimitive() {
     // stage to reduce the rest dimensions.
     if (use_aux_kernel) {
         aux_jcp = jcp;
-        aux_jcp.src_prc = jcp.dst_prc;
+        aux_jcp.src_el_type = jcp.dst_el_type;
         create_reduce_kernel(reduceAuxKernel, aux_jcp);
     }
 }

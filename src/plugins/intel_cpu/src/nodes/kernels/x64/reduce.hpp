@@ -23,8 +23,8 @@ enum ReduceLayoutType {
 struct JitReduceConfigParams {
     ReduceLayoutType layout;
     Algorithm reduce_mode;
-    InferenceEngine::Precision src_prc;
-    InferenceEngine::Precision dst_prc;
+    element::Type src_el_type;
+    element::Type dst_el_type;
 };
 
 struct JitReduceCallArgs {
@@ -56,8 +56,8 @@ public:
 
     virtual ~JitReduceKernelBase() = default;
 
-    const InferenceEngine::Precision &get_exec_prc() {
-        return exec_prc;
+    const element::Type &get_exec_prc() const {
+        return exec_el_type;
     }
 
 protected:
@@ -66,12 +66,12 @@ protected:
     void horiz_qq(const Xbyak::Xmm& xmm, const Xbyak::Operand& op);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-    void horiz_reduce_store_ps(const Xbyak::Xmm& vmm_dst, const InferenceEngine::Precision& dst_dt, bool load_embedded = false);
+    void horiz_reduce_store_ps(const Xbyak::Xmm& vmm_dst, const element::Type& dst_dt, bool load_embedded = false);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-    void horiz_reduce_store_qq(const Xbyak::Xmm& vmm_dst, const InferenceEngine::Precision& dst_dt, bool load_embedded = false);
+    void horiz_reduce_store_qq(const Xbyak::Xmm& vmm_dst, const element::Type& dst_dt, bool load_embedded = false);
 
-    InferenceEngine::Precision exec_prc;
+    element::Type exec_el_type;
 
     const Xbyak::Reg64 &reg_dst = this->r9;
 
@@ -153,7 +153,7 @@ private:
 
     void reduce_gather(const Vmm &vmm_dst, int64_t offset);
 
-    void pack_gathered_vector(const Vmm& vmm_val, const Vmm& vmm_index, int64_t offset, const InferenceEngine::Precision& src_dt);
+    void pack_gathered_vector(const Vmm& vmm_val, const Vmm& vmm_index, int64_t offset, const element::Type& src_dt);
 
     void reduce_kernel_tail();
 
@@ -248,13 +248,13 @@ private:
 
     void reduce_post_tail();
 
-    void apply_post_ops(const InferenceEngine::Precision &dst_dt, bool is_broadcast);
+    void apply_post_ops(const element::Type &dst_dt, bool is_broadcast);
 
     void reduce_map_kernel(const Vmm &vmm_dst);
 
     void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
 
-    void horiz_store(const Xbyak::Xmm &xmm_dst, const InferenceEngine::Precision &dst_dt, bool load_embedded);
+    void horiz_store(const Xbyak::Xmm &xmm_dst, const element::Type &dst_dt, bool load_embedded);
 };  // JitReducePostKernel
 
 }   // namespace kernel

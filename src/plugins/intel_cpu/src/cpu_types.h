@@ -165,7 +165,7 @@ enum class Algorithm {
     EltwiseElu,
     EltwiseTanh,
     EltwiseSigmoid,
-    EltwiseAbs,
+    EltwiseAbs, // 40
     EltwiseSelect,
     EltwiseSqrt,
     EltwiseSoftRelu,

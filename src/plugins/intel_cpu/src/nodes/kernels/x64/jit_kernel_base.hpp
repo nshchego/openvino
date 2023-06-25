@@ -171,36 +171,35 @@ public:
             const bool useMask  = true,
             const bool zeroFill = false);
 
-
     void load_vector(
             const Xbyak::Xmm &vDst,
             const Xbyak::Address &srcAdr,
-            const InferenceEngine::Precision &dstPrc,
-            const InferenceEngine::Precision &srcPrc);
+            const ov::element::Type& dstPrc,
+            const ov::element::Type& srcPrc);
 
     void load_scalar(
             const Xbyak::Xmm &vDst,
             const Xbyak::Address &srcAdr,
-            const InferenceEngine::Precision &dstPrc,
-            const InferenceEngine::Precision &srcPrc);
+            const ov::element::Type& dstPrc,
+            const ov::element::Type& srcPrc);
 
     void load_with_bcst(
             const Xbyak::Xmm &vDst,
             const Xbyak::Address &srcAdr,
-            const InferenceEngine::Precision &dstPrc,
-            const InferenceEngine::Precision &srcPrc);
+            const ov::element::Type& dstPrc,
+            const ov::element::Type& srcPrc);
 
     void store_vector(
             const Xbyak::Address &dstAdr,
             const Xbyak::Xmm &vSrc,
-            const InferenceEngine::Precision &dstPrc,
-            const InferenceEngine::Precision &srcPrc);
+            const ov::element::Type& dstPrc,
+            const ov::element::Type& srcPrc);
 
     void store_scalar(
             const Xbyak::Address &dstAdr,
             const Xbyak::Xmm &vSrc,
-            const InferenceEngine::Precision &dstPrc,
-            const InferenceEngine::Precision &srcPrc);
+            const ov::element::Type& dstPrc,
+            const ov::element::Type& srcPrc);
 
 protected:
     inline bool isValidIsa(dnnl::impl::cpu::x64::cpu_isa_t isa) {

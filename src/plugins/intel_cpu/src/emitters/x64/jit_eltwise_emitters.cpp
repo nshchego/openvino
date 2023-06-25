@@ -293,7 +293,7 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, cons
                 Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
                 Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
                 // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
-                // vmm_src0 = ab; vmm_src1 = cd;
+                // vmm_src0 -> ab; vmm_src1 -> cd;
                 h->uni_vpsrlq(vmm_aux0, vmm_src0, 32);
                 h->uni_vpmuludq(vmm_aux0, vmm_aux0, vmm_src1); // a * d
                 h->uni_vpsrlq(vmm_aux1, vmm_src1, 32);
