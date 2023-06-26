@@ -229,7 +229,7 @@ public:
     using KernelFunc = void (*)(const CallArgs *);
 
     explicit JitKernel(const char* name, const CompileParams& jcp, dnnl::impl::cpu::x64::cpu_isa_t max_cpu_isa)
-            : JitKernelBase{name, max_cpu_isa}, func{nullptr}, jcp{jcp} {}
+            : JitKernelBase{name, max_cpu_isa}, jcp{jcp}, func{nullptr} {}
     ~JitKernel() override = default;
 
     dnnl::impl::status_t create_kernel() override {

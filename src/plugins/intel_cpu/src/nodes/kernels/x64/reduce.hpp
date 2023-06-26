@@ -73,12 +73,7 @@ protected:
 
     element::Type exec_el_type;
 
-    const Xbyak::Reg64 &reg_dst = this->r9;
-
-    Xbyak::Xmm xmm_aux1;
-    Xbyak::Xmm xmm_aux2;
-
-    Xbyak::Ymm ymm_aux1;
+    RegistersPool::Reg<Xbyak::Reg64> reg_dst;
 
     std::shared_ptr<jit_multiply_emitter> jit_multiply_i64;
 };
@@ -101,37 +96,22 @@ private:
 
     Xbyak::Address table_val(int index) { return ptr[reg_table + index * vlen]; }
 
-    const Xbyak::Reg64 &reg_src            = r8;
-    const Xbyak::Reg64 &reg_idx            = rdx;
-    const Xbyak::Reg64 &reg_work_amount    = r10;
-    const Xbyak::Reg64 &reg_reduce_w       = r11;
-    const Xbyak::Reg64 &reg_reduce_stride  = r12;
-    const Xbyak::Reg64 &reg_work_batch     = r13;
-    const Xbyak::Reg64 &reg_table          = r14;
-    const Xbyak::Reg64 reg_params          = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
+    const Xbyak::Reg64 reg_params = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
-    const Xbyak::Reg8  &reg_tmp_8          = r15b;
-    const Xbyak::Reg32 &reg_tmp_32         = r15d;
-    const Xbyak::Reg64 &reg_tmp_64         = r15;
+    RegistersPool::Reg<Xbyak::Reg64> reg_src;
+    RegistersPool::Reg<Xbyak::Reg64> reg_work_amount;
+    RegistersPool::Reg<Xbyak::Reg64> reg_reduce_w;
+    RegistersPool::Reg<Xbyak::Reg64> reg_reduce_stride;
+    RegistersPool::Reg<Xbyak::Reg64> reg_work_batch;
+    RegistersPool::Reg<Xbyak::Reg64> reg_table;
 
-    const Xbyak::Reg64 &reg_src_aux        = rax;
-    const Xbyak::Reg64 &reg_work_batch_aux = rbx;
-
-    Vmm vmm_aux     = Vmm(0);
-    Vmm vmm_src     = Vmm(1);
-    Vmm vmm_dst     = Vmm(2);
-    Vmm vmm_zero    = Vmm(3);
-    Vmm vmm_dst_aux = Vmm(4);
-    Vmm vmm_idx     = Vmm(8);
-    Vmm vmm_mask    = Vmm(9);
-
-    Xbyak::Xmm xmm_aux  = Xbyak::Xmm(vmm_aux.getIdx());
-    Xbyak::Xmm xmm_src  = Xbyak::Xmm(vmm_src.getIdx());
-    Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
-    Xbyak::Xmm xmm_zero = Xbyak::Xmm(vmm_zero.getIdx());
-    Xbyak::Xmm xmm_idx  = Xbyak::Xmm(vmm_idx.getIdx());
-
-    Xbyak::Ymm ymm_idx  = Xbyak::Ymm(vmm_idx.getIdx());
+    RegistersPool::Reg<Vmm> v_src;
+    RegistersPool::Reg<Vmm> v_dst;
+    RegistersPool::Reg<Vmm> v_zero;
+    RegistersPool::Reg<Vmm> v_dst_aux;
+    RegistersPool::Reg<Vmm> v_idx;
+    RegistersPool::Reg<Vmm> v_ones;
+    RegistersPool::Reg<Vmm> v_abs_mask;
 
     const Xbyak::Opmask &k_mask = k1;
 
@@ -151,7 +131,7 @@ private:
 
     void reduce_batch();
 
-    void reduce_gather(const Vmm &vmm_dst, int64_t offset);
+    void reduce_gather(const Vmm& vmm_dst, int64_t offset);
 
     void pack_gathered_vector(const Vmm& vmm_val, const Vmm& vmm_index, int64_t offset, const element::Type& src_dt);
 
@@ -163,9 +143,9 @@ private:
 
     void reduce_main_loop();
 
-    void reduce_kernel(const Vmm &vmm_src, const Vmm &vmm_dst);
+    void reduce_kernel(const Vmm& vmm_src, const Vmm& vmm_dst);
 
-    void reduce_kernel_scalar(const Xbyak::Xmm &xmm_src, const Xbyak::Xmm &xmm_dst);
+    void reduce_kernel_scalar(const Xbyak::Xmm& xmm_src, const Xbyak::Xmm& xmm_dst);
 
     void load_dst_vector();
 
@@ -212,31 +192,21 @@ private:
     const size_t vlen = dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen;
     bool planar_layout = false;
 
-    const Xbyak::Reg64 &reg_work_amount       = r8;
-    const Xbyak::Reg64 &reg_total_work_amount = r10;
-    const Xbyak::Reg64 &reg_channel_size      = r11;
-    const Xbyak::Reg64 &reg_divisor           = r12;
-    const Xbyak::Reg64 &reg_reduce_c          = r13;
-    const Xbyak::Reg64 reg_params             = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
+    const Xbyak::Reg64 reg_params = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
-    const Xbyak::Reg8  &reg_tmp_8             = r14b;
-    const Xbyak::Reg32 &reg_tmp_32            = r14d;
-    const Xbyak::Reg64 &reg_tmp_64            = r14;
+    RegistersPool::Reg<Xbyak::Reg64> reg_work_amount;
+    RegistersPool::Reg<Xbyak::Reg64> reg_divider;
+    RegistersPool::Reg<Xbyak::Reg64> reg_reduce_c;
 
-    const Xbyak::Reg64 &reg_oc_off            = rax;
-    const Xbyak::Reg64 &reg_d_weights         = rbx;
-    const Xbyak::Reg64 &reg_d_bias            = rdx;
-    const Xbyak::Reg64 &reg_post_ops_data     = r15;
+    RegistersPool::Reg<Xbyak::Reg64> reg_oc_off;
+    RegistersPool::Reg<Xbyak::Reg64> reg_d_weights;
+    RegistersPool::Reg<Xbyak::Reg64> reg_d_bias;
+    RegistersPool::Reg<Xbyak::Reg64> reg_post_ops_data;
 
-    Vmm vmm_aux       = Vmm(0);
-    Vmm vmm_dst       = Vmm(1);
-    Vmm vmm_zero      = Vmm(2);
-    Vmm vmm_dst_aux   = Vmm(3);
-    Vmm vmm_d_weights = Vmm(7);
-    Vmm vmm_d_bias    = Vmm(8);
-
-    Xbyak::Xmm xmm_aux  = Xbyak::Xmm(vmm_aux.getIdx());
-    Xbyak::Xmm xmm_dst  = Xbyak::Xmm(vmm_dst.getIdx());
+    RegistersPool::Reg<Vmm> v_dst;
+    RegistersPool::Reg<Vmm> v_d_weights;
+    RegistersPool::Reg<Vmm> v_d_bias;
+    RegistersPool::Reg<Vmm> v_divider;
 
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
 
@@ -248,13 +218,13 @@ private:
 
     void reduce_post_tail();
 
-    void apply_post_ops(const element::Type &dst_dt, bool is_broadcast);
+    void apply_post_ops(const element::Type& dst_dt, bool is_broadcast);
 
-    void reduce_map_kernel(const Vmm &vmm_dst);
+    void reduce_map_kernel(const Vmm& vmm_dst);
 
-    void reduce_map_kernel_scalar(const Xbyak::Xmm &xmm_dst);
+    void reduce_map_kernel_scalar(const Xbyak::Xmm& xmm_dst);
 
-    void horiz_store(const Xbyak::Xmm &xmm_dst, const element::Type &dst_dt, bool load_embedded);
+    void horiz_store(const Xbyak::Xmm& xmm_dst, const element::Type& dst_dt, bool load_embedded);
 };  // JitReducePostKernel
 
 }   // namespace kernel
