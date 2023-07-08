@@ -38,7 +38,7 @@ private:
     void reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr);
     void reduce_BLK(const uint8_t *in_ptr, uint8_t *out_ptr);
     void reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr);
-    inline void reduceKernelProcess(const uint8_t *in_p, uint8_t *out_p, size_t work_amount,
+    inline void reduce_kernel_process(const uint8_t *in_p, uint8_t *out_p, size_t work_amount,
                                     size_t reduce_w = 2, size_t work_batch = 1, const int *tab_idx = NULL);
     inline void reduceKernelPostProcess(uint8_t *out_ptr);
     inline void reduce_kernel_reassign();

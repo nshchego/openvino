@@ -45,10 +45,10 @@ JitReduceKernelBase<CallArgs>::JitReduceKernelBase(const char* name, const JitRe
 
 ////////// FLOAT 32 //////////
 template<typename CallArgs>
-void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm &vmm, const Operand &op) {
+void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm& vmm_dst, const Operand& op) {
     switch (this->jcp.reduce_mode) {
         case Algorithm::ReduceAnd:
-            this->uni_vandps(vmm, vmm, op);
+            this->uni_vandps(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceL1:
         case Algorithm::ReduceL2:
@@ -57,19 +57,19 @@ void JitReduceKernelBase<CallArgs>::horiz_ps(const Xmm &vmm, const Operand &op) 
         case Algorithm::ReduceSum:
         case Algorithm::ReduceSumSquare:
         case Algorithm::ReduceLogSumExp:
-            this->uni_vaddps(vmm, vmm, op);
+            this->uni_vaddps(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceMax:
-            this->uni_vmaxps(vmm, vmm, op);
+            this->uni_vmaxps(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceMin:
-            this->uni_vminps(vmm, vmm, op);
+            this->uni_vminps(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceOr:
-            this->uni_vorps(vmm, vmm, op);
+            this->uni_vorps(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceProd:
-            this->uni_vmulps(vmm, vmm, op);
+            this->uni_vmulps(vmm_dst, vmm_dst, op);
             break;
         default:
             IE_THROW() << "Unsupported reduce mode '" << algToString(this->jcp.reduce_mode) << "'";
@@ -92,10 +92,10 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_ps(const Xmm& vmm_dst, co
         this->vextractf128(xmm_aux_2, ymm_aux_1, 1);
         this->horiz_ps(xmm_aux_1, xmm_aux_2);
     } else if (isa == x64::avx2) {
+        auto ymm_dst = Ymm(vmm_dst.getIdx());
         auto xmm_dst = Xmm(vmm_dst.getIdx());
-        auto ymm_aux_1 = Ymm(xmm_aux_1.getIdx());
 
-        this->vextractf128(xmm_aux_1, ymm_aux_1, 1);
+        this->vextractf128(xmm_aux_1, ymm_dst, 1);
         this->horiz_ps(xmm_aux_1, xmm_dst);
     } else if (isa == x64::sse41) {
         auto xmm_dst = Xmm(vmm_dst.getIdx());
@@ -114,7 +114,7 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_ps(const Xmm& vmm_dst, co
 
     if (isa != x64::sse41) {
         if (one_of(this->jcp.reduce_mode, Algorithm::ReduceL1, Algorithm::ReduceL2, Algorithm::ReduceLogSum, Algorithm::ReduceMean,
-                                    Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
+                                          Algorithm::ReduceSum, Algorithm::ReduceSumSquare, Algorithm::ReduceLogSumExp)) {
             this->uni_vhaddps(xmm_aux_1, xmm_aux_1, xmm_aux_1);
             this->uni_vhaddps(xmm_aux_1, xmm_aux_1, xmm_aux_1);
         } else {
@@ -138,10 +138,11 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_ps(const Xmm& vmm_dst, co
 
 ////////// INTEGER 64 //////////
 template<typename CallArgs>
-void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm& vmm, const Operand& op) {
+template <x64::cpu_isa_t isa>
+void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm& vmm_dst, const Operand& op) {
     switch (this->jcp.reduce_mode) {
         case Algorithm::ReduceAnd:
-            this->uni_vandpd(vmm, vmm, op);
+            this->uni_vandpd(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceL1:
         case Algorithm::ReduceL2:
@@ -150,20 +151,51 @@ void JitReduceKernelBase<CallArgs>::horiz_qq(const Xmm& vmm, const Operand& op) 
         case Algorithm::ReduceSum:
         case Algorithm::ReduceSumSquare:
         case Algorithm::ReduceLogSumExp:
-            this->uni_vpaddq(vmm, vmm, op);
+            this->uni_vpaddq(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceMax:
-            this->vpmaxsq(vmm, vmm, op);
+            if (isa == x64::avx512_core) {
+                this->vpmaxsq(vmm_dst, vmm_dst, op);
+            } else if (isa == x64::avx2) {
+                if (vmm_dst.isYMM()) {
+                    auto ymm_aux = RegistersPool::Reg<Ymm>(this->registersPool);
+
+                    this->vpcmpgtq(ymm_aux, vmm_dst, op);
+                    this->uni_vandpd(vmm_dst, vmm_dst, ymm_aux);
+                    this->vandnpd(ymm_aux, ymm_aux, op);
+                    this->uni_vorpd(vmm_dst, vmm_dst, ymm_aux);
+                } else {
+                    auto xmm_aux = RegistersPool::Reg<Xmm>(this->registersPool);
+
+                    this->vpcmpgtq(xmm_aux, vmm_dst, op);
+                    this->uni_vandpd(vmm_dst, vmm_dst, xmm_aux);
+                    this->vandnpd(xmm_aux, xmm_aux, op);
+                    this->uni_vorpd(vmm_dst, vmm_dst, xmm_aux);
+                }
+            } else {
+                auto xmm_aux = RegistersPool::Reg<Xmm>(this->registersPool);
+
+                this->vpcmpgtq(xmm_aux, vmm_dst, op);
+                this->uni_vandpd(vmm_dst, vmm_dst, xmm_aux);
+                this->vandnpd(xmm_aux, xmm_aux, op);
+                this->uni_vorpd(vmm_dst, vmm_dst, xmm_aux);
+            }
             break;
         case Algorithm::ReduceMin:
-            this->vpminsq(vmm, vmm, op);
+            if (isa == x64::avx512_core) {
+                this->vpminsq(vmm_dst, vmm_dst, op);
+            } else {
+            }
             break;
         case Algorithm::ReduceOr:
-            this->uni_vorpd(vmm, vmm, op);
+            this->uni_vorpd(vmm_dst, vmm_dst, op);
             break;
         case Algorithm::ReduceProd:
-            this->vpmullq(vmm, vmm, op);
-            // jit_multiply_i64->emit_code({static_cast<size_t>(vmm.getIdx()), static_cast<size_t>(op.getIdx())}, {static_cast<size_t>(vmm.getIdx())});
+            if (isa == x64::avx512_core) {
+                this->vpmullq(vmm_dst, vmm_dst, op);
+            } else {
+                // jit_multiply_i64->emit_code({static_cast<size_t>(vmm_dst.getIdx()), static_cast<size_t>(op.getIdx())}, {static_cast<size_t>(vmm_dst.getIdx())});
+            }
             break;
         default:
             IE_THROW() << "Unsupported reduce mode '" << algToString(this->jcp.reduce_mode) << "'";
@@ -182,32 +214,32 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_qq(const Xmm& vmm_dst, co
         auto ymm_aux_1 = Ymm(xmm_aux_1.getIdx());
 
         this->vextractf64x4(ymm_aux_1, zmm_dst, 1);
-        this->horiz_qq(ymm_aux_1, ymm_dst);
+        this->horiz_qq<isa>(ymm_aux_1, ymm_dst);
         this->vextractf128(xmm_aux_2, ymm_aux_1, 1);
-        this->horiz_qq(xmm_aux_1, xmm_aux_2);
+        this->horiz_qq<isa>(xmm_aux_1, xmm_aux_2);
         this->vshufpd(xmm_aux_2, xmm_aux_1, xmm_aux_1, 0b00000001);
-        this->horiz_qq(xmm_aux_1, xmm_aux_2);
+        this->horiz_qq<isa>(xmm_aux_1, xmm_aux_2);
     } else if (isa == x64::avx2) {
         auto ymm_dst = Ymm(vmm_dst.getIdx());
         auto xmm_dst = Xmm(vmm_dst.getIdx());
 
         this->vextractf128(xmm_aux_1, ymm_dst, 1);
-        this->horiz_qq(xmm_aux_1, xmm_dst);
+        this->horiz_qq<isa>(xmm_aux_1, xmm_dst);
         this->vshufpd(xmm_aux_2, xmm_aux_1, xmm_aux_1, 0b00000001);
-        this->horiz_qq(xmm_aux_1, xmm_aux_2);
+        this->horiz_qq<isa>(xmm_aux_1, xmm_aux_2);
     } else if (isa == x64::sse41) {
         auto xmm_dst = Xmm(vmm_dst.getIdx());
 
         this->vshufpd(xmm_aux_1, xmm_dst, xmm_dst, 0b00000001);
-        this->horiz_qq(xmm_aux_1, xmm_dst);
+        this->horiz_qq<isa>(xmm_aux_1, xmm_dst);
     }
 
     if (load_embedded) {
         if (isa == x64::avx512_core && exec_el_type == dst_el_type) {
-            this->horiz_qq(xmm_aux_1, this->ptr_b[reg_dst]);
+            this->horiz_qq<isa>(xmm_aux_1, this->ptr_b[reg_dst]);
         } else {
             this->load_scalar(xmm_aux_2, this->ptr[reg_dst], exec_el_type, dst_el_type);
-            this->horiz_qq(xmm_aux_1, xmm_aux_2);
+            this->horiz_qq<isa>(xmm_aux_1, xmm_aux_2);
         }
     }
     this->store_scalar(this->ptr[reg_dst], xmm_aux_1, dst_el_type, exec_el_type);
@@ -655,48 +687,56 @@ void JitReduceKernel<isa>::reduce_batch() {
     L(reduce_batch_loop_end_label);
 }
 
-template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::reduce_gather(const Vmm& vmm_dst, int64_t offset) {
-    switch (jcp.src_el_type) {
-        case ov::element::f64:
-        case ov::element::i64:
-            if (isa == x64::avx512_core) {
+template <>
+void JitReduceKernel<x64::avx512_core>::reduce_gather(const Zmm& vmm_dst, int64_t offset) {
+    switch (jcp.src_el_type.size()) {
+        case 8: {
                 auto ymm_idx = Ymm(v_idx.getIdx());
-                auto zmm_src = Zmm(v_src.getIdx());
 
                 kxnorq(k_mask, k_mask, k_mask);
-                vgatherdpd(zmm_src | k_mask, ptr[reg_src + offset + ymm_idx]);
+                vgatherdpd((Zmm)v_src | k_mask, ptr[reg_src + offset + ymm_idx]);
                 if (jcp.src_el_type == ov::element::f64 && exec_el_type == ov::element::i64) {
-                    vcvtpd2qq(zmm_src, zmm_src);
+                    vcvtpd2qq(v_src, v_src);
                 } else if (jcp.src_el_type == ov::element::i64 && exec_el_type == ov::element::f64) {
-                    vcvtqq2pd(zmm_src, zmm_src);
+                    vcvtqq2pd(v_src, v_src);
                 }
-            } else if (isa == x64::avx2) {
-                auto ymm_idx = Ymm(v_idx.getIdx());
+            }
+            break;
+        case 4: {
+                kxnord(k_mask, k_mask, k_mask);
+                if (jcp.src_el_type == ov::element::f32) {
+                    vgatherdps((Zmm)v_src | k_mask, ptr[reg_src + offset + v_idx]);
+                } else {
+                    vpgatherdd((Zmm)v_src | k_mask, ptr[reg_src + offset + v_idx]);
+                    uni_vcvtdq2ps(v_src, v_src);
+                }
+            }
+            break;
+        case 2:
+        case 1:
+            pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
+            break;
+        default:
+            IE_THROW() << "Unkown source element type '" << jcp.src_el_type << "'";
+    }
+    reduce_kernel(v_src, vmm_dst);
+}
+
+template <>
+void JitReduceKernel<x64::avx2>::reduce_gather(const Ymm& vmm_dst, int64_t offset) {
+    switch (jcp.src_el_type.size()) {
+        case 8: {
+                // auto ymm_idx = Ymm(v_idx.getIdx());
                 auto v_mask = getVmm();
 
                 uni_vpcmpeqq(v_mask, v_mask, v_mask);
-                vgatherdpd(v_src, ptr[reg_src + offset + ymm_idx], v_mask);
+                vgatherdpd(v_src, ptr[reg_src + offset + v_idx], v_mask);
                 if (exec_el_type == ov::element::i64) {
                     // TODO Convert pd tp qq (v_src, v_src);
                 }
-            } else {
-                pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
             }
             break;
-        case ov::element::f32:
-        case ov::element::i32:
-            if (isa == x64::avx512_core) {
-                auto zmm_src = Zmm(v_src.getIdx());
-
-                kxnord(k_mask, k_mask, k_mask);
-                if (jcp.src_el_type == ov::element::f32) {
-                    vgatherdps(zmm_src | k_mask, ptr[reg_src + offset + v_idx]);
-                } else {
-                    vpgatherdd(zmm_src | k_mask, ptr[reg_src + offset + v_idx]);
-                    uni_vcvtdq2ps(zmm_src, zmm_src);
-                }
-            } else if (isa == x64::avx2) {
+        case 4: {
                 auto v_mask = getVmm();
 
                 uni_vpcmpeqd(v_mask, v_mask, v_mask);
@@ -706,13 +746,10 @@ void JitReduceKernel<isa>::reduce_gather(const Vmm& vmm_dst, int64_t offset) {
                     vpgatherdd(v_src, ptr[reg_src + offset + v_idx], v_mask);
                     uni_vcvtdq2ps(v_src, v_src);
                 }
-            } else {
-                pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
             }
             break;
-        case ov::element::bf16:
-        case ov::element::i8:
-        case ov::element::u8:
+        case 2:
+        case 1:
             pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
             break;
         default:
@@ -720,6 +757,78 @@ void JitReduceKernel<isa>::reduce_gather(const Vmm& vmm_dst, int64_t offset) {
     }
     reduce_kernel(v_src, vmm_dst);
 }
+
+template <>
+void JitReduceKernel<x64::sse41>::reduce_gather(const Xmm& vmm_dst, int64_t offset) {
+    pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
+    reduce_kernel(v_src, vmm_dst);
+}
+
+// template <x64::cpu_isa_t isa>
+// void JitReduceKernel<isa>::reduce_gather(const Vmm& vmm_dst, int64_t offset) {
+//     switch (jcp.src_el_type) {
+//         case ov::element::f64:
+//         case ov::element::i64:
+//             if (isa == x64::avx512_core) {
+//                 auto ymm_idx = Ymm(v_idx.getIdx());
+//                 auto zmm_src = Zmm(v_src.getIdx());
+
+//                 kxnorq(k_mask, k_mask, k_mask);
+//                 vgatherdpd(zmm_src | k_mask, ptr[reg_src + offset + ymm_idx]);
+//                 if (jcp.src_el_type == ov::element::f64 && exec_el_type == ov::element::i64) {
+//                     vcvtpd2qq(zmm_src, zmm_src);
+//                 } else if (jcp.src_el_type == ov::element::i64 && exec_el_type == ov::element::f64) {
+//                     vcvtqq2pd(zmm_src, zmm_src);
+//                 }
+//             } else if (isa == x64::avx2) {
+//                 auto ymm_idx = Ymm(v_idx.getIdx());
+//                 auto v_mask = getVmm();
+
+//                 uni_vpcmpeqq(v_mask, v_mask, v_mask);
+//                 vgatherdpd(v_src, ptr[reg_src + offset + ymm_idx], v_mask);
+//                 if (exec_el_type == ov::element::i64) {
+//                     // TODO Convert pd tp qq (v_src, v_src);
+//                 }
+//             } else {
+//                 pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
+//             }
+//             break;
+//         case ov::element::f32:
+//         case ov::element::i32:
+//             if (isa == x64::avx512_core) {
+//                 auto zmm_src = Zmm(v_src.getIdx());
+
+//                 kxnord(k_mask, k_mask, k_mask);
+//                 if (jcp.src_el_type == ov::element::f32) {
+//                     vgatherdps(zmm_src | k_mask, ptr[reg_src + offset + v_idx]);
+//                 } else {
+//                     vpgatherdd(zmm_src | k_mask, ptr[reg_src + offset + v_idx]);
+//                     uni_vcvtdq2ps(zmm_src, zmm_src);
+//                 }
+//             } else if (isa == x64::avx2) {
+//                 auto v_mask = getVmm();
+
+//                 uni_vpcmpeqd(v_mask, v_mask, v_mask);
+//                 if (jcp.src_el_type == ov::element::f32) {
+//                     vgatherdps(v_src, ptr[reg_src + offset + v_idx], v_mask);
+//                 } else {
+//                     vpgatherdd(v_src, ptr[reg_src + offset + v_idx], v_mask);
+//                     uni_vcvtdq2ps(v_src, v_src);
+//                 }
+//             } else {
+//                 pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
+//             }
+//             break;
+//         case ov::element::bf16:
+//         case ov::element::i8:
+//         case ov::element::u8:
+//             pack_gathered_vector(v_src, v_idx, offset, jcp.src_el_type);
+//             break;
+//         default:
+//             IE_THROW() << "Unkown source element type '" << jcp.src_el_type << "'";
+//     }
+//     reduce_kernel(v_src, vmm_dst);
+// }
 
 template <x64::cpu_isa_t isa>
 void JitReduceKernel<isa>::pack_gathered_vector(const Vmm& vmm_val, const Vmm& vmm_index, int64_t offset, const ov::element::Type& src_el_type) {

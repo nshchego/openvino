@@ -70,7 +70,6 @@ public:
     }
 
 protected:
-    GridSampleKernelConfParams jcp;
     uint64_t vlen         = 16lu;
     uint64_t dataTypeSize = 1lu;
     uint64_t gridTypeSize = 1lu;

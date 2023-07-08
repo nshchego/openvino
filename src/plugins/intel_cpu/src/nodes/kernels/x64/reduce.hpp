@@ -63,6 +63,7 @@ public:
 protected:
     void horiz_ps(const Xbyak::Xmm& xmm, const Xbyak::Operand& op);
 
+    template <dnnl::impl::cpu::x64::cpu_isa_t isa>
     void horiz_qq(const Xbyak::Xmm& xmm, const Xbyak::Operand& op);
 
     template <dnnl::impl::cpu::x64::cpu_isa_t isa>
