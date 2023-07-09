@@ -20,289 +20,391 @@ JitKernelBase::JitKernelBase(const char* name, x64::cpu_isa_t isa) :
     }
 }
 
-void JitKernelBase::uni_vfmsub132ps(const Xmm& vDst,
+void JitKernelBase::uni_vfmsub132ps(const Xmm& vmm_dst,
                                     const Xmm& vSrc,
                                     const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub132ps(vDst, vSrc, op);
+        vfmsub132ps(vmm_dst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(vDst.getIdx() != vSrc.getIdx());
-        vmulps(vDst, vDst, op);
-        vsubps(vDst, vDst, vSrc);
+        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        vmulps(vmm_dst, vmm_dst, op);
+        vsubps(vmm_dst, vmm_dst, vSrc);
     } else {
-        assert(vDst.getIdx() != vSrc.getIdx());
-        mulps(vDst, op);
-        subps(vDst, vSrc);
+        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        mulps(vmm_dst, op);
+        subps(vmm_dst, vSrc);
     }
 }
 
-void JitKernelBase::uni_vfnmadd132ps(const Xmm& vDst,
+void JitKernelBase::uni_vfnmadd132ps(const Xmm& vmm_dst,
                                      const Xmm& vSrc,
                                      const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfnmadd132ps(vDst, vSrc, op);
+        vfnmadd132ps(vmm_dst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(vDst.getIdx() != vSrc.getIdx());
-        vmulps(vDst, vDst, op);
-        vsubps(vDst, vSrc, vDst);
+        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        vmulps(vmm_dst, vmm_dst, op);
+        vsubps(vmm_dst, vSrc, vmm_dst);
     } else {
-        assert(vDst.getIdx() != vSrc.getIdx());
-        mulps(vDst, op);
-        subps(vSrc, vDst);
-        movups(vDst, vSrc);
+        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        mulps(vmm_dst, op);
+        subps(vSrc, vmm_dst);
+        movups(vmm_dst, vSrc);
     }
 }
 
-void JitKernelBase::uni_vfmsub231ps(const Xmm& vDst,
+void JitKernelBase::uni_vfmsub231ps(const Xmm& vmm_dst,
                                     const Xmm& vSrc,
                                     const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub231ps(vDst, vSrc, op);
+        vfmsub231ps(vmm_dst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(!vDst.isEqualIfNotInherited(op));
+        assert(!vmm_dst.isEqualIfNotInherited(op));
         vmulps(vSrc, vSrc, op);
-        vsubps(vDst, vSrc, vDst);
+        vsubps(vmm_dst, vSrc, vmm_dst);
     } else {
-        assert(!vDst.isEqualIfNotInherited(op));
+        assert(!vmm_dst.isEqualIfNotInherited(op));
         mulps(vSrc, op);
-        subps(vSrc, vDst);
-        movups(vDst, vSrc);
+        subps(vSrc, vmm_dst);
+        movups(vmm_dst, vSrc);
     }
 }
 
-void JitKernelBase::uni_vpaddd(const Ymm& vDst,
+void JitKernelBase::uni_vpaddd(const Ymm& vmm_dst,
                                const Ymm& vSrc,
                                const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vpaddd(vDst, vSrc, op);
+        vpaddd(vmm_dst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        Xmm xmmDst(vDst.getIdx());
-        vmovups(vDst, vSrc);
+        Xmm xmmDst(vmm_dst.getIdx());
+        vmovups(vmm_dst, vSrc);
         if (op.isYMM()) {
             Ymm ymmOp(op.getIdx());
             Xmm xmmOp(op.getIdx());
             paddd(xmmDst, xmmOp);
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
             paddd(xmmDst, xmmOp);
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
         } else if (op.isMEM()) {
             const int vlen = x64::cpu_isa_traits<x64::sse41>::vlen;
             paddd(xmmDst, op.getAddress());
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             paddd(xmmDst, ptr[op.getAddress().getRegExp() + vlen]);
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
         } else {
             IE_THROW() << "Not supported operand type.";
         }
     } else if (isValidIsa(x64::sse41)) {
-        assert(vDst.getIdx() != vSrc.getIdx());
-        paddd(vDst, op);
+        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        paddd(vmm_dst, op);
     } else {
         IE_THROW() << "Not defined behavior for instruction 'vpaddd' in current instructions set.";
     }
 }
 
-void JitKernelBase::uni_vaddpd(const Xmm &vDst, const Operand &op1, const Operand &op2) {
+void JitKernelBase::uni_vaddpd(const Xmm& vmm_dst, const Operand &op1, const Operand &op2) {
     if (isValidIsa(x64::avx)) {
-        vaddpd(vDst, op1, op2);
+        vaddpd(vmm_dst, op1, op2);
     } else {
-        if (vDst.getIdx() != op1.getIdx()) {
-            movupd(vDst, op1);
+        if (vmm_dst.getIdx() != op1.getIdx()) {
+            movupd(vmm_dst, op1);
         }
-        addpd(vDst, op2);
+        addpd(vmm_dst, op2);
     }
 }
 
-void JitKernelBase::uni_vpsubd(const Ymm& vDst,
+void JitKernelBase::uni_vpsubd(const Ymm& vmm_dst,
                                const Ymm& vSrc,
                                const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vpsubd(vDst, vSrc, op);
+        vpsubd(vmm_dst, vSrc, op);
     } else if (isValidIsa(x64::avx)) {
-        Xmm xmmDst(vDst.getIdx());
-        vmovups(vDst, vSrc);
+        Xmm xmmDst(vmm_dst.getIdx());
+        vmovups(vmm_dst, vSrc);
         if (op.isYMM()) {
             Ymm ymmOp(op.getIdx());
             Xmm xmmOp(op.getIdx());
             psubd(xmmDst, xmmOp);
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
             psubd(xmmDst, xmmOp);
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             vperm2f128(ymmOp, ymmOp, ymmOp, 0x1);
         } else if (op.isMEM()) {
             const int vlen = x64::cpu_isa_traits<x64::sse41>::vlen;
             psubd(xmmDst, op.getAddress());
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             psubd(xmmDst, ptr[op.getAddress().getRegExp() + vlen]);
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
         } else {
             IE_THROW() << "Not supported operand type.";
         }
     } else if (isValidIsa(x64::sse41)) {
-        if (vDst.getIdx() != vSrc.getIdx()) {
-            movups(vDst, vSrc);
+        if (vmm_dst.getIdx() != vSrc.getIdx()) {
+            movups(vmm_dst, vSrc);
         }
-        psubd(vDst, op);
+        psubd(vmm_dst, op);
     } else {
         IE_THROW() << "Not defined behavior for instruction 'vpsubd' in current instructions set.";
     }
 }
 
-void JitKernelBase::uni_vmulpd(const Xmm& vDst,
+void JitKernelBase::uni_vmulpd(const Xmm& vmm_dst,
                                const Operand& op1,
                                const Operand& op2) {
     if (isValidIsa(x64::avx)) {
-        vmulpd(vDst, op1, op2);
+        vmulpd(vmm_dst, op1, op2);
     } else {
-        if (vDst.getIdx() != op1.getIdx()) {
-            movupd(vDst, op1);
+        if (vmm_dst.getIdx() != op1.getIdx()) {
+            movupd(vmm_dst, op1);
         }
-        mulpd(vDst, op2);
+        mulpd(vmm_dst, op2);
     }
 }
 
-void JitKernelBase::uni_vdivps(const Xmm& vDst,
+void JitKernelBase::uni_vpmullq(const Xmm& vmm_dst,
+                                const Xmm& vmm_src,
+                                const Operand& op) {
+    if (get_isa() == x64::avx512_core) {
+        vpmullq(vmm_dst, vmm_src, op);
+    } else if (get_isa() == x64::avx2) {
+        auto ymm_aux_0 = RegistersPool::Reg<Ymm>(registersPool);
+        auto ymm_aux_1 = RegistersPool::Reg<Ymm>(registersPool);
+        // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
+        // vmm_src0 -> ab; vmm_src1 -> cd;
+        uni_vpsrlq(ymm_aux_0, vmm_src, 32);
+        uni_vpmuludq(ymm_aux_0, ymm_aux_0, op);      // a * d
+        uni_vpsrlq(ymm_aux_1, op, 32);
+        uni_vpmuludq(ymm_aux_1, ymm_aux_1, vmm_src); // b * c
+        uni_vpaddq(ymm_aux_1, ymm_aux_1, ymm_aux_0); // a * d + b * c
+        uni_vpsllq(ymm_aux_1, ymm_aux_1, 32);
+        uni_vpmuludq(ymm_aux_0, vmm_src, op);        // b * d
+        uni_vpaddq(vmm_dst, ymm_aux_0, ymm_aux_1);   // (a * d + b * c) << 32 + b * d
+    } else {
+        auto xmm_aux_0 = RegistersPool::Reg<Xmm>(registersPool);
+        auto xmm_aux_1 = RegistersPool::Reg<Xmm>(registersPool);
+        // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
+        // vmm_src0 -> ab; vmm_src1 -> cd;
+        uni_vpsrlq(xmm_aux_0, vmm_src, 32);
+        uni_vpmuludq(xmm_aux_0, xmm_aux_0, op);      // a * d
+        uni_vpsrlq(xmm_aux_1, op, 32);
+        uni_vpmuludq(xmm_aux_1, xmm_aux_1, vmm_src); // b * c
+        uni_vpaddq(xmm_aux_1, xmm_aux_1, xmm_aux_0); // a * d + b * c
+        uni_vpsllq(xmm_aux_1, xmm_aux_1, 32);
+        uni_vpmuludq(xmm_aux_0, vmm_src, op);        // b * d
+        uni_vpaddq(vmm_dst, xmm_aux_0, xmm_aux_1);   // (a * d + b * c) << 32 + b * d
+    }
+}
+
+void JitKernelBase::uni_vdivps(const Xmm& vmm_dst,
                                const Operand& op1,
                                const Operand& op2) {
     if (isValidIsa(x64::avx)) {
-        vdivps(vDst, op1, op2);
+        vdivps(vmm_dst, op1, op2);
     } else {
-        if (!vDst.isEqualIfNotInherited(op1)) {
-            movups(vDst, op1);
+        if (!vmm_dst.isEqualIfNotInherited(op1)) {
+            movups(vmm_dst, op1);
         }
-        divps(vDst, op2);
+        divps(vmm_dst, op2);
     }
 }
 
-void JitKernelBase::uni_vdivpd(const Xmm& vDst,
+void JitKernelBase::uni_vdivpd(const Xmm& vmm_dst,
                                const Operand& op1,
                                const Operand& op2) {
     if (isValidIsa(x64::avx)) {
-        vdivpd(vDst, op1, op2);
+        vdivpd(vmm_dst, op1, op2);
     } else {
-        if (vDst.getIdx() != op1.getIdx()) {
-            movupd(vDst, op1);
+        if (vmm_dst.getIdx() != op1.getIdx()) {
+            movupd(vmm_dst, op1);
         }
-        divpd(vDst, op2);
+        divpd(vmm_dst, op2);
     }
 }
 
-void JitKernelBase::uni_vsqrtpd(const Xmm &vDst, const Operand &op) {
+void JitKernelBase::uni_vsqrtpd(const Xmm& vmm_dst, const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vsqrtpd(vDst, op);
+        vsqrtpd(vmm_dst, op);
     } else {
-        sqrtpd(vDst, op);
+        sqrtpd(vmm_dst, op);
     }
 }
 
-void JitKernelBase::uni_vandps(const Xmm& vDst,
+void JitKernelBase::uni_vandps(const Xmm& vmm_dst,
                                const Xmm& vSrs,
                                const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vandps(vDst, vSrs, op);
+        vandps(vmm_dst, vSrs, op);
     } else {
-        if (vDst.getIdx() != vSrs.getIdx()) {
-            movups(vDst, vSrs);
+        if (vmm_dst.getIdx() != vSrs.getIdx()) {
+            movups(vmm_dst, vSrs);
         }
-        andps(vDst, op);
+        andps(vmm_dst, op);
     }
 }
 
-void JitKernelBase::uni_vandpd(const Xmm& vDst,
+void JitKernelBase::uni_vandpd(const Xmm& vmm_dst,
                                const Xmm& vSrs,
                                const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vandpd(vDst, vSrs, op);
+        vandpd(vmm_dst, vSrs, op);
     } else {
-        if (vDst.getIdx() != vSrs.getIdx()) {
-            movupd(vDst, vSrs);
+        if (vmm_dst.getIdx() != vSrs.getIdx()) {
+            movupd(vmm_dst, vSrs);
         }
-        andpd(vDst, op);
+        andpd(vmm_dst, op);
     }
 }
 
-void JitKernelBase::uni_vandnps(const Xmm& vDst,
+void JitKernelBase::uni_vandnps(const Xmm& vmm_dst,
                                 const Xmm& vSrs,
                                 const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vandnps(vDst, vSrs, op);
+        vandnps(vmm_dst, vSrs, op);
     } else {
-        if (!vDst.isEqualIfNotInherited(vSrs)) {
-            movups(vDst, vSrs);
+        if (!vmm_dst.isEqualIfNotInherited(vSrs)) {
+            movups(vmm_dst, vSrs);
         }
-        andnps(vDst, op);
+        andnps(vmm_dst, op);
     }
 }
 
-void JitKernelBase::uni_vorpd(const Xmm& vDst,
+void JitKernelBase::uni_vorpd(const Xmm& vmm_dst,
                               const Xmm& vSrs,
                               const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vorpd(vDst, vSrs, op);
+        vorpd(vmm_dst, vSrs, op);
     } else {
-        if (vDst.getIdx() != vSrs.getIdx()) {
-            movupd(vDst, vSrs);
+        if (vmm_dst.getIdx() != vSrs.getIdx()) {
+            movupd(vmm_dst, vSrs);
         }
-        orpd(vDst, op);
+        orpd(vmm_dst, op);
     }
 }
 
-void JitKernelBase::uni_vcmppd(const Xmm &vDst,
+void JitKernelBase::uni_vcmppd(const Xmm& vmm_dst,
                                const Xmm &vSrs,
                                const Operand &op,
                                const uint8_t imm) {
     if (isValidIsa(x64::avx)) {
-        vcmppd(vDst, vSrs, op, imm);
+        vcmppd(vmm_dst, vSrs, op, imm);
     } else {
-        if (vDst.getIdx() != vSrs.getIdx()) {
-            movupd(vDst, vSrs);
+        if (vmm_dst.getIdx() != vSrs.getIdx()) {
+            movupd(vmm_dst, vSrs);
         }
-        cmppd(vDst, op, imm);
+        cmppd(vmm_dst, op, imm);
     }
 }
 
-void JitKernelBase::uni_vmaxpd(const Xmm &vDst, const Operand &op1, const Operand &op2) {
+void JitKernelBase::uni_vmaxpd(const Xmm& vmm_dst, const Operand &op1, const Operand &op2) {
     if (isValidIsa(x64::avx)) {
-        vmaxpd(vDst, op1, op2);
+        vmaxpd(vmm_dst, op1, op2);
     } else {
-        if (vDst.getIdx() != op1.getIdx()) {
-            movupd(vDst, op1);
+        if (vmm_dst.getIdx() != op1.getIdx()) {
+            movupd(vmm_dst, op1);
         }
-        maxpd(vDst, op2);
+        maxpd(vmm_dst, op2);
     }
 }
 
-void JitKernelBase::uni_vminpd(const Xmm &vDst, const Operand &op1, const Operand &op2) {
+void JitKernelBase::uni_vminpd(const Xmm& vmm_dst, const Operand &op1, const Operand &op2) {
     if (isValidIsa(x64::avx)) {
-        vminpd(vDst, op1, op2);
+        vminpd(vmm_dst, op1, op2);
     } else {
-        if (vDst.getIdx() != op1.getIdx()) {
-            movupd(vDst, op1);
+        if (vmm_dst.getIdx() != op1.getIdx()) {
+            movupd(vmm_dst, op1);
         }
-        minpd(vDst, op2);
+        minpd(vmm_dst, op2);
     }
 }
 
-void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm &vDst, const Xbyak::Operand &op) {
-    if (isValidIsa(x64::avx)) {
-        vcvtpd2dq(vDst, op);
+void JitKernelBase::uni_vpmaxsq(const Xmm& vmm_dst, const Xmm& vmm_src, const Operand& op) {
+    if (get_isa() == x64::avx512_core) {
+        vpmaxsq(vmm_dst, vmm_src, op);
+    } else if (get_isa() == x64::avx2) {
+        if (vmm_dst.isYMM()) {
+            auto ymm_aux = RegistersPool::Reg<Ymm>(registersPool);
+
+            vpcmpgtq(ymm_aux, vmm_src, op);
+            vandpd(vmm_dst, vmm_src, ymm_aux);
+            vandnpd(ymm_aux, ymm_aux, op);
+            vorpd(vmm_dst, vmm_dst, ymm_aux);
+        } else {
+            auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
+
+            vpcmpgtq(xmm_aux, vmm_src, op);
+            vandpd(vmm_dst, vmm_src, xmm_aux);
+            vandnpd(xmm_aux, xmm_aux, op);
+            vorpd(vmm_dst, vmm_dst, xmm_aux);
+        }
     } else {
-        cvtpd2dq(vDst, op);
+        auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
+
+        movups(xmm_aux, vmm_src);
+        pcmpgtq(xmm_aux, op);
+        andpd(xmm_aux, vmm_src);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movups(vmm_dst, vmm_src);
+        }
+        pcmpgtq(vmm_dst, op);
+        andnpd(vmm_dst, op);
+        orpd(vmm_dst, xmm_aux);
     }
 }
 
-void JitKernelBase::uni_vcvtpd2ps(const Xbyak::Xmm &vDst, const Xbyak::Operand &op) {
-    if (isValidIsa(x64::avx)) {
-        vcvtpd2ps(vDst, op);
+void JitKernelBase::uni_vpminsq(const Xmm& vmm_dst, const Xmm& vmm_src, const Operand& op) {
+    if (get_isa() == x64::avx512_core) {
+        vpminsq(vmm_dst, vmm_src, op);
+    } else if (get_isa() == x64::avx2) {
+        if (vmm_dst.isYMM()) {
+            auto ymm_aux = RegistersPool::Reg<Ymm>(registersPool);
+
+            vpcmpgtq(ymm_aux, vmm_src, op);
+            vandpd(vmm_dst, vmm_src, ymm_aux);
+            vandnpd(ymm_aux, ymm_aux, op);
+            vorpd(vmm_dst, vmm_dst, ymm_aux);
+        } else {
+            auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
+
+            vpcmpgtq(xmm_aux, vmm_src, op);
+            vandpd(vmm_dst, vmm_src, xmm_aux);
+            vandnpd(xmm_aux, xmm_aux, op);
+            vorpd(vmm_dst, vmm_dst, xmm_aux);
+        }
     } else {
-        cvtpd2ps(vDst, op);
+        auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
+
+        movups(xmm_aux, vmm_src);
+        pcmpgtq(xmm_aux, op);
+        andpd(xmm_aux, vmm_src);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movups(vmm_dst, vmm_src);
+        }
+        pcmpgtq(vmm_dst, op);
+        andnpd(vmm_dst, op);
+        orpd(vmm_dst, xmm_aux);
     }
 }
 
-void JitKernelBase::gatherdd(const Xmm&    vDst,
+void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm &vmm_dst, const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vcvtpd2dq(vmm_dst, op);
+    } else {
+        cvtpd2dq(vmm_dst, op);
+    }
+}
+
+void JitKernelBase::uni_vcvtpd2ps(const Xbyak::Xmm &vmm_dst, const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx)) {
+        vcvtpd2ps(vmm_dst, op);
+    } else {
+        cvtpd2ps(vmm_dst, op);
+    }
+}
+
+void JitKernelBase::gatherdd(const Xmm&    vmm_dst,
                              const Reg64&  rSrcPtr,
                              const Xmm&    vSrcShift,
                              const Opmask& kReadMask,
@@ -314,28 +416,28 @@ void JitKernelBase::gatherdd(const Xmm&    vDst,
     if (!useMask)
         kxnord(kReadMask, kReadMask, kReadMask);
     if (zeroFill)
-        uni_vpxor(vDst, vDst, vDst);
+        uni_vpxor(vmm_dst, vmm_dst, vmm_dst);
 
-    vpgatherdd(vDst | kReadMask, ptr[rSrcPtr + vSrcShift]);
+    vpgatherdd(vmm_dst | kReadMask, ptr[rSrcPtr + vSrcShift]);
 }
 
-void JitKernelBase::gatherdd(const Xmm&   vDst,
+void JitKernelBase::gatherdd(const Xmm&   vmm_dst,
                              const Reg64& rSrcPtr,
                              const Xmm&   vSrcShift,
                              const Xmm&   vReadMask,
                              const bool useMask,
                              const bool zeroFill) {
-    if (vDst.getIdx() == vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
+    if (vmm_dst.getIdx() == vSrcShift.getIdx() || vmm_dst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
         IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
     }
     if (zeroFill)
-        pxor(vDst, vDst); // Don't use vpxor. It zeros the rest of the YMM register.
+        pxor(vmm_dst, vmm_dst); // Don't use vpxor. It zeros the rest of the YMM register.
 
     if (isValidIsa(x64::avx2)) {
         if (!useMask)
             uni_vpcmpeqd(vReadMask, vReadMask, vReadMask);
 
-        vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
+        vpgatherdd(vmm_dst, ptr[rSrcPtr + vSrcShift], vReadMask);
     } else {
         auto rAux = getReg64();
         Reg32 r32Aux = Reg32(rAux.getIdx());
@@ -349,7 +451,7 @@ void JitKernelBase::gatherdd(const Xmm&   vDst,
                 je(lLoopNext, T_NEAR);
             }
             uni_vpextrd(r32Aux, vSrcShift, i);
-            pinsrd(vDst, ptr[rSrcPtr + rAux], i);
+            pinsrd(vmm_dst, ptr[rSrcPtr + rAux], i);
 
             if (useMask)
                 L(lLoopNext);
@@ -357,30 +459,30 @@ void JitKernelBase::gatherdd(const Xmm&   vDst,
     }
 }
 
-void JitKernelBase::gatherdd(const Ymm&   vDst,
+void JitKernelBase::gatherdd(const Ymm&   vmm_dst,
                              const Reg64& rSrcPtr,
                              const Ymm&   vSrcShift,
                              const Ymm&   vReadMask,
                              const bool useMask,
                              const bool zeroFill) {
-    if (vDst.getIdx() == vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
+    if (vmm_dst.getIdx() == vSrcShift.getIdx() || vmm_dst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
         IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
     }
     if (isValidIsa(x64::avx2)) {
         if (!useMask)
             uni_vpcmpeqd(vReadMask, vReadMask, vReadMask);
         if (zeroFill)
-            uni_vpxor(vDst, vDst, vDst);
+            uni_vpxor(vmm_dst, vmm_dst, vmm_dst);
 
-        vpgatherdd(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
+        vpgatherdd(vmm_dst, ptr[rSrcPtr + vSrcShift], vReadMask);
     } else {
-        Xmm xmmDst      = Xmm(vDst.getIdx()),
+        Xmm xmmDst      = Xmm(vmm_dst.getIdx()),
                    xmmSrcShft  = Xmm(vSrcShift.getIdx()),
                    xmmReadMask = Xmm(vReadMask.getIdx());
         for (uint8_t i = 0; i < 2; i++) {
             gatherdd(xmmDst, rSrcPtr, xmmSrcShft, xmmReadMask, useMask, zeroFill);
 
-            vperm2f128(vDst, vDst, vDst, 0x1);
+            vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
             vperm2f128(vSrcShift, vSrcShift, vSrcShift, 0x1);
             if (useMask)
                 vperm2f128(vReadMask, vReadMask, vReadMask, 0x1);
@@ -388,23 +490,23 @@ void JitKernelBase::gatherdd(const Ymm&   vDst,
     }
 }
 
-// void JitKernelBase::gatherqq(const Xmm&   vDst,
+// void JitKernelBase::gatherqq(const Xmm&   vmm_dst,
 //                              const Reg64& rSrcPtr,
 //                              const Xmm&   vSrcShift,
 //                              const Xmm&   vReadMask,
 //                              const bool useMask,
 //                              const bool zeroFill) {
-//     if (vDst.getIdx() == vSrcShift.getIdx() || vDst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
+//     if (vmm_dst.getIdx() == vSrcShift.getIdx() || vmm_dst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
 //         IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
 //     }
 //     if (zeroFill)
-//         pxor(vDst, vDst); // Don't use vpxor. It zeros the rest of the YMM register.
+//         pxor(vmm_dst, vmm_dst); // Don't use vpxor. It zeros the rest of the YMM register.
 
 //     if (isValidIsa(x64::avx2)) {
 //         if (!useMask)
 //             uni_vpcmpeqq(vReadMask, vReadMask, vReadMask);
 
-//         vpgatherqq(vDst, ptr[rSrcPtr + vSrcShift], vReadMask);
+//         vpgatherqq(vmm_dst, ptr[rSrcPtr + vSrcShift], vReadMask);
 //     } else {
 //         auto rAux = getReg64();
 //         // Reg32 r32Aux = Reg32(rAux.getIdx());
@@ -418,7 +520,7 @@ void JitKernelBase::gatherdd(const Ymm&   vDst,
 //                 je(lLoopNext, T_NEAR);
 //             }
 //             uni_vpextrd(rAux, vSrcShift, i);
-//             pinsrd(vDst, ptr[rSrcPtr + rAux], i);
+//             pinsrd(vmm_dst, ptr[rSrcPtr + rAux], i);
 
 //             if (useMask)
 //                 L(lLoopNext);
@@ -536,7 +638,7 @@ void JitKernelBase::fillRestWorkMask(const Ymm& ymmDstMask,
     L(lEnd);
 }
 
-void JitKernelBase::load(const Xmm&     vDst,
+void JitKernelBase::load(const Xmm&     vmm_dst,
                          const Address& srcAddr,
                          const Reg64&   rLoadNum,
                          const size_t   typeSize,
@@ -547,7 +649,7 @@ void JitKernelBase::load(const Xmm&     vDst,
     const uint8_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
     Label lEnd;
     if (zeroFilling)
-        pxor(vDst, vDst);
+        pxor(vmm_dst, vmm_dst);
 
     for (uint8_t i = 0; i < elPerVec; i++) {
         cmp(rLoadNum, i);
@@ -555,18 +657,18 @@ void JitKernelBase::load(const Xmm&     vDst,
 
         const size_t offset = i * typeSize;
         if (typeSize == 1)
-            pinsrb(vDst, ptr[srcAddr.getRegExp() + offset], i);
+            pinsrb(vmm_dst, ptr[srcAddr.getRegExp() + offset], i);
         else if (typeSize == 2)
-            pinsrw(vDst, ptr[srcAddr.getRegExp() + offset], i);
+            pinsrw(vmm_dst, ptr[srcAddr.getRegExp() + offset], i);
         else if (typeSize == 4)
-            pinsrd(vDst, ptr[srcAddr.getRegExp() + offset], i);
+            pinsrd(vmm_dst, ptr[srcAddr.getRegExp() + offset], i);
         else if (typeSize == 8)
-            pinsrq(vDst, ptr[srcAddr.getRegExp() + offset], i);
+            pinsrq(vmm_dst, ptr[srcAddr.getRegExp() + offset], i);
     }
     L(lEnd);
 }
 
-void JitKernelBase::load(const Ymm&     vDst,
+void JitKernelBase::load(const Ymm&     vmm_dst,
                          const Address& srcAddr,
                          const Reg64&   rLoadNum,
                          const size_t   typeSize,
@@ -577,8 +679,8 @@ void JitKernelBase::load(const Ymm&     vDst,
     const size_t elPerXmm = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
     Label lEnd;
     if (zeroFilling)
-        uni_vpxor(vDst, vDst, vDst);
-    Xmm xmmDst(vDst.getIdx());
+        uni_vpxor(vmm_dst, vmm_dst, vmm_dst);
+    Xmm xmmDst(vmm_dst.getIdx());
 
     for (size_t i = 0lu; i < 2lu; i++) {
         Label lPerm;
@@ -601,7 +703,7 @@ void JitKernelBase::load(const Ymm&     vDst,
         }
 
         L(lPerm);
-        vperm2f128(vDst, vDst, vDst, 0x1);
+        vperm2f128(vmm_dst, vmm_dst, vmm_dst, 0x1);
     }
     L(lEnd);
 }
@@ -750,22 +852,22 @@ void JitKernelBase::memMovDD(const Reg64& rDst,
     L(lEnd);
 }
 
-void JitKernelBase::load_vector(const Xmm &vDst,
+void JitKernelBase::load_vector(const Xmm& vmm_dst,
                                const Address &srcAdr,
                                const ov::element::Type& dstPrc,
                                const ov::element::Type& srcPrc) {
-    Xmm xmmDst = Xmm(vDst.getIdx());
-    Ymm ymmDst = Ymm(vDst.getIdx());
+    Xmm xmmDst = Xmm(vmm_dst.getIdx());
+    Ymm ymmDst = Ymm(vmm_dst.getIdx());
 
     switch (srcPrc) {
         case ov::element::f64:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::i64, ov::element::i32, ov::element::f32)) {
                 if (dstPrc == ov::element::i64) {
-                    vcvtpd2qq(vDst, srcAdr);
+                    vcvtpd2qq(vmm_dst, srcAdr);
                 } else if (dstPrc == ov::element::i32) {
-                    uni_vcvtpd2dq(vDst.isZMM() ? ymmDst : vDst, srcAdr);
+                    uni_vcvtpd2dq(vmm_dst.isZMM() ? ymmDst : vmm_dst, srcAdr);
                 } else if (dstPrc == ov::element::f32) {
-                    uni_vcvtpd2ps(vDst.isZMM() ? ymmDst : vDst, srcAdr);
+                    uni_vcvtpd2ps(vmm_dst.isZMM() ? ymmDst : vmm_dst, srcAdr);
                 }
             } else if (!x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f32, ov::element::i32)) {
                 if (dstPrc == ov::element::f32) {
@@ -774,66 +876,66 @@ void JitKernelBase::load_vector(const Xmm &vDst,
                     uni_vcvtpd2dq(xmmDst, srcAdr);
                 }
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i64:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::f32)) {
                 if (dstPrc == ov::element::f64) {
-                    vcvtqq2pd(vDst, srcAdr);
+                    vcvtqq2pd(vmm_dst, srcAdr);
                 } else if (dstPrc == ov::element::f32) {
-                    vcvtqq2ps(vDst.isZMM() ? ymmDst : vDst, srcAdr);
+                    vcvtqq2ps(vmm_dst.isZMM() ? ymmDst : vmm_dst, srcAdr);
                 }
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::f32:
             if (dstPrc == ov::element::i32) {
-                uni_vcvtps2dq(vDst, srcAdr);
+                uni_vcvtps2dq(vmm_dst, srcAdr);
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i32:
             if (dstPrc == ov::element::f64) {
-                uni_vcvtdq2pd(vDst, srcAdr);
+                uni_vcvtdq2pd(vmm_dst, srcAdr);
             } else if (dstPrc == ov::element::f32) {
-                uni_vcvtdq2ps(vDst, srcAdr);
+                uni_vcvtdq2ps(vmm_dst, srcAdr);
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::bf16:
-            uni_vpmovzxwd(vDst, srcAdr);
-            uni_vpslld(vDst, vDst, 16);
+            uni_vpmovzxwd(vmm_dst, srcAdr);
+            uni_vpslld(vmm_dst, vmm_dst, 16);
             break;
         case ov::element::u16:
             if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovzxwd(vDst, srcAdr);
+                uni_vpmovzxwd(vmm_dst, srcAdr);
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i16:
             if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovsxwd(vDst, srcAdr);
+                uni_vpmovsxwd(vmm_dst, srcAdr);
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i8:
             if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovsxbd(vDst, srcAdr);
+                uni_vpmovsxbd(vmm_dst, srcAdr);
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         case ov::element::u8:
             if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovzxbd(vDst, srcAdr);
+                uni_vpmovzxbd(vmm_dst, srcAdr);
             } else {
-                uni_vmovups(vDst, srcAdr);
+                uni_vmovups(vmm_dst, srcAdr);
             }
             break;
         default:
@@ -846,13 +948,13 @@ void JitKernelBase::load_vector(const Xmm &vDst,
                 // Do conversion later.
             }
             if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::i16, ov::element::u16)) {
-                uni_vcvtdq2ps(vDst, vDst);
+                uni_vcvtdq2ps(vmm_dst, vmm_dst);
             }
             break;
         case ov::element::i32:
             if (x64::mayiuse(x64::avx512_core)) {
                 if (srcPrc == ov::element::i64) {
-                    vpmovsqd(vDst, vDst);
+                    vpmovsqd(vmm_dst, vmm_dst);
                 }
             } else {
                 if (srcPrc == ov::element::i64) {
@@ -860,7 +962,7 @@ void JitKernelBase::load_vector(const Xmm &vDst,
                 }
             }
             if (one_of(srcPrc, ov::element::bf16)) {
-                uni_vcvtps2dq(vDst, vDst);
+                uni_vcvtps2dq(vmm_dst, vmm_dst);
             }
             break;
         case ov::element::i64:
@@ -871,7 +973,7 @@ void JitKernelBase::load_vector(const Xmm &vDst,
     }
 }
 
-void JitKernelBase::load_scalar(const Xmm &vDst,
+void JitKernelBase::load_scalar(const Xmm& vmm_dst,
                                const Address &srcAdr,
                                const ov::element::Type& dstPrc,
                                const ov::element::Type& srcPrc) {
@@ -881,68 +983,68 @@ void JitKernelBase::load_scalar(const Xmm &vDst,
         case ov::element::f64:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::i64, ov::element::i32, ov::element::f32)) {
                 if (dstPrc == ov::element::i64) {
-                    vcvtpd2qq(vDst, src_adr_bcst);
+                    vcvtpd2qq(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::i32) {
-                    vcvtpd2dq(vDst, src_adr_bcst);
+                    vcvtpd2dq(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::f32) {
-                    vcvtpd2ps(vDst, src_adr_bcst);
+                    vcvtpd2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovsd(vDst, srcAdr);
+                uni_vmovsd(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i64:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::f32)) {
                 if (dstPrc == ov::element::f64) {
-                    vcvtqq2pd(vDst, src_adr_bcst);
+                    vcvtqq2pd(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::f32) {
-                    vcvtqq2ps(vDst, src_adr_bcst);
+                    vcvtqq2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovsd(vDst, srcAdr);
+                uni_vmovsd(vmm_dst, srcAdr);
             }
             break;
         case ov::element::f32:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::i32)) {
                 if (dstPrc == ov::element::f64) {
-                    vcvtps2pd(vDst, src_adr_bcst);
+                    vcvtps2pd(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::i32) {
-                    vcvtps2dq(vDst, src_adr_bcst);
+                    vcvtps2dq(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovss(vDst, srcAdr);
+                uni_vmovss(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i32:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f32, ov::element::f64)) {
                 if (dstPrc == ov::element::f32) {
-                    vcvtdq2ps(vDst, src_adr_bcst);
+                    vcvtdq2ps(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::f64) {
-                    vcvtdq2pd(vDst, src_adr_bcst);
+                    vcvtdq2pd(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovss(vDst, srcAdr);
+                uni_vmovss(vmm_dst, srcAdr);
             }
             break;
         case ov::element::bf16:
-            uni_vpinsrw(vDst, vDst, srcAdr, 0);
-            uni_vpslld(vDst, vDst, 16);
+            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpslld(vmm_dst, vmm_dst, 16);
             break;
         case ov::element::i16:
-            uni_vpinsrw(vDst, vDst, srcAdr, 0);
-            uni_vpmovsxwd(vDst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpmovsxwd(vmm_dst, srcAdr);
             break;
         case ov::element::u16:
-            uni_vpinsrw(vDst, vDst, srcAdr, 0);
-            uni_vpmovzxwd(vDst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpmovzxwd(vmm_dst, srcAdr);
             break;
         case ov::element::i8:
-            pinsrb(vDst, srcAdr, 0);
-            uni_vpmovsxbd(vDst, vDst);
+            pinsrb(vmm_dst, srcAdr, 0);
+            uni_vpmovsxbd(vmm_dst, vmm_dst);
             break;
         case ov::element::u8:
-            pinsrb(vDst, srcAdr, 0);
-            uni_vpmovzxbd(vDst, vDst);
+            pinsrb(vmm_dst, srcAdr, 0);
+            uni_vpmovzxbd(vmm_dst, vmm_dst);
             break;
         default:
             IE_THROW() << "Unsupported source precision: " << srcPrc;
@@ -952,15 +1054,15 @@ void JitKernelBase::load_scalar(const Xmm &vDst,
         case ov::element::f32:
             if (x64::mayiuse(x64::avx512_core)) {
                 if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16)) {
-                    uni_vcvtdq2ps(vDst, vDst);
+                    uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             } else {
                 if (srcPrc == ov::element::f64) {
-                    uni_vcvtpd2ps(vDst, vDst);
+                    uni_vcvtpd2ps(vmm_dst, vmm_dst);
                 } else if (srcPrc == ov::element::i64) {
                     // Do conversion later.
                 } else if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16, ov::element::i32)) {
-                    uni_vcvtdq2ps(vDst, vDst);
+                    uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             }
             break;
@@ -969,10 +1071,10 @@ void JitKernelBase::load_scalar(const Xmm &vDst,
                 if (srcPrc == ov::element::i64) {
                     // Do conversion later.
                 } else if (one_of(srcPrc, ov::element::f32, ov::element::bf16)) {
-                    uni_vcvtps2dq(vDst, vDst);
+                    uni_vcvtps2dq(vmm_dst, vmm_dst);
                 }
             } else if (srcPrc == ov::element::i64) {
-                vpmovsqd(vDst, vDst);
+                vpmovsqd(vmm_dst, vmm_dst);
             }
             break;
         case ov::element::i64:
@@ -983,7 +1085,7 @@ void JitKernelBase::load_scalar(const Xmm &vDst,
     }
 }
 
-void JitKernelBase::load_with_bcst(const Xmm &vDst,
+void JitKernelBase::load_with_bcst(const Xmm& vmm_dst,
                                    const Address &srcAdr,
                                    const ov::element::Type& dstPrc,
                                    const ov::element::Type& srcPrc) {
@@ -993,75 +1095,75 @@ void JitKernelBase::load_with_bcst(const Xmm &vDst,
         case ov::element::f64:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::i64, ov::element::i32, ov::element::f32)) {
                 if (dstPrc == ov::element::i64) {
-                    vcvtpd2qq(vDst, src_adr_bcst);
+                    vcvtpd2qq(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::i32) {
-                    vcvtpd2dq(vDst, src_adr_bcst);
+                    vcvtpd2dq(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::f32) {
-                    vcvtpd2ps(vDst, src_adr_bcst);
+                    vcvtpd2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastsd(vDst, srcAdr); // does not work with XMM, use vpbroadcastq instead
+                uni_vbroadcastsd(vmm_dst, srcAdr); // does not work with XMM, use vpbroadcastq instead
             }
             break;
         case ov::element::i64:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::f32)) {
                 if (dstPrc == ov::element::f64) {
-                    vcvtqq2pd(vDst, src_adr_bcst);
+                    vcvtqq2pd(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::f32) {
-                    vcvtqq2ps(vDst, src_adr_bcst);
+                    vcvtqq2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastsd(vDst, srcAdr);
+                uni_vbroadcastsd(vmm_dst, srcAdr);
             }
             break;
         case ov::element::f32:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::i32)) {
                 if (dstPrc == ov::element::f64) {
-                    vcvtps2pd(vDst, src_adr_bcst);
+                    vcvtps2pd(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::i32) {
-                    vcvtps2dq(vDst, src_adr_bcst);
+                    vcvtps2dq(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastss(vDst, srcAdr);
+                uni_vbroadcastss(vmm_dst, srcAdr);
             }
             break;
         case ov::element::i32:
             if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f32, ov::element::f64)) {
                 if (dstPrc == ov::element::f32) {
-                    vcvtdq2ps(vDst, src_adr_bcst);
+                    vcvtdq2ps(vmm_dst, src_adr_bcst);
                 } else if (dstPrc == ov::element::f64) {
-                    vcvtdq2pd(vDst, src_adr_bcst);
+                    vcvtdq2pd(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastss(vDst, srcAdr);
+                uni_vbroadcastss(vmm_dst, srcAdr);
             }
             break;
         case ov::element::bf16:
-            uni_vpinsrw(vDst, vDst, srcAdr, 0);
-            uni_vpslld(vDst, vDst, 16);
+            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpslld(vmm_dst, vmm_dst, 16);
             break;
         case ov::element::i16:
-            uni_vpinsrw(vDst, vDst, srcAdr, 0);
-            uni_vpmovsxwd(vDst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpmovsxwd(vmm_dst, srcAdr);
             break;
         case ov::element::u16:
-            uni_vpinsrw(vDst, vDst, srcAdr, 0);
-            uni_vpmovzxwd(vDst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpmovzxwd(vmm_dst, srcAdr);
             break;
         case ov::element::i8:
             if (dstPrc == ov::element::i32) {
-                pinsrb(vDst, srcAdr, 0);
-                uni_vpmovsxbd(vDst, vDst);
+                pinsrb(vmm_dst, srcAdr, 0);
+                uni_vpmovsxbd(vmm_dst, vmm_dst);
             } else {
-                vpbroadcastb(vDst, srcAdr);
+                vpbroadcastb(vmm_dst, srcAdr);
             }
             break;
         case ov::element::u8:
             if (dstPrc == ov::element::i32) {
-                pinsrb(vDst, srcAdr, 0);
-                uni_vpmovzxbd(vDst, vDst);
+                pinsrb(vmm_dst, srcAdr, 0);
+                uni_vpmovzxbd(vmm_dst, vmm_dst);
             } else {
-                vpbroadcastb(vDst, srcAdr);
+                vpbroadcastb(vmm_dst, srcAdr);
             }
             break;
         default:
@@ -1072,15 +1174,15 @@ void JitKernelBase::load_with_bcst(const Xmm &vDst,
         case ov::element::f32:
             if (x64::mayiuse(x64::avx512_core)) {
                 if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16)) {
-                    uni_vcvtdq2ps(vDst, vDst);
+                    uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             } else {
                 if (srcPrc == ov::element::f64) {
-                    uni_vcvtpd2ps(vDst, vDst);
+                    uni_vcvtpd2ps(vmm_dst, vmm_dst);
                 } else if (srcPrc == ov::element::i64) {
                     // Do conversion later.
                 } else if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16, ov::element::i32)) {
-                    uni_vcvtdq2ps(vDst, vDst);
+                    uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             }
             break;
@@ -1089,10 +1191,10 @@ void JitKernelBase::load_with_bcst(const Xmm &vDst,
                 if (srcPrc == ov::element::i64) {
                     // Do conversion later.
                 } else if (one_of(srcPrc, ov::element::f32, ov::element::bf16)) {
-                    uni_vcvtps2dq(vDst, vDst);
+                    uni_vcvtps2dq(vmm_dst, vmm_dst);
                 }
             } else if (srcPrc == ov::element::i64) {
-                vpmovsqd(vDst, vDst);
+                vpmovsqd(vmm_dst, vmm_dst);
             }
             break;
         case ov::element::i64:

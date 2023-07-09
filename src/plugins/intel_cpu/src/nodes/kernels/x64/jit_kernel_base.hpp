@@ -21,54 +21,60 @@ class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 public:
     JitKernelBase(const char* name, dnnl::impl::cpu::x64::cpu_isa_t max_cpu_isa);
 
-    void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
+    void uni_vfmsub132ps(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vfnmadd132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
+    void uni_vfnmadd132ps(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vfmsub231ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
+    void uni_vfmsub231ps(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vpaddd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op) {
-        jit_generator::uni_vpaddd(vDst, vSrc, op);
+    void uni_vpaddd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op) {
+        jit_generator::uni_vpaddd(vmm_dst, vmm_src, op);
     }
 
-    void uni_vpaddd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
+    void uni_vpaddd(const Xbyak::Ymm& vmm_dst, const Xbyak::Ymm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vaddpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+    void uni_vaddpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
 
-    void uni_vpsubd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op) {
-        jit_generator::uni_vpsubd(vDst, vSrc, op);
+    void uni_vpsubd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op) {
+        jit_generator::uni_vpsubd(vmm_dst, vmm_src, op);
     }
 
-    void uni_vpsubd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
+    void uni_vpsubd(const Xbyak::Ymm& vmm_dst, const Xbyak::Ymm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vmulpd(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+    void uni_vmulpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
-    void uni_vdivps(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+    void uni_vpmullq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vdivpd(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+    void uni_vdivps(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
-    void uni_vsqrtpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op);
+    void uni_vdivpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
-    void uni_vandps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+    void uni_vsqrtpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op);
 
-    void uni_vandpd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+    void uni_vandps(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op);
 
-    void uni_vandnps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+    void uni_vandpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op);
 
-    void uni_vorpd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
+    void uni_vandnps(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op);
 
-    void uni_vcmppd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op, const uint8_t imm);
+    void uni_vorpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op);
 
-    void uni_vmaxpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+    void uni_vcmppd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op, const uint8_t imm);
 
-    void uni_vminpd(const Xbyak::Xmm &vDst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+    void uni_vmaxpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+
+    void uni_vminpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
+
+    void uni_vpmaxsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
+
+    void uni_vpminsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
         kmovd(kDst, kSrc);
     }
 
-    void uni_kmovd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc) {
-        uni_vmovups(vDst, vSrc);
+    void uni_kmovd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src) {
+        uni_vmovups(vmm_dst, vmm_src);
     }
 
     void uni_kandd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc1, const Xbyak::Opmask& kSrc2) {
@@ -79,16 +85,16 @@ public:
         uni_vandps(kDst, kSrc1, kSrc2);
     }
 
-    void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op);
+    void uni_vpbroadcastd(const Xbyak::Xmm &vmm_dst, const Xbyak::Operand &op);
 
-    void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op);
+    void uni_vpbroadcastd(const Xbyak::Ymm &vmm_dst, const Xbyak::Operand &op);
 
-    void uni_vcvtpd2dq(const Xbyak::Xmm &vDst, const Xbyak::Operand &op);
+    void uni_vcvtpd2dq(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op);
 
-    void uni_vcvtpd2ps(const Xbyak::Xmm &vDst, const Xbyak::Operand &op);
+    void uni_vcvtpd2ps(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op);
 
     void gatherdd(
-            const Xbyak::Xmm&    vDst,
+            const Xbyak::Xmm&    vmm_dst,
             const Xbyak::Reg64&  rSrcPtr,
             const Xbyak::Xmm&    vSrcShift,
             const Xbyak::Opmask& kReadMask,
@@ -96,7 +102,7 @@ public:
             const bool zeroFill  = false);
 
     void gatherdd(
-            const Xbyak::Xmm&   vDst,
+            const Xbyak::Xmm&   vmm_dst,
             const Xbyak::Reg64& rSrcPtr,
             const Xbyak::Xmm&   vSrcShift,
             const Xbyak::Xmm&   vReadMask,
@@ -104,7 +110,7 @@ public:
             const bool zeroFill = false);
 
     void gatherdd(
-            const Xbyak::Ymm&   vDst,
+            const Xbyak::Ymm&   vmm_dst,
             const Xbyak::Reg64& rSrcPtr,
             const Xbyak::Ymm&   vSrcShift,
             const Xbyak::Ymm&   vReadMask,
@@ -126,28 +132,28 @@ public:
             const uint64_t typeSize = 4);
 
     void load(
-            const Xbyak::Xmm&     vDst,
-            const Xbyak::Address& srcAddr,
+            const Xbyak::Xmm&     vmm_dst,
+            const Xbyak::Address& adr_src,
             const Xbyak::Reg64&   rLoadNum,
             const size_t          typeSize,
             const bool zeroFill = false);
 
     void load(
-            const Xbyak::Ymm&     vDst,
-            const Xbyak::Address& srcAddr,
+            const Xbyak::Ymm&     vmm_dst,
+            const Xbyak::Address& adr_src,
             const Xbyak::Reg64&   rLoadNum,
             const size_t          typeSize,
             const bool zeroFill = false);
 
     void store(
             const Xbyak::Address& dstAddr,
-            const Xbyak::Xmm&     vSrc,
+            const Xbyak::Xmm&     vmm_src,
             const Xbyak::Reg64&   rToStoreNum,
             const size_t          typeSize);
 
     void store(
             const Xbyak::Address& dstAddr,
-            const Xbyak::Ymm&     vSrc,
+            const Xbyak::Ymm&     vmm_src,
             const Xbyak::Reg64&   rToStoreNum,
             const size_t          typeSize);
 
@@ -172,32 +178,32 @@ public:
             const bool zeroFill = false);
 
     void load_vector(
-            const Xbyak::Xmm &vDst,
+            const Xbyak::Xmm& vmm_dst,
             const Xbyak::Address &srcAdr,
             const ov::element::Type& dstPrc,
             const ov::element::Type& srcPrc);
 
     void load_scalar(
-            const Xbyak::Xmm &vDst,
+            const Xbyak::Xmm& vmm_dst,
             const Xbyak::Address &srcAdr,
             const ov::element::Type& dstPrc,
             const ov::element::Type& srcPrc);
 
     void load_with_bcst(
-            const Xbyak::Xmm &vDst,
+            const Xbyak::Xmm& vmm_dst,
             const Xbyak::Address &srcAdr,
             const ov::element::Type& dstPrc,
             const ov::element::Type& srcPrc);
 
     void store_vector(
             const Xbyak::Address &dstAdr,
-            const Xbyak::Xmm &vSrc,
+            const Xbyak::Xmm& vmm_src,
             const ov::element::Type& dstPrc,
             const ov::element::Type& srcPrc);
 
     void store_scalar(
             const Xbyak::Address &dstAdr,
-            const Xbyak::Xmm &vSrc,
+            const Xbyak::Xmm& vmm_src,
             const ov::element::Type& dstPrc,
             const ov::element::Type& srcPrc);
 

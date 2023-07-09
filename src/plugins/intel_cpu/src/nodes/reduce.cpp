@@ -151,7 +151,7 @@ Reduce::Reduce(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
     initializers.at(op->get_type_info())(op, *this);
 
     if (const auto reduction = std::dynamic_pointer_cast<op::util::ReductionBase>(op)) {
-        keepDims = reduction->get_keep_dims();
+        keep_dims = reduction->get_keep_dims();
     }
     const auto idxIn = ov::as_type_ptr<op::v0::Constant>(op->get_input_node_shared_ptr(REDUCE_INDEXES));
     if (idxIn->get_element_type() == ov::element::i32) {
@@ -194,7 +194,7 @@ void Reduce::getSupportedDescriptors() {
         THROW_CPU_NODE_ERR << " gets incorrect index vector dimension! Index vector should be 1 dimension.";
     }
 
-    if (keepDims) {
+    if (keep_dims) {
         if (getInputShapeAtPort(REDUCE_DATA).getRank() != getOutputShapeAtPort(0).getRank())
             THROW_CPU_NODE_ERR << " gets incorrect number of input/output dimensions!";
     } else {
@@ -209,37 +209,37 @@ void Reduce::getSupportedDescriptors() {
 void Reduce::initSupportedPrimitiveDescriptors() {
     const auto &inputPrc0 = getOriginalInputPrecisionAtPort(REDUCE_DATA);
     auto inputPrc1 = getOriginalInputPrecisionAtPort(REDUCE_INDEXES);
-    outputPrc = getOriginalOutputPrecisionAtPort(0);
+    output_prec = getOriginalOutputPrecisionAtPort(0);
 
     if (!one_of(inputPrc1, Precision::I32, Precision::I64)) {
         inputPrc1 = Precision::I32;
     }
 
     if (!fusedWith.empty()) {
-        outputPrc = fusedWith[fusedWith.size() - 1]->getOriginalOutputPrecisionAtPort(0);
+        output_prec = fusedWith[fusedWith.size() - 1]->getOriginalOutputPrecisionAtPort(0);
     }
 
-    jit_mode = canApplyJIT(inputPrc0, outputPrc);
+    jit_mode = canApplyJIT(inputPrc0, output_prec);
 
     if (jit_mode) {
         // Since in jit mode we use the output memory as an intermediate accumulator for certain reduce modes, we can't use BF16 output precision due to
         // the possible accuracy loss. Therefore, for such mods, we will change the output precision to FP32.
-        if (Precision::BF16 == outputPrc) {
+        if (Precision::BF16 == output_prec) {
             if (!x64::mayiuse(x64::avx512_core)) {
-                    outputPrc = Precision::FP32;
+                    output_prec = Precision::FP32;
             } else if (algorithm != Algorithm::ReduceAnd && algorithm != Algorithm::ReduceOr &&
                        algorithm != Algorithm::ReduceMin && algorithm != Algorithm::ReduceMax) {
-                            outputPrc = Precision::FP32;
+                            output_prec = Precision::FP32;
             }
         }
     }
 
-    precision_change = inputPrc0 != outputPrc;
+    precision_change = inputPrc0 != output_prec;
     support_split = algorithm != Algorithm::ReduceL2 && algorithm != Algorithm::ReduceLogSumExp &&
                     algorithm != Algorithm::ReduceSumSquare;
 
     srcDataSize = inputPrc0.size();
-    dstDataSize = outputPrc.size();
+    dstDataSize = output_prec.size();
 
     NodeConfig config;
     config.inConfs.resize(2);
@@ -304,30 +304,30 @@ void Reduce::initSupportedPrimitiveDescriptors() {
             impl_type = impl_desc_type::jit_avx2;
         }
 
-        pushDesc(LayoutType::ncsp, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+        pushDesc(LayoutType::ncsp, LayoutType::ncsp, inputPrc0, inputPrc1, output_prec, impl_type);
         if ((getInputShapeAtPort(REDUCE_DATA).getRank() == 4 || getInputShapeAtPort(REDUCE_DATA).getRank() == 5) &&
                 getInputShapeAtPort(REDUCE_DATA).getMinDims()[1] > 1) {
-            if (keepDims) {
-                pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, outputPrc, impl_type);
+            if (keep_dims) {
+                pushDesc(LayoutType::nspc, LayoutType::nspc, inputPrc0, inputPrc1, output_prec, impl_type);
                 if (x64::mayiuse(x64::avx512_core)) {
                     if (srcDataSize <= 4) {
-                        pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, outputPrc, impl_type);
+                        pushDesc(LayoutType::nCsp16c, LayoutType::nCsp16c, inputPrc0, inputPrc1, output_prec, impl_type);
                     } else if (srcDataSize == 8) {
-                        pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
+                        pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, output_prec, impl_type);
                     }
                 } else if (srcDataSize <= 4) {
-                    pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    pushDesc(LayoutType::nCsp8c, LayoutType::nCsp8c, inputPrc0, inputPrc1, output_prec, impl_type);
                 }
             } else {
-                pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                pushDesc(LayoutType::nspc, LayoutType::ncsp, inputPrc0, inputPrc1, output_prec, impl_type);
                 if (x64::mayiuse(x64::avx512_core)) {
                     if (srcDataSize <= 4) {
-                        pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                        pushDesc(LayoutType::nCsp16c, LayoutType::ncsp, inputPrc0, inputPrc1, output_prec, impl_type);
                     } else if (srcDataSize == 8) {
-                        pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                        pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, output_prec, impl_type);
                     }
                 } else if (srcDataSize <= 4) {
-                    pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, outputPrc, impl_type);
+                    pushDesc(LayoutType::nCsp8c, LayoutType::ncsp, inputPrc0, inputPrc1, output_prec, impl_type);
                 }
             }
         }
@@ -356,7 +356,7 @@ void Reduce::prepareParams() {
         return;
     }
 
-    srcDims = getParentEdgesAtPort(REDUCE_DATA)[0]->getMemory().getDesc().getShape().getDims();
+    src_dims = getParentEdgesAtPort(REDUCE_DATA)[0]->getMemory().getDesc().getShape().getDims();
     std::vector<int64_t> reduceAxes;
     if (jit_mode && jit_beyond_5D) {
         reduceAxes = update_src_dims();
@@ -367,9 +367,9 @@ void Reduce::prepareParams() {
     auto &dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
     const SizeVector &dst_dims = dstMemPtr->getDesc().getShape().getDims();
     dst_size = dstMemPtr->GetSize();
-    calcProcessDstDims(reduceAxes, dst_dims);
+    calc_process_dst_dims(reduceAxes, dst_dims);
     if (jit_mode) {
-        setReduceDimFlags();
+        set_reduce_dim_flags();
     }
 
     auto builder = [&](const ReduceKey& key) -> std::shared_ptr<JitReduceKernelBase<JitReducePostCallArgs>> {
@@ -443,7 +443,7 @@ void Reduce::createPrimitive() {
 
     // hybrid layout: nspc/blocked layout for input and ncsp for output
     // !keepDims is needed to avoid hybrid layout for cases eg. (A, B, C, D) reduce to (A, 1, 1, 1)
-    if (!keepDims && (layout == ReduceLayoutType::reduce_nspc || layout == ReduceLayoutType::reduce_blocked)) {
+    if (!keep_dims && (layout == ReduceLayoutType::reduce_nspc || layout == ReduceLayoutType::reduce_blocked)) {
         is_hybrid_layout = dstMemPtr->getDesc().hasLayoutType(LayoutType::ncsp);
     }
 
@@ -660,8 +660,8 @@ void Reduce::executeDynamicImpl(dnnl::stream strm) {
 }
 
 void Reduce::reduce_type(const uint8_t *in_ptr, uint8_t *out_ptr, size_t dst_size) {
-    initDstData(out_ptr, dst_size);
-    reduceStride = IW;
+    init_dst_data(out_ptr, dst_size);
+    reduce_stride = IW;
 
     if (layout == ReduceLayoutType::reduce_ncsp || layout == ReduceLayoutType::reduce_nspc) {
         reduce_PLN(in_ptr, out_ptr);
@@ -688,7 +688,7 @@ void Reduce::reduce_type(const uint8_t *in_ptr, uint8_t *out_ptr, size_t dst_siz
 void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
     if (ReduceN && !ReduceC && !ReduceD && !ReduceH && !ReduceW) {
         size_t IA = IC * ID * IH * IW;
-        reduceStride = IA;
+        reduce_stride = IA;
         // parallel_for(IA / blockLen, [&](size_t iba){
         //     size_t oba = iba;
         //     reduce_kernel_process(in_ptr + iba * blockLen * srcDataSize, out_ptr + oba * blockLen * dstDataSize,
@@ -776,9 +776,9 @@ void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
                     // reduce parallelly in HW dimensions
                     // step1: ReduceC && ReduceD && !ReduceH && !ReduceW
                     uint8_t *prc_ptr_n = &vec_reduceCDW_prc[0];
-                    initDstData(prc_ptr_n, prc_size);
+                    init_dst_data(prc_ptr_n, prc_size);
                     size_t IS = IH * IW;
-                    reduceStride = IS;
+                    reduce_stride = IS;
                     parallel_for(IS / blockLen, [&](size_t ibs){
                         size_t pbs = ibs;
                         reduce_kernel_process(in_ptr_n + ibs * blockLen * srcDataSize, prc_ptr_n + pbs * blockLen * prcDataSize,
@@ -845,7 +845,7 @@ void Reduce::reduce_PLN(const uint8_t *in_ptr, uint8_t *out_ptr) {
                         // reduce parallelly in D dimension
                         // step1: !ReduceD && ReduceH && !ReduceW
                         uint8_t *prc_ptr_n = &vec_reduceDH_prc[0];
-                        initDstData(prc_ptr_n, prc_size);
+                        init_dst_data(prc_ptr_n, prc_size);
                         for (size_t id = 0; id < ID; id++) {
                         for (size_t iwb = 0; iwb < IWB; iwb++) {
                         // parallel_for2d(ID, IWB, [&](size_t id, size_t iwb){
@@ -858,7 +858,7 @@ std::cout << "dst shift: " << (pd * PW + pwb * blockLen) * prcDataSize << "; blo
                         }
                         }
                         // step2: ReduceD
-                        reduceStride = PW;
+                        reduce_stride = PW;
                         reduce_kernel_reassign();
                         for (size_t iwb = 0; iwb < IWB; iwb++) {
                         // parallel_for(IWB, [&](size_t iwb){
@@ -870,7 +870,7 @@ std::cout << "dst shift: " << (pd * PW + pwb * blockLen) * prcDataSize << "; blo
                         reduce_kernel_restore();
                     }
                     // reduce tail
-                    reduceStride = IW;
+                    reduce_stride = IW;
                     size_t tail_start = IWB * blockLen;
                     for (size_t i_tail = 0; i_tail < IW - tail_start; i_tail++) {
                     // parallel_for(IW - tail_start, [&](size_t i_tail) {
@@ -905,7 +905,7 @@ std::cout << "dst shift: " << (pd * PW + pwb * blockLen) * prcDataSize << "; blo
                                       IW - tail_start, 0, IC * ID * IH);
             } else if (ReduceC && !ReduceD && !ReduceH && !ReduceW) {
                 size_t IS = ID * IH * IW;
-                reduceStride = IS;
+                reduce_stride = IS;
                 // parallel_for(IS / blockLen, [&](size_t ibs){
                 for (size_t ibs = 0; ibs < IS / blockLen; ibs++) {
                     size_t obs = ibs;
@@ -938,7 +938,7 @@ std::cout << "dst shift: " << (pd * PW + pwb * blockLen) * prcDataSize << "; blo
         }
     }
 
-    reduceKernelPostProcess(out_ptr);
+    reduce_kernel_post_process(out_ptr);
 }
 
 void Reduce::reduce_BLK(const uint8_t *in_ptr, uint8_t *out_ptr) {
@@ -960,7 +960,7 @@ void Reduce::reduce_BLK(const uint8_t *in_ptr, uint8_t *out_ptr) {
                 // step1: !ReduceC && ReduceD && ReduceH && ReduceW
                 size_t prc_size = ICB * blockLen * dstDataSize;
                 std::vector<uint8_t> vec_prc(prc_size);
-                initDstData(vec_prc.data(), prc_size);
+                init_dst_data(vec_prc.data(), prc_size);
                 uint8_t *out_ptr_n_cp = out_ptr_n;
                 out_ptr_n = vec_prc.data();
                 parallel_for(ICB, [&](size_t icb) {
@@ -984,7 +984,7 @@ void Reduce::reduce_BLK(const uint8_t *in_ptr, uint8_t *out_ptr) {
                 }
             }
         } else if (ReduceC && !ReduceD && !ReduceH && !ReduceW) {
-            reduceStride = ID * IH * IW * blockLen;
+            reduce_stride = ID * IH * IW * blockLen;
             parallel_for3d(ID, IH, IW, [&](size_t id, size_t ih, size_t iw) {
                 size_t icb = 0, ocb = 0; GET_PTR_NC_BLK;
                 size_t od = id; GET_PTR_NCD_BLK;
@@ -1009,7 +1009,7 @@ void Reduce::reduce_BLK(const uint8_t *in_ptr, uint8_t *out_ptr) {
         }
     }
 
-    reduceKernelPostProcess(out_ptr);
+    reduce_kernel_post_process(out_ptr);
 }
 
 void Reduce::reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr) {
@@ -1099,12 +1099,12 @@ void Reduce::reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr)
         }
     }
 
-    reduceKernelPostProcess(out_ptr);
+    reduce_kernel_post_process(out_ptr);
 }
 
 inline void Reduce::reduce_kernel_process(const uint8_t *inPtr, uint8_t *outPtr, size_t workAmount,
                                         size_t reduceW, size_t workBatch, const int *tabIdx) {
-// printf("reduce_kernel_process workAmount: %ld; reduceW: %ld; workBatch: %ld; reduceStride: %ld\n", workAmount, reduceW, workBatch, reduceStride);
+// printf("reduce_kernel_process workAmount: %ld; reduceW: %ld; workBatch: %ld; reduce_stride: %ld\n", workAmount, reduceW, workBatch, reduce_stride);
 // auto iIn = reinterpret_cast<const float *>(inPtr);
 // std::cout << "IN:  ";
 // for (int i = 0; i < workAmount; i++) {
@@ -1121,7 +1121,7 @@ inline void Reduce::reduce_kernel_process(const uint8_t *inPtr, uint8_t *outPtr,
     arg.work_amount = workAmount;
     arg.work_batch = workBatch;
     arg.reduce_w = reduceW;
-    arg.reduce_stride = reduceStride;
+    arg.reduce_stride = reduce_stride;
 
     (*reduceKernel)(&arg);
 
@@ -1134,8 +1134,8 @@ inline void Reduce::reduce_kernel_process(const uint8_t *inPtr, uint8_t *outPtr,
 // std::cout << std::endl;
 }
 
-inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
-// printf("reduceKernelPostProcess workAmount+\n");
+inline void Reduce::reduce_kernel_post_process(uint8_t *out_ptr) {
+printf("reduce_kernel_post_process workAmount layout: %d\n", int(layout));
     if (layout == ReduceLayoutType::reduce_ncsp) {
 //        const auto channelSize = layout == ReduceLayoutType::reduce_nspc ? OW : OC; // OW is related to nspc-ncsp dimension reinterpret
         const auto workAmount = OD * OH * OW;
@@ -1151,7 +1151,7 @@ inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
             arg.divisor = postKerDivisor;
             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
 
-// std::cout << "reduceKernelPostProcess oc_off: " << arg.oc_off << "; channel_size: " << arg.channel_size << "; work_amount: " <<
+// std::cout << "reduce_kernel_post_process oc_off: " << arg.oc_off << "; channel_size: " << arg.channel_size << "; work_amount: " <<
 // arg.work_amount << "; divisor: " << *(float*)arg.divisor << "; postOpsDataPtrs.size: " << postOpsDataPtrs.size() << std::endl;
 
 //  auto inQuant = reinterpret_cast<const float *>(postOpsDataPtrs[0]);
@@ -1168,7 +1168,7 @@ inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
 //  }
 //  std::cout << std::endl;
             (*reducePostKernel)(&arg);
-// std::cout << "reduceKernelPostProcess oc-: " << oc << std::endl;
+// std::cout << "reduce_kernel_post_process oc-: " << oc << std::endl;
 // auto iOut = reinterpret_cast<const float *>(out_p);
 // std::cout << "OUT: ";
 // for (int i = 0; i < arg.work_amount; i++) {
@@ -1226,7 +1226,7 @@ inline void Reduce::reduceKernelPostProcess(uint8_t *out_ptr) {
         }
         // });
     }
-// printf("reduceKernelPostProcess workAmount-\n");
+// printf("reduce_kernel_post_process workAmount-\n");
 }
 
 inline void Reduce::reduce_kernel_reassign() {
@@ -1372,7 +1372,7 @@ void Reduce::blocked2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
     }
 }
 
-inline void Reduce::initDstData(uint8_t *out_ptr, size_t dst_size) {
+inline void Reduce::init_dst_data(uint8_t *out_ptr, size_t dst_size) {
     switch (algorithm) {
         case Algorithm::ReduceL1:
         case Algorithm::ReduceL2:
@@ -1386,73 +1386,73 @@ inline void Reduce::initDstData(uint8_t *out_ptr, size_t dst_size) {
             break;
         case Algorithm::ReduceAnd:
         case Algorithm::ReduceProd:
-            if (outputPrc == Precision::FP64) {
+            if (output_prec == Precision::FP64) {
                 auto out_p = reinterpret_cast<double *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<int64_t>(1); });
-            } else if (outputPrc == Precision::FP32) {
-                auto out_p = reinterpret_cast<float *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<float>(1); });
-            } else if (outputPrc == Precision::I32) {
-                auto out_p = reinterpret_cast<int32_t *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<int32_t>(1); });
-            } else if (outputPrc == Precision::I64) {
+            } else if (output_prec == Precision::I64) {
                 auto out_p = reinterpret_cast<int64_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<int64_t>(1); });
-            } else if (outputPrc == Precision::BF16) {
+            } else if (output_prec == Precision::FP32) {
+                auto out_p = reinterpret_cast<float *>(out_ptr);
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<float>(1); });
+            } else if (output_prec == Precision::I32) {
+                auto out_p = reinterpret_cast<int32_t *>(out_ptr);
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<int32_t>(1); });
+            } else if (output_prec == Precision::BF16) {
                 auto out_p = reinterpret_cast<bfloat16_t*>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<bfloat16_t>(1); });
-            } else if (outputPrc == Precision::U8) {
+            } else if (output_prec == Precision::U8) {
                 auto out_p = reinterpret_cast<uint8_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<uint8_t>(1); });
-            } else if (outputPrc == Precision::I8) {
+            } else if (output_prec == Precision::I8) {
                 auto out_p = reinterpret_cast<int8_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = static_cast<int8_t>(1); });
             }
             break;
         case Algorithm::ReduceMax:
-            if (outputPrc == Precision::FP64) {
+            if (output_prec == Precision::FP64) {
                 auto out_p = reinterpret_cast<double *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<double>::lowest(); });
-            } else if (outputPrc == Precision::FP32) {
-                auto out_p = reinterpret_cast<float *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::lowest(); });
-            } else if (outputPrc == Precision::I32) {
-                auto out_p = reinterpret_cast<int32_t *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int32_t>::min(); });
-            } else if (outputPrc == Precision::I64) {
+            } else if (output_prec == Precision::I64) {
                 auto out_p = reinterpret_cast<int64_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int64_t>::min(); });
-            } else if (outputPrc == Precision::BF16) {
+            } else if (output_prec == Precision::FP32) {
+                auto out_p = reinterpret_cast<float *>(out_ptr);
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::lowest(); });
+            } else if (output_prec == Precision::I32) {
+                auto out_p = reinterpret_cast<int32_t *>(out_ptr);
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int32_t>::min(); });
+            } else if (output_prec == Precision::BF16) {
                 auto out_p = reinterpret_cast<bfloat16_t*>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<bfloat16_t>::lowest(); });
-            } else if (outputPrc == Precision::U8) {
+            } else if (output_prec == Precision::U8) {
                 auto out_p = reinterpret_cast<uint8_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<uint8_t>::min(); });
-            } else if (outputPrc == Precision::I8) {
+            } else if (output_prec == Precision::I8) {
                 auto out_p = reinterpret_cast<int8_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int8_t>::min(); });
             }
             break;
         case Algorithm::ReduceMin:
-            if (outputPrc == Precision::FP64) {
+            if (output_prec == Precision::FP64) {
                 auto out_p = reinterpret_cast<double *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<double>::max(); });
-            } else if (outputPrc == Precision::FP32) {
-                auto out_p = reinterpret_cast<float *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::max(); });
-            } else if (outputPrc == Precision::I32) {
-                auto out_p = reinterpret_cast<int32_t *>(out_ptr);
-                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int32_t>::max(); });
-            } else if (outputPrc == Precision::I64) {
+            } else if (output_prec == Precision::I64) {
                 auto out_p = reinterpret_cast<int64_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int64_t>::max(); });
-            } else if (outputPrc == Precision::BF16) {
+            } else if (output_prec == Precision::FP32) {
+                auto out_p = reinterpret_cast<float *>(out_ptr);
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<float>::max(); });
+            } else if (output_prec == Precision::I32) {
+                auto out_p = reinterpret_cast<int32_t *>(out_ptr);
+                parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int32_t>::max(); });
+            } else if (output_prec == Precision::BF16) {
                 auto out_p = reinterpret_cast<bfloat16_t*>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<bfloat16_t>::max(); });
-            } else if (outputPrc == Precision::U8) {
+            } else if (output_prec == Precision::U8) {
                 auto out_p = reinterpret_cast<uint8_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<uint8_t>::max(); });
-            } else if (outputPrc == Precision::I8) {
+            } else if (output_prec == Precision::I8) {
                 auto out_p = reinterpret_cast<int8_t *>(out_ptr);
                 parallel_for(dst_size / dstDataSize, [&](size_t i) { out_p[i] = std::numeric_limits<int8_t>::max(); });
             }
@@ -1469,7 +1469,7 @@ inline void Reduce::create_hybrid_working_memory() {
                     : (rank == 4 ? (x64::mayiuse(x64::avx512_core) ? dnnl::memory::format_tag::nChw16c : dnnl::memory::format_tag::nChw8c)
                                  : (x64::mayiuse(x64::avx512_core) ? dnnl::memory::format_tag::nCdhw16c : dnnl::memory::format_tag::nCdhw8c));
     auto prc_dims = rank == 4 ? std::vector<size_t>{OB, OC, OH, OW} : std::vector<size_t>{OB, OC, OD, OH, OW};
-    auto desc = dnnl::memory::desc(DnnlExtensionUtils::convertToDnnlDims(prc_dims), DnnlExtensionUtils::IEPrecisionToDataType(outputPrc), format);
+    auto desc = dnnl::memory::desc(DnnlExtensionUtils::convertToDnnlDims(prc_dims), DnnlExtensionUtils::IEPrecisionToDataType(output_prec), format);
     prc_mem = dnnl::memory(desc, getEngine());
     dst_size = desc.get_size();
 }
@@ -1503,19 +1503,19 @@ std::cout << "ReduceCDW_opt dstDataSize: " << dstDataSize <<std::endl;
     }
 }
 
-inline void Reduce::calcProcessDstDims(std::vector<int64_t> &reduce_axes, const SizeVector &dst_dims) {
+inline void Reduce::calc_process_dst_dims(std::vector<int64_t> &reduce_axes, const SizeVector &dst_dims) {
     std::set<size_t> axes;
     SizeVector out_dims;
     process_dst_dims.clear();
     axes_for_reduction.clear();
     for (auto &axis : reduce_axes) {
         if (axis < 0)
-            axis += srcDims.size();
-        if (static_cast<size_t>(axis) > srcDims.size())
+            axis += src_dims.size();
+        if (static_cast<size_t>(axis) > src_dims.size())
             THROW_CPU_NODE_ERR << " exceeds data tensor dimension on index to reduce";
         axes.insert(static_cast<size_t>(axis));
     }
-    for (size_t i = 0; i < srcDims.size(); i++) {
+    for (size_t i = 0; i < src_dims.size(); i++) {
         bool found = false;
         for (auto axis : axes) {
             if (i == axis) {
@@ -1524,12 +1524,12 @@ inline void Reduce::calcProcessDstDims(std::vector<int64_t> &reduce_axes, const 
             }
         }
         if (found) {
-            if (keepDims) out_dims.push_back(1);
+            if (keep_dims) out_dims.push_back(1);
             process_dst_dims.push_back(1);
             axes_for_reduction.push_back(i);
         } else {
-            out_dims.push_back(srcDims[i]);
-            process_dst_dims.push_back(srcDims[i]);
+            out_dims.push_back(src_dims[i]);
+            process_dst_dims.push_back(src_dims[i]);
         }
     }
     if (jit_mode && jit_beyond_5D) {
@@ -1544,22 +1544,22 @@ inline void Reduce::calcProcessDstDims(std::vector<int64_t> &reduce_axes, const 
     }
 }
 
-inline void Reduce::setReduceDimFlags() {
-    size_t dims_size = srcDims.size();
+inline void Reduce::set_reduce_dim_flags() {
+    size_t dims_size = src_dims.size();
     if (dims_size == 5) {
-        SET_SRC_DIM_VALUE(srcDims[0], srcDims[1], srcDims[2], srcDims[3], srcDims[4]);
+        SET_SRC_DIM_VALUE(src_dims[0], src_dims[1], src_dims[2], src_dims[3], src_dims[4]);
         SET_DST_DIM_VALUE(process_dst_dims[0], process_dst_dims[1], process_dst_dims[2], process_dst_dims[3], process_dst_dims[4]);
     } else if (dims_size == 4) {
-        SET_SRC_DIM_VALUE(srcDims[0], srcDims[1], 1, srcDims[2], srcDims[3]);
+        SET_SRC_DIM_VALUE(src_dims[0], src_dims[1], 1, src_dims[2], src_dims[3]);
         SET_DST_DIM_VALUE(process_dst_dims[0], process_dst_dims[1], 1, process_dst_dims[2], process_dst_dims[3]);
     } else if (dims_size == 3) {
-        SET_SRC_DIM_VALUE(1, srcDims[0], 1, srcDims[1], srcDims[2]);
+        SET_SRC_DIM_VALUE(1, src_dims[0], 1, src_dims[1], src_dims[2]);
         SET_DST_DIM_VALUE(1, process_dst_dims[0], 1, process_dst_dims[1], process_dst_dims[2]);
     } else if (dims_size == 2) {
-        SET_SRC_DIM_VALUE(1, 1, 1, srcDims[0], srcDims[1]);
+        SET_SRC_DIM_VALUE(1, 1, 1, src_dims[0], src_dims[1]);
         SET_DST_DIM_VALUE(1, 1, 1, process_dst_dims[0], process_dst_dims[1]);
     } else {
-        SET_SRC_DIM_VALUE(1, srcDims[0], 1, 1, 1);
+        SET_SRC_DIM_VALUE(1, src_dims[0], 1, 1, 1);
         SET_DST_DIM_VALUE(1, process_dst_dims[0], 1, 1, 1);
     }
 
@@ -1651,11 +1651,12 @@ inline void Reduce::reduce_ref(const float *in_ptr, float *out_ptr) {
 }
 
 void Reduce::reduce_ref_process(const float *in_ptr, float *out_ptr, float init_value, std::function<float(float, float)> func) {
+std::cout << "CPU REFERENCE" << std::endl;
     size_t work_amount_dst = 1, reduced_dims_work_amount = 1;
     for (size_t i = 0; i < process_dst_dims.size(); i++)
         work_amount_dst *= process_dst_dims[i];
-    for (size_t i = 0; i < srcDims.size(); i++)
-        reduced_dims_work_amount *= srcDims[i];
+    for (size_t i = 0; i < src_dims.size(); i++)
+        reduced_dims_work_amount *= src_dims[i];
     reduced_dims_work_amount /= work_amount_dst;
 
     SizeVector src_strides = getParentEdgeAt(REDUCE_DATA)->getMemory().GetDescWithType<BlockedMemoryDesc>()->getStrides();
@@ -1675,14 +1676,14 @@ void Reduce::reduce_ref_process(const float *in_ptr, float *out_ptr, float init_
             for (i = 0; i < reduced_dims_work_amount; ++i) {
                 if (update_idx) {
                     src_idx = 0;
-                    for (j = 0; j < static_cast<int>(srcDims.size()); ++j)
-                        src_idx += (src_counters[j] % srcDims[j]) * src_strides[j];
+                    for (j = 0; j < static_cast<int>(src_dims.size()); ++j)
+                        src_idx += (src_counters[j] % src_dims[j]) * src_strides[j];
                     update_idx = false;
                 }
                 reduce_prod = func(reduce_prod, in_ptr[src_idx]);
                 for (j = axes_for_reduction.size() - 1; j >= 0; j--) {
                     src_counters[axes_for_reduction[j]]++;
-                    if (src_counters[axes_for_reduction[j]] < srcDims[axes_for_reduction[j]]) {
+                    if (src_counters[axes_for_reduction[j]] < src_dims[axes_for_reduction[j]]) {
                         src_idx += src_strides[axes_for_reduction[j]];
                         break;
                     } else {
@@ -1791,28 +1792,28 @@ std::vector<int64_t> Reduce::update_src_dims() {
     size_t inner_dim = 1;
     int outer_end = reduce_axes[0];
     int inner_start = reduce_axes[reduce_axes.size() - 1];
-    for (size_t i = 0; i < srcDims.size(); i++) {
+    for (size_t i = 0; i < src_dims.size(); i++) {
         if (static_cast<int>(i) < outer_end) {
-            outer_dim *= srcDims[i];
+            outer_dim *= src_dims[i];
         } else if (static_cast<int>(i) > inner_start) {
-            inner_dim *= srcDims[i];
+            inner_dim *= src_dims[i];
         } else {
-            axis_dim *= srcDims[i];
+            axis_dim *= src_dims[i];
         }
     }
 
     reduce_axes.clear();
     reduce_axes.push_back(1);
 
-    srcDims.clear();
-    srcDims.push_back(outer_dim);
-    srcDims.push_back(axis_dim);
-    srcDims.push_back(inner_dim);
+    src_dims.clear();
+    src_dims.push_back(outer_dim);
+    src_dims.push_back(axis_dim);
+    src_dims.push_back(inner_dim);
 
     return reduce_axes;
 }
 
-bool Reduce::canApplyJIT(const Precision &inputPrc, const Precision &outputPrc) const {
+bool Reduce::canApplyJIT(const Precision &input_prec, const Precision &output_prec) const {
     static const Precision supportedPrecisions[] = {
             Precision::FP64,
             Precision::I64,
@@ -1824,13 +1825,13 @@ bool Reduce::canApplyJIT(const Precision &inputPrc, const Precision &outputPrc) 
     };
 
     return (x64::mayiuse(x64::sse41)) && (getInputShapeAtPort(REDUCE_DATA).getRank() <= 5 || jit_beyond_5D) &&
-           std::find(std::begin(supportedPrecisions), std::end(supportedPrecisions), inputPrc) != std::end(supportedPrecisions) &&
-           std::find(std::begin(supportedPrecisions), std::end(supportedPrecisions), outputPrc) != std::end(supportedPrecisions);
+           std::find(std::begin(supportedPrecisions), std::end(supportedPrecisions), input_prec) != std::end(supportedPrecisions) &&
+           std::find(std::begin(supportedPrecisions), std::end(supportedPrecisions), output_prec) != std::end(supportedPrecisions);
 }
 
 int Reduce::getFusingAxis() const {
     int channelAxis = 1;
-    if (!keepDims) {
+    if (!keep_dims) {
         for (auto &raw_axis : rawAxes) {
             int axis = raw_axis >= 0 ? raw_axis : raw_axis + static_cast<int>(getInputShapeAtPort(REDUCE_DATA).getRank());
             if (axis == 1) {
@@ -1846,15 +1847,15 @@ int Reduce::getFusingAxis() const {
 }
 
 bool Reduce::canFuse(const NodePtr& node) const {
-    const auto inputPrc = getOriginalInputPrecisionAtPort(REDUCE_DATA);
-    const auto outputPrc = getOriginalOutputPrecisionAtPort(0);
-    if (!canApplyJIT(inputPrc, outputPrc) || jit_beyond_5D || algorithm == Algorithm::ReduceAnd || algorithm == Algorithm::ReduceOr) {
+    const auto input_prec = getOriginalInputPrecisionAtPort(REDUCE_DATA);
+    const auto output_prec = getOriginalOutputPrecisionAtPort(0);
+    if (!canApplyJIT(input_prec, output_prec) || jit_beyond_5D || algorithm == Algorithm::ReduceAnd || algorithm == Algorithm::ReduceOr) {
         return false;
     }
 
     // In jit mode we use the output memory as an intermediate accumulator for certain reduce modes.
     // If the post ops node has a lower precision for such modes, post ops fusing won't be supposted, in order to avoid accuracy loss.
-    if (outputPrc == Precision::FP32 &&
+    if (output_prec == Precision::FP32 &&
             !node->getOriginalOutputPrecisions().empty() && node->getOriginalOutputPrecisionAtPort(0) != Precision::FP32) {
         if (!one_of(algorithm, Algorithm::ReduceAnd, Algorithm::ReduceOr, Algorithm::ReduceMin, Algorithm::ReduceMax)) {
             return false;

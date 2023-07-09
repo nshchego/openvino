@@ -171,7 +171,7 @@ protected:
             const auto& funcInput = funcInputs[i];
             ov::Tensor tensor;
             if (reductionType == ngraph::helpers::ReductionType::Prod) {
-                tensor = ov::test::utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i], 10, 1);
+                tensor = utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i], 10, 1);
                 if (netPrecision == ElementType::f32) {
                     auto *rawBlobDataPtr = static_cast<float *>(tensor.data());
                     for (size_t i = 0; i < tensor.get_size(); ++i) {
@@ -189,7 +189,7 @@ protected:
                 //     }
                 }
             } else {
-                tensor = ov::test::utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i]);
+                tensor = utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i]);
             }
 
             inputs.insert({funcInput.get_node_shared_ptr(), tensor});
@@ -302,32 +302,32 @@ const std::vector<ngraph::helpers::ReductionType> reductionLogicalTypes = {
         ngraph::helpers::ReductionType::LogicalAnd
 };
 
-std::vector<std::vector<ov::test::InputShape>> inputShapes = {
+std::vector<std::vector<InputShape>> inputShapes = {
     {{{}, {{2, 19, 2, 9}}}},
     {{{{1, 5}, 19, {1, 5}, {1, 10}}, {{2, 19, 2, 2}, {2, 19, 2, 9}}}},
 };
 
-std::vector<std::vector<ov::test::InputShape>> inputShapes_5D = {
+std::vector<std::vector<InputShape>> inputShapes_5D = {
     {{{}, {{2, 19, 2, 2, 9}}}},
     {{{{1, 5}, 19, {1, 5}, {1, 5}, {1, 5}}, {{2, 19, 2, 2, 2}, {2, 19, 3, 2, 2}}}},
 };
 
-std::vector<std::vector<ov::test::InputShape>> inputShapes_6D = {
+std::vector<std::vector<InputShape>> inputShapes_6D = {
     {{{}, {{2, 19, 2, 2, 2, 2}}}},
     {{{{1, 5}, 19, {1, 5}, {1, 5}, {1, 5}, {1, 5}}, {{2, 19, 2, 2, 2, 2}, {2, 19, 2, 2, 3, 2}}}},
 };
 
-std::vector<std::vector<ov::test::InputShape>> inputShapes_Int32 = {
+std::vector<std::vector<InputShape>> inputShapes_Int32 = {
     {{{}, {{2, 19, 2, 3}}}},
     {{{{1, 5}, 19, {1, 5}, {1, 10}}, {{2, 19, 2, 2}, {2, 19, 2, 3}}}},
 };
 
-std::vector<std::vector<ov::test::InputShape>> inputShapes_SmallChannel = {
+std::vector<std::vector<InputShape>> inputShapes_SmallChannel = {
     {{{}, {{2, 3, 2, 9}}}},
     {{{{1, 5}, 3, {1, 5}, {1, 10}}, {{2, 3, 2, 2}, {2, 3, 2, 9}}}},
 };
 
-std::vector<std::vector<ov::test::InputShape>> inputShapes_SingleBatch = {
+std::vector<std::vector<InputShape>> inputShapes_SingleBatch = {
     {{{}, {{1, 19, 2, 9}}}},
     {{{{1, 5}, 19, {1, 5}, {1, 10}}, {{1, 19, 2, 2}, {1, 19, 2, 9}}}},
 };
@@ -580,7 +580,7 @@ const auto params_Int32 = testing::Combine(
                 testing::Values(ElementType::undefined),
                 testing::Values(ElementType::undefined),
                 testing::ValuesIn(inputShapes_Int32),
-                testing::Values(additional_config_i64)),
+                testing::Values(additional_config)),
         testing::Values(emptyCPUSpec),
         testing::Values(emptyFusingSpec));
 

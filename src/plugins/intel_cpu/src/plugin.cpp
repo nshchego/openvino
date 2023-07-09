@@ -433,13 +433,12 @@ static Config::SnippetsMode getSnippetsMode(const std::map<std::string, std::str
 }
 
 static void setI64Mode(const std::map<std::string, std::string>& modelConfig, Config& engineConfig) {
+    engineConfig.enableNativeI64 = false;
     const auto i64prop = modelConfig.find(InferenceEngine::PluginConfigInternalParams::KEY_CPU_NATIVE_I64);
     if (i64prop != modelConfig.end()) {
         if (i64prop->second == PluginConfigParams::YES) {
             engineConfig.enableNativeI64 = true;
-        } else if (i64prop->second == PluginConfigParams::NO) {
-            engineConfig.enableNativeI64 = false;
-        } else {
+        } else if (i64prop->second != PluginConfigParams::NO) {
             IE_THROW() << "Wrong value for property key " << PluginConfigInternalParams::KEY_CPU_NATIVE_I64 << ": " << i64prop->second
                                 << ". Expected only YES or NO values.";
         }

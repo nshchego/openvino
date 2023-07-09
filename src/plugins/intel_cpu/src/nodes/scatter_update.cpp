@@ -11,8 +11,6 @@
 #include <algorithm>
 #include "common/cpu_memcpy.h"
 
-//#include <ngraph/opsets/opset3.hpp>
-
 using namespace dnnl;
 using namespace InferenceEngine;
 

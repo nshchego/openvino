@@ -290,8 +290,8 @@ void jit_multiply_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, cons
             if (isa == x64::avx512_core) {
                 h->vpmullq(vmm_dst, vmm_src0, vmm_src1);
             } else {
-                Vmm vmm_aux0 = Vmm(aux_vec_idxs[0]);
-                Vmm vmm_aux1 = Vmm(aux_vec_idxs[1]);
+                auto vmm_aux0 = Vmm(aux_vec_idxs[0]);
+                auto vmm_aux1 = Vmm(aux_vec_idxs[1]);
                 // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
                 // vmm_src0 -> ab; vmm_src1 -> cd;
                 h->uni_vpsrlq(vmm_aux0, vmm_src0, 32);
@@ -687,36 +687,54 @@ void jit_maximum_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, cons
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_maximum_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
 template <x64::cpu_isa_t isa>
 void jit_maximum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const {
     using Vmm = typename conditional3<isa == x64::sse41, Xmm, isa == x64::avx2, Ymm, Zmm>::type;
-    Vmm vmm_src0 = Vmm(in_vec_idxs[0]);
-    Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
-    Vmm vmm_dst = Vmm(out_vec_idxs[0]);
+    auto vmm_src0 = Vmm(in_vec_idxs[0]);
+    auto vmm_src1 = Vmm(in_vec_idxs[1]);
+    auto vmm_dst = Vmm(out_vec_idxs[0]);
 
-    auto uni_vmax = [this](Vmm vmm_dst, Vmm vmm_src0, Vmm vmm_src1) {
-        switch (exec_prc_) {
-            case Precision::FP32: h->uni_vmaxps(vmm_dst, vmm_src0, vmm_src1); break;
-            case Precision::I32:  h->uni_vpmaxsd(vmm_dst, vmm_src0, vmm_src1); break;
-            default: assert(!"unsupported precision");
-        }
-    };
+    switch (exec_prc_) {
+        case Precision::FP32: h->uni_vmaxps(vmm_dst, vmm_src0, vmm_src1); break;
+        case Precision::I32:  h->uni_vpmaxsd(vmm_dst, vmm_src0, vmm_src1); break;
+        case Precision::I64: {
+            if (isa == x64::avx512_core) {
+                h->vpmaxsq(vmm_dst, vmm_src0, vmm_src1);
+            } else if (isa == x64::avx2) {
+                auto vmm_aux = Vmm(aux_vec_idxs[0]);
 
-    if (isa == x64::sse41) {
-        if (vmm_src0.getIdx() != vmm_dst.getIdx())
-            h->uni_vmovups(vmm_dst, vmm_src0);
-        uni_vmax(vmm_dst, vmm_dst, vmm_src1);
-    } else {
-        uni_vmax(vmm_dst, vmm_src0, vmm_src1);
+                h->vpcmpgtq(vmm_aux, vmm_src0, vmm_src1);
+                h->vandpd(vmm_dst, vmm_src0, vmm_aux);
+                h->vandnpd(vmm_aux, vmm_aux, vmm_src1);
+                h->vorpd(vmm_dst, vmm_dst, vmm_aux);
+            } else {
+                auto vmm_aux = Vmm(aux_vec_idxs[0]);
+
+                h->movups(vmm_aux, vmm_src0);
+                h->pcmpgtq(vmm_aux, vmm_src1);
+                h->andpd(vmm_aux, vmm_src0);
+                if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+                    h->movups(vmm_dst, vmm_src0);
+                }
+                h->pcmpgtq(vmm_dst, vmm_src1);
+                h->andnpd(vmm_dst, vmm_src1);
+                h->orpd(vmm_dst, vmm_aux);
+            }
+        } break;
+        default: IE_THROW() << "jit_maximum_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
 std::set<std::vector<element::Type>> jit_maximum_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    return {{element::f32, element::f32}, {element::i32, element::i32}};
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+}
+
+size_t jit_maximum_emitter::aux_vecs_count() const {
+    return (host_isa_ != x64::avx512_core && exec_prc_ == Precision::I64) ? 1 : 0;
 }
 
 /// MINIMUM ///
@@ -735,7 +753,7 @@ void jit_minimum_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, cons
     } else if (host_isa_ == x64::avx512_core) {
         emit_isa<x64::avx512_core>(in_vec_idxs, out_vec_idxs);
     } else {
-        assert(!"unsupported isa");
+        IE_THROW() << "jit_minimum_emitter doesn't support ISA '" << host_isa_ << "'";
     }
 }
 
@@ -746,25 +764,43 @@ void jit_minimum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
     Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
-    auto uni_vmin = [this](Vmm vmm_dst, Vmm vmm_src0, Vmm vmm_src1) {
-        switch (exec_prc_) {
-            case Precision::FP32: h->uni_vminps(vmm_dst, vmm_src0, vmm_src1); break;
-            case Precision::I32:  h->uni_vpminsd(vmm_dst, vmm_src0, vmm_src1); break;
-            default: assert(!"unsupported precision");
-        }
-    };
+    switch (exec_prc_) {
+        case Precision::FP32: h->uni_vminps(vmm_dst, vmm_src0, vmm_src1); break;
+        case Precision::I32:  h->uni_vpminsd(vmm_dst, vmm_src0, vmm_src1); break;
+        case Precision::I64: {
+            if (isa == x64::avx512_core) {
+                h->vpminsq(vmm_dst, vmm_src0, vmm_src1);
+            } else if (isa == x64::avx2) {
+                auto vmm_aux = Vmm(aux_vec_idxs[0]);
 
-    if (isa == x64::sse41) {
-        if (vmm_src0.getIdx() != vmm_dst.getIdx())
-            h->uni_vmovups(vmm_dst, vmm_src0);
-        uni_vmin(vmm_dst, vmm_dst, vmm_src1);
-    } else {
-        uni_vmin(vmm_dst, vmm_src0, vmm_src1);
+                h->vpcmpgtq(vmm_aux, vmm_src0, vmm_src1);
+                h->vandpd(vmm_dst, vmm_src1, vmm_aux);
+                h->vandnpd(vmm_aux, vmm_aux, vmm_src0);
+                h->vorpd(vmm_dst, vmm_dst, vmm_aux);
+            } else {
+                auto vmm_aux = Vmm(aux_vec_idxs[0]);
+
+                h->movups(vmm_aux, vmm_src0);
+                h->pcmpgtq(vmm_aux, vmm_src1);
+                h->andpd(vmm_aux, vmm_src1);
+                if (vmm_dst.getIdx() != vmm_src0.getIdx()) {
+                    h->movups(vmm_dst, vmm_src0);
+                }
+                h->pcmpgtq(vmm_dst, vmm_src1);
+                h->andnpd(vmm_dst, vmm_src0);
+                h->orpd(vmm_dst, vmm_aux);
+            }
+        } break;
+        default: IE_THROW() << "jit_minimum_emitter doesn't support precision '" << exec_prc_ << "'";
     }
 }
 
 std::set<std::vector<element::Type>> jit_minimum_emitter::get_supported_precisions(const std::shared_ptr<ov::Node>& node) {
-    return {{element::f32, element::f32}, {element::i32, element::i32}};
+    return {{element::f32, element::f32}, {element::i32, element::i32}, {element::i64, element::i64}};
+}
+
+size_t jit_minimum_emitter::aux_vecs_count() const {
+    return (host_isa_ != x64::avx512_core && exec_prc_ == Precision::I64) ? 1 : 0;
 }
 
 /// SQUARED_DIFFERENCE ///

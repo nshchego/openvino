@@ -75,8 +75,6 @@ protected:
     element::Type exec_el_type;
 
     RegistersPool::Reg<Xbyak::Reg64> reg_dst;
-
-    std::shared_ptr<jit_multiply_emitter> jit_multiply_i64;
 };
 
 

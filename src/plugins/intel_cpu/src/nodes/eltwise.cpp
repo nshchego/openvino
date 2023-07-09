@@ -1721,6 +1721,7 @@ std::cout << "OUT_PRC: " << outPrc << std::endl;
     }
 
     void exec(const jit_eltwise_call_args_ptrs &args_ptrs, const VectorDims &dims_out) override {
+std::cout << "JIT EXEC" << std::endl;
         if (!_pKernel)
             IE_THROW() << "Can't execute, kernel for eltwise node is not compiled";
 
@@ -1856,6 +1857,7 @@ public:
     }
 
     void exec(const jit_eltwise_call_args_ptrs &args_ptrs, const VectorDims &dims_out) override {
+std::cout << "REFERENCE" << std::endl;
         if (_opData.algo == Algorithm::EltwiseLog) {
             const float* src_ptr_f = reinterpret_cast<const float*>(args_ptrs.src_ptr[0]);
             float* dst_ptr_f = reinterpret_cast<float*>(args_ptrs.dst_ptr);

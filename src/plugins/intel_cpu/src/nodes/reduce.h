@@ -40,14 +40,14 @@ private:
     void reduce_BLK_concern_padding(const uint8_t *in_ptr, uint8_t *out_ptr);
     inline void reduce_kernel_process(const uint8_t *in_p, uint8_t *out_p, size_t work_amount,
                                     size_t reduce_w = 2, size_t work_batch = 1, const int *tab_idx = NULL);
-    inline void reduceKernelPostProcess(uint8_t *out_ptr);
+    inline void reduce_kernel_post_process(uint8_t *out_ptr);
     inline void reduce_kernel_reassign();
     inline void reduce_kernel_restore();
-    inline void initDstData(uint8_t *out_ptr, size_t dst_size);
+    inline void init_dst_data(uint8_t *out_ptr, size_t dst_size);
     inline void create_hybrid_working_memory();
     inline void create_opt_working_memory();
-    inline void calcProcessDstDims(std::vector<int64_t> &reduce_axes, const InferenceEngine::SizeVector &dst_dim);
-    inline void setReduceDimFlags();
+    inline void calc_process_dst_dims(std::vector<int64_t> &reduce_axes, const InferenceEngine::SizeVector &dst_dim);
+    inline void set_reduce_dim_flags();
     inline void reduce_ref(const float *in_ptr, float *out_ptr);
     void reduce_ref_process(const float *in_ptr, float *out_ptr, float init_value, std::function<float(float, float)> func);
     void create_reduce_kernel(std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> &kernel, const kernel::JitReduceConfigParams &jcp);
@@ -66,7 +66,7 @@ private:
     static constexpr size_t REDUCE_INDEXES = 1;
     bool jit_beyond_5D = false;
     bool jit_mode = true;
-    bool keepDims = true;
+    bool keep_dims = true;
     bool is_hybrid_layout = false;
     bool compile_post_kernel = true;
     bool support_split = false;
@@ -81,10 +81,10 @@ private:
     size_t OB, OC, OD, OH, OW;
     size_t PD, PH, PW;
     size_t srcDataSize, dstDataSize, prcDataSize;
-    size_t reduceStride;
+    size_t reduce_stride;
     kernel::ReduceLayoutType layout;
-    InferenceEngine::Precision inputPrc, outputPrc;
-    InferenceEngine::SizeVector srcDims;
+    InferenceEngine::Precision input_prec, output_prec;
+    InferenceEngine::SizeVector src_dims;
     InferenceEngine::SizeVector process_dst_dims;
     InferenceEngine::SizeVector axes_for_reduction;
     std::vector<int64_t> rawAxes;
