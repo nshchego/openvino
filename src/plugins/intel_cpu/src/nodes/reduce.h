@@ -80,7 +80,7 @@ private:
     size_t IB, IC, ID, IH, IW;
     size_t OB, OC, OD, OH, OW;
     size_t PD, PH, PW;
-    size_t srcDataSize, dstDataSize, prcDataSize;
+    size_t src_data_size, dst_data_size, prc_data_size;
     size_t reduce_stride;
     kernel::ReduceLayoutType layout;
     InferenceEngine::Precision input_prec, output_prec;

@@ -455,19 +455,19 @@ const auto params_MultiAxis_4D = testing::Combine(
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D)),
         testing::Values(emptyFusingSpec));
 
-// const auto params_MultiAxis_4D_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axesND),
-//                 testing::Values(CommonTestUtils::OpType::VECTOR),
-//                 testing::Values(true),
-//                 testing::ValuesIn(reductionTypes),
-//                 testing::Values(ElementType::i64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes),
-//                 testing::Values(additional_config_i64)),
-//         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D_I64, ElementType::i64)),
-//         testing::Values(emptyFusingSpec));
+ const auto params_MultiAxis_4D_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axesND),
+                 testing::Values(CommonTestUtils::OpType::VECTOR),
+                 testing::Values(true),
+                 testing::ValuesIn(reductionTypes),
+                 testing::Values(ElementType::i64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes),
+                 testing::Values(additional_config_i64)),
+         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D_I64, ElementType::i64)),
+         testing::Values(emptyFusingSpec));
 
 const auto params_MultiAxis_5D = testing::Combine(
         testing::Combine(
@@ -485,19 +485,19 @@ const auto params_MultiAxis_5D = testing::Combine(
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 
-// const auto params_MultiAxis_5D_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axes5D),
-//                 testing::Values(CommonTestUtils::OpType::VECTOR),
-//                 testing::Values(true),
-//                 testing::ValuesIn(reductionTypes),
-//                 testing::Values(ElementType::i64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes_5D),
-//                 testing::Values(additional_config_i64)),
-//         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D_I64, ElementType::i64)),
-//         testing::Values(emptyFusingSpec));
+ const auto params_MultiAxis_5D_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axes5D),
+                 testing::Values(CommonTestUtils::OpType::VECTOR),
+                 testing::Values(true),
+                 testing::ValuesIn(reductionTypes),
+                 testing::Values(ElementType::i64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes_5D),
+                 testing::Values(additional_config_i64)),
+         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D_I64, ElementType::i64)),
+         testing::Values(emptyFusingSpec));
 
 const auto params_MultiAxis_4D_Hybrid = testing::Combine(
         testing::Combine(
@@ -513,19 +513,19 @@ const auto params_MultiAxis_4D_Hybrid = testing::Combine(
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_4D)),
         testing::Values(emptyFusingSpec));
 
-// const auto params_MultiAxis_4D_Hybrid_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axesND),
-//                 testing::Values(CommonTestUtils::OpType::VECTOR),
-//                 testing::Values(false),
-//                 testing::ValuesIn(reductionTypes),
-//                 testing::Values(ElementType::i64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes),
-//                 testing::Values(additional_config_i64)),
-//         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_4D_I64, ElementType::i64)),
-//         testing::Values(emptyFusingSpec));
+ const auto params_MultiAxis_4D_Hybrid_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axesND),
+                 testing::Values(CommonTestUtils::OpType::VECTOR),
+                 testing::Values(false),
+                 testing::ValuesIn(reductionTypes),
+                 testing::Values(ElementType::i64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes),
+                 testing::Values(additional_config_i64)),
+         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_4D_I64, ElementType::i64)),
+         testing::Values(emptyFusingSpec));
 
 const auto params_MultiAxis_5D_Hybrid = testing::Combine(
         testing::Combine(
@@ -542,19 +542,19 @@ const auto params_MultiAxis_5D_Hybrid = testing::Combine(
         testing::Values(emptyFusingSpec));
 #endif
 
-// const auto params_MultiAxis_5D_Hybrid_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axes5D),
-//                 testing::Values(CommonTestUtils::OpType::VECTOR),
-//                 testing::Values(false),
-//                 testing::ValuesIn(reductionTypes),
-//                 testing::Values(ElementType::i64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes_5D),
-//                 testing::Values(additional_config_i64)),
-//         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_5D_I64, ElementType::i64)),
-//         testing::Values(emptyFusingSpec));
+ const auto params_MultiAxis_5D_Hybrid_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axes5D),
+                 testing::Values(CommonTestUtils::OpType::VECTOR),
+                 testing::Values(false),
+                 testing::ValuesIn(reductionTypes),
+                 testing::Values(ElementType::i64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes_5D),
+                 testing::Values(additional_config_i64)),
+         testing::ValuesIn(filterCPUSpecificParams(cpuParams_HybridLayout_5D_I64, ElementType::i64)),
+         testing::Values(emptyFusingSpec));
 
 const auto params_MultiAxis_6D = testing::Combine(
         testing::Combine(
@@ -633,12 +633,12 @@ INSTANTIATE_TEST_SUITE_P(
         ReduceCPULayerTest::getTestCaseName
 );
 
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_MultiAxis_4D_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_MultiAxis_4D_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+ INSTANTIATE_TEST_SUITE_P(
+         smoke_Reduce_MultiAxis_4D_CPU_I64,
+         ReduceCPULayerTest,
+         params_MultiAxis_4D_I64,
+         ReduceCPULayerTest::getTestCaseName
+ );
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_5D_CPU,
@@ -648,12 +648,12 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_MultiAxis_5D_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_MultiAxis_5D_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_MultiAxis_5D_CPU_I64,
+        ReduceCPULayerTest,
+        params_MultiAxis_5D_I64,
+        ReduceCPULayerTest::getTestCaseName
+);
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_4D_Hybrid_CPU,
@@ -662,12 +662,12 @@ INSTANTIATE_TEST_SUITE_P(
         ReduceCPULayerTest::getTestCaseName
 );
 
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_MultiAxis_4D_Hybrid_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_MultiAxis_4D_Hybrid_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_MultiAxis_4D_Hybrid_CPU_I64,
+        ReduceCPULayerTest,
+        params_MultiAxis_4D_Hybrid_I64,
+        ReduceCPULayerTest::getTestCaseName
+);
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_5D_Hybrid_CPU,
@@ -677,12 +677,12 @@ INSTANTIATE_TEST_SUITE_P(
 );
 #endif
 
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_MultiAxis_5D_Hybrid_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_MultiAxis_5D_Hybrid_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_MultiAxis_5D_Hybrid_CPU_I64,
+        ReduceCPULayerTest,
+        params_MultiAxis_5D_Hybrid_I64,
+        ReduceCPULayerTest::getTestCaseName
+);
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_6D_CPU,
@@ -862,19 +862,19 @@ const auto params_OneAxis_fusing = testing::Combine(
         testing::Values(emptyCPUSpec),
         testing::ValuesIn(fusingParamsSet));
 
-// const auto params_OneAxis_fusing_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axes),
-//                 testing::ValuesIn(opTypes),
-//                 testing::Values(true),
-//                 testing::ValuesIn(reductionTypesFusing),
-//                 testing::Values(ElementType::i64, ElementType::u64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes),
-//                 testing::Values(additional_config_i64)),
-//         testing::Values(emptyCPUSpec),
-//         testing::ValuesIn(fusingParamsSet));
+ const auto params_OneAxis_fusing_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axes),
+                 testing::ValuesIn(opTypes),
+                 testing::Values(true),
+                 testing::ValuesIn(reductionTypesFusing),
+                 testing::Values(ElementType::i64, ElementType::u64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes),
+                 testing::Values(additional_config_i64)),
+         testing::Values(emptyCPUSpec),
+         testing::ValuesIn(fusingParamsSet));
 
 const auto params_MultiAxis_4D_fusing = testing::Combine(
         testing::Combine(
@@ -890,19 +890,19 @@ const auto params_MultiAxis_4D_fusing = testing::Combine(
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D)),
         testing::ValuesIn(fusingParamsSet));
 
-// const auto params_MultiAxis_4D_fusing_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axesND),
-//                 testing::Values(CommonTestUtils::OpType::VECTOR),
-//                 testing::Values(true),
-//                 testing::ValuesIn(reductionTypesFusing),
-//                 testing::Values(ElementType::i64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes),
-//                 testing::Values(additional_config_i64)),
-//         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D_I64, ElementType::i64)),
-//         testing::ValuesIn(fusingParamsSet));
+ const auto params_MultiAxis_4D_fusing_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axesND),
+                 testing::Values(CommonTestUtils::OpType::VECTOR),
+                 testing::Values(true),
+                 testing::ValuesIn(reductionTypesFusing),
+                 testing::Values(ElementType::i64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes),
+                 testing::Values(additional_config_i64)),
+         testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D_I64, ElementType::i64)),
+         testing::ValuesIn(fusingParamsSet));
 
 const auto params_MultiAxis_5D_fusing = testing::Combine(
         testing::Combine(
@@ -918,19 +918,19 @@ const auto params_MultiAxis_5D_fusing = testing::Combine(
         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D)),
         testing::ValuesIn(fusingParamsSet));
 
-// const auto params_MultiAxis_5D_fusing_I64 = testing::Combine(
-//         testing::Combine(
-//                 testing::ValuesIn(axes5D),
-//                 testing::Values(CommonTestUtils::OpType::VECTOR),
-//                 testing::Values(true),
-//                 testing::ValuesIn(reductionTypesFusing),
-//                 testing::Values(ElementType::i64),
-//                 testing::Values(ElementType::undefined),
-//                 testing::Values(ElementType::undefined),
-//                 testing::ValuesIn(inputShapes_5D),
-//                 testing::Values(additional_config_i64)),
-//         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D_I64, ElementType::i64)),
-//         testing::ValuesIn(fusingParamsSet));
+ const auto params_MultiAxis_5D_fusing_I64 = testing::Combine(
+         testing::Combine(
+                 testing::ValuesIn(axes5D),
+                 testing::Values(CommonTestUtils::OpType::VECTOR),
+                 testing::Values(true),
+                 testing::ValuesIn(reductionTypesFusing),
+                 testing::Values(ElementType::i64),
+                 testing::Values(ElementType::undefined),
+                 testing::Values(ElementType::undefined),
+                 testing::ValuesIn(inputShapes_5D),
+                 testing::Values(additional_config_i64)),
+         testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D_I64, ElementType::i64)),
+         testing::ValuesIn(fusingParamsSet));
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_OneAxis_fusing_CPU,
@@ -939,12 +939,12 @@ INSTANTIATE_TEST_SUITE_P(
         ReduceCPULayerTest::getTestCaseName
 );
 
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_OneAxis_fusing_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_OneAxis_fusing_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_OneAxis_fusing_CPU_I64,
+        ReduceCPULayerTest,
+        params_OneAxis_fusing_I64,
+        ReduceCPULayerTest::getTestCaseName
+);
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_4D_fusing_CPU,
@@ -953,12 +953,12 @@ INSTANTIATE_TEST_SUITE_P(
         ReduceCPULayerTest::getTestCaseName
 );
 
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_MultiAxis_4D_fusing_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_MultiAxis_4D_fusing_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+ INSTANTIATE_TEST_SUITE_P(
+         smoke_Reduce_MultiAxis_4D_fusing_CPU_I64,
+         ReduceCPULayerTest,
+         params_MultiAxis_4D_fusing_I64,
+         ReduceCPULayerTest::getTestCaseName
+ );
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_5D_fusing_CPU,
@@ -967,12 +967,12 @@ INSTANTIATE_TEST_SUITE_P(
         ReduceCPULayerTest::getTestCaseName
 );
 
-// INSTANTIATE_TEST_SUITE_P(
-//         smoke_Reduce_MultiAxis_5D_fusing_CPU_I64,
-//         ReduceCPULayerTest,
-//         params_MultiAxis_5D_fusing_I64,
-//         ReduceCPULayerTest::getTestCaseName
-// );
+ INSTANTIATE_TEST_SUITE_P(
+         smoke_Reduce_MultiAxis_5D_fusing_CPU_I64,
+         ReduceCPULayerTest,
+         params_MultiAxis_5D_fusing_I64,
+         ReduceCPULayerTest::getTestCaseName
+ );
 
 /* ================================ 2.2 Fusion - KeepNoDims ================================ */
 const auto params_OneAxis_fusing_KeepNoDims = testing::Combine(

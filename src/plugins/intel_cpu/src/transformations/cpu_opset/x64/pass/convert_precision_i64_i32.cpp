@@ -1,4 +1,4 @@
-// Copyright (C) 2023 Intel Corporation
+// Copyright (C) 2018-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 
 
@@ -11,52 +11,55 @@
 
 bool isNativelySupported(const ov::Node::type_info_t &type) {
     static const std::unordered_set<ov::Node::type_info_t> i64Ops = {
-        ov::opset12::Add::get_type_info_static(),
-        ov::op::v1::Broadcast::get_type_info_static(),
-        ov::op::v3::Broadcast::get_type_info_static(),
-        ov::opset12::Concat::get_type_info_static(),
-        ov::opset12::Constant::get_type_info_static(),
-        ov::opset12::Convert::get_type_info_static(),
-        ov::opset12::CumSum::get_type_info_static(),
-        ov::opset12::Divide::get_type_info_static(),
-        ov::opset12::Equal::get_type_info_static(),
-        ov::opset12::FloorMod::get_type_info_static(),
-        ov::op::v1::Gather::get_type_info_static(),
-        ov::op::v7::Gather::get_type_info_static(),
-        ov::op::v8::Gather::get_type_info_static(),
-        ov::opset12::Greater::get_type_info_static(),
-        ov::opset12::Less::get_type_info_static(),
-        ov::opset12::Maximum::get_type_info_static(),
-        ov::opset12::Minimum::get_type_info_static(),
-        ov::opset12::Multiply::get_type_info_static(),
-        ov::opset12::NonMaxSuppression::get_type_info_static(),
-        ov::opset12::OneHot::get_type_info_static(),
-        ov::opset12::Parameter::get_type_info_static(),
-        ov::opset12::ReduceL1::get_type_info_static(),
-        ov::opset12::ReduceL2::get_type_info_static(),
-        ov::opset12::ReduceLogicalAnd::get_type_info_static(),
-        ov::opset12::ReduceMax::get_type_info_static(),
-        ov::opset12::ReduceMean::get_type_info_static(),
-        ov::opset12::ReduceMin::get_type_info_static(),
-        ov::opset12::ReduceProd::get_type_info_static(),
-        ov::opset12::ReduceSum::get_type_info_static(),
-        ov::opset12::Reshape::get_type_info_static(),
-        ov::opset12::Result::get_type_info_static(),
-        ov::opset12::ScatterElementsUpdate::get_type_info_static(),
-        ov::opset12::ScatterNDUpdate::get_type_info_static(),
-        ov::opset12::ScatterUpdate::get_type_info_static(),
-        ov::opset12::Select::get_type_info_static(),
-        ov::opset12::ShapeOf::get_type_info_static(),
-        ov::opset12::Slice::get_type_info_static(),
-        ov::opset12::Split::get_type_info_static(),
-        ov::opset12::SquaredDifference::get_type_info_static(),
-        ov::opset12::Squeeze::get_type_info_static(),
-        ov::opset12::StridedSlice::get_type_info_static(),
-        ov::opset12::Subtract::get_type_info_static(),
-        ov::opset12::Tile::get_type_info_static(),
-        ov::opset12::Transpose::get_type_info_static(),
-        ov::opset12::Unique::get_type_info_static(),
-        ov::opset12::Unsqueeze::get_type_info_static()
+            ov::opset12::Add::get_type_info_static(),
+            ov::op::v1::Broadcast::get_type_info_static(),
+            ov::op::v3::Broadcast::get_type_info_static(),
+            ov::opset12::Concat::get_type_info_static(),
+            ov::opset12::Constant::get_type_info_static(),
+            ov::opset12::Convert::get_type_info_static(),
+            ov::opset12::CumSum::get_type_info_static(),
+            ov::opset12::Divide::get_type_info_static(),
+            ov::opset12::Equal::get_type_info_static(),
+            ov::opset12::FloorMod::get_type_info_static(),
+            ov::op::v1::Gather::get_type_info_static(),
+            ov::op::v7::Gather::get_type_info_static(),
+            ov::op::v8::Gather::get_type_info_static(),
+            ov::op::v5::GatherND::get_type_info_static(),
+            ov::op::v8::GatherND::get_type_info_static(),
+            ov::opset12::Greater::get_type_info_static(),
+            ov::opset12::Less::get_type_info_static(),
+            ov::opset12::Maximum::get_type_info_static(),
+            ov::opset12::Minimum::get_type_info_static(),
+            ov::opset12::Multiply::get_type_info_static(),
+            ov::opset12::NonMaxSuppression::get_type_info_static(),
+            ov::opset12::NonZero::get_type_info_static(),
+            ov::opset12::OneHot::get_type_info_static(),
+            ov::opset12::Parameter::get_type_info_static(),
+            ov::opset12::ReduceL1::get_type_info_static(),
+            ov::opset12::ReduceL2::get_type_info_static(),
+            ov::opset12::ReduceLogicalAnd::get_type_info_static(),
+            ov::opset12::ReduceMax::get_type_info_static(),
+            ov::opset12::ReduceMean::get_type_info_static(),
+            ov::opset12::ReduceMin::get_type_info_static(),
+            ov::opset12::ReduceProd::get_type_info_static(),
+            ov::opset12::ReduceSum::get_type_info_static(),
+            ov::opset12::Reshape::get_type_info_static(),
+            ov::opset12::Result::get_type_info_static(),
+            ov::opset12::ScatterElementsUpdate::get_type_info_static(),
+            ov::opset12::ScatterNDUpdate::get_type_info_static(),
+            ov::opset12::ScatterUpdate::get_type_info_static(),
+            ov::opset12::Select::get_type_info_static(),
+            ov::opset12::ShapeOf::get_type_info_static(),
+            ov::opset12::Slice::get_type_info_static(),
+            ov::opset12::Split::get_type_info_static(),
+            ov::opset12::SquaredDifference::get_type_info_static(),
+            ov::opset12::Squeeze::get_type_info_static(),
+            ov::opset12::StridedSlice::get_type_info_static(),
+            ov::opset12::Subtract::get_type_info_static(),
+            ov::opset12::Tile::get_type_info_static(),
+            ov::opset12::Transpose::get_type_info_static(),
+            ov::opset12::Unique::get_type_info_static(),
+            ov::opset12::Unsqueeze::get_type_info_static()
     };
 
     return i64Ops.find(type) != i64Ops.end();
@@ -98,7 +101,7 @@ bool ov::intel_cpu::ConvertPrecisionI64ToI32::run_on_model(const std::shared_ptr
                 auto parentOutput = input.get_source_output();
                 auto parentNode = parentOutput.get_node_shared_ptr();
                 if (ov::is_type<ov::opset12::Convert>(parentNode) &&
-                        parentNode->get_rt_info().find("convert_i32_i64") != parentNode->get_rt_info().end()) {
+                    parentNode->get_rt_info().find("convert_i32_i64") != parentNode->get_rt_info().end()) {
                     input.replace_source_output(parentNode->input_value(0));
                 } else if (auto constOp = ov::as_type_ptr<ov::op::v0::Constant>(parentNode)) {
                     auto newConst = changeConstantPrecision(constOp);
