@@ -1916,10 +1916,6 @@ bool Reduce::canFuse(const NodePtr& node) const {
         return false;
     }
 
-    if (one_of(8, input_prec.size(), output_prec.size())) {
-        return false;
-    }
-
     // In jit mode we use the output memory as an intermediate accumulator for certain reduce modes.
     // If the post ops node has a lower precision for such modes, post ops fusing won't be supposted, in order to avoid accuracy loss.
     if (output_prec == Precision::FP32 &&
@@ -1927,6 +1923,10 @@ bool Reduce::canFuse(const NodePtr& node) const {
         if (!one_of(algorithm, Algorithm::ReduceAnd, Algorithm::ReduceOr, Algorithm::ReduceMin, Algorithm::ReduceMax)) {
             return false;
         }
+    }
+
+    if (one_of(8, input_prec.size(), output_prec.size())) {
+        return false;
     }
 
     return canFuseSimpleOperation(node);

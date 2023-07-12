@@ -14,7 +14,7 @@ namespace CPULayerTestsDefinitions {
 
 using GatherNDLayerCPUTestParamSet = std::tuple<
         InputShape,                                     // Input shapes
-        std::pair<ov::Shape, std::vector<int>>,             // Indexes shape and values
+        std::pair<ov::Shape, std::vector<int>>,         // Indexes shape and values
         ElementType,                                    // Input element type
         ElementType,                                    // Indices element type
         int,                                            // Batch dims
@@ -149,6 +149,15 @@ const auto subset_BD0 = ::testing::Combine(
 
 INSTANTIATE_TEST_SUITE_P(smoke_GatherND5DynamicBD_0, GatherNDLayerCPUTest, subset_BD0, GatherNDLayerCPUTest::getTestCaseName);
 INSTANTIATE_TEST_SUITE_P(smoke_GatherND8DynamicBD_0, GatherND8LayerCPUTest, subset_BD0, GatherNDLayerCPUTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(smoke_GatherND8DynamicBD_0_I64, GatherND8LayerCPUTest,
+                ::testing::Combine(
+                        ::testing::ValuesIn(inputShapesDynamicBD_0),
+                        ::testing::ValuesIn(indexesShapesBD_0),
+                        ::testing::Values(ElementType::i64),
+                        ::testing::Values(ElementType::i64),
+                        ::testing::Values(0),
+                        ::testing::Values(config_i64)),
+                GatherNDLayerCPUTest::getTestCaseName);
 
 const std::vector<InputShape> inputShapesDynamicBD_1 = {
         {{3, -1, -1},                                            // dynamic
@@ -174,6 +183,15 @@ const auto subset_BD1 = ::testing::Combine(
 
 INSTANTIATE_TEST_SUITE_P(smoke_GatherND5DynamicBD_1, GatherNDLayerCPUTest, subset_BD1, GatherNDLayerCPUTest::getTestCaseName);
 INSTANTIATE_TEST_SUITE_P(smoke_GatherND8DynamicBD_1, GatherND8LayerCPUTest, subset_BD1, GatherNDLayerCPUTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(smoke_GatherND8DynamicBD_1_I64, GatherND8LayerCPUTest,
+                ::testing::Combine(
+                        ::testing::ValuesIn(inputShapesDynamicBD_1),
+                        ::testing::ValuesIn(indexesShapesBD_1),
+                        ::testing::Values(ElementType::i64),
+                        ::testing::Values(ElementType::i64),
+                        ::testing::Values(0),
+                        ::testing::Values(config_i64)),
+                GatherNDLayerCPUTest::getTestCaseName);
 
 const std::vector<InputShape> inputShapesDynamicBD_2 = {
         {{2, 2, -1, -1, -1},                                                       // dynamic
@@ -186,7 +204,7 @@ const std::vector<InputShape> inputShapesDynamicBD_2 = {
 const std::vector<std::pair<ov::Shape, std::vector<int>>> indexesShapesBD_2 = {
         std::pair<ov::Shape, std::vector<int>>{{2, 2, 3}, {0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0}},
         std::pair<ov::Shape, std::vector<int>>{{2, 2, 2, 3}, {0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0,
-                                                                0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0}},
+                                                              0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0}},
 };
 
 const auto subset_BD2 = ::testing::Combine(
@@ -199,7 +217,15 @@ const auto subset_BD2 = ::testing::Combine(
 
 INSTANTIATE_TEST_SUITE_P(smoke_GatherND5DynamicBD_2, GatherNDLayerCPUTest, subset_BD2, GatherNDLayerCPUTest::getTestCaseName);
 INSTANTIATE_TEST_SUITE_P(smoke_GatherND8DynamicBD_2, GatherND8LayerCPUTest, subset_BD2, GatherNDLayerCPUTest::getTestCaseName);
-
+INSTANTIATE_TEST_SUITE_P(smoke_GatherND8DynamicBD_2_I64, GatherND8LayerCPUTest,
+                ::testing::Combine(
+                        ::testing::ValuesIn(inputShapesDynamicBD_2),
+                        ::testing::ValuesIn(indexesShapesBD_2),
+                        ::testing::Values(ElementType::i64),
+                        ::testing::Values(ElementType::i64),
+                        ::testing::Values(0),
+                        ::testing::Values(config_i64)),
+                GatherNDLayerCPUTest::getTestCaseName);
 
 }  // namespace
 } // namespace CPULayerTestsDefinitions
