@@ -59,7 +59,7 @@ private:
     std::vector<int64_t> update_src_dims();
     bool canApplyJIT(const InferenceEngine::Precision &input_prec, const InferenceEngine::Precision &output_prec) const;
 
-    size_t blockLen;
+    size_t blk_size;
     size_t dst_size;
     size_t prc_size;
     static constexpr size_t REDUCE_DATA = 0;
@@ -87,7 +87,7 @@ private:
     InferenceEngine::SizeVector src_dims;
     InferenceEngine::SizeVector process_dst_dims;
     InferenceEngine::SizeVector axes_for_reduction;
-    std::vector<int64_t> rawAxes;
+    std::vector<int64_t> raw_axes;
     float postKerDivisorF = 1.f;
     double postKerDivisorD = 1.;
     void* postKerDivisor;
@@ -103,10 +103,10 @@ private:
     std::vector<uint8_t> vec_reduceDH_prc;
     std::vector<uint8_t> vec_reduceCDW_prc;
 
-    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduceKernel;
-    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduceAuxKernel;
-    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduceTmpKernel;
-    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReducePostCallArgs>> reducePostKernel;
+    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduce_kernel;
+    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduce_aux_kernel;
+    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> reduce_tmp_kernel;
+    std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReducePostCallArgs>> reduce_post_kernel;
 
     static const std::map<const ov::DiscreteTypeInfo, std::function<void(const std::shared_ptr<ov::Node>& op, Reduce& node)>> initializers;
 

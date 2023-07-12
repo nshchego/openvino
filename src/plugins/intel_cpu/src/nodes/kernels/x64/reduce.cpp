@@ -1714,7 +1714,7 @@ void JitReducePostKernel<isa>::reduce_post_tail() {
 }
 
 template <x64::cpu_isa_t isa>
-void JitReducePostKernel<isa>::apply_post_ops(const ov::element::Type &dst_el_type, bool is_broadcast) {
+void JitReducePostKernel<isa>::apply_post_ops(const ov::element::Type& dst_el_type, bool is_broadcast) {
     const auto &p = attr.post_ops_;
     int eltwise_inj_idx = 0;
     int depthwise_inj_idx = 0;

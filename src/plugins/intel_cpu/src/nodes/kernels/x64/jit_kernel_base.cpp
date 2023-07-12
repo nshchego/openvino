@@ -21,63 +21,63 @@ JitKernelBase::JitKernelBase(const char* name, x64::cpu_isa_t isa) :
 }
 
 void JitKernelBase::uni_vfmsub132ps(const Xmm& vmm_dst,
-                                    const Xmm& vSrc,
+                                    const Xmm& vmm_src,
                                     const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub132ps(vmm_dst, vSrc, op);
+        vfmsub132ps(vmm_dst, vmm_src, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        assert(vmm_dst.getIdx() != vmm_src.getIdx());
         vmulps(vmm_dst, vmm_dst, op);
-        vsubps(vmm_dst, vmm_dst, vSrc);
+        vsubps(vmm_dst, vmm_dst, vmm_src);
     } else {
-        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        assert(vmm_dst.getIdx() != vmm_src.getIdx());
         mulps(vmm_dst, op);
-        subps(vmm_dst, vSrc);
+        subps(vmm_dst, vmm_src);
     }
 }
 
 void JitKernelBase::uni_vfnmadd132ps(const Xmm& vmm_dst,
-                                     const Xmm& vSrc,
+                                     const Xmm& vmm_src,
                                      const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfnmadd132ps(vmm_dst, vSrc, op);
+        vfnmadd132ps(vmm_dst, vmm_src, op);
     } else if (isValidIsa(x64::avx)) {
-        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        assert(vmm_dst.getIdx() != vmm_src.getIdx());
         vmulps(vmm_dst, vmm_dst, op);
-        vsubps(vmm_dst, vSrc, vmm_dst);
+        vsubps(vmm_dst, vmm_src, vmm_dst);
     } else {
-        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        assert(vmm_dst.getIdx() != vmm_src.getIdx());
         mulps(vmm_dst, op);
-        subps(vSrc, vmm_dst);
-        movups(vmm_dst, vSrc);
+        subps(vmm_src, vmm_dst);
+        movups(vmm_dst, vmm_src);
     }
 }
 
 void JitKernelBase::uni_vfmsub231ps(const Xmm& vmm_dst,
-                                    const Xmm& vSrc,
+                                    const Xmm& vmm_src,
                                     const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vfmsub231ps(vmm_dst, vSrc, op);
+        vfmsub231ps(vmm_dst, vmm_src, op);
     } else if (isValidIsa(x64::avx)) {
         assert(!vmm_dst.isEqualIfNotInherited(op));
-        vmulps(vSrc, vSrc, op);
-        vsubps(vmm_dst, vSrc, vmm_dst);
+        vmulps(vmm_src, vmm_src, op);
+        vsubps(vmm_dst, vmm_src, vmm_dst);
     } else {
         assert(!vmm_dst.isEqualIfNotInherited(op));
-        mulps(vSrc, op);
-        subps(vSrc, vmm_dst);
-        movups(vmm_dst, vSrc);
+        mulps(vmm_src, op);
+        subps(vmm_src, vmm_dst);
+        movups(vmm_dst, vmm_src);
     }
 }
 
 void JitKernelBase::uni_vpaddd(const Ymm& vmm_dst,
-                               const Ymm& vSrc,
+                               const Ymm& vmm_src,
                                const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vpaddd(vmm_dst, vSrc, op);
+        vpaddd(vmm_dst, vmm_src, op);
     } else if (isValidIsa(x64::avx)) {
         Xmm xmmDst(vmm_dst.getIdx());
-        vmovups(vmm_dst, vSrc);
+        vmovups(vmm_dst, vmm_src);
         if (op.isYMM()) {
             Ymm ymmOp(op.getIdx());
             Xmm xmmOp(op.getIdx());
@@ -97,7 +97,7 @@ void JitKernelBase::uni_vpaddd(const Ymm& vmm_dst,
             IE_THROW() << "Not supported operand type.";
         }
     } else if (isValidIsa(x64::sse41)) {
-        assert(vmm_dst.getIdx() != vSrc.getIdx());
+        assert(vmm_dst.getIdx() != vmm_src.getIdx());
         paddd(vmm_dst, op);
     } else {
         IE_THROW() << "Not defined behavior for instruction 'vpaddd' in current instructions set.";
@@ -116,13 +116,13 @@ void JitKernelBase::uni_vaddpd(const Xmm& vmm_dst, const Operand &op1, const Ope
 }
 
 void JitKernelBase::uni_vpsubd(const Ymm& vmm_dst,
-                               const Ymm& vSrc,
+                               const Ymm& vmm_src,
                                const Operand& op) {
     if (isValidIsa(x64::avx2)) {
-        vpsubd(vmm_dst, vSrc, op);
+        vpsubd(vmm_dst, vmm_src, op);
     } else if (isValidIsa(x64::avx)) {
         Xmm xmmDst(vmm_dst.getIdx());
-        vmovups(vmm_dst, vSrc);
+        vmovups(vmm_dst, vmm_src);
         if (op.isYMM()) {
             Ymm ymmOp(op.getIdx());
             Xmm xmmOp(op.getIdx());
@@ -142,8 +142,8 @@ void JitKernelBase::uni_vpsubd(const Ymm& vmm_dst,
             IE_THROW() << "Not supported operand type.";
         }
     } else if (isValidIsa(x64::sse41)) {
-        if (vmm_dst.getIdx() != vSrc.getIdx()) {
-            movups(vmm_dst, vSrc);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movups(vmm_dst, vmm_src);
         }
         psubd(vmm_dst, op);
     } else {
@@ -709,7 +709,7 @@ void JitKernelBase::load(const Ymm&     vmm_dst,
 }
 
 void JitKernelBase::store(const Address& dstAddr,
-                          const Xmm&     vSrc,
+                          const Xmm&     vmm_src,
                           const Reg64&   rToStoreNum,
                           const size_t          typeSize) {
     if (!one_of(typeSize, 1u, 2u, 4u, 8u)) {
@@ -724,27 +724,27 @@ void JitKernelBase::store(const Address& dstAddr,
 
         const size_t offset = i * typeSize;
         if (typeSize == 1) {
-            uni_vpextrb(ptr[dstAddr.getRegExp() + offset], vSrc, i);
+            uni_vpextrb(ptr[dstAddr.getRegExp() + offset], vmm_src, i);
         } else if (typeSize == 2) {
-            uni_vpextrw(ptr[dstAddr.getRegExp() + offset], vSrc, i);
+            uni_vpextrw(ptr[dstAddr.getRegExp() + offset], vmm_src, i);
         } else if (typeSize == 4) {
-            uni_vpextrd(ptr[dstAddr.getRegExp() + offset], vSrc, i);
+            uni_vpextrd(ptr[dstAddr.getRegExp() + offset], vmm_src, i);
         } else if (typeSize == 8) {
-            uni_vpextrq(ptr[dstAddr.getRegExp() + offset], vSrc, i);
+            uni_vpextrq(ptr[dstAddr.getRegExp() + offset], vmm_src, i);
         }
     }
     L(lEnd);
 }
 
 void JitKernelBase::store(const Address& dstAddr,
-                          const Ymm&     vSrc,
+                          const Ymm&     vmm_src,
                           const Reg64&   rToStoreNum,
                           const size_t          typeSize) {
     if (!one_of(typeSize, 1u, 2u, 4u, 8u)) {
         IE_THROW() << "Could not store data with type size " << typeSize;
     }
     Label lEnd;
-    Xmm xmmSrc(vSrc.getIdx());
+    Xmm xmm_src(vmm_src.getIdx());
     const size_t elPerXmm = x64::cpu_isa_traits<x64::sse41>::vlen / typeSize;
 
     for (int i = 0; i < 2; i++) {
@@ -758,18 +758,18 @@ void JitKernelBase::store(const Address& dstAddr,
 
             const size_t offset = offset0 + j * typeSize;
             if (typeSize == 8) {
-                uni_vpextrq(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
+                uni_vpextrq(ptr[dstAddr.getRegExp() + offset], xmm_src, j);
             } else if (typeSize == 4) {
-                uni_vpextrd(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
+                uni_vpextrd(ptr[dstAddr.getRegExp() + offset], xmm_src, j);
             } else if (typeSize == 2) {
-                uni_vpextrw(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
+                uni_vpextrw(ptr[dstAddr.getRegExp() + offset], xmm_src, j);
             } else if (typeSize == 1) {
-                uni_vpextrb(ptr[dstAddr.getRegExp() + offset], xmmSrc, j);
+                uni_vpextrb(ptr[dstAddr.getRegExp() + offset], xmm_src, j);
             }
         }
 
         L(lPerm);
-        vperm2f128(vSrc, vSrc, vSrc, 0x1);
+        vperm2f128(vmm_src, vmm_src, vmm_src, 0x1);
     }
     L(lEnd);
 }
@@ -853,115 +853,115 @@ void JitKernelBase::memMovDD(const Reg64& rDst,
 }
 
 void JitKernelBase::load_vector(const Xmm& vmm_dst,
-                               const Address &srcAdr,
-                               const ov::element::Type& dstPrc,
-                               const ov::element::Type& srcPrc) {
+                               const Address &adr_src,
+                               const ov::element::Type& dst_prc,
+                               const ov::element::Type& src_prc) {
     Xmm xmmDst = Xmm(vmm_dst.getIdx());
     Ymm ymmDst = Ymm(vmm_dst.getIdx());
 
-    switch (srcPrc) {
+    switch (src_prc) {
         case ov::element::f64:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::i64, ov::element::i32, ov::element::f32)) {
-                if (dstPrc == ov::element::i64) {
-                    vcvtpd2qq(vmm_dst, srcAdr);
-                } else if (dstPrc == ov::element::i32) {
-                    uni_vcvtpd2dq(vmm_dst.isZMM() ? ymmDst : vmm_dst, srcAdr);
-                } else if (dstPrc == ov::element::f32) {
-                    uni_vcvtpd2ps(vmm_dst.isZMM() ? ymmDst : vmm_dst, srcAdr);
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::i64, ov::element::i32, ov::element::f32)) {
+                if (dst_prc == ov::element::i64) {
+                    vcvtpd2qq(vmm_dst, adr_src);
+                } else if (dst_prc == ov::element::i32) {
+                    uni_vcvtpd2dq(vmm_dst.isZMM() ? ymmDst : vmm_dst, adr_src);
+                } else if (dst_prc == ov::element::f32) {
+                    uni_vcvtpd2ps(vmm_dst.isZMM() ? ymmDst : vmm_dst, adr_src);
                 }
-            } else if (!x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                if (dstPrc == ov::element::f32) {
-                    uni_vcvtpd2ps(xmmDst, srcAdr);
-                } else if (dstPrc == ov::element::i32) {
-                    uni_vcvtpd2dq(xmmDst, srcAdr);
+            } else if (!x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f32, ov::element::i32)) {
+                if (dst_prc == ov::element::f32) {
+                    uni_vcvtpd2ps(xmmDst, adr_src);
+                } else if (dst_prc == ov::element::i32) {
+                    uni_vcvtpd2dq(xmmDst, adr_src);
                 }
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::i64:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::f32)) {
-                if (dstPrc == ov::element::f64) {
-                    vcvtqq2pd(vmm_dst, srcAdr);
-                } else if (dstPrc == ov::element::f32) {
-                    vcvtqq2ps(vmm_dst.isZMM() ? ymmDst : vmm_dst, srcAdr);
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f64, ov::element::f32)) {
+                if (dst_prc == ov::element::f64) {
+                    vcvtqq2pd(vmm_dst, adr_src);
+                } else if (dst_prc == ov::element::f32) {
+                    vcvtqq2ps(vmm_dst.isZMM() ? ymmDst : vmm_dst, adr_src);
                 }
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::f32:
-            if (dstPrc == ov::element::i32) {
-                uni_vcvtps2dq(vmm_dst, srcAdr);
+            if (dst_prc == ov::element::i32) {
+                uni_vcvtps2dq(vmm_dst, adr_src);
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::i32:
-            if (dstPrc == ov::element::f64) {
-                uni_vcvtdq2pd(vmm_dst, srcAdr);
-            } else if (dstPrc == ov::element::f32) {
-                uni_vcvtdq2ps(vmm_dst, srcAdr);
+            if (dst_prc == ov::element::f64) {
+                uni_vcvtdq2pd(vmm_dst, adr_src);
+            } else if (dst_prc == ov::element::f32) {
+                uni_vcvtdq2ps(vmm_dst, adr_src);
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::bf16:
-            uni_vpmovzxwd(vmm_dst, srcAdr);
+            uni_vpmovzxwd(vmm_dst, adr_src);
             uni_vpslld(vmm_dst, vmm_dst, 16);
             break;
         case ov::element::u16:
-            if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovzxwd(vmm_dst, srcAdr);
+            if (one_of(dst_prc, ov::element::f32, ov::element::i32)) {
+                uni_vpmovzxwd(vmm_dst, adr_src);
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::i16:
-            if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovsxwd(vmm_dst, srcAdr);
+            if (one_of(dst_prc, ov::element::f32, ov::element::i32)) {
+                uni_vpmovsxwd(vmm_dst, adr_src);
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::i8:
-            if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovsxbd(vmm_dst, srcAdr);
+            if (one_of(dst_prc, ov::element::f32, ov::element::i32)) {
+                uni_vpmovsxbd(vmm_dst, adr_src);
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         case ov::element::u8:
-            if (one_of(dstPrc, ov::element::f32, ov::element::i32)) {
-                uni_vpmovzxbd(vmm_dst, srcAdr);
+            if (one_of(dst_prc, ov::element::f32, ov::element::i32)) {
+                uni_vpmovzxbd(vmm_dst, adr_src);
             } else {
-                uni_vmovups(vmm_dst, srcAdr);
+                uni_vmovups(vmm_dst, adr_src);
             }
             break;
         default:
-            IE_THROW() << "Unsupported source precision: " << srcPrc;
+            IE_THROW() << "Unsupported source precision: " << src_prc;
     }
 
-    switch (dstPrc) {
+    switch (dst_prc) {
         case ov::element::f32:
-            if (!x64::mayiuse(x64::avx512_core) && (srcPrc == ov::element::i64)) {
+            if (!x64::mayiuse(x64::avx512_core) && (src_prc == ov::element::i64)) {
                 // Do conversion later.
             }
-            if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::i16, ov::element::u16)) {
+            if (one_of(src_prc, ov::element::u8, ov::element::i8, ov::element::i16, ov::element::u16)) {
                 uni_vcvtdq2ps(vmm_dst, vmm_dst);
             }
             break;
         case ov::element::i32:
             if (x64::mayiuse(x64::avx512_core)) {
-                if (srcPrc == ov::element::i64) {
+                if (src_prc == ov::element::i64) {
                     vpmovsqd(vmm_dst, vmm_dst);
                 }
             } else {
-                if (srcPrc == ov::element::i64) {
+                if (src_prc == ov::element::i64) {
                     // Do conversion later.
                 }
             }
-            if (one_of(srcPrc, ov::element::bf16)) {
+            if (one_of(src_prc, ov::element::bf16)) {
                 uni_vcvtps2dq(vmm_dst, vmm_dst);
             }
             break;
@@ -969,111 +969,111 @@ void JitKernelBase::load_vector(const Xmm& vmm_dst,
         case ov::element::f64:
             break;
         default:
-            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+            IE_THROW() << "Unsupported destination precision: " << dst_prc;
     }
 }
 
 void JitKernelBase::load_scalar(const Xmm& vmm_dst,
-                               const Address &srcAdr,
-                               const ov::element::Type& dstPrc,
-                               const ov::element::Type& srcPrc) {
-    Address src_adr_bcst(srcAdr.getBit(), true, srcAdr.getRegExp());
+                               const Address &adr_src,
+                               const ov::element::Type& dst_prc,
+                               const ov::element::Type& src_prc) {
+    Address src_adr_bcst(adr_src.getBit(), true, adr_src.getRegExp());
 
-    switch (srcPrc) {
+    switch (src_prc) {
         case ov::element::f64:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::i64, ov::element::i32, ov::element::f32)) {
-                if (dstPrc == ov::element::i64) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::i64, ov::element::i32, ov::element::f32)) {
+                if (dst_prc == ov::element::i64) {
                     vcvtpd2qq(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::i32) {
+                } else if (dst_prc == ov::element::i32) {
                     vcvtpd2dq(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::f32) {
+                } else if (dst_prc == ov::element::f32) {
                     vcvtpd2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovsd(vmm_dst, srcAdr);
+                uni_vmovsd(vmm_dst, adr_src);
             }
             break;
         case ov::element::i64:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::f32)) {
-                if (dstPrc == ov::element::f64) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f64, ov::element::f32)) {
+                if (dst_prc == ov::element::f64) {
                     vcvtqq2pd(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::f32) {
+                } else if (dst_prc == ov::element::f32) {
                     vcvtqq2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovsd(vmm_dst, srcAdr);
+                uni_vmovsd(vmm_dst, adr_src);
             }
             break;
         case ov::element::f32:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::i32)) {
-                if (dstPrc == ov::element::f64) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f64, ov::element::i32)) {
+                if (dst_prc == ov::element::f64) {
                     vcvtps2pd(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::i32) {
+                } else if (dst_prc == ov::element::i32) {
                     vcvtps2dq(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovss(vmm_dst, srcAdr);
+                uni_vmovss(vmm_dst, adr_src);
             }
             break;
         case ov::element::i32:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f32, ov::element::f64)) {
-                if (dstPrc == ov::element::f32) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f32, ov::element::f64)) {
+                if (dst_prc == ov::element::f32) {
                     vcvtdq2ps(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::f64) {
+                } else if (dst_prc == ov::element::f64) {
                     vcvtdq2pd(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vmovss(vmm_dst, srcAdr);
+                uni_vmovss(vmm_dst, adr_src);
             }
             break;
         case ov::element::bf16:
-            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpinsrw(vmm_dst, vmm_dst, adr_src, 0);
             uni_vpslld(vmm_dst, vmm_dst, 16);
             break;
         case ov::element::i16:
-            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
-            uni_vpmovsxwd(vmm_dst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, adr_src, 0);
+            uni_vpmovsxwd(vmm_dst, adr_src);
             break;
         case ov::element::u16:
-            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
-            uni_vpmovzxwd(vmm_dst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, adr_src, 0);
+            uni_vpmovzxwd(vmm_dst, adr_src);
             break;
         case ov::element::i8:
-            pinsrb(vmm_dst, srcAdr, 0);
+            pinsrb(vmm_dst, adr_src, 0);
             uni_vpmovsxbd(vmm_dst, vmm_dst);
             break;
         case ov::element::u8:
-            pinsrb(vmm_dst, srcAdr, 0);
+            pinsrb(vmm_dst, adr_src, 0);
             uni_vpmovzxbd(vmm_dst, vmm_dst);
             break;
         default:
-            IE_THROW() << "Unsupported source precision: " << srcPrc;
+            IE_THROW() << "Unsupported source precision: " << src_prc;
     }
 
-    switch (dstPrc) {
+    switch (dst_prc) {
         case ov::element::f32:
             if (x64::mayiuse(x64::avx512_core)) {
-                if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16)) {
+                if (one_of(src_prc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16)) {
                     uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             } else {
-                if (srcPrc == ov::element::f64) {
+                if (src_prc == ov::element::f64) {
                     uni_vcvtpd2ps(vmm_dst, vmm_dst);
-                } else if (srcPrc == ov::element::i64) {
+                } else if (src_prc == ov::element::i64) {
                     // Do conversion later.
-                } else if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16, ov::element::i32)) {
+                } else if (one_of(src_prc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16, ov::element::i32)) {
                     uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             }
             break;
         case ov::element::i32:
             if (!x64::mayiuse(x64::avx512_core)) {
-                if (srcPrc == ov::element::i64) {
+                if (src_prc == ov::element::i64) {
                     // Do conversion later.
-                } else if (one_of(srcPrc, ov::element::f32, ov::element::bf16)) {
+                } else if (one_of(src_prc, ov::element::f32, ov::element::bf16)) {
                     uni_vcvtps2dq(vmm_dst, vmm_dst);
                 }
-            } else if (srcPrc == ov::element::i64) {
+            } else if (src_prc == ov::element::i64) {
                 vpmovsqd(vmm_dst, vmm_dst);
             }
             break;
@@ -1081,119 +1081,119 @@ void JitKernelBase::load_scalar(const Xmm& vmm_dst,
         case ov::element::f64:
             break;
         default:
-            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+            IE_THROW() << "Unsupported destination precision: " << dst_prc;
     }
 }
 
-void JitKernelBase::load_with_bcst(const Xmm& vmm_dst,
-                                   const Address &srcAdr,
-                                   const ov::element::Type& dstPrc,
-                                   const ov::element::Type& srcPrc) {
-    Address src_adr_bcst(srcAdr.getBit(), true, srcAdr.getRegExp());
+void JitKernelBase::load_with_bcst(const Xmm &vmm_dst,
+                                   const Address &adr_src,
+                                   const ov::element::Type& dst_prc,
+                                   const ov::element::Type& src_prc) {
+    Address src_adr_bcst(adr_src.getBit(), true, adr_src.getRegExp());
 
-    switch (srcPrc) {
+    switch (src_prc) {
         case ov::element::f64:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::i64, ov::element::i32, ov::element::f32)) {
-                if (dstPrc == ov::element::i64) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::i64, ov::element::i32, ov::element::f32)) {
+                if (dst_prc == ov::element::i64) {
                     vcvtpd2qq(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::i32) {
+                } else if (dst_prc == ov::element::i32) {
                     vcvtpd2dq(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::f32) {
+                } else if (dst_prc == ov::element::f32) {
                     vcvtpd2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastsd(vmm_dst, srcAdr); // does not work with XMM, use vpbroadcastq instead
+                uni_vbroadcastsd(vmm_dst, adr_src); // does not work with XMM, use vpbroadcastq instead
             }
             break;
         case ov::element::i64:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::f32)) {
-                if (dstPrc == ov::element::f64) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f64, ov::element::f32)) {
+                if (dst_prc == ov::element::f64) {
                     vcvtqq2pd(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::f32) {
+                } else if (dst_prc == ov::element::f32) {
                     vcvtqq2ps(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastsd(vmm_dst, srcAdr);
+                uni_vbroadcastsd(vmm_dst, adr_src);
             }
             break;
         case ov::element::f32:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f64, ov::element::i32)) {
-                if (dstPrc == ov::element::f64) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f64, ov::element::i32)) {
+                if (dst_prc == ov::element::f64) {
                     vcvtps2pd(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::i32) {
+                } else if (dst_prc == ov::element::i32) {
                     vcvtps2dq(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastss(vmm_dst, srcAdr);
+                uni_vbroadcastss(vmm_dst, adr_src);
             }
             break;
         case ov::element::i32:
-            if (x64::mayiuse(x64::avx512_core) && one_of(dstPrc, ov::element::f32, ov::element::f64)) {
-                if (dstPrc == ov::element::f32) {
+            if (x64::mayiuse(x64::avx512_core) && one_of(dst_prc, ov::element::f32, ov::element::f64)) {
+                if (dst_prc == ov::element::f32) {
                     vcvtdq2ps(vmm_dst, src_adr_bcst);
-                } else if (dstPrc == ov::element::f64) {
+                } else if (dst_prc == ov::element::f64) {
                     vcvtdq2pd(vmm_dst, src_adr_bcst);
                 }
             } else {
-                uni_vbroadcastss(vmm_dst, srcAdr);
+                uni_vbroadcastss(vmm_dst, adr_src);
             }
             break;
         case ov::element::bf16:
-            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
+            uni_vpinsrw(vmm_dst, vmm_dst, adr_src, 0);
             uni_vpslld(vmm_dst, vmm_dst, 16);
             break;
         case ov::element::i16:
-            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
-            uni_vpmovsxwd(vmm_dst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, adr_src, 0);
+            uni_vpmovsxwd(vmm_dst, adr_src);
             break;
         case ov::element::u16:
-            uni_vpinsrw(vmm_dst, vmm_dst, srcAdr, 0);
-            uni_vpmovzxwd(vmm_dst, srcAdr);
+            uni_vpinsrw(vmm_dst, vmm_dst, adr_src, 0);
+            uni_vpmovzxwd(vmm_dst, adr_src);
             break;
         case ov::element::i8:
-            if (dstPrc == ov::element::i32) {
-                pinsrb(vmm_dst, srcAdr, 0);
+            if (dst_prc == ov::element::i32) {
+                pinsrb(vmm_dst, adr_src, 0);
                 uni_vpmovsxbd(vmm_dst, vmm_dst);
             } else {
-                vpbroadcastb(vmm_dst, srcAdr);
+                vpbroadcastb(vmm_dst, adr_src);
             }
             break;
         case ov::element::u8:
-            if (dstPrc == ov::element::i32) {
-                pinsrb(vmm_dst, srcAdr, 0);
+            if (dst_prc == ov::element::i32) {
+                pinsrb(vmm_dst, adr_src, 0);
                 uni_vpmovzxbd(vmm_dst, vmm_dst);
             } else {
-                vpbroadcastb(vmm_dst, srcAdr);
+                vpbroadcastb(vmm_dst, adr_src);
             }
             break;
         default:
-            IE_THROW() << "Unsupported source precision: " << srcPrc;
+            IE_THROW() << "Unsupported source precision: " << src_prc;
     }
 
-    switch (dstPrc) {
+    switch (dst_prc) {
         case ov::element::f32:
             if (x64::mayiuse(x64::avx512_core)) {
-                if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16)) {
+                if (one_of(src_prc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16)) {
                     uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             } else {
-                if (srcPrc == ov::element::f64) {
+                if (src_prc == ov::element::f64) {
                     uni_vcvtpd2ps(vmm_dst, vmm_dst);
-                } else if (srcPrc == ov::element::i64) {
+                } else if (src_prc == ov::element::i64) {
                     // Do conversion later.
-                } else if (one_of(srcPrc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16, ov::element::i32)) {
+                } else if (one_of(src_prc, ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16, ov::element::i32)) {
                     uni_vcvtdq2ps(vmm_dst, vmm_dst);
                 }
             }
             break;
         case ov::element::i32:
             if (!x64::mayiuse(x64::avx512_core)) {
-                if (srcPrc == ov::element::i64) {
+                if (src_prc == ov::element::i64) {
                     // Do conversion later.
-                } else if (one_of(srcPrc, ov::element::f32, ov::element::bf16)) {
+                } else if (one_of(src_prc, ov::element::f32, ov::element::bf16)) {
                     uni_vcvtps2dq(vmm_dst, vmm_dst);
                 }
-            } else if (srcPrc == ov::element::i64) {
+            } else if (src_prc == ov::element::i64) {
                 vpmovsqd(vmm_dst, vmm_dst);
             }
             break;
@@ -1201,265 +1201,265 @@ void JitKernelBase::load_with_bcst(const Xmm& vmm_dst,
         case ov::element::f64:
             break;
         default:
-            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+            IE_THROW() << "Unsupported destination precision: " << dst_prc;
     }
 }
 
-void JitKernelBase::store_vector(const Address &dstAdr,
-                                 const Xmm &vSrc,
-                                 const ov::element::Type& dstPrc,
-                                 const ov::element::Type& srcPrc) {
-    auto xmmSrc = Xmm(vSrc.getIdx());
-    auto ymmSrc = Ymm(vSrc.getIdx());
+void JitKernelBase::store_vector(const Address &adr_dst,
+                                 const Xmm &vmm_src,
+                                 const ov::element::Type& dst_prc,
+                                 const ov::element::Type& src_prc) {
+    auto xmm_src = Xmm(vmm_src.getIdx());
+    auto ymm_src = Ymm(vmm_src.getIdx());
 
-    switch (srcPrc) {
+    switch (src_prc) {
         case ov::element::f64:
-            if (dstPrc == ov::element::f32) {
-                uni_vcvtpd2ps(x64::mayiuse(x64::avx512_core) ? ymmSrc : xmmSrc, vSrc);
-            } else if (dstPrc == ov::element::i64) {
+            if (dst_prc == ov::element::f32) {
+                uni_vcvtpd2ps(x64::mayiuse(x64::avx512_core) ? ymm_src : xmm_src, vmm_src);
+            } else if (dst_prc == ov::element::i64) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtpd2qq(vSrc, vSrc);
+                    vcvtpd2qq(vmm_src, vmm_src);
                 } else {
                     // TODO
                 }
-            } else if (dstPrc == ov::element::i32) {
-                vcvtpd2dq(ymmSrc, vSrc);
+            } else if (dst_prc == ov::element::i32) {
+                vcvtpd2dq(ymm_src, vmm_src);
             }
             break;
         case ov::element::i64:
-            if (dstPrc == ov::element::f32 || dstPrc == ov::element::bf16) {
+            if (dst_prc == ov::element::f32 || dst_prc == ov::element::bf16) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtqq2ps(ymmSrc, vSrc);
+                    vcvtqq2ps(ymm_src, vmm_src);
                 } else {
                     // TODO
                 }
-            } else if (dstPrc == ov::element::f64) {
+            } else if (dst_prc == ov::element::f64) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtqq2pd(vSrc, vSrc);
+                    vcvtqq2pd(vmm_src, vmm_src);
                 } else {
                     // TODO
                 }
             }
             break;
         case ov::element::f32:
-            if (dstPrc == ov::element::i64) {
+            if (dst_prc == ov::element::i64) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtps2qq(vSrc, ymmSrc);
+                    vcvtps2qq(vmm_src, ymm_src);
                 } else {
                     // TODO
                 }
-            } else if ((dstPrc == ov::element::u8 || dstPrc == ov::element::u16) && x64::mayiuse(x64::avx512_core)) {
-                vcvtps2udq(vSrc, vSrc);
-            } else if (dstPrc != ov::element::f32 && dstPrc != ov::element::bf16) {
-                uni_vcvtps2dq(vSrc, vSrc);
+            } else if ((dst_prc == ov::element::u8 || dst_prc == ov::element::u16) && x64::mayiuse(x64::avx512_core)) {
+                vcvtps2udq(vmm_src, vmm_src);
+            } else if (dst_prc != ov::element::f32 && dst_prc != ov::element::bf16) {
+                uni_vcvtps2dq(vmm_src, vmm_src);
             }
             break;
         case ov::element::i32:
-            if (dstPrc == ov::element::f32 || dstPrc == ov::element::bf16) {
-                uni_vcvtdq2ps(vSrc, vSrc);
+            if (dst_prc == ov::element::f32 || dst_prc == ov::element::bf16) {
+                uni_vcvtdq2ps(vmm_src, vmm_src);
             }
             break;
         default:
-            IE_THROW() << "Unsupported source precision: " << srcPrc;
+            IE_THROW() << "Unsupported source precision: " << src_prc;
     }
 
-    switch (dstPrc) {
+    switch (dst_prc) {
         case ov::element::f64:
-            uni_vmovups(dstAdr, vSrc);
+            uni_vmovups(adr_dst, vmm_src);
             break;
         case ov::element::f32:
-            if (srcPrc.size() == 8) {
-                uni_vmovups(dstAdr, ymmSrc);
+            if (src_prc.size() == 8) {
+                uni_vmovups(adr_dst, ymm_src);
             } else {
-                uni_vmovups(dstAdr, vSrc);
+                uni_vmovups(adr_dst, vmm_src);
             }
             break;
         case ov::element::i64:
-            uni_vmovups(dstAdr, vSrc);
+            uni_vmovups(adr_dst, vmm_src);
             break;
         case ov::element::i32:
-            if (srcPrc == ov::element::i64) {
+            if (src_prc == ov::element::i64) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vpmovsqd(dstAdr, vSrc);
+                    vpmovsqd(adr_dst, vmm_src);
                 } else {
                     // TODO
                 }
-            } else if (srcPrc == ov::element::f64) {
-                uni_vmovups(dstAdr, ymmSrc);
+            } else if (src_prc == ov::element::f64) {
+                uni_vmovups(adr_dst, ymm_src);
             } else {
-                uni_vmovups(dstAdr, vSrc);
+                uni_vmovups(adr_dst, vmm_src);
             }
             break;
         case ov::element::bf16:
-            vcvtneps2bf16->emit_code({static_cast<size_t>(ymmSrc.getIdx())}, {static_cast<size_t>(ymmSrc.getIdx())});
-            vmovdqu16(dstAdr, ymmSrc);
+            vcvtneps2bf16->emit_code({static_cast<size_t>(ymm_src.getIdx())}, {static_cast<size_t>(ymm_src.getIdx())});
+            vmovdqu16(adr_dst, ymm_src);
             break;
         case ov::element::i16:
             if (x64::mayiuse(x64::avx512_core)) {
-                vpmovsdw(dstAdr, vSrc);
+                vpmovsdw(adr_dst, vmm_src);
             } else {
-                uni_vpackssdw(vSrc, vSrc, vSrc);
+                uni_vpackssdw(vmm_src, vmm_src, vmm_src);
                 if (x64::mayiuse(x64::avx)) {
-                    vpermq(ymmSrc, ymmSrc, 0x08);
-                    uni_vmovdqu(dstAdr, xmmSrc);
+                    vpermq(ymm_src, ymm_src, 0x08);
+                    uni_vmovdqu(adr_dst, xmm_src);
                 } else {
-                    movq(dstAdr, xmmSrc);
+                    movq(adr_dst, xmm_src);
                 }
             }
             break;
         case ov::element::u16:
             if (x64::mayiuse(x64::avx512_core)) {
-                vpmovusdw(dstAdr, xmmSrc);
+                vpmovusdw(adr_dst, xmm_src);
             } else {
-                uni_vpackusdw(vSrc, vSrc, vSrc);
+                uni_vpackusdw(vmm_src, vmm_src, vmm_src);
                 if (x64::mayiuse(x64::avx)) {
-                    vpermq(ymmSrc, ymmSrc, 0x08);
-                    uni_vmovdqu(dstAdr, xmmSrc);
+                    vpermq(ymm_src, ymm_src, 0x08);
+                    uni_vmovdqu(adr_dst, xmm_src);
                 } else {
-                    movq(dstAdr, xmmSrc);
+                    movq(adr_dst, xmm_src);
                 }
             }
             break;
         case ov::element::i8:
             if (x64::mayiuse(x64::avx512_core)) {
-                if (srcPrc == ov::element::i64) {
-                    vpmovsqb(dstAdr, vSrc);
+                if (src_prc == ov::element::i64) {
+                    vpmovsqb(adr_dst, vmm_src);
                 } else {
-                    vpmovsdb(dstAdr, vSrc);
+                    vpmovsdb(adr_dst, vmm_src);
                 }
             } else {
-                uni_vpackssdw(vSrc, vSrc, vSrc);
+                uni_vpackssdw(vmm_src, vmm_src, vmm_src);
                 if (x64::mayiuse(x64::avx)) {
-                    vpermq(ymmSrc, ymmSrc, 0x08);
+                    vpermq(ymm_src, ymm_src, 0x08);
                 }
-                uni_vpacksswb(vSrc, vSrc, vSrc);
+                uni_vpacksswb(vmm_src, vmm_src, vmm_src);
                 if (x64::mayiuse(x64::avx)) {
-                    vmovq(dstAdr, xmmSrc);
+                    vmovq(adr_dst, xmm_src);
                 } else {
-                    movd(dstAdr, xmmSrc);
+                    movd(adr_dst, xmm_src);
                 }
             }
             break;
         case ov::element::u8:
             if (x64::mayiuse(x64::avx512_core)) {
-                if (srcPrc == ov::element::i64) {
-                    vpmovusqb(dstAdr, vSrc);
+                if (src_prc == ov::element::i64) {
+                    vpmovusqb(adr_dst, vmm_src);
                 } else {
-                    vpmovusdb(dstAdr, vSrc);
+                    vpmovusdb(adr_dst, vmm_src);
                 }
             } else {
-                uni_vpackusdw(vSrc, vSrc, vSrc);
+                uni_vpackusdw(vmm_src, vmm_src, vmm_src);
                 if (x64::mayiuse(x64::avx)) {
-                    vpermq(ymmSrc, ymmSrc, 0x08);
+                    vpermq(ymm_src, ymm_src, 0x08);
                 }
-                uni_vpackuswb(vSrc, vSrc, vSrc);
+                uni_vpackuswb(vmm_src, vmm_src, vmm_src);
                 if (x64::mayiuse(x64::avx)) {
-                    vmovq(dstAdr, xmmSrc);
+                    vmovq(adr_dst, xmm_src);
                 } else {
-                    movd(dstAdr, xmmSrc);
+                    movd(adr_dst, xmm_src);
                 }
             }
             break;
         default:
-            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+            IE_THROW() << "Unsupported destination precision: " << dst_prc;
     }
 }
 
-void JitKernelBase::store_scalar(const Address &dstAdr,
-                                const Xmm &vSrc,
-                                const ov::element::Type& dstPrc,
-                                const ov::element::Type& srcPrc) {
-    switch (srcPrc) {
+void JitKernelBase::store_scalar(const Address &adr_dst,
+                                 const Xmm &vmm_src,
+                                 const ov::element::Type& dst_prc,
+                                 const ov::element::Type& src_prc) {
+    switch (src_prc) {
         case ov::element::f64:
-            if (dstPrc == ov::element::f32) {
-                uni_vcvtpd2ps(vSrc, vSrc);
-            } else if (dstPrc == ov::element::i64) {
+            if (dst_prc == ov::element::f32) {
+                uni_vcvtpd2ps(vmm_src, vmm_src);
+            } else if (dst_prc == ov::element::i64) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtpd2qq(vSrc, vSrc);
+                    vcvtpd2qq(vmm_src, vmm_src);
                 } else {
                     // TODO
                 }
-            } else if (dstPrc == ov::element::i32) {
-                uni_vcvtpd2dq(vSrc, vSrc);
+            } else if (dst_prc == ov::element::i32) {
+                uni_vcvtpd2dq(vmm_src, vmm_src);
             }
             break;
         case ov::element::i64:
-            if (dstPrc == ov::element::f32 || dstPrc == ov::element::bf16) {
+            if (dst_prc == ov::element::f32 || dst_prc == ov::element::bf16) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtqq2ps(vSrc, vSrc);
+                    vcvtqq2ps(vmm_src, vmm_src);
                 } else {
                     // TODO
                 }
-            } else if (dstPrc == ov::element::i32) {
+            } else if (dst_prc == ov::element::i32) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vpmovsqd(vSrc, vSrc);
+                    vpmovsqd(vmm_src, vmm_src);
                 } else {
                     // TODO
                 }
             }
             break;
         case ov::element::f32:
-            if (dstPrc == ov::element::i64) {
+            if (dst_prc == ov::element::i64) {
                 if (x64::mayiuse(x64::avx512_core)) {
-                    vcvtps2qq(vSrc, vSrc);
+                    vcvtps2qq(vmm_src, vmm_src);
                 } else {
                     // TODO
                 }
-            } else if (dstPrc == ov::element::u8 && x64::mayiuse(x64::avx512_core)) {
-                vcvtps2udq(vSrc, vSrc);
-            } else if (dstPrc != ov::element::f32 && dstPrc != ov::element::bf16) {
-                uni_vcvtps2dq(vSrc, vSrc);
+            } else if (dst_prc == ov::element::u8 && x64::mayiuse(x64::avx512_core)) {
+                vcvtps2udq(vmm_src, vmm_src);
+            } else if (dst_prc != ov::element::f32 && dst_prc != ov::element::bf16) {
+                uni_vcvtps2dq(vmm_src, vmm_src);
             }
             break;
         case ov::element::i32:
-            if (dstPrc == ov::element::f32 || dstPrc == ov::element::bf16) {
-                uni_vcvtdq2ps(vSrc, vSrc);
+            if (dst_prc == ov::element::f32 || dst_prc == ov::element::bf16) {
+                uni_vcvtdq2ps(vmm_src, vmm_src);
             }
             break;
         default:
-            IE_THROW() << "Unsupported source precision: " << srcPrc;
+            IE_THROW() << "Unsupported source precision: " << src_prc;
     }
 
-    switch (dstPrc) {
+    switch (dst_prc) {
         case ov::element::f64:
         case ov::element::i64:
-            uni_vmovsd(dstAdr, vSrc);
+            uni_vmovsd(adr_dst, vmm_src);
             break;
         case ov::element::f32:
         case ov::element::i32:
-            uni_vmovss(dstAdr, vSrc);
+            uni_vmovss(adr_dst, vmm_src);
             break;
         case ov::element::bf16:
-            uni_vpsrld(vSrc, vSrc, 16);
-            uni_vpextrw(dstAdr, vSrc, 0x0);
+            uni_vpsrld(vmm_src, vmm_src, 16);
+            uni_vpextrw(adr_dst, vmm_src, 0x0);
             break;
         case ov::element::i16:
-            uni_vpackssdw(vSrc, vSrc, vSrc);
-            uni_vpextrw(dstAdr, vSrc, 0x0);
+            uni_vpackssdw(vmm_src, vmm_src, vmm_src);
+            uni_vpextrw(adr_dst, vmm_src, 0x0);
             break;
         case ov::element::u16:
-            uni_vpackusdw(vSrc, vSrc, vSrc);
-            uni_vpextrw(dstAdr, vSrc, 0x0);
+            uni_vpackusdw(vmm_src, vmm_src, vmm_src);
+            uni_vpextrw(adr_dst, vmm_src, 0x0);
             break;
         case ov::element::i8:
             if (x64::mayiuse(x64::avx512_core)) {
-                vpmovsdb(vSrc, vSrc);
+                vpmovsdb(vmm_src, vmm_src);
             } else {
-                uni_vpackssdw(vSrc, vSrc, vSrc);
-                uni_vpacksswb(vSrc, vSrc, vSrc);
+                uni_vpackssdw(vmm_src, vmm_src, vmm_src);
+                uni_vpacksswb(vmm_src, vmm_src, vmm_src);
             }
-            uni_vpextrb(dstAdr, vSrc, 0x0);
+            uni_vpextrb(adr_dst, vmm_src, 0x0);
             break;
         case ov::element::u8:
             if (x64::mayiuse(x64::avx512_core)) {
-                vpmovusdb(vSrc, vSrc);
+                vpmovusdb(vmm_src, vmm_src);
             } else {
-                uni_vpackusdw(vSrc, vSrc, vSrc);
-                uni_vpackuswb(vSrc, vSrc, vSrc);
+                uni_vpackusdw(vmm_src, vmm_src, vmm_src);
+                uni_vpackuswb(vmm_src, vmm_src, vmm_src);
             }
-            uni_vpextrb(dstAdr, vSrc, 0);
+            uni_vpextrb(adr_dst, vmm_src, 0);
             break;
         default:
-            IE_THROW() << "Unsupported destination precision: " << dstPrc;
+            IE_THROW() << "Unsupported destination precision: " << dst_prc;
     }
 }

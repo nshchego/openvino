@@ -989,6 +989,20 @@ const auto params_OneAxis_fusing_KeepNoDims = testing::Combine(
         testing::Values(emptyCPUSpec),
         testing::ValuesIn(fusingParamsSet_KeepNoDims));
 
+const auto params_OneAxis_fusing_KeepNoDims_I64 = testing::Combine(
+        testing::Combine(
+                testing::ValuesIn(axes),
+                testing::ValuesIn(opTypes),
+                testing::Values(false),
+                testing::ValuesIn(reductionTypesFusing),
+                testing::Values(ElementType::i64),
+                testing::Values(ElementType::undefined),
+                testing::Values(ElementType::undefined),
+                testing::ValuesIn(inputShapes),
+                testing::Values(additional_config_i64)),
+        testing::Values(emptyCPUSpec),
+        testing::ValuesIn(fusingParamsSet_KeepNoDims));
+
 const auto params_MultiAxis_4D_Hybrid_fusing_KeepNoDims = testing::Combine(
         testing::Combine(
                 testing::ValuesIn(axesNDFusing),
@@ -1021,6 +1035,13 @@ INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_OneAxis_fusing_KeepNoDims_CPU,
         ReduceCPULayerTest,
         params_OneAxis_fusing_KeepNoDims,
+        ReduceCPULayerTest::getTestCaseName
+);
+
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_OneAxis_fusing_KeepNoDims_CPU_I64,
+        ReduceCPULayerTest,
+        params_OneAxis_fusing_KeepNoDims_I64,
         ReduceCPULayerTest::getTestCaseName
 );
 
