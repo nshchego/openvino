@@ -75,6 +75,10 @@ protected:
     element::Type exec_el_type;
 
     RegistersPool::Reg<Xbyak::Reg64> reg_dst;
+
+    std::shared_ptr<jit_maximum_emitter>  max_emitter;
+    std::shared_ptr<jit_minimum_emitter>  min_emitter;
+    std::shared_ptr<jit_multiply_emitter> mul_emitter;
 };
 
 
@@ -207,8 +211,9 @@ private:
     RegistersPool::Reg<Vmm> v_d_bias;
     RegistersPool::Reg<Vmm> v_divider;
 
+    std::shared_ptr<jit_divide_emitter>  division_emitter;
+    std::shared_ptr<jit_sqrt_emitter>    sqrt_emitter;
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
-    std::shared_ptr<jit_divide_emitter> division_emitter;
 
     std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>>> eltwise_injectors;
     std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_depthwise_injector_f32<isa>>> depthwise_injectors;

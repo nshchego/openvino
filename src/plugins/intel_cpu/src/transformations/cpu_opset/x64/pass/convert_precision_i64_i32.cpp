@@ -60,7 +60,8 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
             ov::opset12::Tile::get_type_info_static(),
             ov::opset12::Transpose::get_type_info_static(),
             ov::opset12::Unique::get_type_info_static(),
-            ov::opset12::Unsqueeze::get_type_info_static()
+            ov::opset12::Unsqueeze::get_type_info_static(),
+            ov::opset12::VariadicSplit::get_type_info_static()
     };
 
     return i64Ops.find(type) != i64Ops.end();

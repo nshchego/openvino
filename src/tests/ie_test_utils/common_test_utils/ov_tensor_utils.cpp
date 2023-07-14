@@ -243,14 +243,14 @@ void compare(const ov::Tensor& expected,
 // for (int i = 0; i < shape_size_cnt; i++) {
 //     if (i != 0 && i % 8  == 0)
 //         std::cout << "| ";
-//     std::cout << int(expected_data[i]) << "; ";
+//     std::cout << (expected_data[i]) << "; ";
 // }
 // std::cout << std::endl;
 // std::cout << "ACTUAL: " << std::endl;
 // for (int i = 0; i < shape_size_cnt; i++) {
 //     if (i != 0 && i % 8  == 0)
 //         std::cout << "| ";
-//     std::cout << int(actual_data[i]) << "; ";
+//     std::cout << (actual_data[i]) << "; ";
 // }
 // std::cout << std::endl;
 

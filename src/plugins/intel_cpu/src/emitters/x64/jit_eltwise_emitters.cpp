@@ -276,6 +276,8 @@ void jit_multiply_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, con
     }
 }
 
+// template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+// void jit_multiply_emitter::emit_isa(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op) const {
 template <x64::cpu_isa_t isa>
 void jit_multiply_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
     using Vmm = typename conditional3<isa == x64::sse41, Xmm, isa == x64::avx2, Ymm, Zmm>::type;
@@ -2005,11 +2007,11 @@ size_t jit_prelu_emitter::aux_vecs_count() const {
 
 /// SQRT ///
 jit_sqrt_emitter::jit_sqrt_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const std::shared_ptr<ov::Node>& node, const Precision& exec_prc)
-    : jit_emitter(host, host_isa, node, exec_prc) {
+        : jit_emitter(host, host_isa, node, exec_prc) {
     prepare_table();
 }
 jit_sqrt_emitter::jit_sqrt_emitter(x64::jit_generator *host, x64::cpu_isa_t host_isa, const Precision& exec_prc)
-    : jit_emitter(host, host_isa, exec_prc) {
+        : jit_emitter(host, host_isa, exec_prc) {
     prepare_table();
 }
 
@@ -2043,7 +2045,9 @@ void jit_sqrt_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const st
             if (isa == x64::avx512_core) {
                 h->vcvtqq2pd(vmm_dst, vmm_src_0);
                 h->uni_vsqrtpd(vmm_dst, vmm_dst);
-                h->uni_vroundpd(vmm_dst, vmm_dst, 3); // rounding to zero
+                if (rounding_type != RoundType::nearest) {
+                    h->uni_vroundpd(vmm_dst, vmm_dst, rounding_type);
+                }
                 h->vcvtpd2qq(vmm_dst, vmm_dst);
             } else {
                 Vmm vmm_aux_0 = Vmm(aux_vec_idxs[0]);
@@ -2053,7 +2057,9 @@ void jit_sqrt_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const st
                 h->uni_vsubpd(vmm_dst,  vmm_dst,  vmm_aux_0);
 
                 h->uni_vsqrtpd(vmm_dst, vmm_dst);
-                h->uni_vroundpd(vmm_dst, vmm_dst, 3); // rounding to zero
+                if (rounding_type != RoundType::nearest) {
+                    h->uni_vroundpd(vmm_dst, vmm_dst, rounding_type);
+                }
 
                 h->uni_vaddpd(vmm_dst, vmm_dst, vmm_aux_0);
                 h->uni_vpsubq(vmm_dst, vmm_dst, vmm_aux_0);
@@ -2070,7 +2076,7 @@ size_t jit_sqrt_emitter::aux_vecs_count() const {
 }
 
 void jit_sqrt_emitter::register_table_entries() {
-    if (host_isa_ != x64::avx512_core) {
+    if (host_isa_ != x64::avx512_core && exec_prc_ == Precision::I64) {
         push_arg_entry_of_64("dMask",  0x433800002150d000, true);
     }
 }

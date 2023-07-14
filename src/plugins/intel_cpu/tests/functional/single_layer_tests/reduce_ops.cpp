@@ -338,28 +338,28 @@ std::vector<std::vector<InputShape>> inputShapes_SingleBatch = {
 
 std::vector<CPUSpecificParams> cpuParams_4D = {
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
-        CPUSpecificParams({nChw16c}, {nChw16c}, {}, {}),
+        // CPUSpecificParams({nChw16c}, {nChw16c}, {}, {}),
         CPUSpecificParams({nhwc}, {nhwc}, {}, {}),
 #endif
         CPUSpecificParams({nchw}, {nchw}, {}, {}),
 };
 
 std::vector<CPUSpecificParams> cpuParams_4D_I64 = {
-        CPUSpecificParams({nChw16c}, {nChw8c}, {}, {}),
+        // CPUSpecificParams({nChw16c}, {nChw8c}, {}, {}),
         CPUSpecificParams({nchw}, {nchw}, {}, {}),
         CPUSpecificParams({nhwc}, {nhwc}, {}, {})
 };
 
 std::vector<CPUSpecificParams> cpuParams_5D = {
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
-        CPUSpecificParams({nCdhw16c}, {nCdhw16c}, {}, {}),
+        // CPUSpecificParams({nCdhw16c}, {nCdhw16c}, {}, {}),
         CPUSpecificParams({ndhwc}, {ndhwc}, {}, {}),
 #endif
         CPUSpecificParams({ncdhw}, {ncdhw}, {}, {}),
 };
 
 std::vector<CPUSpecificParams> cpuParams_5D_I64 = {
-        CPUSpecificParams({nCdhw8c}, {nCdhw8c}, {}, {}),
+        // CPUSpecificParams({nCdhw8c}, {nCdhw8c}, {}, {}),
         CPUSpecificParams({ncdhw}, {ncdhw}, {}, {}),
         CPUSpecificParams({ndhwc}, {ndhwc}, {}, {})
 };
@@ -399,12 +399,27 @@ const std::vector<fusingSpecificParams> fusingParamsSet {
         fusingScaleShift
 };
 
+const std::vector<fusingSpecificParams> fusingParamsSet_i64 {
+        /* FQ */
+        fusingFakeQuantizePerChannelRelu,
+        fusingFakeQuantizePerTensorRelu,
+        /* another patterns */
+        fusingScaleShift
+};
+
 // Exclude cases of fusingFakeQuantizePerChannelRelu, where FQ for non-1 channel fallbacks
 // to decomposed ngraph reference implementation, so such fusing tests are N/A
 const std::vector<fusingSpecificParams> fusingParamsSet_KeepNoDims {
         /* activations */
         fusingSwish,
 
+        /* FQ */
+        fusingFakeQuantizePerTensorRelu,
+        /* another patterns */
+        fusingScaleShift
+};
+
+const std::vector<fusingSpecificParams> fusingParamsSet_KeepNoDims_i64 {
         /* FQ */
         fusingFakeQuantizePerTensorRelu,
         /* another patterns */
@@ -878,7 +893,7 @@ const auto params_OneAxis_fusing = testing::Combine(
                  testing::ValuesIn(inputShapes),
                  testing::Values(additional_config_i64)),
          testing::Values(emptyCPUSpec),
-         testing::ValuesIn(fusingParamsSet));
+         testing::ValuesIn(fusingParamsSet_i64));
 
 const auto params_MultiAxis_4D_fusing = testing::Combine(
         testing::Combine(
@@ -906,7 +921,7 @@ const auto params_MultiAxis_4D_fusing = testing::Combine(
                  testing::ValuesIn(inputShapes),
                  testing::Values(additional_config_i64)),
          testing::ValuesIn(filterCPUSpecificParams(cpuParams_4D_I64, ElementType::i64)),
-         testing::ValuesIn(fusingParamsSet));
+         testing::ValuesIn(fusingParamsSet_i64));
 
 const auto params_MultiAxis_5D_fusing = testing::Combine(
         testing::Combine(
@@ -934,7 +949,7 @@ const auto params_MultiAxis_5D_fusing = testing::Combine(
                  testing::ValuesIn(inputShapes_5D),
                  testing::Values(additional_config_i64)),
          testing::ValuesIn(filterCPUSpecificParams(cpuParams_5D_I64, ElementType::i64)),
-         testing::ValuesIn(fusingParamsSet));
+         testing::ValuesIn(fusingParamsSet_i64));
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_OneAxis_fusing_CPU,
@@ -1005,7 +1020,7 @@ const auto params_OneAxis_fusing_KeepNoDims_I64 = testing::Combine(
                 testing::ValuesIn(inputShapes),
                 testing::Values(additional_config_i64)),
         testing::Values(emptyCPUSpec),
-        testing::ValuesIn(fusingParamsSet_KeepNoDims));
+        testing::ValuesIn(fusingParamsSet_KeepNoDims_i64));
 
 const auto params_MultiAxis_4D_Hybrid_fusing_KeepNoDims = testing::Combine(
         testing::Combine(

@@ -72,6 +72,9 @@ public:
 
     size_t aux_vecs_count() const override;
 
+    // template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+    // void emit_isa(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op) const;
+
 private:
     void emit_impl(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const override;
 
@@ -512,6 +515,8 @@ public:
 
     size_t get_inputs_num() const override;
     static std::set<std::vector<element::Type>> get_supported_precisions(const std::shared_ptr<ov::Node>& node = nullptr);
+
+    RoundType rounding_type = RoundType::nearest;
 
 private:
     void emit_impl(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const override;
