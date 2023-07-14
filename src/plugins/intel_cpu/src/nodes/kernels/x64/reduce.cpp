@@ -4,12 +4,11 @@
 
 #include "reduce.hpp"
 #include "utils/bfloat16.hpp"
+#include <ie_ngraph_utils.hpp>
 
-using namespace ov::intel_cpu;
 using namespace ov::intel_cpu::kernel;
 using namespace dnnl::impl::utils;
 using namespace dnnl::impl::cpu;
-using namespace ov::element;
 using namespace Xbyak;
 
 #define GET_OFF(field) offsetof(JitReduceCallArgs, field)
@@ -27,10 +26,15 @@ static inline bool isFloatCompatible(const ov::element::Type& type) {
 template<typename CallArgs>
 JitReduceKernelBase<CallArgs>::JitReduceKernelBase(const char* name, const JitReduceConfigParams& jcp, x64::cpu_isa_t isa)
         : JitKernel<JitReduceConfigParams, CallArgs>(name, jcp, isa) {
-    if (jcp.src_el_type.size() <= 4) {
+    exec_el_type = jcp.src_el_type;
+    if (exec_el_type.size() <= 4) {
         exec_el_type = ov::element::f32;
-    } else if (jcp.src_el_type.size() == 8) {
-        exec_el_type = jcp.src_el_type;
+    } else if (exec_el_type == ov::element::u64) {
+        exec_el_type = ov::element::i64;
+    }
+
+    if (one_of(ov::element::bf16, exec_el_type, jcp.src_el_type, jcp.dst_el_type)) {
+        this->vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, isa));
     }
 }
 
@@ -209,14 +213,15 @@ void JitReduceKernelBase<CallArgs>::horiz_reduce_store_qq(const Xmm& vmm_dst, co
 ///////////////////////////////
 
 template <x64::cpu_isa_t isa>
-JitReduceKernel<isa>::JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase<JitReduceCallArgs>(jit_name(), jcp, isa) {}
-
-template <x64::cpu_isa_t isa>
-void JitReduceKernel<isa>::generate() {
+JitReduceKernel<isa>::JitReduceKernel(const JitReduceConfigParams &jcp) : JitReduceKernelBase<JitReduceCallArgs>(jit_name(), jcp, isa) {
+    planar_layout = one_of(jcp.layout, ReduceLayoutType::reduce_ncsp, ReduceLayoutType::reduce_nspc);
     if (jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
         exp_injector = std::make_shared<x64::jit_uni_eltwise_injector_f32<isa>>(this, dnnl::impl::alg_kind::eltwise_exp, 0.f, 0.f, 1.f);
     }
+}
 
+template <x64::cpu_isa_t isa>
+void JitReduceKernel<isa>::generate() {
     this->preamble();
 
     registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
@@ -231,9 +236,9 @@ void JitReduceKernel<isa>::generate() {
     mov(reg_work_batch, ptr[reg_params + GET_OFF(work_batch)]);
 
     reg_reduce_stride = getReg64();
-
     v_src = getVmm();
     v_dst = getVmm();
+
     if (jcp.reduce_mode == Algorithm::ReduceL1 && !(isa == x64::avx512_core && exec_el_type == ov::element::i64)) {
         v_abs_mask = getVmm();
     }
@@ -241,23 +246,19 @@ void JitReduceKernel<isa>::generate() {
         v_dst_aux = getVmm();
     }
 
-    planar_layout = one_of(jcp.layout, ReduceLayoutType::reduce_ncsp, ReduceLayoutType::reduce_nspc);
     if (planar_layout) {
         reg_reduce_w = getReg64();
         mov(reg_reduce_w, ptr[reg_params + GET_OFF(reduce_w)]);
     }
-
     if (one_of(jcp.reduce_mode, Algorithm::ReduceAnd, Algorithm::ReduceL1, Algorithm::ReduceMax,
                                 Algorithm::ReduceMin, Algorithm::ReduceProd, Algorithm::ReduceOr)) {
         reg_table = getReg64();
         mov(reg_table, l_table);
     }
-
     if (one_of(jcp.reduce_mode, Algorithm::ReduceAnd, Algorithm::ReduceOr)) {
         v_zero = getVmm();
         uni_vpxor(v_zero, v_zero, v_zero);
     }
-
     if (jcp.reduce_mode == Algorithm::ReduceOr) {
         v_ones = getVmm();
         uni_vmovups(v_ones, table_val(0));
@@ -267,12 +268,12 @@ void JitReduceKernel<isa>::generate() {
     reduce_tail();
 
     registersPool.reset();
+
     this->postamble();
 
-    if (isa == x64::avx512_core) {
+    if (vcvtneps2bf16) {
         vcvtneps2bf16->emit_data();
     }
-
     if (one_of(jcp.reduce_mode, Algorithm::ReduceAnd, Algorithm::ReduceL1, Algorithm::ReduceMax,
                                 Algorithm::ReduceMin, Algorithm::ReduceProd, Algorithm::ReduceOr)) {
         prepare_aux_table();
@@ -1365,7 +1366,18 @@ void JitReduceKernel<isa>::prepare_aux_table() {
 
 template <x64::cpu_isa_t isa>
 JitReducePostKernel<isa>::JitReducePostKernel(const JitReduceConfigParams& jcp, const dnnl_primitive_attr& attr)
-        : JitReduceKernelBase<JitReducePostCallArgs>(jit_name(), jcp, isa), attr(attr) {}
+        : JitReduceKernelBase<JitReducePostCallArgs>(jit_name(), jcp, isa), attr(attr) {
+    planar_layout = one_of(jcp.layout, ReduceLayoutType::reduce_ncsp, ReduceLayoutType::reduce_nspc);
+
+    if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
+        log_injector = std::make_shared<x64::jit_uni_eltwise_injector_f32<isa>>(this, dnnl::impl::alg_kind::eltwise_log, 0.f, 0.f, 1.f);
+    }
+
+    if (jcp.reduce_mode == Algorithm::ReduceMean) {
+        division_emitter = std::make_shared<ov::intel_cpu::jit_divide_emitter>(this, isa, InferenceEngine::details::convertPrecision(exec_el_type));
+        division_emitter->second_is_float = true;
+    }
+}
 
 template <x64::cpu_isa_t isa>
 void JitReducePostKernel<isa>::generate() {
@@ -1401,10 +1413,6 @@ void JitReducePostKernel<isa>::generate() {
         }
     }
 
-    if (jcp.reduce_mode == Algorithm::ReduceLogSum || jcp.reduce_mode == Algorithm::ReduceLogSumExp) {
-        log_injector = std::make_shared<x64::jit_uni_eltwise_injector_f32<isa>>(this, dnnl::impl::alg_kind::eltwise_log, 0.f, 0.f, 1.f);
-    }
-
     this->preamble();
 
     reg_dst         = getReg64();
@@ -1412,16 +1420,8 @@ void JitReducePostKernel<isa>::generate() {
     mov(reg_dst, ptr[reg_params + GET_OFF_POST(dst)]);
     mov(reg_work_amount, ptr[reg_params + GET_OFF_POST(work_amount)]);
 
-    // reg_oc_off        = getReg64();
-    // reg_post_ops_data = getReg64();
-
     v_dst = getVmm();
 
-    if (jcp.reduce_mode == Algorithm::ReduceMean) {
-        v_divider = getVmm();
-    }
-
-    planar_layout = one_of(jcp.layout, ReduceLayoutType::reduce_ncsp, ReduceLayoutType::reduce_nspc);
     if (!planar_layout) {
         reg_reduce_c = getReg64();
         mov(reg_reduce_c, ptr[reg_params + GET_OFF_POST(reduce_c)]);
@@ -1433,6 +1433,7 @@ void JitReducePostKernel<isa>::generate() {
         mov(reg_oc_off, ptr[reg_params + GET_OFF_POST(oc_off)]);
     }
     if (jcp.reduce_mode == Algorithm::ReduceMean) {
+        v_divider = getVmm();
         reg_divider = getReg64();
         mov(reg_divider, ptr[reg_params + GET_OFF_POST(divisor)]);
     }
@@ -1470,14 +1471,15 @@ void JitReducePostKernel<isa>::generate() {
 
     this->postamble();
 
-    if (isa == x64::avx512_core) { // Only if bf16?
+    if (vcvtneps2bf16) {
         vcvtneps2bf16->emit_data();
     }
-
+    if (division_emitter) {
+        division_emitter->emit_data();
+    }
     if (one_of(jcp.reduce_mode, Algorithm::ReduceLogSum, Algorithm::ReduceLogSumExp)) {
         log_injector->prepare_table();
     }
-
     for (auto& inj : eltwise_injectors) {
         inj->prepare_table();
     }
@@ -1550,8 +1552,7 @@ void JitReducePostKernel<isa>::reduce_post_main() {
                 if (exec_el_type.size() == 4) {
                     uni_vbroadcastss(v_divider, ptr[reg_divider]);
                 } else if (exec_el_type.size() == 8) {
-                    auto zmm_divisor = Zmm(v_divider.getIdx());
-                    vbroadcastsd(zmm_divisor, ptr[reg_divider]);
+                    uni_vbroadcastsd(v_divider, ptr[reg_divider]);
                 }
             }
 
@@ -1760,24 +1761,7 @@ void JitReducePostKernel<isa>::apply_post_ops(const ov::element::Type& dst_el_ty
 template <x64::cpu_isa_t isa>
 void JitReducePostKernel<isa>::reduce_map_kernel(const Vmm& vmm_dst) {
     if (jcp.reduce_mode == Algorithm::ReduceMean) {
-        if (exec_el_type == ov::element::f32) {
-            uni_vdivps(vmm_dst, vmm_dst, v_divider);
-        } else if (exec_el_type == ov::element::f64) {
-            uni_vdivpd(vmm_dst, vmm_dst, v_divider);
-        } else if (exec_el_type == ov::element::i64) {
-            if (isa == x64::avx512_core) {
-                vcvtqq2pd(vmm_dst, vmm_dst);
-            } else {
-                // TODO
-            }
-            uni_vdivpd(vmm_dst, vmm_dst, v_divider);
-            uni_vroundpd(vmm_dst, vmm_dst, 0x3); // Truncation
-            if (isa == x64::avx512_core) {
-                vcvtpd2qq(vmm_dst, vmm_dst);
-            } else {
-                // TODO
-            }
-        }
+        division_emitter->emit_code({ vmm_dst.getIdx(), v_divider.getIdx() }, { vmm_dst.getIdx() });
     } else if (jcp.reduce_mode == Algorithm::ReduceL2) {
         if (exec_el_type == ov::element::f32) {
             uni_vsqrtps(vmm_dst, vmm_dst);
@@ -1801,21 +1785,7 @@ void JitReducePostKernel<isa>::reduce_map_kernel(const Vmm& vmm_dst) {
 template <x64::cpu_isa_t isa>
 void JitReducePostKernel<isa>::reduce_map_kernel_scalar(const Xmm& xmm_dst) {
     if (jcp.reduce_mode == Algorithm::ReduceMean) {
-        auto xmm_divisor = Xmm(v_divider.getIdx());
-        if (exec_el_type == ov::element::f32) {
-            uni_vdivps(xmm_dst, xmm_dst, xmm_divisor);
-        } else if (exec_el_type == ov::element::f64) {
-            uni_vdivpd(xmm_dst, xmm_dst, xmm_divisor);
-        } else if (exec_el_type == ov::element::i64) {
-            if (isa == x64::avx512_core) {
-                vcvtqq2pd(xmm_dst, xmm_dst);
-                uni_vdivpd(xmm_dst, xmm_dst, xmm_divisor);
-                uni_vroundpd(xmm_dst, xmm_dst, 0x3); // Truncation
-                vcvtpd2qq(xmm_dst, xmm_dst);
-            } else {
-                // TODO
-            }
-        }
+        division_emitter->emit_code({ xmm_dst.getIdx(), v_divider.getIdx() }, { xmm_dst.getIdx() });
     } else if (jcp.reduce_mode == Algorithm::ReduceL2) {
         if (exec_el_type == ov::element::f32) {
             uni_vsqrtps(xmm_dst, xmm_dst);

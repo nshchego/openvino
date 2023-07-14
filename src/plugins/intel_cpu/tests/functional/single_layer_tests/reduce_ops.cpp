@@ -71,10 +71,14 @@ public:
             result << "KeepDims=false_";
         result << "netPRC=" << netPrecision << "_";
         result << "inPRC=" << inPrc << "_";
-        result << "outPRC=" << outPrc << "_";
-        for (auto const& configItem : config) {
-            result << "_configItem=" << configItem.first << "_";
-            configItem.second.print(result);
+        result << "outPRC=" << outPrc;
+
+        if (!config.empty()) {
+            result << "_PluginConf";
+            for (const auto& configItem : config) {
+                result << "_" << configItem.first << "=";
+                configItem.second.print(result);
+            }
         }
 
         result << CPUTestsBase::getTestCaseName(cpuParams);
@@ -633,12 +637,12 @@ INSTANTIATE_TEST_SUITE_P(
         ReduceCPULayerTest::getTestCaseName
 );
 
- INSTANTIATE_TEST_SUITE_P(
-         smoke_Reduce_MultiAxis_4D_CPU_I64,
-         ReduceCPULayerTest,
-         params_MultiAxis_4D_I64,
-         ReduceCPULayerTest::getTestCaseName
- );
+INSTANTIATE_TEST_SUITE_P(
+        smoke_Reduce_MultiAxis_4D_CPU_I64,
+        ReduceCPULayerTest,
+        params_MultiAxis_4D_I64,
+        ReduceCPULayerTest::getTestCaseName
+);
 
 INSTANTIATE_TEST_SUITE_P(
         smoke_Reduce_MultiAxis_5D_CPU,

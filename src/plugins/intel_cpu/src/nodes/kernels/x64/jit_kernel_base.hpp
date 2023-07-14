@@ -49,8 +49,6 @@ public:
 
     void uni_vdivpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
-    void uni_vsqrtpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op);
-
     void uni_vandps(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op);
 
     void uni_vandpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand &op);

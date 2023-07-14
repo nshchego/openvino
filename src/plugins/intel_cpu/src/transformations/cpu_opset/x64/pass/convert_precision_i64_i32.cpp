@@ -52,6 +52,7 @@ bool isNativelySupported(const ov::Node::type_info_t &type) {
             ov::opset12::ShapeOf::get_type_info_static(),
             ov::opset12::Slice::get_type_info_static(),
             ov::opset12::Split::get_type_info_static(),
+            ov::opset12::Sqrt::get_type_info_static(),
             ov::opset12::SquaredDifference::get_type_info_static(),
             ov::opset12::Squeeze::get_type_info_static(),
             ov::opset12::StridedSlice::get_type_info_static(),

@@ -11,13 +11,6 @@ using namespace Xbyak;
 
 JitKernelBase::JitKernelBase(const char* name, x64::cpu_isa_t isa) :
         x64::jit_generator(name, nullptr, dnnl::impl::cpu::x64::MAX_CODE_SIZE, true, isa) {
-    if (isa == x64::avx512_core) {
-        vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::avx512_core));
-    } else if (isa == x64::avx2) {
-        vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::avx2));
-    } else if (isa == x64::sse41) {
-        vcvtneps2bf16.reset(new jit_uni_vcvtneps2bf16(this, x64::sse41));
-    }
 }
 
 void JitKernelBase::uni_vfmsub132ps(const Xmm& vmm_dst,
@@ -224,75 +217,67 @@ void JitKernelBase::uni_vdivpd(const Xmm& vmm_dst,
     }
 }
 
-void JitKernelBase::uni_vsqrtpd(const Xmm& vmm_dst, const Operand &op) {
-    if (isValidIsa(x64::avx)) {
-        vsqrtpd(vmm_dst, op);
-    } else {
-        sqrtpd(vmm_dst, op);
-    }
-}
-
 void JitKernelBase::uni_vandps(const Xmm& vmm_dst,
-                               const Xmm& vSrs,
+                               const Xmm& vmm_src,
                                const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vandps(vmm_dst, vSrs, op);
+        vandps(vmm_dst, vmm_src, op);
     } else {
-        if (vmm_dst.getIdx() != vSrs.getIdx()) {
-            movups(vmm_dst, vSrs);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movups(vmm_dst, vmm_src);
         }
         andps(vmm_dst, op);
     }
 }
 
 void JitKernelBase::uni_vandpd(const Xmm& vmm_dst,
-                               const Xmm& vSrs,
+                               const Xmm& vmm_src,
                                const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vandpd(vmm_dst, vSrs, op);
+        vandpd(vmm_dst, vmm_src, op);
     } else {
-        if (vmm_dst.getIdx() != vSrs.getIdx()) {
-            movupd(vmm_dst, vSrs);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movupd(vmm_dst, vmm_src);
         }
         andpd(vmm_dst, op);
     }
 }
 
 void JitKernelBase::uni_vandnps(const Xmm& vmm_dst,
-                                const Xmm& vSrs,
+                                const Xmm& vmm_src,
                                 const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vandnps(vmm_dst, vSrs, op);
+        vandnps(vmm_dst, vmm_src, op);
     } else {
-        if (!vmm_dst.isEqualIfNotInherited(vSrs)) {
-            movups(vmm_dst, vSrs);
+        if (!vmm_dst.isEqualIfNotInherited(vmm_src)) {
+            movups(vmm_dst, vmm_src);
         }
         andnps(vmm_dst, op);
     }
 }
 
 void JitKernelBase::uni_vorpd(const Xmm& vmm_dst,
-                              const Xmm& vSrs,
+                              const Xmm& vmm_src,
                               const Operand &op) {
     if (isValidIsa(x64::avx)) {
-        vorpd(vmm_dst, vSrs, op);
+        vorpd(vmm_dst, vmm_src, op);
     } else {
-        if (vmm_dst.getIdx() != vSrs.getIdx()) {
-            movupd(vmm_dst, vSrs);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movupd(vmm_dst, vmm_src);
         }
         orpd(vmm_dst, op);
     }
 }
 
 void JitKernelBase::uni_vcmppd(const Xmm& vmm_dst,
-                               const Xmm &vSrs,
+                               const Xmm &vmm_src,
                                const Operand &op,
                                const uint8_t imm) {
     if (isValidIsa(x64::avx)) {
-        vcmppd(vmm_dst, vSrs, op, imm);
+        vcmppd(vmm_dst, vmm_src, op, imm);
     } else {
-        if (vmm_dst.getIdx() != vSrs.getIdx()) {
-            movupd(vmm_dst, vSrs);
+        if (vmm_dst.getIdx() != vmm_src.getIdx()) {
+            movupd(vmm_dst, vmm_src);
         }
         cmppd(vmm_dst, op, imm);
     }
@@ -1291,6 +1276,9 @@ void JitKernelBase::store_vector(const Address &adr_dst,
             }
             break;
         case ov::element::bf16:
+            if (!vcvtneps2bf16) {
+                IE_THROW() << "Converter for bf16 was not initialized!";
+            }
             vcvtneps2bf16->emit_code({static_cast<size_t>(ymm_src.getIdx())}, {static_cast<size_t>(ymm_src.getIdx())});
             vmovdqu16(adr_dst, ymm_src);
             break;

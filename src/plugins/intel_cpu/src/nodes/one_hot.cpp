@@ -89,7 +89,7 @@ bool OneHot::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std
     return true;
 }
 
-OneHot::OneHot(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr &context)
+OneHot::OneHot(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         : Node(op, context, OneHotShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {

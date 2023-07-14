@@ -208,6 +208,7 @@ private:
     RegistersPool::Reg<Vmm> v_divider;
 
     std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>> log_injector;
+    std::shared_ptr<jit_divide_emitter> division_emitter;
 
     std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_eltwise_injector_f32<isa>>> eltwise_injectors;
     std::vector<std::shared_ptr<dnnl::impl::cpu::x64::jit_uni_depthwise_injector_f32<isa>>> depthwise_injectors;
