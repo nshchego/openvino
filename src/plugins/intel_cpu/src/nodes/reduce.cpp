@@ -406,13 +406,13 @@ void Reduce::prepareParams() {
         jit_mode = jit_mode && reduce_post_kernel;
 
         if (jit_mode) {
-            const size_t divisorI = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
+            const size_t divisor = IB * IC * ID * IH * IW / (OB * OC * OD * OH * OW);
             if (reduce_post_kernel->get_exec_prc().size() == 4) {
-                postKerDivisorF = static_cast<float>(divisorI);
-                postKerDivisor = &postKerDivisorF;
+                in_out_divisor_f32 = static_cast<float>(divisor);
+                in_out_divisor = &in_out_divisor_f32;
             } else if (reduce_post_kernel->get_exec_prc().size() == 8) {
-                postKerDivisorD = static_cast<double>(divisorI);
-                postKerDivisor = &postKerDivisorD;
+                in_out_divisor_f64 = static_cast<double>(divisor);
+                in_out_divisor = &in_out_divisor_f64;
             }
         }
 
@@ -680,9 +680,19 @@ void Reduce::reduce_type(const uint8_t *in_ptr, uint8_t *out_ptr, size_t dst_siz
         auto &dstMemPtr = getChildEdgeAt(0)->getMemoryPtr();
         out_ptr = reinterpret_cast<uint8_t *>(dstMemPtr->GetPtr());
         if (layout == ReduceLayoutType::reduce_nspc) {
-            nspc2ncsp(proc_ptr, out_ptr);
+            switch (dst_data_size) {
+                case 1: nspc2ncsp<uint8_t>(proc_ptr, out_ptr); break;
+                case 2: nspc2ncsp<uint16_t>(proc_ptr, out_ptr); break;
+                case 4: nspc2ncsp<uint32_t>(proc_ptr, out_ptr); break;
+                case 8: nspc2ncsp<uint64_t>(proc_ptr, out_ptr); break;
+            }
         } else {
-            blocked2ncsp(proc_ptr, out_ptr);
+            switch (dst_data_size) {
+                case 1: blocked2ncsp<uint8_t>(proc_ptr, out_ptr); break;
+                case 2: blocked2ncsp<uint16_t>(proc_ptr, out_ptr); break;
+                case 4: blocked2ncsp<uint32_t>(proc_ptr, out_ptr); break;
+                case 8: blocked2ncsp<uint64_t>(proc_ptr, out_ptr); break;
+            }
         }
     }
 }
@@ -1154,7 +1164,7 @@ inline void Reduce::reduce_kernel_post_process(uint8_t *out_ptr) {
             arg.oc_off = oc * sizeof(float);
             arg.channel_size = OC;
             arg.work_amount = work_amount;
-            arg.divisor = postKerDivisor;
+            arg.divisor = in_out_divisor;
             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
 
 //std::cout << "reduce_kernel_post_process oc_off: " << arg.oc_off << "; channel_size: " << arg.channel_size << "; work_amount: " <<
@@ -1200,7 +1210,7 @@ inline void Reduce::reduce_kernel_post_process(uint8_t *out_ptr) {
             arg.oc_off = 0;
             arg.channel_size = OW; // OW is related to nspc-ncsp dimension reinterpret
             arg.work_amount = work_amount;
-            arg.divisor = postKerDivisor;
+            arg.divisor = in_out_divisor;
             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
 
 // std::cout << "reduce_kernel_post_process oc_off: " << arg.oc_off << "; channel_size: " << arg.channel_size << "; work_amount: " <<
@@ -1242,7 +1252,7 @@ inline void Reduce::reduce_kernel_post_process(uint8_t *out_ptr) {
             arg.reduce_c = ReduceC ? 1 : 0;
             arg.oc_off = ocb * blk_size * sizeof(float);
             arg.work_amount = work_amount;
-            arg.divisor = postKerDivisor;
+            arg.divisor = in_out_divisor;
             arg.post_op_data = static_cast<const void **>(postOpsDataPtrs.data());
 // auto iIn = reinterpret_cast<const float *>(out_p);
 // std::cout << "IN:  ";
@@ -1276,6 +1286,7 @@ inline void Reduce::reduce_kernel_restore() {
     }
 }
 
+template<typename T>
 void Reduce::nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
     // dimension reinterpret after nspc reusing routine reduce_PLN
     // demote -- nspc -- ncsp
@@ -1292,9 +1303,8 @@ void Reduce::nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
     const size_t stride1 = DIM2 * DIM3 * DIM4;
     const size_t stride0 = stride1 * DIM1;
 
-    if (dst_data_size == 8) {
-        auto src_data = reinterpret_cast<const int64_t *>(proc_ptr);
-        auto dst_data = reinterpret_cast<int64_t *>(out_ptr);
+        auto src_data = reinterpret_cast<const T *>(proc_ptr);
+        auto dst_data = reinterpret_cast<T *>(out_ptr);
         parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
             auto src_off = b * stride0 + j * DIM1;
             auto dst_off = b * stride0 + j;
@@ -1304,45 +1314,59 @@ void Reduce::nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
                 dst_off += stride1;
             }
         });
-    } else if (dst_data_size == 4) {
-        auto src_data = reinterpret_cast<const float *>(proc_ptr);
-        auto dst_data = reinterpret_cast<float *>(out_ptr);
-        parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
-            auto src_off = b * stride0 + j * DIM1;
-            auto dst_off = b * stride0 + j;
-            for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
-                dst_data[dst_off] = src_data[src_off];
-                src_off++;
-                dst_off += stride1;
-            }
-        });
-    } else if (dst_data_size == 2) {
-        auto src_data = reinterpret_cast<const uint16_t *>(proc_ptr);
-        auto dst_data = reinterpret_cast<uint16_t *>(out_ptr);
-        parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
-            auto src_off = b * stride0 + j * DIM1;
-            auto dst_off = b * stride0 + j;
-            for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
-                dst_data[dst_off] = src_data[src_off];
-                src_off++;
-                dst_off += stride1;
-            }
-        });
-    } else {
-        auto src_data = reinterpret_cast<const uint8_t *>(proc_ptr);
-        auto dst_data = reinterpret_cast<uint8_t *>(out_ptr);
-        parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
-            auto src_off = b * stride0 + j * DIM1;
-            auto dst_off = b * stride0 + j;
-            for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
-                dst_data[dst_off] = src_data[src_off];
-                src_off++;
-                dst_off += stride1;
-            }
-        });
-    }
+    
+    // if (dst_data_size == 8) {
+    //     auto src_data = reinterpret_cast<const int64_t *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<int64_t *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * stride0 + j * DIM1;
+    //         auto dst_off = b * stride0 + j;
+    //         for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // } else if (dst_data_size == 4) {
+    //     auto src_data = reinterpret_cast<const float *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<float *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * stride0 + j * DIM1;
+    //         auto dst_off = b * stride0 + j;
+    //         for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // } else if (dst_data_size == 2) {
+    //     auto src_data = reinterpret_cast<const uint16_t *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<uint16_t *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * stride0 + j * DIM1;
+    //         auto dst_off = b * stride0 + j;
+    //         for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // } else {
+    //     auto src_data = reinterpret_cast<const uint8_t *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<uint8_t *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * stride0 + j * DIM1;
+    //         auto dst_off = b * stride0 + j;
+    //         for (size_t dim1 = 0; dim1 < DIM1; dim1++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // }
 }
 
+template<typename T>
 void Reduce::blocked2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
     const size_t DIM0 = OB;
     const size_t DIM1 = OC;
@@ -1353,9 +1377,8 @@ void Reduce::blocked2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
     const size_t src_stride0 = stride1 * div_up(OC, blk_size) * blk_size;
     const size_t dst_stride0 = stride1 * DIM1;
 
-    if (dst_data_size == 8) {
-        auto src_data = reinterpret_cast<const int64_t *>(proc_ptr);
-        auto dst_data = reinterpret_cast<int64_t *>(out_ptr);
+        auto src_data = reinterpret_cast<const T *>(proc_ptr);
+        auto dst_data = reinterpret_cast<T *>(out_ptr);
         parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
             auto src_off = b * src_stride0 + j * blk_size;
             auto dst_off = b * dst_stride0 + j;
@@ -1374,70 +1397,92 @@ void Reduce::blocked2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr) {
                 dst_off += stride1;
             }
         });
-    } else if (dst_data_size == 4) {
-        auto src_data = reinterpret_cast<const float *>(proc_ptr);
-        auto dst_data = reinterpret_cast<float *>(out_ptr);
-        parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
-            auto src_off = b * src_stride0 + j * blk_size;
-            auto dst_off = b * dst_stride0 + j;
-            for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
-                for (size_t k = 0; k < blk_size; k++) {
-                    dst_data[dst_off] = src_data[src_off];
-                    src_off++;
-                    dst_off += stride1;
-                }
-                src_off += (stride1 - 1) * blk_size;
-            }
-            size_t tail = DIM1 % blk_size;
-            for (size_t k = 0; k < tail; k++) {
-                dst_data[dst_off] = src_data[src_off];
-                src_off++;
-                dst_off += stride1;
-            }
-        });
-    } else if (dst_data_size == 2) {
-        auto src_data = reinterpret_cast<const uint16_t *>(proc_ptr);
-        auto dst_data = reinterpret_cast<uint16_t *>(out_ptr);
-        parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
-            auto src_off = b * src_stride0 + j * blk_size;
-            auto dst_off = b * dst_stride0 + j;
-            for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
-                for (size_t k = 0; k < blk_size; k++) {
-                    dst_data[dst_off] = src_data[src_off];
-                    src_off++;
-                    dst_off += stride1;
-                }
-                src_off += (stride1 - 1) * blk_size;
-            }
-            size_t tail = DIM1 % blk_size;
-            for (size_t k = 0; k < tail; k++) {
-                dst_data[dst_off] = src_data[src_off];
-                src_off++;
-                dst_off += stride1;
-            }
-        });
-    } else {
-        auto src_data = reinterpret_cast<const uint8_t *>(proc_ptr);
-        auto dst_data = reinterpret_cast<uint8_t *>(out_ptr);
-        parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
-            auto src_off = b * src_stride0 + j * blk_size;
-            auto dst_off = b * dst_stride0 + j;
-            for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
-                for (size_t k = 0; k < blk_size; k++) {
-                    dst_data[dst_off] = src_data[src_off];
-                    src_off++;
-                    dst_off += stride1;
-                }
-                src_off += (stride1 - 1) * blk_size;
-            }
-            size_t tail = DIM1 % blk_size;
-            for (size_t k = 0; k < tail; k++) {
-                dst_data[dst_off] = src_data[src_off];
-                src_off++;
-                dst_off += stride1;
-            }
-        });
-    }
+        
+    // if (dst_data_size == 8) {
+    //     auto src_data = reinterpret_cast<const int64_t *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<int64_t *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * src_stride0 + j * blk_size;
+    //         auto dst_off = b * dst_stride0 + j;
+    //         for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
+    //             for (size_t k = 0; k < blk_size; k++) {
+    //                 dst_data[dst_off] = src_data[src_off];
+    //                 src_off++;
+    //                 dst_off += stride1;
+    //             }
+    //             src_off += (stride1 - 1) * blk_size;
+    //         }
+    //         size_t tail = DIM1 % blk_size;
+    //         for (size_t k = 0; k < tail; k++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // } else if (dst_data_size == 4) {
+    //     auto src_data = reinterpret_cast<const float *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<float *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * src_stride0 + j * blk_size;
+    //         auto dst_off = b * dst_stride0 + j;
+    //         for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
+    //             for (size_t k = 0; k < blk_size; k++) {
+    //                 dst_data[dst_off] = src_data[src_off];
+    //                 src_off++;
+    //                 dst_off += stride1;
+    //             }
+    //             src_off += (stride1 - 1) * blk_size;
+    //         }
+    //         size_t tail = DIM1 % blk_size;
+    //         for (size_t k = 0; k < tail; k++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // } else if (dst_data_size == 2) {
+    //     auto src_data = reinterpret_cast<const uint16_t *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<uint16_t *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * src_stride0 + j * blk_size;
+    //         auto dst_off = b * dst_stride0 + j;
+    //         for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
+    //             for (size_t k = 0; k < blk_size; k++) {
+    //                 dst_data[dst_off] = src_data[src_off];
+    //                 src_off++;
+    //                 dst_off += stride1;
+    //             }
+    //             src_off += (stride1 - 1) * blk_size;
+    //         }
+    //         size_t tail = DIM1 % blk_size;
+    //         for (size_t k = 0; k < tail; k++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // } else {
+    //     auto src_data = reinterpret_cast<const uint8_t *>(proc_ptr);
+    //     auto dst_data = reinterpret_cast<uint8_t *>(out_ptr);
+    //     parallel_for2d(DIM0, stride1, [&](size_t b, size_t j) {
+    //         auto src_off = b * src_stride0 + j * blk_size;
+    //         auto dst_off = b * dst_stride0 + j;
+    //         for (size_t dim1 = 0; dim1 + blk_size <= DIM1; dim1 += blk_size) {
+    //             for (size_t k = 0; k < blk_size; k++) {
+    //                 dst_data[dst_off] = src_data[src_off];
+    //                 src_off++;
+    //                 dst_off += stride1;
+    //             }
+    //             src_off += (stride1 - 1) * blk_size;
+    //         }
+    //         size_t tail = DIM1 % blk_size;
+    //         for (size_t k = 0; k < tail; k++) {
+    //             dst_data[dst_off] = src_data[src_off];
+    //             src_off++;
+    //             dst_off += stride1;
+    //         }
+    //     });
+    // }
 }
 
 inline void Reduce::init_dst_data(uint8_t *out_ptr, size_t dst_size) {
@@ -1914,8 +1959,8 @@ int Reduce::getFusingAxis() const {
 }
 
 bool Reduce::canFuse(const NodePtr& node) const {
-    const auto input_prec = getOriginalInputPrecisionAtPort(REDUCE_DATA);
-    const auto output_prec = getOriginalOutputPrecisionAtPort(0);
+    const auto& input_prec = getOriginalInputPrecisionAtPort(REDUCE_DATA);
+    const auto& output_prec = getOriginalOutputPrecisionAtPort(0);
     if (!canApplyJIT(input_prec, output_prec) || jit_beyond_5D || algorithm == Algorithm::ReduceAnd || algorithm == Algorithm::ReduceOr) {
         return false;
     }

@@ -43,7 +43,7 @@ public:
 
     void uni_vmulpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
-    void uni_vpmullq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
+//     void uni_vpmullq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
     void uni_vdivps(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
@@ -63,9 +63,9 @@ public:
 
     void uni_vminpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
 
-    void uni_vpmaxsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
+//     void uni_vpmaxsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
-    void uni_vpminsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
+//     void uni_vpminsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
         kmovd(kDst, kSrc);

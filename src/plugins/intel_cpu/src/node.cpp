@@ -102,9 +102,9 @@ Node::Node(const std::shared_ptr<ov::Node>& op,
 
         bool isScalar = shape.rank().get_length() == 0;
         inputShapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
-//if (type == Type::CumSum) {
-//    std::cout << "CPU CumSum IN: " << op->get_input_element_type(i) << std::endl;
-//}
+// if (type == Type::Eltwise) {
+//    std::cout << "CPU isScalar: " << isScalar << std::endl;
+// }
         originalInputPrecisions.emplace_back(details::convertPrecision(op->get_input_element_type(i)));
     }
 

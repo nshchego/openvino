@@ -73,6 +73,8 @@ protected:
     void horiz_reduce_store_qq(const Xbyak::Xmm& vmm_dst, const element::Type& dst_dt, bool load_embedded = false);
 
     element::Type exec_el_type;
+    bool planar_layout = false;
+    int loop_step = 1;
 
     RegistersPool::Reg<Xbyak::Reg64> reg_dst;
 
@@ -95,7 +97,6 @@ private:
                                                          isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
                                                                                              Xbyak::Zmm>::type;
     const size_t vlen = dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen;
-    bool planar_layout = false;
 
     Xbyak::Address table_val(int index) { return ptr[reg_table + index * vlen]; }
 
@@ -193,7 +194,6 @@ private:
                                                          isa == dnnl::impl::cpu::x64::avx2,  Xbyak::Ymm,
                                                                                              Xbyak::Zmm>::type;
     const size_t vlen = dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen;
-    bool planar_layout = false;
 
     const Xbyak::Reg64 reg_params = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 

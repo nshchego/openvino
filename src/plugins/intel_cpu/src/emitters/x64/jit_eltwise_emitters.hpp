@@ -72,9 +72,6 @@ public:
 
     size_t aux_vecs_count() const override;
 
-    // template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-    // void emit_isa(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op) const;
-
 private:
     void emit_impl(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const override;
 

@@ -276,34 +276,47 @@ void jit_multiply_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, con
     }
 }
 
-// template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-// void jit_multiply_emitter::emit_isa(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op) const {
 template <x64::cpu_isa_t isa>
 void jit_multiply_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
     using Vmm = typename conditional3<isa == x64::sse41, Xmm, isa == x64::avx2, Ymm, Zmm>::type;
+
     Vmm vmm_src_0 = Vmm(in_vec_idxs[0]);
-    Vmm vmm_src_1 = Vmm(in_vec_idxs[1]);
+    Operand op_src_1;
+    if (in_vec_idxs.size() > 1) {
+        op_src_1 = Vmm(in_vec_idxs[1]);
+    } else if (aux_gpr_idxs.size() > 0) {
+        op_src_1 = h->ptr[Reg64(aux_gpr_idxs[0])];
+    } else {
+        IE_THROW() << "jit_multiply_emitter has invalid inputs number.";
+    }
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
     switch (exec_prc_) {
-        case Precision::FP32: h->uni_vmulps(vmm_dst, vmm_src_0, vmm_src_1); break;
-        case Precision::I32:  h->uni_vpmulld(vmm_dst, vmm_src_0, vmm_src_1); break;
+        case Precision::FP32: h->uni_vmulps(vmm_dst, vmm_src_0, op_src_1); break;
+        case Precision::I32:  h->uni_vpmulld(vmm_dst, vmm_src_0, op_src_1); break;
         case Precision::I64: {
             if (isa == x64::avx512_core) {
-                h->vpmullq(vmm_dst, vmm_src_0, vmm_src_1);
+                h->vpmullq(vmm_dst, vmm_src_0, op_src_1);
             } else {
+                if (aux_vec_idxs.size() < 2) {
+                    IE_THROW() << "jit_multiply_emitter has invalid number of aux vectors.";
+                }
                 auto vmm_aux_0 = Vmm(aux_vec_idxs[0]);
                 auto vmm_aux_1 = Vmm(aux_vec_idxs[1]);
                 // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
-                // vmm_src_0 -> ab; vmm_src_1 -> cd;
+                // Represent inputs as vmm_src_0 -> AB and op_src_1 -> CD
                 h->uni_vpsrlq(vmm_aux_0, vmm_src_0, 32);
-                h->uni_vpmuludq(vmm_aux_0, vmm_aux_0, vmm_src_1); // a * d
-                h->uni_vpsrlq(vmm_aux_1, vmm_src_1, 32);
-                h->uni_vpmuludq(vmm_aux_1, vmm_aux_1, vmm_src_0); // b * c
-                h->uni_vpaddq(vmm_aux_1, vmm_aux_1, vmm_aux_0);   // a * d + b * c
+                h->uni_vpmuludq(vmm_aux_0, vmm_aux_0, op_src_1);      // A * D
+                if (!op_src_1.isMEM() && vmm_src_0.getIdx() == op_src_1.getIdx()) { // Optimization for the case of src ^ 2
+                    h->uni_vpaddq(vmm_aux_1, vmm_aux_0, vmm_aux_0);   // A * B + A * B
+                } else {
+                    h->uni_vpsrlq(vmm_aux_1, op_src_1, 32);
+                    h->uni_vpmuludq(vmm_aux_1, vmm_aux_1, vmm_src_0); // B * C
+                    h->uni_vpaddq(vmm_aux_1, vmm_aux_1, vmm_aux_0);   // A * D + B * C
+                }
                 h->uni_vpsllq(vmm_aux_1, vmm_aux_1, 32);
-                h->uni_vpmuludq(vmm_aux_0, vmm_src_0, vmm_src_1); // b * d
-                h->uni_vpaddq(vmm_dst, vmm_aux_0, vmm_aux_1);    // (a * d + b * c) << 32 + b * d
+                h->uni_vpmuludq(vmm_aux_0, vmm_src_0, op_src_1);      // B * D
+                h->uni_vpaddq(vmm_dst, vmm_aux_0, vmm_aux_1);         // (A * D + B * C) << 32 + B * D
             }
         } break;
         default: IE_THROW() << "jit_multiply_emitter doesn't support precision '" << exec_prc_ << "'";
@@ -707,35 +720,45 @@ void jit_maximum_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, cons
 template <x64::cpu_isa_t isa>
 void jit_maximum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const {
     using Vmm = typename conditional3<isa == x64::sse41, Xmm, isa == x64::avx2, Ymm, Zmm>::type;
-    auto vmm_src_0 = Vmm(in_vec_idxs[0]);
-    auto vmm_src_1 = Vmm(in_vec_idxs[1]);
-    auto vmm_dst = Vmm(out_vec_idxs[0]);
+
+    Vmm vmm_src_0 = Vmm(in_vec_idxs[0]);
+    Operand op_src_1;
+    if (in_vec_idxs.size() > 1) {
+        op_src_1 = Vmm(in_vec_idxs[1]);
+    } else if (aux_gpr_idxs.size() > 0) {
+        op_src_1 = h->ptr[Reg64(aux_gpr_idxs[0])];
+    } else {
+        IE_THROW() << "jit_maximum_emitter has invalid inputs number.";
+    }
+    Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
     switch (exec_prc_) {
-        case Precision::FP32: h->uni_vmaxps(vmm_dst, vmm_src_0, vmm_src_1); break;
-        case Precision::I32:  h->uni_vpmaxsd(vmm_dst, vmm_src_0, vmm_src_1); break;
+        case Precision::FP32: h->uni_vmaxps(vmm_dst, vmm_src_0, op_src_1); break;
+        case Precision::I32:  h->uni_vpmaxsd(vmm_dst, vmm_src_0, op_src_1); break;
         case Precision::I64: {
             if (isa == x64::avx512_core) {
-                h->vpmaxsq(vmm_dst, vmm_src_0, vmm_src_1);
-            } else if (isa == x64::avx2) {
-                auto vmm_aux = Vmm(aux_vec_idxs[0]);
-
-                h->vpcmpgtq(vmm_aux, vmm_src_0, vmm_src_1);
-                h->vandpd(vmm_dst, vmm_src_0, vmm_aux);
-                h->vandnpd(vmm_aux, vmm_aux, vmm_src_1);
-                h->vorpd(vmm_dst, vmm_dst, vmm_aux);
+                h->vpmaxsq(vmm_dst, vmm_src_0, op_src_1);
             } else {
-                auto vmm_aux = Vmm(aux_vec_idxs[0]);
-
-                h->movups(vmm_aux, vmm_src_0);
-                h->pcmpgtq(vmm_aux, vmm_src_1);
-                h->andpd(vmm_aux, vmm_src_0);
-                if (vmm_dst.getIdx() != vmm_src_0.getIdx()) {
-                    h->movups(vmm_dst, vmm_src_0);
+                if (aux_vec_idxs.size() < 1) {
+                    IE_THROW() << "jit_maximum_emitter has invalid number of aux vectors.";
                 }
-                h->pcmpgtq(vmm_dst, vmm_src_1);
-                h->andnpd(vmm_dst, vmm_src_1);
-                h->orpd(vmm_dst, vmm_aux);
+                auto vmm_aux = Vmm(aux_vec_idxs[0]);
+                if (isa == x64::avx2) {
+                    h->vpcmpgtq(vmm_aux, vmm_src_0, op_src_1);
+                    h->vandpd(vmm_dst, vmm_src_0, vmm_aux);
+                    h->vandnpd(vmm_aux, vmm_aux, op_src_1);
+                    h->vorpd(vmm_dst, vmm_dst, vmm_aux);
+                } else {
+                    h->movups(vmm_aux, vmm_src_0);
+                    h->pcmpgtq(vmm_aux, op_src_1);
+                    h->andpd(vmm_aux, vmm_src_0);
+                    if (vmm_dst.getIdx() != vmm_src_0.getIdx()) {
+                        h->movups(vmm_dst, vmm_src_0);
+                    }
+                    h->pcmpgtq(vmm_dst, op_src_1);
+                    h->andnpd(vmm_dst, op_src_1);
+                    h->orpd(vmm_dst, vmm_aux);
+                }
             }
         } break;
         default: IE_THROW() << "jit_maximum_emitter doesn't support precision '" << exec_prc_ << "'";
@@ -773,35 +796,45 @@ void jit_minimum_emitter::emit_impl(const std::vector<size_t> &in_vec_idxs, cons
 template <x64::cpu_isa_t isa>
 void jit_minimum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const std::vector<size_t> &out_vec_idxs) const {
     using Vmm = typename conditional3<isa == x64::sse41, Xmm, isa == x64::avx2, Ymm, Zmm>::type;
+
     Vmm vmm_src_0 = Vmm(in_vec_idxs[0]);
-    Vmm vmm_src_1 = Vmm(in_vec_idxs[1]);
+    Operand op_src_1;
+    if (in_vec_idxs.size() > 1) {
+        op_src_1 = Vmm(in_vec_idxs[1]);
+    } else if (aux_gpr_idxs.size() > 0) {
+        op_src_1 = h->ptr[Reg64(aux_gpr_idxs[0])];
+    } else {
+        IE_THROW() << "jit_minimum_emitter has invalid inputs number.";
+    }
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
     switch (exec_prc_) {
-        case Precision::FP32: h->uni_vminps(vmm_dst, vmm_src_0, vmm_src_1); break;
-        case Precision::I32:  h->uni_vpminsd(vmm_dst, vmm_src_0, vmm_src_1); break;
+        case Precision::FP32: h->uni_vminps(vmm_dst, vmm_src_0, op_src_1); break;
+        case Precision::I32:  h->uni_vpminsd(vmm_dst, vmm_src_0, op_src_1); break;
         case Precision::I64: {
             if (isa == x64::avx512_core) {
-                h->vpminsq(vmm_dst, vmm_src_0, vmm_src_1);
-            } else if (isa == x64::avx2) {
-                auto vmm_aux = Vmm(aux_vec_idxs[0]);
-
-                h->vpcmpgtq(vmm_aux, vmm_src_0, vmm_src_1);
-                h->vandpd(vmm_dst, vmm_src_1, vmm_aux);
-                h->vandnpd(vmm_aux, vmm_aux, vmm_src_0);
-                h->vorpd(vmm_dst, vmm_dst, vmm_aux);
+                h->vpminsq(vmm_dst, vmm_src_0, op_src_1);
             } else {
-                auto vmm_aux = Vmm(aux_vec_idxs[0]);
-
-                h->movups(vmm_aux, vmm_src_0);
-                h->pcmpgtq(vmm_aux, vmm_src_1);
-                h->andpd(vmm_aux, vmm_src_1);
-                if (vmm_dst.getIdx() != vmm_src_0.getIdx()) {
-                    h->movups(vmm_dst, vmm_src_0);
+                if (aux_vec_idxs.size() < 1) {
+                    IE_THROW() << "jit_minimum_emitter has invalid number of aux vectors.";
                 }
-                h->pcmpgtq(vmm_dst, vmm_src_1);
-                h->andnpd(vmm_dst, vmm_src_0);
-                h->orpd(vmm_dst, vmm_aux);
+                auto vmm_aux = Vmm(aux_vec_idxs[0]);
+                if (isa == x64::avx2) {
+                    h->vpcmpgtq(vmm_aux, vmm_src_0, op_src_1);
+                    h->vandpd(vmm_dst, vmm_aux, op_src_1);
+                    h->vandnpd(vmm_aux, vmm_aux, vmm_src_0);
+                    h->vorpd(vmm_dst, vmm_dst, vmm_aux);
+                } else {
+                    h->movups(vmm_aux, vmm_src_0);
+                    h->pcmpgtq(vmm_aux, op_src_1);
+                    h->andpd(vmm_aux, op_src_1);
+                    if (vmm_dst.getIdx() != vmm_src_0.getIdx()) {
+                        h->movups(vmm_dst, vmm_src_0);
+                    }
+                    h->pcmpgtq(vmm_dst, op_src_1);
+                    h->andnpd(vmm_dst, vmm_src_0);
+                    h->orpd(vmm_dst, vmm_aux);
+                }
             }
         } break;
         default: IE_THROW() << "jit_minimum_emitter doesn't support precision '" << exec_prc_ << "'";

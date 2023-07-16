@@ -52,7 +52,9 @@ private:
     void reduce_ref_process(const float *in_ptr, float *out_ptr, float init_value, std::function<float(float, float)> func);
     void create_reduce_kernel(std::shared_ptr<kernel::JitReduceKernelBase<kernel::JitReduceCallArgs>> &kernel, const kernel::JitReduceConfigParams &jcp);
     inline void reduce_ref_map(float *out_ptr, size_t work_amount_dst, size_t reduced_dims_work_amount);
+    template<typename T>
     void nspc2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr);
+    template<typename T>
     void blocked2ncsp(uint8_t *proc_ptr, uint8_t *out_ptr);
     void setPostOps(dnnl::primitive_attr &attr, const VectorDims &postOpDims, bool initWeights = false);
     void setJITBeyond5D();
@@ -88,9 +90,9 @@ private:
     InferenceEngine::SizeVector process_dst_dims;
     InferenceEngine::SizeVector axes_for_reduction;
     std::vector<int64_t> raw_axes;
-    float postKerDivisorF = 1.f;
-    double postKerDivisorD = 1.;
-    void* postKerDivisor;
+    float in_out_divisor_f32 = 1.f;
+    double in_out_divisor_f64 = 1.;
+    void* in_out_divisor;
 
     kernel::JitReduceConfigParams jcp;
     kernel::JitReduceConfigParams aux_jcp;
