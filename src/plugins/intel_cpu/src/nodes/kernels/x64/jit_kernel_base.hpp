@@ -12,10 +12,10 @@ namespace ov {
 namespace intel_cpu {
 namespace kernel {
 
-#define getReg64() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
-#define getReg32() RegistersPool::Reg<Xbyak::Reg32>(registersPool)
-#define getVmm()   RegistersPool::Reg<Vmm>(registersPool)
-#define getMask()  RegistersPool::Reg<Vmask>(registersPool)
+#define getReg64() RegistersPool::Reg<Xbyak::Reg64>(this->registersPool)
+#define getReg32() RegistersPool::Reg<Xbyak::Reg32>(this->registersPool)
+#define getVmm()   RegistersPool::Reg<Vmm>(this->registersPool)
+#define getMask()  RegistersPool::Reg<Vmask>(this->registersPool)
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 public:
@@ -43,8 +43,6 @@ public:
 
     void uni_vmulpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
-//     void uni_vpmullq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
-
     void uni_vdivps(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
     void uni_vdivpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
@@ -62,10 +60,6 @@ public:
     void uni_vmaxpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
 
     void uni_vminpd(const Xbyak::Xmm& vmm_dst, const Xbyak::Operand &op1, const Xbyak::Operand &op2);
-
-//     void uni_vpmaxsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
-
-//     void uni_vpminsq(const Xbyak::Xmm& vmm_dst, const Xbyak::Xmm& vmm_src, const Xbyak::Operand& op);
 
     void uni_kmovd(const Xbyak::Opmask& kDst, const Xbyak::Opmask& kSrc) {
         kmovd(kDst, kSrc);

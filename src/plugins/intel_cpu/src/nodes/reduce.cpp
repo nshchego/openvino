@@ -177,6 +177,13 @@ Reduce::Reduce(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
 // const int64_t int64min = std::numeric_limits<int64_t>::lowest(), int64max = std::numeric_limits<int64_t>::max();
 // double one = 1.0, dlow = std::numeric_limits<double>::lowest(), dmax = std::numeric_limits<double>::max(),
 //     int64_min = static_cast<double>(int64min), int64_max = static_cast<double>(int64max);
+// int64_t int64min = 0x8000000000000000;
+// int64_t int64max = 0x7fffffffffffffff;
+// std::cout << "int64min: " << int64min << std::endl;
+// std::cout << "int64max: " << int64max << std::endl;
+
+// std::cout << std::hex << "int32min: " << std::numeric_limits<int32_t>::lowest() << "; " << std::numeric_limits<int32_t>::min() << std::endl;
+// std::cout << std::hex << "int32max: " << std::numeric_limits<int32_t>::max() << std::endl;
 // std::cout << std::hex << "[DOUBLE] one: " << *(reinterpret_cast<int64_t*>(&one))
 //         << "; dlow: " << *(reinterpret_cast<int64_t*>(&dlow)) << "; dmax: " << *(reinterpret_cast<int64_t*>(&dmax))
 //         << "; int64min=" << *(reinterpret_cast<int64_t*>(&int64_min)) << "; int64_max=" << *(reinterpret_cast<int64_t*>(&int64_max)) << std::endl;

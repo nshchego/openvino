@@ -48,6 +48,9 @@ void NonZero::getSupportedDescriptors() {
 }
 
 void NonZero::initSupportedPrimitiveDescriptors() {
+    if (!supportedPrimitiveDescriptors.empty())
+        return;
+
     const auto inPrc = getOriginalInputPrecisionAtPort(0);
     if (!one_of(inPrc, Precision::FP32, Precision::BF16, Precision::I64, Precision::I32, Precision::U32, Precision::I8,  Precision::U8)) {
         IE_THROW() << "Can't create primitive descriptor for NonZero layer with name: " << getName() << " doesn't support "

@@ -174,7 +174,8 @@ private:
 
         uint64_t int64_one = 0x0000000000000001; // 1
         uint64_t int64_abs = 0x7fffffffffffffff; // mask to make positive
-        uint64_t int64_min = 0x0000000000000000; // lowest int64 presented in double
+        // uint64_t int64_min = 0x0000000000000000; // lowest int64
+        uint64_t int64_min = 0x8000000000000000; // lowest int64
         uint64_t int64_max = 0x7fffffffffffffff; // max int64
     } aux_vals;
 };
@@ -198,7 +199,7 @@ private:
     const Xbyak::Reg64 reg_params = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
     RegistersPool::Reg<Xbyak::Reg64> reg_work_amount;
-    RegistersPool::Reg<Xbyak::Reg64> reg_divider;
+    RegistersPool::Reg<Xbyak::Reg64> reg_divisor;
     RegistersPool::Reg<Xbyak::Reg64> reg_reduce_c;
 
     RegistersPool::Reg<Xbyak::Reg64> reg_oc_off;
@@ -209,7 +210,7 @@ private:
     RegistersPool::Reg<Vmm> v_dst;
     RegistersPool::Reg<Vmm> v_d_weights;
     RegistersPool::Reg<Vmm> v_d_bias;
-    RegistersPool::Reg<Vmm> v_divider;
+    RegistersPool::Reg<Vmm> v_divisor;
 
     std::shared_ptr<jit_divide_emitter>  division_emitter;
     std::shared_ptr<jit_sqrt_emitter>    sqrt_emitter;

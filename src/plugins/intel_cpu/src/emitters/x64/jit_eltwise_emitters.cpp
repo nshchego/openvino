@@ -821,8 +821,8 @@ void jit_minimum_emitter::emit_isa(const std::vector<size_t> &in_vec_idxs, const
                 auto vmm_aux = Vmm(aux_vec_idxs[0]);
                 if (isa == x64::avx2) {
                     h->vpcmpgtq(vmm_aux, vmm_src_0, op_src_1);
-                    h->vandpd(vmm_dst, vmm_aux, op_src_1);
-                    h->vandnpd(vmm_aux, vmm_aux, vmm_src_0);
+                    h->vandnpd(vmm_dst, vmm_aux, vmm_src_0);
+                    h->vandpd(vmm_aux, vmm_aux, op_src_1);
                     h->vorpd(vmm_dst, vmm_dst, vmm_aux);
                 } else {
                     h->movups(vmm_aux, vmm_src_0);

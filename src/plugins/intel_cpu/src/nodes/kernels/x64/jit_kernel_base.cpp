@@ -157,40 +157,6 @@ void JitKernelBase::uni_vmulpd(const Xmm& vmm_dst,
     }
 }
 
-// void JitKernelBase::uni_vpmullq(const Xmm& vmm_dst,
-//                                 const Xmm& vmm_src,
-//                                 const Operand& op) {
-//     if (get_isa() == x64::avx512_core) {
-//         vpmullq(vmm_dst, vmm_src, op);
-//     } else if (get_isa() == x64::avx2) {
-//         auto ymm_aux_0 = RegistersPool::Reg<Ymm>(registersPool);
-//         auto ymm_aux_1 = RegistersPool::Reg<Ymm>(registersPool);
-//         // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
-//         // vmm_src0 -> ab; vmm_src1 -> cd;
-//         uni_vpsrlq(ymm_aux_0, vmm_src, 32);
-//         uni_vpmuludq(ymm_aux_0, ymm_aux_0, op);      // a * d
-//         uni_vpsrlq(ymm_aux_1, op, 32);
-//         uni_vpmuludq(ymm_aux_1, ymm_aux_1, vmm_src); // b * c
-//         uni_vpaddq(ymm_aux_1, ymm_aux_1, ymm_aux_0); // a * d + b * c
-//         uni_vpsllq(ymm_aux_1, ymm_aux_1, 32);
-//         uni_vpmuludq(ymm_aux_0, vmm_src, op);        // b * d
-//         uni_vpaddq(vmm_dst, ymm_aux_0, ymm_aux_1);   // (a * d + b * c) << 32 + b * d
-//     } else {
-//         auto xmm_aux_0 = RegistersPool::Reg<Xmm>(registersPool);
-//         auto xmm_aux_1 = RegistersPool::Reg<Xmm>(registersPool);
-//         // There is no multiply int64 instruction on AVX2 and SSE41, thus the WA is used.
-//         // vmm_src0 -> ab; vmm_src1 -> cd;
-//         uni_vpsrlq(xmm_aux_0, vmm_src, 32);
-//         uni_vpmuludq(xmm_aux_0, xmm_aux_0, op);      // a * d
-//         uni_vpsrlq(xmm_aux_1, op, 32);
-//         uni_vpmuludq(xmm_aux_1, xmm_aux_1, vmm_src); // b * c
-//         uni_vpaddq(xmm_aux_1, xmm_aux_1, xmm_aux_0); // a * d + b * c
-//         uni_vpsllq(xmm_aux_1, xmm_aux_1, 32);
-//         uni_vpmuludq(xmm_aux_0, vmm_src, op);        // b * d
-//         uni_vpaddq(vmm_dst, xmm_aux_0, xmm_aux_1);   // (a * d + b * c) << 32 + b * d
-//     }
-// }
-
 void JitKernelBase::uni_vdivps(const Xmm& vmm_dst,
                                const Operand& op1,
                                const Operand& op2) {
@@ -305,74 +271,6 @@ void JitKernelBase::uni_vminpd(const Xmm& vmm_dst, const Operand &op1, const Ope
     }
 }
 
-// void JitKernelBase::uni_vpmaxsq(const Xmm& vmm_dst, const Xmm& vmm_src, const Operand& op) {
-//     if (get_isa() == x64::avx512_core) {
-//         vpmaxsq(vmm_dst, vmm_src, op);
-//     } else if (get_isa() == x64::avx2) {
-//         if (vmm_dst.isYMM()) {
-//             auto ymm_aux = RegistersPool::Reg<Ymm>(registersPool);
-
-//             vpcmpgtq(ymm_aux, vmm_src, op);
-//             vandpd(vmm_dst, vmm_src, ymm_aux);
-//             vandnpd(ymm_aux, ymm_aux, op);
-//             vorpd(vmm_dst, vmm_dst, ymm_aux);
-//         } else {
-//             auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
-
-//             vpcmpgtq(xmm_aux, vmm_src, op);
-//             vandpd(vmm_dst, vmm_src, xmm_aux);
-//             vandnpd(xmm_aux, xmm_aux, op);
-//             vorpd(vmm_dst, vmm_dst, xmm_aux);
-//         }
-//     } else {
-//         auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
-
-//         movups(xmm_aux, vmm_src);
-//         pcmpgtq(xmm_aux, op);
-//         andpd(xmm_aux, vmm_src);
-//         if (vmm_dst.getIdx() != vmm_src.getIdx()) {
-//             movups(vmm_dst, vmm_src);
-//         }
-//         pcmpgtq(vmm_dst, op);
-//         andnpd(vmm_dst, op);
-//         orpd(vmm_dst, xmm_aux);
-//     }
-// }
-
-// void JitKernelBase::uni_vpminsq(const Xmm& vmm_dst, const Xmm& vmm_src, const Operand& op) {
-//     if (get_isa() == x64::avx512_core) {
-//         vpminsq(vmm_dst, vmm_src, op);
-//     } else if (get_isa() == x64::avx2) {
-//         if (vmm_dst.isYMM()) {
-//             auto ymm_aux = RegistersPool::Reg<Ymm>(registersPool);
-
-//             vpcmpgtq(ymm_aux, vmm_src, op);
-//             vandpd(vmm_dst, vmm_src, ymm_aux);
-//             vandnpd(ymm_aux, ymm_aux, op);
-//             vorpd(vmm_dst, vmm_dst, ymm_aux);
-//         } else {
-//             auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
-
-//             vpcmpgtq(xmm_aux, vmm_src, op);
-//             vandpd(vmm_dst, vmm_src, xmm_aux);
-//             vandnpd(xmm_aux, xmm_aux, op);
-//             vorpd(vmm_dst, vmm_dst, xmm_aux);
-//         }
-//     } else {
-//         auto xmm_aux = RegistersPool::Reg<Xmm>(registersPool);
-
-//         movups(xmm_aux, vmm_src);
-//         pcmpgtq(xmm_aux, op);
-//         andpd(xmm_aux, vmm_src);
-//         if (vmm_dst.getIdx() != vmm_src.getIdx()) {
-//             movups(vmm_dst, vmm_src);
-//         }
-//         pcmpgtq(vmm_dst, op);
-//         andnpd(vmm_dst, op);
-//         orpd(vmm_dst, xmm_aux);
-//     }
-// }
-
 void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm &vmm_dst, const Xbyak::Operand &op) {
     if (isValidIsa(x64::avx)) {
         vcvtpd2dq(vmm_dst, op);
@@ -474,44 +372,6 @@ void JitKernelBase::gatherdd(const Ymm&   vmm_dst,
         }
     }
 }
-
-// void JitKernelBase::gatherqq(const Xmm&   vmm_dst,
-//                              const Reg64& rSrcPtr,
-//                              const Xmm&   vSrcShift,
-//                              const Xmm&   vReadMask,
-//                              const bool useMask,
-//                              const bool zeroFill) {
-//     if (vmm_dst.getIdx() == vSrcShift.getIdx() || vmm_dst.getIdx() == vReadMask.getIdx() || vSrcShift.getIdx() == vReadMask.getIdx()) {
-//         IE_THROW() << "Any pair of the index, mask, or destination registers cannot be the same.";
-//     }
-//     if (zeroFill)
-//         pxor(vmm_dst, vmm_dst); // Don't use vpxor. It zeros the rest of the YMM register.
-
-//     if (isValidIsa(x64::avx2)) {
-//         if (!useMask)
-//             uni_vpcmpeqq(vReadMask, vReadMask, vReadMask);
-
-//         vpgatherqq(vmm_dst, ptr[rSrcPtr + vSrcShift], vReadMask);
-//     } else {
-//         auto rAux = getReg64();
-//         // Reg32 r32Aux = Reg32(rAux.getIdx());
-//         const uint8_t elPerVec = x64::cpu_isa_traits<x64::sse41>::vlen / sizeof(int);
-
-//         for (uint8_t i = 0; i < elPerVec; i++) {
-//             Label lLoopNext;
-//             if (useMask) {
-//                 uni_vpextrd(rAux, vReadMask, i);
-//                 cmp(rAux, 0); // TODO: check significant bit
-//                 je(lLoopNext, T_NEAR);
-//             }
-//             uni_vpextrd(rAux, vSrcShift, i);
-//             pinsrd(vmm_dst, ptr[rSrcPtr + rAux], i);
-
-//             if (useMask)
-//                 L(lLoopNext);
-//         }
-//     }
-// }
 
 void JitKernelBase::uni_vpbroadcastd(const Xmm &x, const Operand &op) {
     if (isValidIsa(x64::avx2)) {
