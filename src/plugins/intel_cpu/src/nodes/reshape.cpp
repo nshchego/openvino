@@ -250,6 +250,21 @@ Reshape::Reshape(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr c
     }
 }
 
+template<typename T>
+bool Reshape::validateSecondInputValues(const void* inPtr) const {
+    const auto sndInput = reinterpret_cast<const T *>(inPtr);
+    for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
+        const auto inVal = static_cast<int64_t>(sndInput[i]);
+        if (lastSecondInputValues[i] != inVal) {
+            for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
+                lastSecondInputValues[i] = inVal;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Reshape::needShapeInfer() const {
     if (inputShapesModified()) {
         return true;
@@ -259,27 +274,10 @@ bool Reshape::needShapeInfer() const {
         lastSecondInputValues.resize(mem.getStaticDims()[0], 0);
     }
 
-    const auto shapePrc = mem.getDesc().getPrecision();
-    if (shapePrc == Precision::I64) {
-        const auto sndInput = reinterpret_cast<const int64_t *>(mem.GetPtr());
-        for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
-            if (lastSecondInputValues[i] != sndInput[i]) {
-                for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
-                    lastSecondInputValues[i] = sndInput[i];
-                }
-                return true;
-            }
-        }
-    } else if (shapePrc == Precision::I32) {
-        const auto sndInput = reinterpret_cast<const int32_t *>(mem.GetPtr());
-        for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
-            if (lastSecondInputValues[i] != sndInput[i]) {
-                for (size_t i = 0; i < lastSecondInputValues.size(); i++) {
-                    lastSecondInputValues[i] = sndInput[i];
-                }
-                return true;
-            }
-        }
+    switch (mem.getDesc().getPrecision()) {
+        case Precision::I64: return validateSecondInputValues<int64_t>(mem.GetPtr());
+        case Precision::I32: return validateSecondInputValues<int32_t>(mem.GetPtr());
+        default: THROW_CPU_NODE_ERR << "has unsupported  second input data type.";
     }
 
     return false;

@@ -24,10 +24,13 @@ public:
     void executeDynamicImpl(dnnl::stream strm) override;
     void execute(dnnl::stream strm) override;
 
+    template<typename T>
+    bool validateSecondInputValues(const void* inPtr) const;
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
 private:
-    mutable std::vector<int> lastSecondInputValues;
+    mutable std::vector<int64_t> lastSecondInputValues;
 };
 
 }   // namespace node

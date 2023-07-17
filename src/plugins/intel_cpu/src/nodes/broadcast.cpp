@@ -2,17 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <cmath>
-#include <vector>
-#include <string>
-#include <dnnl_types.h>
-#include "ie_parallel.hpp"
-#include "utils/bfloat16.hpp"
-#include <selective_build.h>
 #include "broadcast.h"
-#include <nodes/common/blocked_desc_creator.h>
-#include <ngraph/opsets/opset1.hpp>
+
 #include "common/cpu_memcpy.h"
+#include "ie_parallel.hpp"
+#include <openvino/op/broadcast.hpp>
+#include <openvino/op/constant.hpp>
 
 using namespace InferenceEngine;
 
@@ -22,12 +17,12 @@ namespace node {
 
 bool Broadcast::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!ov::is_type<ov::op::v1::Broadcast>(op)) {
+        if (!ov::is_type<op::v1::Broadcast>(op)) {
             errorMessage = "Only Broadcast operations from opset1 are supported.";
             return false;
         }
-        if (!one_of(ov::as_type_ptr<const ov::op::v1::Broadcast>(op)->get_broadcast_spec().m_type,
-                ov::op::AutoBroadcastType::NUMPY, ov::op::AutoBroadcastType::EXPLICIT)) {
+        if (!one_of(ov::as_type_ptr<const op::v1::Broadcast>(op)->get_broadcast_spec().m_type,
+                op::AutoBroadcastType::NUMPY, op::AutoBroadcastType::EXPLICIT)) {
             errorMessage = "Only NUMPY and EXPLICIT broadcast types are supported.";
             return false;
         }
@@ -37,9 +32,9 @@ bool Broadcast::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, 
             return false;
         }
         if (!isDynamicNgraphNode(op) &&
-                (!ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX)) ||
+                (!ov::is_type<op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX)) ||
                  (op->get_input_size() > AXES_MAPPING_IDX &&
-                 !ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX))))) {
+                 !ov::is_type<op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX))))) {
             errorMessage = "Only constant target shapes and axis mapping inputs are supported for static shapes.";
             return false;
         }
@@ -50,7 +45,7 @@ bool Broadcast::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, 
 }
 
 Broadcast::Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
-    : Node(op, context, NgraphShapeInferFactory(op, PortMask(TARGET_SHAPE_IDX, AXES_MAPPING_IDX))) {
+        : Node(op, context, NgraphShapeInferFactory(op, PortMask(TARGET_SHAPE_IDX, AXES_MAPPING_IDX))) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
@@ -62,10 +57,10 @@ Broadcast::Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     if (op->get_output_size() == 0)
         IE_THROW() << errorPrefix << "has no output edges.";
 
-    auto broadcastOp = ov::as_type_ptr<const ov::op::v1::Broadcast>(op);
-    if (broadcastOp->get_broadcast_spec().m_type == ov::op::AutoBroadcastType::NUMPY) {
+    auto broadcastOp = ov::as_type_ptr<const op::v1::Broadcast>(op);
+    if (broadcastOp->get_broadcast_spec().m_type == op::AutoBroadcastType::NUMPY) {
         broadcastType = NUMPY;
-    } else if (broadcastOp->get_broadcast_spec().m_type == ov::op::AutoBroadcastType::EXPLICIT) {
+    } else if (broadcastOp->get_broadcast_spec().m_type == op::AutoBroadcastType::EXPLICIT) {
         if (op->get_input_size() <= AXES_MAPPING_IDX)
             IE_THROW() << errorPrefix << " and EXPLICIT mode must have tree input edges: " << getParentEdges().size();
         broadcastType = EXPLICIT;
@@ -73,35 +68,15 @@ Broadcast::Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
         IE_THROW() << errorPrefix << "has unexpected broadcast type: " << broadcastOp->get_broadcast_spec().m_type;
     }
 
-    if (ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX))) {
+    if (auto shapeOp = ov::as_type<op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX))) {
         constMap[TARGET_SHAPE_IDX] = true;
-        if (op->get_input_element_type(TARGET_SHAPE_IDX) == ov::element::i64) {
-            auto idxShape = (ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX)))->get_vector<int64_t>();
-            targetShape.reserve(idxShape.size());
-            targetShape.assign(idxShape.begin(), idxShape.end());
-        } else if (op->get_input_element_type(TARGET_SHAPE_IDX) == ov::element::i32) {
-            auto idxShape = (ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX)))->get_vector<int32_t>();
-            targetShape.reserve(idxShape.size());
-            targetShape.assign(idxShape.begin(), idxShape.end());
-        } else {
-            IE_THROW() << errorPrefix << " does not support precision '" << op->get_input_element_type(TARGET_SHAPE_IDX)
-                << "' for the Target shape input.";
-        }
+        targetShape = shapeOp->cast_vector<Dim>();
     }
-    if (broadcastType == EXPLICIT &&
-                ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX))) {
-        constMap[AXES_MAPPING_IDX] = true;
-        if (op->get_input_element_type(AXES_MAPPING_IDX) == ov::element::i64) {
-            auto mapping = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX))->get_vector<int64_t>();
-            axesMapping.reserve(mapping.size());
-            axesMapping.assign(mapping.begin(), mapping.end());
-        } else if (op->get_input_element_type(AXES_MAPPING_IDX) == ov::element::i32) {
-            auto mapping = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX))->get_vector<int32_t>();
-            axesMapping.reserve(mapping.size());
-            axesMapping.assign(mapping.begin(), mapping.end());
-        } else {
-            IE_THROW() << errorPrefix << " does not support precision '" << op->get_input_element_type(TARGET_SHAPE_IDX)
-                       << "' for the Axes mapping input.";
+
+    if (broadcastType == EXPLICIT) {
+        if (auto axesOp = ov::as_type<op::v0::Constant>(op->get_input_node_ptr(AXES_MAPPING_IDX))) {
+            constMap[AXES_MAPPING_IDX] = true;
+            axesMapping = axesOp->cast_vector<Dim>();
         }
     }
 }

@@ -13,7 +13,7 @@ namespace node {
 
 bool Tile::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!ov::is_type<ov::op::v0::Tile>(op)) {
+        if (!ov::is_type<op::v0::Tile>(op)) {
             errorMessage = "Only opset1 Tile operation is supported.";
             return false;
         }
@@ -22,7 +22,7 @@ bool Tile::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
             return false;
         }
         if (!isDynamicNgraphNode(op) &&
-                !ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))) {
+                !ov::is_type<op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))) {
             errorMessage = "Only constant 'Repeats' input is supported with static shapes.";
             return false;
         }
@@ -39,16 +39,9 @@ Tile::Tile(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    if (ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))) {
+    if (auto repeatsOp = ov::as_type<op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS))) {
         constMap[TILE_REPEATS] = true;
-        auto repeatsOp = ov::as_type<const ov::op::v0::Constant>(op->get_input_node_ptr(TILE_REPEATS));
-        if (repeatsOp->get_element_type() == ov::element::i64) {
-            repeats = originRepeats = repeatsOp->get_vector<size_t>();
-        } else if (repeatsOp->get_element_type() == ov::element::i32) {
-            const auto rData = repeatsOp->get_vector<int32_t>();
-            repeats.assign(rData.begin(), rData.end());
-            originRepeats = repeats;
-        }
+        repeats = originRepeats = repeatsOp->cast_vector<Dim>();
         while (repeats.size() < getInputShapeAtPort(TILE_INPUT).getRank()) {
             repeats.insert(repeats.begin(), 1lu);
         }

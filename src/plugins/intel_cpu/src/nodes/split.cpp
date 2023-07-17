@@ -86,8 +86,8 @@ void Split::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    const auto &srcShape = getInputShapeAtPort(0);
-    const auto &dstFirstDims = getOutputShapeAtPort(0).getDims();
+    const auto& srcShape = getInputShapeAtPort(0);
+    const auto& dstFirstDims = getOutputShapeAtPort(0).getDims();
     for (size_t i = 0; i < outputShapes.size(); i++) {
         const auto &o_Dims = outputShapes[i].getDims();
         if (dstFirstDims.size() != o_Dims.size()) {
@@ -102,9 +102,9 @@ void Split::initSupportedPrimitiveDescriptors() {
         }
     }
 
-    const auto &inpPrecision = getOriginalInputPrecisionAtPort(0);
-    const auto &axisPrecision = getOriginalInputPrecisionAtPort(1);
-    const auto &outPrecision = inpPrecision; // the split layer doesn't convert precisions
+    const auto& inpPrecision = getOriginalInputPrecisionAtPort(0);
+    const auto& axisPrecision = getOriginalInputPrecisionAtPort(1);
+    const auto& outPrecision = inpPrecision; // the split layer doesn't convert precisions
 
     // Set plain and tailC formats
     std::vector<LayoutType> tdCreatorTypes{ LayoutType::ncsp, LayoutType::nspc };

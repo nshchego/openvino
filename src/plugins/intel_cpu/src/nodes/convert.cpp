@@ -103,7 +103,7 @@ void Convert::initSupportedPrimitiveDescriptors() {
         config.outConfs.push_back(dataConfigOut);
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown);
     } else if (inputShapes.size() == 1 && outputShapes.size() == 1) {
-        const auto& insShape = getInputShapeAtPort(0);
+        const auto& inShape = getInputShapeAtPort(0);
         const auto& inPrecision = getOriginalInputPrecisionAtPort(0);
         const auto& outputShape = getOutputShapeAtPort(0);
         const auto& outPrecision = getOriginalOutputPrecisionAtPort(0);
@@ -112,10 +112,10 @@ void Convert::initSupportedPrimitiveDescriptors() {
         config.outConfs.push_back(dataConfigOut);
 
         auto creators = BlockedDescCreator::getCommonCreators();
-        auto range = BlockedDescCreator::makeFilteredRange(creators, insShape.getRank());
+        auto range = BlockedDescCreator::makeFilteredRange(creators, inShape.getRank());
 
         for (auto itr = range.first; itr != range.second; ++itr) {
-            config.inConfs[0].setMemDesc(std::make_shared<CpuBlockedMemoryDesc>(itr->second->createDesc(inPrecision, insShape)));
+            config.inConfs[0].setMemDesc(std::make_shared<CpuBlockedMemoryDesc>(itr->second->createDesc(inPrecision, inShape)));
             config.outConfs[0].setMemDesc(std::make_shared<CpuBlockedMemoryDesc>(itr->second->createDesc(outPrecision, outputShape)));
 
             supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown);

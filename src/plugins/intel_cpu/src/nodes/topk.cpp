@@ -1791,14 +1791,14 @@ private:
 
 bool TopK::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(), ov::op::v1::TopK::get_type_info_static(),
-                                         ov::op::v3::TopK::get_type_info_static(),
-                                         ov::op::v11::TopK::get_type_info_static())) {
+        if (!one_of(op->get_type_info(), op::v1::TopK::get_type_info_static(),
+                                         op::v3::TopK::get_type_info_static(),
+                                         op::v11::TopK::get_type_info_static())) {
             errorMessage = "Node is not an instance of the TopK from the operation sets v1, v3 or v11";
             return false;
         }
 
-        auto topKOp = ov::as_type_ptr<const ov::op::util::TopKBase>(op);
+        auto topKOp = ov::as_type_ptr<const op::util::TopKBase>(op);
         if (!isDynamicNgraphNode(op)) {
             if (topKOp->get_input_node_shared_ptr(TOPK_K)->get_type_info() != ov::opset1::Constant::get_type_info_static()) {
                 errorMessage = "Second tensor is not constant in static shape mode";
@@ -1806,14 +1806,14 @@ bool TopK::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
             }
         }
 
-        if (topKOp->get_mode() != ov::op::TopKMode::MAX &&
-            topKOp->get_mode() != ov::op::TopKMode::MIN) {
+        if (topKOp->get_mode() != op::TopKMode::MAX &&
+            topKOp->get_mode() != op::TopKMode::MIN) {
             errorMessage = "Unsupported mode.";
             return false;
         }
-        if (!one_of(topKOp->get_sort_type(), ov::op::TopKSortType::NONE,
-                                             ov::op::TopKSortType::SORT_VALUES,
-                                             ov::op::TopKSortType::SORT_INDICES)) {
+        if (!one_of(topKOp->get_sort_type(), op::TopKSortType::NONE,
+                                             op::TopKSortType::SORT_VALUES,
+                                             op::TopKSortType::SORT_INDICES)) {
             errorMessage = "Unsupported sort type.";
             return false;
         }
@@ -1830,20 +1830,20 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
         IE_THROW(NotImplemented) << errorMessage;
     }
 
-    auto topKOp = ov::as_type_ptr<const ov::op::util::TopKBase>(op);
+    auto topKOp = ov::as_type_ptr<const op::util::TopKBase>(op);
 
-    auto in_dims = topKOp->get_input_partial_shape(TOPK_DATA);
-    auto out_dims = topKOp->get_output_partial_shape(TOPK_DATA);
-    auto out_idx_dims = topKOp->get_output_partial_shape(TOPK_INDEX);
-    auto in_dims_size = in_dims.size();
+    const auto& in_dims = topKOp->get_input_partial_shape(TOPK_DATA);
+    const auto& out_dims = topKOp->get_output_partial_shape(TOPK_DATA);
+    const auto& out_idx_dims = topKOp->get_output_partial_shape(TOPK_INDEX);
+    const auto in_dims_size = in_dims.size();
 
     top_k = 0;
     if (!isDynamicNgraphNode(op)) {
-        if (auto topKL = ov::as_type<ov::opset1::Constant>(topKOp->get_input_node_ptr(TOPK_K))) {
+        if (auto topKL = ov::as_type<op::v0::Constant>(topKOp->get_input_node_ptr(TOPK_K))) {
             if (topKL->get_element_type() == ov::element::i64) {
-                top_k = topKL->get_vector<int64_t>()[0];
-            } else if (topKL->get_element_type() == ov::element::i32) {
-                top_k = topKL->get_vector<int32_t>()[0];
+                top_k = topKL->get_data_ptr<int64_t>()[0];
+            } else {
+                top_k = topKL->cast_vector<int64_t>()[0];
             }
         } else {
             THROW_CPU_NODE_ERR << " gets non-constant second tensor in static shape mode!";
@@ -1851,13 +1851,12 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
     }
 
     axis = topKOp->get_axis();
-    mode_max = topKOp->get_mode() == ov::op::TopKMode::MAX;
-    sort_index = topKOp->get_sort_type() == ov::op::TopKSortType::SORT_INDICES;
+    mode_max = topKOp->get_mode() == op::TopKMode::MAX;
+    sort_index = topKOp->get_sort_type() == op::TopKSortType::SORT_INDICES;
 
     stable = false;
     if (!sort_index) {
-        const auto topKOpV11 = ngraph::as_type_ptr<const ov::op::v11::TopK>(op);
-        if (topKOpV11) {
+        if (auto topKOpV11 = ov::as_type_ptr<const op::v11::TopK>(op)) {
             stable = topKOpV11->get_stable();
         }
     }
