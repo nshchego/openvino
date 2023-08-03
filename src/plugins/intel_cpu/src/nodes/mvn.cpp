@@ -2077,11 +2077,11 @@ void MVN::prepareParams() {
 
     auto builder = [&](const MVNKey& key) -> std::shared_ptr<MVNExecutorBase> {
         std::shared_ptr<MVNExecutorBase> executor;
-        if (mayiuse(cpu::x64::sse41)) {
-            executor = std::make_shared<MVNJitExecutor>(key.mvnAttrs, key.attr);
-        } else {
+        // if (mayiuse(cpu::x64::sse41)) {
+        //     executor = std::make_shared<MVNJitExecutor>(key.mvnAttrs, key.attr);
+        // } else {
             executor = std::make_shared<MVNRefExecutor>(key.mvnAttrs);
-        }
+        // }
         return executor;
     };
 

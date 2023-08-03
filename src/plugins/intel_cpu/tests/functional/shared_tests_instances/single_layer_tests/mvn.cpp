@@ -100,6 +100,18 @@ INSTANTIATE_TEST_SUITE_P(smoke_MVN_5D, Mvn6LayerTest,
                             ::testing::Values(CommonTestUtils::DEVICE_CPU)),
                         Mvn6LayerTest::getTestCaseName);
 
+INSTANTIATE_TEST_SUITE_P(smoke_MVN_5D_Ref_Diff, Mvn6LayerTest,
+                        ::testing::Combine(
+                            ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 32, 224, 224, 160}}),
+                            ::testing::Values(InferenceEngine::Precision::FP32),
+                            ::testing::Values(InferenceEngine::Precision::I32),
+                            ::testing::ValuesIn(std::vector<std::vector<int>>{{2, 3, 4}}),
+                            ::testing::ValuesIn(normalizeVariance),
+                            ::testing::Values(0.00001),
+                            ::testing::ValuesIn(epsMode),
+                            ::testing::Values(CommonTestUtils::DEVICE_CPU)),
+                        Mvn6LayerTest::getTestCaseName);
+
 INSTANTIATE_TEST_SUITE_P(smoke_MVN_4D, Mvn6LayerTest,
                         ::testing::Combine(
                             ::testing::ValuesIn(std::vector<std::vector<size_t>>{{1, 10, 5, 17}, {1, 3, 8, 9}}),
