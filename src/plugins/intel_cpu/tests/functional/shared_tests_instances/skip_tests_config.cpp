@@ -200,6 +200,8 @@ std::vector<std::string> disabledTestPatterns() {
         // Issue: 121313
         R"(smoke_GroupConvBackpropData.*paddingDefined/GroupConvBackpropLayerTest.Inference.*f16.*)",
         R"(smoke_GroupConvBackpropData.*paddingDefined/GroupConvBackpropLayerTest.Inference.*f32.*)",
+        // Need to generate sequence exactly in the i64 data type. Enable in scope of i64 enabling.
+        R"(.*RandomUniformLayerTestCPU.*OutPrc=i64.*)",
     };
 #if defined(__APPLE__) && defined(OPENVINO_ARCH_ARM64)
     // Issue: 120950
