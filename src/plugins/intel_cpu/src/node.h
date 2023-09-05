@@ -41,6 +41,8 @@
 #include "nodes/executors/mvn_list.hpp"
 #include "nodes/executors/executor.hpp"
 
+#define THROW_CPU_NODE_ERR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
+
 namespace ov {
 namespace intel_cpu {
 

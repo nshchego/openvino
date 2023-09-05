@@ -120,6 +120,7 @@ const InferenceEngine::details::caseless_unordered_map<std::string, Type> type_t
         { "ScatterElementsUpdate", Type::ScatterElementsUpdate},
         { "ScatterNDUpdate", Type::ScatterNDUpdate},
         { "Interpolate", Type::Interpolate},
+        { "RandomUniform", Type::RandomUniform},
         { "ReduceL1", Type::Reduce},
         { "ReduceL2", Type::Reduce},
         { "ReduceLogicalAnd", Type::Reduce},
@@ -311,6 +312,7 @@ std::string NameFromType(const Type type) {
         CASE(PriorBox);
         CASE(PriorBoxClustered)
         CASE(MHA);
+        CASE(RandomUniform);
         CASE(Unique);
         CASE(Ngram);
         CASE(Unknown);
