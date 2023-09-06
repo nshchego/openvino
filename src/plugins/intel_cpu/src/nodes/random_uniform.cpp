@@ -16,6 +16,7 @@ namespace intel_cpu {
 namespace node {
 
 bool RandomUniform::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
+std::cout << "RandomUniform::isSupportedOperation" << std::endl;
     try {
         if (op->get_type_info() != op::v8::RandomUniform::get_type_info_static()) {
             errorMessage = "Only RandomUniform operation from the opset8 is supported by the CPU plugin.";
@@ -59,13 +60,16 @@ RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphCon
     }
 
     if (m_const_inputs[SHAPE]) {
+std::cout << "RandomUniform::RandomUniform m_const_inputs[SHAPE]; dyn: " << isDynamicNgraphNode(op) << std::endl;
         initOutShape(m_out_shape, as_type<op::v0::Constant>(op->get_input_node_ptr(SHAPE))->get_data_ptr(), m_shape_prc,
                 op->get_input_shape(SHAPE)[0]);
     }
     if (m_const_inputs[MIN_VAL]) {
+std::cout << "RandomUniform::RandomUniform m_const_inputs[MIN_VAL]" << std::endl;
         initEdge(m_min_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MIN_VAL))->get_data_ptr(), m_output_prc);
     }
     if (m_const_inputs[MAX_VAL]) {
+std::cout << "RandomUniform::RandomUniform m_const_inputs[MAX_VAL]" << std::endl;
         initEdge(m_max_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MAX_VAL))->get_data_ptr(), m_output_prc);
     }
 
@@ -93,6 +97,7 @@ void RandomUniform::initSupportedPrimitiveDescriptors() {
 }
 
 void RandomUniform::execute(dnnl::stream strm) {
+std::cout << "RandomUniform::execute" << std::endl;
     if (!m_const_inputs[SHAPE]) {
         auto memPtr = getParentEdgeAt(SHAPE)->getMemoryPtr();
         // VectorDims out_shape;

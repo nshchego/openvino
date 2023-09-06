@@ -87,6 +87,7 @@ bool RandomUniform::evaluate(TensorVector& outputs, const TensorVector& inputs) 
         input_shapes.emplace_back(t.get_shape());
     }
     const auto out_shape = shape_infer(this, input_shapes, make_tensor_accessor(inputs)).front().to_shape();
+std::cout << "RandomUniform::evaluate out_shape: " << out_shape << std::endl;
     const auto out_dims = std::vector<uint64_t>(out_shape.begin(), out_shape.end());
 
     const auto& t_out = get_out_type();

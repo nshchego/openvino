@@ -4,6 +4,7 @@
 
 #include "shared_test_classes/base/ov_subgraph.hpp"
 #include "test_utils/cpu_test_utils.hpp"
+#include "ngraph_functions/builders.hpp"
 
 using namespace CPUTestUtils;
 using namespace ov::test;
@@ -17,6 +18,9 @@ typedef std::tuple<
         ElementType,                       // Output precision
         int,                               // Global seed
         int,                               // Operational seed
+        bool,                              // Is 1st input constant
+        bool,                              // Is 2st input constant
+        bool,                              // Is 3st input constant
         ov::AnyMap,                        // Additional plugin configuration
         CPUTestUtils::CPUSpecificParams
 > RandomUniformLayerCPUTestParamSet;
@@ -31,8 +35,11 @@ public:
         const auto& output_prc       = std::get<3>(obj.param);
         const auto& global_seed      = std::get<4>(obj.param);
         const auto& operational_seed = std::get<5>(obj.param);
-        const auto& config           = std::get<6>(obj.param);
-        const auto& cpu_params       = std::get<7>(obj.param);
+        const auto& const_in_1       = std::get<6>(obj.param);
+        const auto& const_in_2       = std::get<7>(obj.param);
+        const auto& const_in_3       = std::get<8>(obj.param);
+        const auto& config           = std::get<9>(obj.param);
+        const auto& cpu_params       = std::get<10>(obj.param);
 
         std::ostringstream result;
         result << "IS={" << out_sahpe.second[0].size() << "}_";
@@ -47,6 +54,9 @@ public:
         result << "_OutPrc=" << output_prc;
         result << "_GlobalSeed=" << global_seed;
         result << "_OperationalSeed=" << operational_seed;
+        result << "_Const1=" << (const_in_1 ? "True" : "False");
+        result << "_Const2=" << (const_in_2 ? "True" : "False");
+        result << "_Const3=" << (const_in_3 ? "True" : "False");
         result << CPUTestsBase::getTestCaseName(cpu_params);
 
         if (!config.empty()) {
@@ -62,7 +72,7 @@ public:
     }
 
 protected:
-    void SetUp() {
+    void SetUp() override {
         targetDevice = utils::DEVICE_CPU;
 
         const auto& params           = this->GetParam();
@@ -72,8 +82,11 @@ protected:
         const auto& output_prc       = std::get<3>(params);
         const auto& global_seed      = std::get<4>(params);
         const auto& operational_seed = std::get<5>(params);
-        const auto& config           = std::get<6>(params);
-        const auto& cpu_params       = std::get<7>(params);
+        const auto& const_in_1       = std::get<6>(params);
+        const auto& const_in_2       = std::get<7>(params);
+        const auto& const_in_3       = std::get<8>(params);
+        const auto& config           = std::get<9>(params);
+        const auto& cpu_params       = std::get<10>(params);
 
         output_shape = out_sahpe.second[0];
         min_val = std::get<0>(min_max);
@@ -82,28 +95,39 @@ protected:
 
         selectedType = makeSelectedTypeStr("ref_any", shape_prc);
 
-        InputShape in_shape_0 = {{}, {{out_sahpe.second.size()}}},
+        InputShape in_shape_0 = {{}, {{out_sahpe.second[0].size()}}},
                    in_shape_1 = {{}, {{1}}},
                    in_shape_2 = {{}, {{1}}};
         init_input_shapes({ in_shape_0, in_shape_1, in_shape_2 });
 
-        ov::ParameterVector inputs;
-        inputs.push_back(std::make_shared<ov::op::v0::Parameter>(shape_prc, inputDynamicShapes[0]));
-        inputs.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, inputDynamicShapes[1]));
-        inputs.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, inputDynamicShapes[2]));
+        ov::ParameterVector in_params;
+        std::vector<std::shared_ptr<ov::Node>> inputs;
+        if (!const_in_1) {
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(shape_prc, inputDynamicShapes[0]));
+            in_params.back()->set_friendly_name("shape");
+            inputs.push_back(in_params.back());
+        } else {
+            inputs.push_back(ngraph::builder::makeConstant(shape_prc, inputDynamicShapes[0].to_shape(), out_sahpe.second[0]));
+        }
+        if (!const_in_2) {
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, inputDynamicShapes[1]));
+            in_params.back()->set_friendly_name("minval");
+            inputs.push_back(in_params.back());
+        } else {
+            inputs.push_back(ngraph::builder::makeConstant(output_prc, inputDynamicShapes[1].to_shape(), std::vector<double>{min_val}));
+        }
+        if (!const_in_3) {
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, inputDynamicShapes[2]));
+            in_params.back()->set_friendly_name("maxval");
+            inputs.push_back(in_params.back());
+        } else {
+            inputs.push_back(ngraph::builder::makeConstant(output_prc, inputDynamicShapes[2].to_shape(), std::vector<double>{max_val}));
+        }
 
-        inputs[0]->set_friendly_name("shape");
-        inputs[1]->set_friendly_name("minval");
-        inputs[2]->set_friendly_name("maxval");
-
-        // const auto inputOrderOp = std::make_shared<ov::op::v0::Constant>(ov::element::i64,
-        //                                                                  ov::Shape({inputOrder.size()}),
-        //                                                                  inputOrder);
         const auto rnd_op = std::make_shared<ov::op::v8::RandomUniform>(inputs[0], inputs[1], inputs[2], output_prc, global_seed, operational_seed);
         const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(rnd_op)};
 
-        function = std::make_shared<ov::Model>(results, inputs, "RandomUniformLayerCPUTest");
-        // functionRefs = ngraph::clone_function(*function);
+        function = std::make_shared<ov::Model>(results, in_params, "RandomUniformLayerCPUTest");
     }
 
     template<typename TD, typename TS>
@@ -220,7 +244,7 @@ const std::vector<int> operational_seed = {
 
 const ov::AnyMap empty_plugin_config{};
 
-INSTANTIATE_TEST_SUITE_P(smoke_Static, RandomUniformLayerCPUTest,
+INSTANTIATE_TEST_SUITE_P(smoke_StaticParams, RandomUniformLayerCPUTest,
         ::testing::Combine(
                 ::testing::ValuesIn(output_shapes),
                 ::testing::ValuesIn(min_max),
@@ -228,9 +252,27 @@ INSTANTIATE_TEST_SUITE_P(smoke_Static, RandomUniformLayerCPUTest,
                 ::testing::ValuesIn(output_prc),
                 ::testing::ValuesIn(global_seed),
                 ::testing::ValuesIn(operational_seed),
+                ::testing::Values(false),
+                ::testing::Values(false),
+                ::testing::Values(false),
                 ::testing::Values(empty_plugin_config),
                 ::testing::Values(CPUSpecificParams{})),
         RandomUniformLayerCPUTest::getTestCaseName);
-}
 
+INSTANTIATE_TEST_SUITE_P(smoke_StaticConst, RandomUniformLayerCPUTest,
+        ::testing::Combine(
+                ::testing::Values(output_shapes[0]),
+                ::testing::ValuesIn(min_max),
+                ::testing::Values(ElementType::i32),
+                ::testing::Values(ElementType::f32),
+                ::testing::ValuesIn(global_seed),
+                ::testing::ValuesIn(operational_seed),
+                ::testing::Values(true),
+                ::testing::Values(true),
+                ::testing::Values(true),
+                ::testing::Values(empty_plugin_config),
+                ::testing::Values(CPUSpecificParams{})),
+        RandomUniformLayerCPUTest::getTestCaseName);
+
+} // namespace
 } // namespace CPULayerTestsDefinitions
