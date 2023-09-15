@@ -156,6 +156,7 @@ void SubgraphBaseTest::query_model() {
 
 void SubgraphBaseTest::compare(const std::vector<ov::Tensor>& expected,
                                const std::vector<ov::Tensor>& actual) {
+std::cout << "SubgraphBaseTest::compare" << std::endl;
     ASSERT_EQ(expected.size(), actual.size());
     ASSERT_EQ(expected.size(), function->get_results().size());
     auto compareMap = utils::getCompareMap();

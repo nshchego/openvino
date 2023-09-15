@@ -135,6 +135,7 @@ bool ov::runtime::interpreter::INTExecutable::call(std::vector<ov::Tensor>& outp
                                                    const std::vector<ov::Tensor>& inputs,
                                                    const ov::EvaluationContext& context,
                                                    bool collect_performance) {
+std::cout << "INTExecutable::call shape +" << std::endl;
 #define CHECK_TERMINATE()                          \
     if (m_cancel_execution) {                      \
         std::lock_guard<std::mutex> lock(m_mutex); \
@@ -166,7 +167,7 @@ bool ov::runtime::interpreter::INTExecutable::call(std::vector<ov::Tensor>& outp
     // for each ordered op in the graph
     for (const auto& op : m_nodes) {
         CHECK_TERMINATE()
-        if (std::dynamic_pointer_cast<ov::op::v0::Parameter>(op)) {
+        if (ov::is_type<ov::op::v0::Parameter>(op)) {
             continue;
         }
         // get op inputs from map
@@ -188,13 +189,23 @@ bool ov::runtime::interpreter::INTExecutable::call(std::vector<ov::Tensor>& outp
                                          output.get_partial_shape().is_dynamic()
                                              ? ov::Shape{0, std::numeric_limits<size_t>::max()}
                                              : output.get_shape());
+std::cout << "INTExecutable::call 1 shape: " << host_tensor.get_shape() << std::endl;
             } else {
+std::cout << "INTExecutable::call 2 shape: " << host_tensor.get_shape() << std::endl;
                 host_tensor = it->second;
             }
             op_outputs.push_back(host_tensor);
         }
 
         {
+
+auto& map = ngraph::runtime::interpreter::get_evaluators_map();
+auto it = map.find(op->get_type_info());
+if (it == map.end()) {
+    std::cout << "Op " << op->get_type_info().name << " NOT IN evaluators_map" << std::endl;
+} else {
+    std::cout << "Op " << op->get_type_info().name << " IN evaluators_map" << std::endl;
+}
             PERF(op, collect_performance);
             // Call evaluate for cloned_node with static shapes
             if (!op->evaluate(op_outputs, op_inputs, context)) {

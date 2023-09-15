@@ -9,8 +9,6 @@
 #include <openvino/op/constant.hpp>
 #include <openvino/op/random_uniform.hpp>
 
-// using namespace InferenceEngine;
-
 namespace ov {
 namespace intel_cpu {
 namespace node {
@@ -35,6 +33,11 @@ RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphCon
         IE_THROW(NotImplemented) << errorMessage;
     }
 
+    // RandomUniform should generate new sequence each run even if all inputs are constants. So that method Node::IsConstant()
+    // doesn't return 'True' for RandomUniform with all constant inputs and the node generates new values for each inference,
+    // we set 'NoConst' value for 'ConstantType' in ctor
+    constant = ConstantType::NoConst;
+
     m_shape_prc = op->get_input_element_type(SHAPE);
     if (!one_of(m_shape_prc, element::i32, element::i64)) {
         m_shape_prc = element::i32;
@@ -43,7 +46,10 @@ RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphCon
     auto rnd_op = as_type_ptr<op::v8::RandomUniform>(op);
     // m_output_prc = rnd_op->get_out_type();
     m_global_seed = rnd_op->get_global_seed();
+std::cout << "CPU m_global_seed: " << m_global_seed << std::endl;
     m_op_seed = rnd_op->get_op_seed();
+    // m_op_seed = 284;
+std::cout << "CPU m_op_seed: " << m_op_seed << std::endl;
 
     m_output_prc = op->get_output_element_type(0);
     if (m_output_prc.is_real() && !one_of(m_output_prc, element::f32, element::f64)) {
@@ -63,14 +69,21 @@ RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphCon
 std::cout << "RandomUniform::RandomUniform m_const_inputs[SHAPE]; dyn: " << isDynamicNgraphNode(op) << std::endl;
         initOutShape(m_out_shape, as_type<op::v0::Constant>(op->get_input_node_ptr(SHAPE))->get_data_ptr(), m_shape_prc,
                 op->get_input_shape(SHAPE)[0]);
+std::cout << "Out shape {";
+for (auto val : m_out_shape) {
+    std::cout << val << "; ";
+}
+std::cout << "}";
     }
     if (m_const_inputs[MIN_VAL]) {
 std::cout << "RandomUniform::RandomUniform m_const_inputs[MIN_VAL]" << std::endl;
         initEdge(m_min_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MIN_VAL))->get_data_ptr(), m_output_prc);
+std::cout << "CPU m_min_val: " << m_min_val.f32 << std::endl;
     }
     if (m_const_inputs[MAX_VAL]) {
 std::cout << "RandomUniform::RandomUniform m_const_inputs[MAX_VAL]" << std::endl;
         initEdge(m_max_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MAX_VAL))->get_data_ptr(), m_output_prc);
+std::cout << "CPU m_max_val: " << m_max_val.f32 << std::endl;
     }
 
     m_generator = std::default_random_engine{m_op_seed};
@@ -97,27 +110,17 @@ void RandomUniform::initSupportedPrimitiveDescriptors() {
 }
 
 void RandomUniform::execute(dnnl::stream strm) {
-std::cout << "RandomUniform::execute" << std::endl;
+// std::cout << "RandomUniform::execute" << std::endl;
     if (!m_const_inputs[SHAPE]) {
         auto memPtr = getParentEdgeAt(SHAPE)->getMemoryPtr();
-        // VectorDims out_shape;
-        // if (memPtr->getDesc().getPrecision() == Precision::I64) {
-        //     auto data = reinterpret_cast<int64_t*>(memPtr->getData());
-        //     out_shape.assign(data, data + memPtr->getShape()->getElementsCount());
-        // } else if (memPtr->getDesc().getPrecision() == Precision::I32) {
-        //     auto data = reinterpret_cast<int32_t*>(memPtr->getData());
-        //     out_shape.assign(data, data + memPtr->getShape()->getElementsCount());
-        // }
         initOutShape(m_out_shape, memPtr->getData(), m_shape_prc, memPtr->getShape().getElementsCount());
 
         redefineOutputMemory({m_out_shape});
     }
     if (!m_const_inputs[MIN_VAL]) {
-        // m_min_val = getParentEdgeAt(MIN_VAL)->getMemoryPtr()->getData();
         initEdge(m_min_val, getParentEdgeAt(MIN_VAL)->getMemoryPtr()->getData(), m_output_prc);
     }
     if (!m_const_inputs[MAX_VAL]) {
-        // m_max_val = getParentEdgeAt(MAX_VAL)->getMemoryPtr()->getData();
         initEdge(m_max_val, getParentEdgeAt(MAX_VAL)->getMemoryPtr()->getData(), m_output_prc);
     }
 

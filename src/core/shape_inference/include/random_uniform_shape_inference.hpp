@@ -30,6 +30,7 @@ std::vector<TRShape> shape_infer(const RandomUniform* op,
                            "Min value must be a scalar or one element 1D tensor.");
 
     const auto& max_shape = input_shapes[2];
+//std::cout << "shape_infer: " << max_shape << std::endl;
     NODE_SHAPE_INFER_CHECK(op,
                            input_shapes,
                            max_shape.compatible(TRShape{}) || max_shape.compatible(TRShape{1}),

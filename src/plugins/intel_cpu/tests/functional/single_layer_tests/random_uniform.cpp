@@ -19,8 +19,8 @@ typedef std::tuple<
         int,                               // Global seed
         int,                               // Operational seed
         bool,                              // Is 1st input constant
-        bool,                              // Is 2st input constant
-        bool,                              // Is 3st input constant
+        bool,                              // Is 2nd input constant
+        bool,                              // Is 3rd input constant
         ov::AnyMap,                        // Additional plugin configuration
         CPUTestUtils::CPUSpecificParams
 > RandomUniformLayerCPUTestParamSet;
@@ -138,6 +138,7 @@ protected:
     }
 
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
+std::cout << "generate_inputs" << std::endl;
         inputs.clear();
         const auto& func_inputs = function->inputs();
 
@@ -195,6 +196,31 @@ protected:
             inputs.insert({func_input.get_node_shared_ptr(), tensor});
         }
     }
+//     void compare(const std::vector<ov::Tensor>& expected,
+//                  const std::vector<ov::Tensor>& actual) override {
+// std::cout << "SubgraphBaseTest::compare" << std::endl;
+//         ASSERT_EQ(expected.size(), actual.size());
+//         ASSERT_EQ(expected.size(), function->get_results().size());
+//         auto compareMap = utils::getCompareMap();
+//         const auto& results = function->get_results();
+//         // for (size_t j = 0; j < results.size(); j++) {
+//             const auto result = results[0];
+//             // for (size_t i = 0; i < result->get_input_size(); ++i) {
+//                 std::shared_ptr<ov::Node> inputNode = result->get_input_node_shared_ptr(i);
+//                 // if (std::dynamic_pointer_cast<ov::op::v0::Convert>(inputNode)) {
+//                 //     std::shared_ptr<ov::Node> nextNodePtr = inputNode->get_input_node_shared_ptr(0);
+//                 //     if (!ngraph::is_type<ov::op::v0::Result>(nextNodePtr)) {
+//                 //         inputNode = nextNodePtr;
+//                 //     }
+//                 // }
+//                 // auto it = compareMap.find(inputNode->get_type_info());
+//                 // ASSERT_NE(it, compareMap.end());
+//                 // it->second(inputNode, i, expected[j], actual[j], abs_threshold, rel_threshold);
+//         //     }
+//         // }
+
+        
+//     }
 
     ov::Shape output_shape;
     double min_val;
@@ -225,7 +251,8 @@ const std::vector<ElementType> output_prc = {
 const std::vector<InputShape> output_shapes = {
         {{}, {{2, 3, 5, 7}}},
         {{}, {{3, 4, 8, 64}}},
-        {{}, {{1, 16, 27, 55}}}
+        {{}, {{1, 16, 27, 55}}},
+        {{}, {{1000, 1000, 1, 1}}}
 };
 
 const std::vector<std::tuple<double, double>> min_max = {
@@ -261,15 +288,15 @@ INSTANTIATE_TEST_SUITE_P(smoke_StaticParams, RandomUniformLayerCPUTest,
 
 INSTANTIATE_TEST_SUITE_P(smoke_StaticConst, RandomUniformLayerCPUTest,
         ::testing::Combine(
-                ::testing::Values(output_shapes[0]),
+                ::testing::Values(output_shapes[3]),
                 ::testing::ValuesIn(min_max),
                 ::testing::Values(ElementType::i32),
                 ::testing::Values(ElementType::f32),
                 ::testing::ValuesIn(global_seed),
                 ::testing::ValuesIn(operational_seed),
-                ::testing::Values(true),
-                ::testing::Values(true),
-                ::testing::Values(true),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
                 ::testing::Values(empty_plugin_config),
                 ::testing::Values(CPUSpecificParams{})),
         RandomUniformLayerCPUTest::getTestCaseName);

@@ -207,9 +207,9 @@ std::pair<uint64_t, uint64_t> random_uniform(const uint64_t* out_shape,
     uint64_t n = n_state;
 
     // Calculate total element count for generation
-    size_t shape_count = shape_size(out_shape_shape);
+    size_t out_shape_rank = shape_size(out_shape_shape);
     size_t elem_count = 1;
-    for (size_t i = 0; i < shape_count; i++) {
+    for (size_t i = 0; i < out_shape_rank; i++) {
         elem_count *= out_shape[i];
     }
 

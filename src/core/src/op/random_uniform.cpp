@@ -31,6 +31,7 @@ RandomUniform::RandomUniform(const Output<Node>& out_shape,
       m_output_type(out_type),
       m_global_seed(global_seed),
       m_op_seed(op_seed) {
+std::cout << "ov::op::RandomUniform op_seed: " << op_seed << std::endl;
     constructor_validate_and_infer_types();
 }
 
@@ -92,6 +93,29 @@ std::cout << "RandomUniform::evaluate out_shape: " << out_shape << std::endl;
 
     const auto& t_out = get_out_type();
     OPENVINO_ASSERT(validate::out_et(t_out), "Unsupported type of RandomUniform: " + t_out.get_type_name());
+
+    auto in0_data = inputs[0].data();
+    Shape output_shape;
+    for (int i = 0; i < inputs[0].get_size(); i++) {
+        output_shape.push_back(out_dims[i]);
+    }
+    // Shape output_shape(in0_data, in0_data + inputs[0].get_shape().size());
+    // outputs[0].set_element_type(m_output_type);
+    // outputs[0].set_shape(output_shape);
+
+    // ngraph::HostTensorPtr output_tensor;
+    // if (!outputs[0]) {
+    //     output_tensor = std::make_shared<DynamicTensor>(ov::element::dynamic);
+    // } else if (ov::util::is_dynamic_shape(outputs[0].get_shape())) {
+    //     output_tensor = std::make_shared<DynamicTensor>(outputs[0].get_element_type());
+    // } else {
+    //     output_tensor = std::make_shared<ngraph::runtime::HostTensor>(outputs[0].get_element_type(), outputs[0].get_shape(), outputs[0].data());
+    // }
+    // auto tensor_outputs = create_tmp_tensors(outputs);
+    // outputs[0].set_element_type(m_output_type);
+    // output_tensor->set_shape(output_shape);
+
+    outputs[0].set_shape(output_shape);
 
     auto state = ngraph::runtime::reference::random_uniform(out_dims.data(),
                                                             static_cast<const char*>(inputs[1].data()),
