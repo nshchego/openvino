@@ -73,7 +73,7 @@ std::cout << "Out shape {";
 for (auto val : m_out_shape) {
     std::cout << val << "; ";
 }
-std::cout << "}";
+std::cout << "}" << std::endl;
     }
     if (m_const_inputs[MIN_VAL]) {
 std::cout << "RandomUniform::RandomUniform m_const_inputs[MIN_VAL]" << std::endl;
@@ -191,7 +191,7 @@ void RandomUniform::generateData(DISTR_TYPE distribution, void* out, size_t work
     auto dst = reinterpret_cast<T*>(out);
     for (size_t i = 0; i < work_amount; i++) {
         *dst = distribution(m_generator);
-        ++dst;
+        dst++;
     }
 }
 

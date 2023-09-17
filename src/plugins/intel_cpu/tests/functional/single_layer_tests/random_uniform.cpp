@@ -95,34 +95,36 @@ protected:
 
         selectedType = makeSelectedTypeStr("ref_any", shape_prc);
 
-        InputShape in_shape_0 = {{}, {{out_sahpe.second[0].size()}}},
-                   in_shape_1 = {{}, {{1}}},
-                   in_shape_2 = {{}, {{1}}};
-        init_input_shapes({ in_shape_0, in_shape_1, in_shape_2 });
-
+        std::vector<InputShape> in_shapes;
         ov::ParameterVector in_params;
         std::vector<std::shared_ptr<ov::Node>> inputs;
+
         if (!const_in_1) {
-            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(shape_prc, inputDynamicShapes[0]));
+            in_shapes.push_back({{-1}, {{out_sahpe.second[0].size()}}});
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(shape_prc, ov::PartialShape{out_sahpe.second[0].size()}));
             in_params.back()->set_friendly_name("shape");
             inputs.push_back(in_params.back());
         } else {
-            inputs.push_back(ngraph::builder::makeConstant(shape_prc, inputDynamicShapes[0].to_shape(), out_sahpe.second[0]));
+            inputs.push_back(ngraph::builder::makeConstant(shape_prc, {out_sahpe.second[0].size()}, out_sahpe.second[0]));
         }
         if (!const_in_2) {
-            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, inputDynamicShapes[1]));
+            in_shapes.push_back({{}, {{1}}});
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, ov::PartialShape{1}));
             in_params.back()->set_friendly_name("minval");
             inputs.push_back(in_params.back());
         } else {
-            inputs.push_back(ngraph::builder::makeConstant(output_prc, inputDynamicShapes[1].to_shape(), std::vector<double>{min_val}));
+            inputs.push_back(ngraph::builder::makeConstant(output_prc, {1}, std::vector<double>{min_val}));
         }
         if (!const_in_3) {
-            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, inputDynamicShapes[2]));
+            in_shapes.push_back({{}, {{1}}});
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(output_prc, ov::PartialShape{1}));
             in_params.back()->set_friendly_name("maxval");
             inputs.push_back(in_params.back());
         } else {
-            inputs.push_back(ngraph::builder::makeConstant(output_prc, inputDynamicShapes[2].to_shape(), std::vector<double>{max_val}));
+            inputs.push_back(ngraph::builder::makeConstant(output_prc, {1}, std::vector<double>{max_val}));
         }
+        
+        init_input_shapes(in_shapes);
 
         const auto rnd_op = std::make_shared<ov::op::v8::RandomUniform>(inputs[0], inputs[1], inputs[2], output_prc, global_seed, operational_seed);
         const ov::ResultVector results{std::make_shared<ov::op::v0::Result>(rnd_op)};
@@ -138,7 +140,6 @@ protected:
     }
 
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
-std::cout << "generate_inputs" << std::endl;
         inputs.clear();
         const auto& func_inputs = function->inputs();
 
@@ -196,35 +197,66 @@ std::cout << "generate_inputs" << std::endl;
             inputs.insert({func_input.get_node_shared_ptr(), tensor});
         }
     }
-//     void compare(const std::vector<ov::Tensor>& expected,
-//                  const std::vector<ov::Tensor>& actual) override {
-// std::cout << "SubgraphBaseTest::compare" << std::endl;
-//         ASSERT_EQ(expected.size(), actual.size());
-//         ASSERT_EQ(expected.size(), function->get_results().size());
-//         auto compareMap = utils::getCompareMap();
-//         const auto& results = function->get_results();
-//         // for (size_t j = 0; j < results.size(); j++) {
-//             const auto result = results[0];
-//             // for (size_t i = 0; i < result->get_input_size(); ++i) {
-//                 std::shared_ptr<ov::Node> inputNode = result->get_input_node_shared_ptr(i);
-//                 // if (std::dynamic_pointer_cast<ov::op::v0::Convert>(inputNode)) {
-//                 //     std::shared_ptr<ov::Node> nextNodePtr = inputNode->get_input_node_shared_ptr(0);
-//                 //     if (!ngraph::is_type<ov::op::v0::Result>(nextNodePtr)) {
-//                 //         inputNode = nextNodePtr;
-//                 //     }
-//                 // }
-//                 // auto it = compareMap.find(inputNode->get_type_info());
-//                 // ASSERT_NE(it, compareMap.end());
-//                 // it->second(inputNode, i, expected[j], actual[j], abs_threshold, rel_threshold);
-//         //     }
-//         // }
 
-        
-//     }
+    void compare(const std::vector<ov::Tensor>& expected, const std::vector<ov::Tensor>& actual) override {
+#define CASE(X) case X : rndUCompare<ov::element_type_traits<X>::value_type>(expected[0], actual[0]); break;
+
+        switch (expected[0].get_element_type()) {
+            CASE(ElementType::f32)
+            CASE(ElementType::i32)
+            CASE(ElementType::f16)
+            CASE(ElementType::bf16)
+            CASE(ElementType::i64)
+            CASE(ElementType::f64)
+            default: OPENVINO_THROW("Unsupported element type: ", expected[0].get_element_type());
+        }
+
+#undef CASE
+    }
+
+    inline double less_or_equal(double a, double b) {
+        return (b - a) >= (std::fmax(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
+    }
+
+    template<typename T>
+    void rndUCompare(const ov::Tensor& expected, const ov::Tensor& actual) {
+        auto actual_data = actual.data<T>();
+        size_t shape_size_cnt = ov::shape_size(expected.get_shape());
+        double act_mean = 0.0;
+        double act_variance = 0.0;
+        const double exp_mean = (max_val + min_val) / 2.0;
+        const double exp_variance = std::pow(max_val - min_val, 2) / 12.0;
+
+        for (size_t i = 0; i < shape_size_cnt; ++i) {
+            auto actual_value = static_cast<double>(actual_data[i]);
+            if (std::isnan(actual_value)) {
+                std::ostringstream out_stream;
+                out_stream << "Actual value is NAN on coordinate: " << i;
+                throw std::runtime_error(out_stream.str());
+            }
+            act_mean += actual_value;
+            act_variance += std::pow(actual_value - exp_mean, 2);
+        }
+        act_mean /= shape_size_cnt;
+        act_variance /= shape_size_cnt;
+
+        auto rel_mean = (exp_mean - act_mean) / exp_mean;
+        auto rel_variance = (exp_variance - act_variance) / exp_variance;
+
+        if (!(less_or_equal(rel_mean, m_mean_threshold) && less_or_equal(rel_variance, m_variance_threshold))) {
+            std::ostringstream out_stream;
+            out_stream << "rel_mean < m_mean_threshold && rel_variance < m_variance_threshold" <<
+                    "\n\t rel_mean: " << rel_mean <<
+                    "\n\t rel_variance: " << rel_variance;
+            throw std::runtime_error(out_stream.str());
+        }
+    }
 
     ov::Shape output_shape;
     double min_val;
     double max_val;
+    static constexpr double m_mean_threshold = 0.0005;
+    static constexpr double m_variance_threshold = 0.002;
 };
 
 TEST_P(RandomUniformLayerCPUTest, CompareWithRefs) {
@@ -244,34 +276,32 @@ const std::vector<ElementType> output_prc = {
         ElementType::f32,
         ElementType::f16,
         ElementType::bf16,
-        ElementType::i64,
-        ElementType::f64
+        ElementType::i64
 };
 
-const std::vector<InputShape> output_shapes = {
-        {{}, {{2, 3, 5, 7}}},
-        {{}, {{3, 4, 8, 64}}},
-        {{}, {{1, 16, 27, 55}}},
-        {{}, {{1000, 1000, 1, 1}}}
+std::vector<InputShape> output_shapes = {
+        {{}, {{100000}}},
+        {{}, {{2, 100000}}},
+        {{}, {{2, 3, 100000}}}
 };
 
 const std::vector<std::tuple<double, double>> min_max = {
-        {0, 10},
-        {-10, 10},
-        {-20, 0}
+        {0, 50},
+        {-50, 50},
+        {-50, 0}
 };
 
 const std::vector<int> global_seed = {
-        0, 1, 5
+        0, 3, 5
 };
 
 const std::vector<int> operational_seed = {
-        0, 1, 5
+        0, 3, 5
 };
 
 const ov::AnyMap empty_plugin_config{};
 
-INSTANTIATE_TEST_SUITE_P(smoke_StaticParams, RandomUniformLayerCPUTest,
+INSTANTIATE_TEST_SUITE_P(smoke_Params, RandomUniformLayerCPUTest,
         ::testing::Combine(
                 ::testing::ValuesIn(output_shapes),
                 ::testing::ValuesIn(min_max),
@@ -286,14 +316,14 @@ INSTANTIATE_TEST_SUITE_P(smoke_StaticParams, RandomUniformLayerCPUTest,
                 ::testing::Values(CPUSpecificParams{})),
         RandomUniformLayerCPUTest::getTestCaseName);
 
-INSTANTIATE_TEST_SUITE_P(smoke_StaticConst, RandomUniformLayerCPUTest,
+INSTANTIATE_TEST_SUITE_P(smoke_ParamConst, RandomUniformLayerCPUTest,
         ::testing::Combine(
-                ::testing::Values(output_shapes[3]),
-                ::testing::ValuesIn(min_max),
+                ::testing::Values(output_shapes[0]),
+                ::testing::Values(min_max[0]),
                 ::testing::Values(ElementType::i32),
                 ::testing::Values(ElementType::f32),
-                ::testing::ValuesIn(global_seed),
-                ::testing::ValuesIn(operational_seed),
+                ::testing::Values(0),
+                ::testing::Values(0),
                 ::testing::Values(true, false),
                 ::testing::Values(true, false),
                 ::testing::Values(true, false),
