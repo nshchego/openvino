@@ -12,7 +12,7 @@ using namespace ov::test;
 namespace CPULayerTestsDefinitions {
 
 typedef std::tuple<
-        InputShape,                        // Output shapes
+        ov::Shape,                         // Output shapes
         std::tuple<double, double>,        // Min and Max values
         ElementType,                       // Shape precision
         ElementType,                       // Output precision
@@ -42,12 +42,13 @@ public:
         const auto& cpu_params       = std::get<10>(obj.param);
 
         std::ostringstream result;
-        result << "IS={" << out_sahpe.second[0].size() << "}_";
+        result << "IS={" << out_sahpe.size() << "}_";
         // result << "OS=" << utils::partialShape2str({out_sahpe.second}) << "_";
         result << "OS=(";
-        for (const auto& shape : out_sahpe.second) {
-            result << utils::vec2str(shape) << "_";
-        }
+        result << utils::vec2str(out_sahpe) << "_";
+        // for (const auto& shape : out_sahpe.second) {
+        //     result << utils::vec2str(shape) << "_";
+        // }
         result << ")_Min=" << std::get<0>(min_max);
         result << "_Max=" << std::get<1>(min_max);
         result << "_ShapePrc=" << shape_prc;
@@ -76,7 +77,7 @@ protected:
         targetDevice = utils::DEVICE_CPU;
 
         const auto& params           = this->GetParam();
-        const auto& out_sahpe        = std::get<0>(params);
+        output_shape                 = std::get<0>(params);
         const auto& min_max          = std::get<1>(params);
         const auto& shape_prc        = std::get<2>(params);
         const auto& output_prc       = std::get<3>(params);
@@ -88,24 +89,24 @@ protected:
         const auto& config           = std::get<9>(params);
         const auto& cpu_params       = std::get<10>(params);
 
-        output_shape = out_sahpe.second[0];
         min_val = std::get<0>(min_max);
         max_val = std::get<1>(min_max);
         std::tie(inFmts, outFmts, priority, selectedType) = cpu_params;
 
         selectedType = makeSelectedTypeStr("ref_any", shape_prc);
+        // selectedType = updateSelectedType("ref_any", shape_prc, cpu_params);
 
         std::vector<InputShape> in_shapes;
         ov::ParameterVector in_params;
         std::vector<std::shared_ptr<ov::Node>> inputs;
 
         if (!const_in_1) {
-            in_shapes.push_back({{-1}, {{out_sahpe.second[0].size()}}});
-            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(shape_prc, ov::PartialShape{out_sahpe.second[0].size()}));
+            in_shapes.push_back({{}, {{output_shape.size()}}});
+            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(shape_prc, ov::PartialShape{output_shape.size()}));
             in_params.back()->set_friendly_name("shape");
             inputs.push_back(in_params.back());
         } else {
-            inputs.push_back(ngraph::builder::makeConstant(shape_prc, {out_sahpe.second[0].size()}, out_sahpe.second[0]));
+            inputs.push_back(ngraph::builder::makeConstant(shape_prc, {output_shape.size()}, output_shape));
         }
         if (!const_in_2) {
             in_shapes.push_back({{}, {{1}}});
@@ -123,7 +124,7 @@ protected:
         } else {
             inputs.push_back(ngraph::builder::makeConstant(output_prc, {1}, std::vector<double>{max_val}));
         }
-        
+
         init_input_shapes(in_shapes);
 
         const auto rnd_op = std::make_shared<ov::op::v8::RandomUniform>(inputs[0], inputs[1], inputs[2], output_prc, global_seed, operational_seed);
@@ -279,10 +280,10 @@ const std::vector<ElementType> output_prc = {
         ElementType::i64
 };
 
-std::vector<InputShape> output_shapes = {
-        {{}, {{100000}}},
-        {{}, {{2, 100000}}},
-        {{}, {{2, 3, 100000}}}
+std::vector<ov::Shape> output_shapes = {
+        {100000},
+        {2, 100000},
+        {2, 3, 100000}
 };
 
 const std::vector<std::tuple<double, double>> min_max = {
