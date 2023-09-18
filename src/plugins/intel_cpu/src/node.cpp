@@ -1596,6 +1596,9 @@ IShapeInfer::Result Node::shapeInfer() const {
         auto input_value_port_mask = shapeInference->get_port_mask();
 
         input_shapes.reserve(inputShapes.size());
+        if (type == Type::Reorder) {
+            std::cout << std::endl;
+        }
         for (size_t port = 0; port < inputShapes.size(); ++port)
             input_shapes.emplace_back(std::ref(getParentEdgesAtPort(port)[0]->getMemory().getStaticDims()));
 

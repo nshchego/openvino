@@ -236,23 +236,23 @@ void compare(const ov::Tensor& expected,
     double rel_threshold = rel_threshold_;
     size_t shape_size_cnt = shape_size(expected_shape);
 
-std::cout << "COMPARE: " << std::endl;
-std::cout << "EXPECTED: " << std::endl;
-for (int i = 0; i < shape_size_cnt; i++) {
-    if (i > 0 && i % 8  == 0)
-    //  std::cout << "| ";
-    std::cout << std::endl;
-    std::cout << (expected_data[i]) << "; ";
-}
-std::cout << std::endl;
-std::cout << "ACTUAL: " << std::endl;
-for (int i = 0; i < shape_size_cnt; i++) {
-    if (i > 0 && i % 8  == 0)
-    //  std::cout << "| ";
-    std::cout << std::endl;
-    std::cout << (actual_data[i]) << "; ";
-}
-std::cout << std::endl;
+// std::cout << "COMPARE: " << std::endl;
+// std::cout << "EXPECTED: " << std::endl;
+// for (int i = 0; i < shape_size_cnt; i++) {
+//     if (i > 0 && i % 8  == 0)
+//     //  std::cout << "| ";
+//     std::cout << std::endl;
+//     std::cout << (expected_data[i]) << "; ";
+// }
+// std::cout << std::endl;
+// std::cout << "ACTUAL: " << std::endl;
+// for (int i = 0; i < shape_size_cnt; i++) {
+//     if (i > 0 && i % 8  == 0)
+//     //  std::cout << "| ";
+//     std::cout << std::endl;
+//     std::cout << (actual_data[i]) << "; ";
+// }
+// std::cout << std::endl;
 
     if (abs_threshold == std::numeric_limits<double>::max() && rel_threshold == std::numeric_limits<double>::max()) {
         if (sizeof(ExpectedT) == 1 || sizeof(ActualT) == 1) {
@@ -276,8 +276,7 @@ std::cout << std::endl;
         std::cout << "[ COMPARATION ] abs_threshold: " << abs_threshold << std::endl;
     }
 
-    double exp_mean = 0.0;
-    double act_mean = 0.0;
+    Error abs_error(abs_threshold), rel_error(rel_threshold);
     for (size_t i = 0; i < shape_size_cnt; ++i) {
         double expected_value = expected_data[i];
         double actual_value = actual_data[i];
@@ -291,50 +290,27 @@ std::cout << std::endl;
             out_stream << "Actual value is NAN on coordinate: " << i;
             throw std::runtime_error(out_stream.str());
         }
-        exp_mean += expected_value;
-        act_mean += actual_value;
+        double abs = std::fabs(expected_value - actual_value);
+        double rel = expected_value ? (abs / std::fabs(expected_value)) : abs;
+        abs_error.update(abs, i);
+        rel_error.update(rel, i);
     }
-    exp_mean /= shape_size_cnt;
-    act_mean /= shape_size_cnt;
+    abs_error.mean /= shape_size_cnt;
+    rel_error.mean /= shape_size_cnt;
 
-    std::cout << "EXP_MEAN: " << exp_mean << "; ACT_MEAN: " << act_mean << std::endl;
-    std::cout << "COMPARE: abs: " << exp_mean - act_mean << "; rel: " << (exp_mean - act_mean)/((exp_mean + act_mean)/2.0) << std::endl;
-
-    // Error abs_error(abs_threshold), rel_error(rel_threshold);
-    // for (size_t i = 0; i < shape_size_cnt; ++i) {
-    //     double expected_value = expected_data[i];
-    //     double actual_value = actual_data[i];
-    //     if (std::isnan(expected_value)) {
-    //         std::ostringstream out_stream;
-    //         out_stream << "Expected value is NAN on coordinate: " << i;
-    //         throw std::runtime_error(out_stream.str());
-    //     }
-    //     if (std::isnan(actual_value)) {
-    //         std::ostringstream out_stream;
-    //         out_stream << "Actual value is NAN on coordinate: " << i;
-    //         throw std::runtime_error(out_stream.str());
-    //     }
-    //     double abs = std::fabs(expected_value - actual_value);
-    //     double rel = expected_value ? (abs / std::fabs(expected_value)) : abs;
-    //     abs_error.update(abs, i);
-    //     rel_error.update(rel, i);
-    // }
-    // abs_error.mean /= shape_size_cnt;
-    // rel_error.mean /= shape_size_cnt;
-
-    // if (!(less_or_equal(abs_error.max, abs_threshold) && less_or_equal(rel_error.max, rel_threshold))) {
-    //     std::ostringstream out_stream;
-    //     out_stream << "abs_max < abs_threshold && rel_max < rel_threshold" <<
-    //             "\n\t abs_max: " << abs_error.max <<
-    //             "\n\t\t coordinate " << abs_error.max_coordinate<<
-    //             "; abs errors count "  << abs_error.count  << "; abs mean " <<
-    //             abs_error.mean  << "; abs threshold "  << abs_threshold <<
-    //             "\n\t rel_max: "  << rel_error.max <<
-    //             "\n\t\t coordinate "  << rel_error.max_coordinate <<
-    //             "; rel errors count "  << rel_error.count  << "; rel mean " <<
-    //             rel_error.mean  << "; rel threshold "  << rel_threshold;
-    //     throw std::runtime_error(out_stream.str());
-    // }
+    if (!(less_or_equal(abs_error.max, abs_threshold) && less_or_equal(rel_error.max, rel_threshold))) {
+        std::ostringstream out_stream;
+        out_stream << "abs_max < abs_threshold && rel_max < rel_threshold" <<
+                "\n\t abs_max: " << abs_error.max <<
+                "\n\t\t coordinate " << abs_error.max_coordinate<<
+                "; abs errors count "  << abs_error.count  << "; abs mean " <<
+                abs_error.mean  << "; abs threshold "  << abs_threshold <<
+                "\n\t rel_max: "  << rel_error.max <<
+                "\n\t\t coordinate "  << rel_error.max_coordinate <<
+                "; rel errors count "  << rel_error.count  << "; rel mean " <<
+                rel_error.mean  << "; rel threshold "  << rel_threshold;
+        throw std::runtime_error(out_stream.str());
+    }
 }
 
 void compare(

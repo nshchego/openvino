@@ -42,22 +42,15 @@ public:
         const auto& cpu_params       = std::get<10>(obj.param);
 
         std::ostringstream result;
-        result << "IS={" << out_sahpe.size() << "}_";
-        // result << "OS=" << utils::partialShape2str({out_sahpe.second}) << "_";
-        result << "OS=(";
-        result << utils::vec2str(out_sahpe) << "_";
-        // for (const auto& shape : out_sahpe.second) {
-        //     result << utils::vec2str(shape) << "_";
-        // }
-        result << ")_Min=" << std::get<0>(min_max);
+        result << "IS={" << out_sahpe.size();
+        result << "}_OS=" << out_sahpe;
+        result << "_Min=" << std::get<0>(min_max);
         result << "_Max=" << std::get<1>(min_max);
         result << "_ShapePrc=" << shape_prc;
         result << "_OutPrc=" << output_prc;
         result << "_GlobalSeed=" << global_seed;
         result << "_OperationalSeed=" << operational_seed;
-        result << "_Const1=" << (const_in_1 ? "True" : "False");
-        result << "_Const2=" << (const_in_2 ? "True" : "False");
-        result << "_Const3=" << (const_in_3 ? "True" : "False");
+        result << "_ConstIn={" << (const_in_1 ? "True," : "False,") << (const_in_2 ? "True," : "False,") << (const_in_3 ? "True}" : "False}");
         result << CPUTestsBase::getTestCaseName(cpu_params);
 
         if (!config.empty()) {
@@ -93,8 +86,14 @@ protected:
         max_val = std::get<1>(min_max);
         std::tie(inFmts, outFmts, priority, selectedType) = cpu_params;
 
-        selectedType = makeSelectedTypeStr("ref_any", shape_prc);
-        // selectedType = updateSelectedType("ref_any", shape_prc, cpu_params);
+        // selectedType = makeSelectedTypeStr("ref_any", shape_prc);
+        if (output_prc == ElementType::i64) {
+            updateSelectedType("ref", ElementType::i32, config);
+        } else if (output_prc == ElementType::bf16 || output_prc == ElementType::f16 || output_prc == ElementType::f64) {
+            updateSelectedType("ref", ElementType::f32, config);
+        } else {
+            updateSelectedType("ref", output_prc, config);
+        }
 
         std::vector<InputShape> in_shapes;
         ov::ParameterVector in_params;
@@ -166,9 +165,9 @@ protected:
                     case ElementType::f32:
                         fill_data(tensor.data<float>(), &min_val, 1); break;
                     case ElementType::f16:
-                        fill_data(tensor.data<int32_t>(), &min_val, 1); break;
+                        fill_data(tensor.data<ov::float16>(), &min_val, 1); break;
                     case ElementType::bf16:
-                        fill_data(tensor.data<int32_t>(), &min_val, 1); break;
+                        fill_data(tensor.data<ov::bfloat16>(), &min_val, 1); break;
                     case ElementType::i64:
                         fill_data(tensor.data<int64_t>(), &min_val, 1); break;
                     case ElementType::f64:
@@ -183,9 +182,9 @@ protected:
                     case ElementType::f32:
                         fill_data(tensor.data<float>(), &max_val, 1); break;
                     case ElementType::f16:
-                        fill_data(tensor.data<int32_t>(), &max_val, 1); break;
+                        fill_data(tensor.data<ov::float16>(), &max_val, 1); break;
                     case ElementType::bf16:
-                        fill_data(tensor.data<int32_t>(), &max_val, 1); break;
+                        fill_data(tensor.data<ov::bfloat16>(), &max_val, 1); break;
                     case ElementType::i64:
                         fill_data(tensor.data<int64_t>(), &max_val, 1); break;
                     case ElementType::f64:
@@ -199,59 +198,59 @@ protected:
         }
     }
 
-    void compare(const std::vector<ov::Tensor>& expected, const std::vector<ov::Tensor>& actual) override {
-#define CASE(X) case X : rndUCompare<ov::element_type_traits<X>::value_type>(expected[0], actual[0]); break;
+//     void compare(const std::vector<ov::Tensor>& expected, const std::vector<ov::Tensor>& actual) override {
+// #define CASE(X) case X : rndUCompare<ov::element_type_traits<X>::value_type>(expected[0], actual[0]); break;
 
-        switch (expected[0].get_element_type()) {
-            CASE(ElementType::f32)
-            CASE(ElementType::i32)
-            CASE(ElementType::f16)
-            CASE(ElementType::bf16)
-            CASE(ElementType::i64)
-            CASE(ElementType::f64)
-            default: OPENVINO_THROW("Unsupported element type: ", expected[0].get_element_type());
-        }
+//         switch (expected[0].get_element_type()) {
+//             CASE(ElementType::f32)
+//             CASE(ElementType::i32)
+//             CASE(ElementType::f16)
+//             CASE(ElementType::bf16)
+//             CASE(ElementType::i64)
+//             CASE(ElementType::f64)
+//             default: OPENVINO_THROW("Unsupported element type: ", expected[0].get_element_type());
+//         }
 
-#undef CASE
-    }
+// #undef CASE
+//     }
 
-    inline double less_or_equal(double a, double b) {
-        return (b - a) >= (std::fmax(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
-    }
+//     inline double less_or_equal(double a, double b) {
+//         return (b - a) >= (std::fmax(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
+//     }
 
-    template<typename T>
-    void rndUCompare(const ov::Tensor& expected, const ov::Tensor& actual) {
-        auto actual_data = actual.data<T>();
-        size_t shape_size_cnt = ov::shape_size(expected.get_shape());
-        double act_mean = 0.0;
-        double act_variance = 0.0;
-        const double exp_mean = (max_val + min_val) / 2.0;
-        const double exp_variance = std::pow(max_val - min_val, 2) / 12.0;
+//     template<typename T>
+//     void rndUCompare(const ov::Tensor& expected, const ov::Tensor& actual) {
+//         auto actual_data = actual.data<T>();
+//         size_t shape_size_cnt = ov::shape_size(expected.get_shape());
+//         double act_mean = 0.0;
+//         double act_variance = 0.0;
+//         const double exp_mean = (max_val + min_val) / 2.0;
+//         const double exp_variance = std::pow(max_val - min_val, 2) / 12.0;
 
-        for (size_t i = 0; i < shape_size_cnt; ++i) {
-            auto actual_value = static_cast<double>(actual_data[i]);
-            if (std::isnan(actual_value)) {
-                std::ostringstream out_stream;
-                out_stream << "Actual value is NAN on coordinate: " << i;
-                throw std::runtime_error(out_stream.str());
-            }
-            act_mean += actual_value;
-            act_variance += std::pow(actual_value - exp_mean, 2);
-        }
-        act_mean /= shape_size_cnt;
-        act_variance /= shape_size_cnt;
+//         for (size_t i = 0; i < shape_size_cnt; ++i) {
+//             auto actual_value = static_cast<double>(actual_data[i]);
+//             if (std::isnan(actual_value)) {
+//                 std::ostringstream out_stream;
+//                 out_stream << "Actual value is NAN on coordinate: " << i;
+//                 throw std::runtime_error(out_stream.str());
+//             }
+//             act_mean += actual_value;
+//             act_variance += std::pow(actual_value - exp_mean, 2);
+//         }
+//         act_mean /= shape_size_cnt;
+//         act_variance /= shape_size_cnt;
 
-        auto rel_mean = (exp_mean - act_mean) / exp_mean;
-        auto rel_variance = (exp_variance - act_variance) / exp_variance;
+//         auto rel_mean = (exp_mean - act_mean) / exp_mean;
+//         auto rel_variance = (exp_variance - act_variance) / exp_variance;
 
-        if (!(less_or_equal(rel_mean, m_mean_threshold) && less_or_equal(rel_variance, m_variance_threshold))) {
-            std::ostringstream out_stream;
-            out_stream << "rel_mean < m_mean_threshold && rel_variance < m_variance_threshold" <<
-                    "\n\t rel_mean: " << rel_mean <<
-                    "\n\t rel_variance: " << rel_variance;
-            throw std::runtime_error(out_stream.str());
-        }
-    }
+//         if (!(less_or_equal(rel_mean, m_mean_threshold) && less_or_equal(rel_variance, m_variance_threshold))) {
+//             std::ostringstream out_stream;
+//             out_stream << "rel_mean < m_mean_threshold && rel_variance < m_variance_threshold" <<
+//                     "\n\t rel_mean: " << rel_mean <<
+//                     "\n\t rel_variance: " << rel_variance;
+//             throw std::runtime_error(out_stream.str());
+//         }
+//     }
 
     ov::Shape output_shape;
     double min_val;
@@ -277,13 +276,14 @@ const std::vector<ElementType> output_prc = {
         ElementType::f32,
         ElementType::f16,
         ElementType::bf16,
-        ElementType::i64
+        ElementType::i64,
+        ElementType::f64
 };
 
 std::vector<ov::Shape> output_shapes = {
-        {100000},
-        {2, 100000},
-        {2, 3, 100000}
+        {100},
+        {2, 100},
+        {2, 3, 100}
 };
 
 const std::vector<std::tuple<double, double>> min_max = {
@@ -302,7 +302,7 @@ const std::vector<int> operational_seed = {
 
 const ov::AnyMap empty_plugin_config{};
 
-INSTANTIATE_TEST_SUITE_P(smoke_Params, RandomUniformLayerCPUTest,
+INSTANTIATE_TEST_SUITE_P(smoke_Param, RandomUniformLayerCPUTest,
         ::testing::Combine(
                 ::testing::ValuesIn(output_shapes),
                 ::testing::ValuesIn(min_max),

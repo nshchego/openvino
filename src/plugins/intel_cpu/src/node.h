@@ -42,6 +42,7 @@
 #include "nodes/executors/executor.hpp"
 
 #define THROW_CPU_NODE_ERR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
+// #define THROW_CPU_NODE_ERR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
 
 namespace ov {
 namespace intel_cpu {
@@ -355,7 +356,7 @@ public:
         inplace = InPlaceType::Unknown;
     }
 
-    std::string getPrimitiveDescriptorType() const;
+    virtual std::string getPrimitiveDescriptorType() const;
 
     PerfCount &PerfCounter() { return perfCounter; }
 

@@ -12,14 +12,14 @@ namespace intel_cpu {
 namespace node {
 
 class RandomUniform : public Node {
-    union edge {
+public:
+    union OutputType {
         int32_t i32;
         int64_t i64;
         float f32;
         double f64;
     };
 
-public:
     RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
@@ -42,17 +42,21 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    std::string getPrimitiveDescriptorType() const override;
+
 private:
-    void compute(void* out, size_t work_amount);
+    void computeOnnx(void* out, size_t work_amount);
+    std::pair<uint64_t, uint64_t> computeTf(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
 
     template <typename T, typename DISTR_TYPE>
     void generateData(DISTR_TYPE distribution, void* out, size_t work_amount);
 
     void initOutShape(VectorDims& dst, const void* src, const element::Type& shape_type, size_t len);
 
-    void initEdge(edge& dst, const void* src, const element::Type& output_type);
+    void initEdgeValues(OutputType& dst, const void* src, const element::Type& output_type);
 
     enum { SHAPE = 0, MIN_VAL, MAX_VAL };
+    enum AlgoType { ONNX, TF };
 
     bool m_const_inputs[3] = {false, false, false};
 
@@ -60,14 +64,18 @@ private:
     ov::element::Type m_output_prc;
     int m_global_seed = 0;
     int m_op_seed = 0;
+    std::pair<uint64_t, uint64_t> m_state;
 
     VectorDims m_out_shape;
-    edge m_min_val;
-    edge m_max_val;
-    // void* m_min_val;
-    // void* m_max_max;
+    OutputType m_min_val;
+    OutputType m_max_val;
+    AlgoType algo = TF;
 
     std::default_random_engine m_generator;
+
+    // Determines how many sequence elements of RNG sequence are skipped between runs.
+    // Can be any positive value, 256 is chosen for parity with Tensorflow.
+    static constexpr uint64_t SKIP_CONST = 256;
 };
 
 }   // namespace node
