@@ -190,6 +190,8 @@ std::vector<std::string> disabledTestPatterns() {
         R"(.*smoke_AutoBatching_CPU/AutoBatching_Test_DetectionOutput.*)",
         // Issue: 117837
         R"(.*smoke_4D_out_of_range/GatherInPlaceLayerTestCPU.*_indices=\(\-15\).*)",
+        // Need to generate sequence exactly in the i64 data type. Enable in scope of i64 enabling.
+        R"(.*smoke_.*RandomUniformLayerTestCPU.*OutPrc=i64.*)",
     };
 
 #if defined(OPENVINO_ARCH_X86)

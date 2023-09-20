@@ -135,11 +135,11 @@ void RandomUniform::execute(dnnl::stream strm) {
 
     if (m_algo == TF) {
 // std::cout << "[CPU] RandomUniform::execute m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
-        if (out_el_num < PHILOX_PARALLEL_EXECUTION_THRESHOLD) {
-            m_state = computeTf(dstMemPtr->getData(), out_el_num, m_state);
-        } else {
+        // if (out_el_num < PHILOX_PARALLEL_EXECUTION_THRESHOLD) {
+        //     m_state = computeTf(dstMemPtr->getData(), out_el_num, m_state);
+        // } else {
             m_state = computeTfParallel(dstMemPtr->getData(), out_el_num, m_state);
-        }
+        // }
     } else if (m_algo == ONNX) {
         computeOnnx(dstMemPtr->getData(), out_el_num);
     } else {
@@ -193,6 +193,7 @@ constexpr uint32_t CRUSH_RESISTANCE_CONST_LOWER_VALUE = 0x9E3779B9;
 constexpr uint32_t CRUSH_RESISTANCE_CONST_UPPER_VALUE = 0xBB67AE85;
 constexpr uint64_t STATISTIC_MAXIMIZING_MULTIPLIER_N = 0xD2511F53;
 constexpr uint64_t STATISTIC_MAXIMIZING_MULTIPLIER_COUNTER = 0xCD9E8D57;
+constexpr uint64_t ROUNDS_NUMBER = 10llu;
 
 using PairType = std::array<uint32_t, 2>;
 
@@ -240,57 +241,41 @@ float uint32_to_float(uint32_t x) {
 
 // Helper function for converting uint32 values to float16.Sets fractional part of
 // floating value with bits from uint32 value. Resulting value is in interval [0,1).
-// float16 uint32_to_float16(uint32_t x) {
-//     // float16 is formatted as follows: sign(1 bit) exponent(5 bits) mantissa(10 bits). The value is interpreted
-//     // The value is interpreted using following formula:
-//     // (-1)^sign * 1, mantissa * 2 ^ (exponent - 15)
-//     // Here we set the following values:
-//     // sign = 0
-//     // exponent = 15, for obtaining a zero exponent.
-//     // mantissa = 10 right bits from generated uint32 random value.
-
-//     uint16_t x_uint16 = static_cast<uint16_t>(x);
-//     RandomUniform::OutputType out_val = {(static_cast<uint16_t>(15) << 10) | (x_uint16 & 0x3ffu)};
-//     return out_val.f16 - static_cast<float16>(1);
-// }
-
-// Helper function for converting uint32 values to double. Sets fractional part of
-// floating double with bits from uint32 values. Resulting value is in interval [0,1).
-double uint32_to_double(uint32_t x1, uint32_t x2) {
-    // float64 is formatted as follows: sign(1 bit) exponent(11 bits) mantissa(52 bits). The value is interpreted
+float16 uint32_to_float16(uint32_t x) {
+    // float16 is formatted as follows: sign(1 bit) exponent(5 bits) mantissa(10 bits). The value is interpreted
     // The value is interpreted using following formula:
-    // (-1)^sign * 1, mantissa * 2 ^ (exponent - 1023)
+    // (-1)^sign * 1, mantissa * 2 ^ (exponent - 15)
     // Here we set the following values:
     // sign = 0
-    // exponent = 1023, for obtaining a zero exponent.
-    // mantissa = 52 right bits from two concatenated uint32 values from random integer generator.
+    // exponent = 15, for obtaining a zero exponent.
+    // mantissa = 10 right bits from generated uint32 random value.
 
-    uint64_t significant = ((static_cast<uint64_t>(x1) & 0xfffffu) << 32) | static_cast<uint64_t>(x2);
-    RandomUniform::OutputType out_val = {((static_cast<uint64_t>(1023) << 52) | significant)};
-    return out_val.f64 - 1.0;
+    uint16_t x_uint16 = static_cast<uint16_t>(x);
+    RandomUniform::OutputType out_val = {(static_cast<uint16_t>(15) << 10) | (x_uint16 & 0x3ffu)};
+    return out_val.f16 - static_cast<float16>(1);
 }
 
 // Helper function for converting uint32 values to bfloat16. Sets fractional part of
 // floating value with bits from uint32 value. Resulting value is in interval [0,1).
-// bfloat16 uint32_to_bfloat16(uint32_t x) {
-//     // bfloat16 is formatted as follows: sign(1 bit) exponent(8 bits) mantissa(7 bits). The value is interpreted
-//     // The value is interpreted using following formula:
-//     // (-1)^sign * 1, mantissa * 2 ^ (exponent - 127)
-//     // Here we set the following values:
-//     // sign = 0
-//     // exponent = 127, for obtaining a zero exponent.
-//     // mantissa = 7 right bits from generated uint32 random value.
+bfloat16 uint32_to_bfloat16(uint32_t x) {
+    // bfloat16 is formatted as follows: sign(1 bit) exponent(8 bits) mantissa(7 bits). The value is interpreted
+    // The value is interpreted using following formula:
+    // (-1)^sign * 1, mantissa * 2 ^ (exponent - 127)
+    // Here we set the following values:
+    // sign = 0
+    // exponent = 127, for obtaining a zero exponent.
+    // mantissa = 7 right bits from generated uint32 random value.
 
-//     uint16_t x_uint16 = static_cast<uint16_t>(x);
-//     RandomUniform::OutputType out_val = {(static_cast<uint16_t>(127) << 7) | (x_uint16 & 0x7fu)};
-//     return out_val.bf16 - static_cast<bfloat16>(1);
-// }
+    uint16_t x_uint16 = static_cast<uint16_t>(x);
+    RandomUniform::OutputType out_val = {(static_cast<uint16_t>(127) << 7) | (x_uint16 & 0x7fu)};
+    return out_val.bf16 - static_cast<bfloat16>(1);
+}
 
-// Runs Philox algorithm.
-void run_philox(PairType key, PairType counter, PairType n, size_t n_rounds, uint32_t* res) {
-    for (size_t i = 0; i < n_rounds; i++) {
+void runPhilox(PairType key, PairType counter, PairType n, uint32_t* res) {
+    // uint32_t* key_32 = reinterpret_cast<uint32_t>(&key);
+    for (size_t i = 0; i < ROUNDS_NUMBER; i++) {
         calculate_round(key, counter, n);
-        if (i < n_rounds - 1)
+        if (i < ROUNDS_NUMBER - 1)
             raiseKey(key);
     }
 
@@ -302,7 +287,7 @@ void run_philox(PairType key, PairType counter, PairType n, size_t n_rounds, uin
 
 // Converts uint32 values to destination type and normalizes to required range.
 template <typename T>
-void convert_to_output_type(const uint32_t* res,
+void convertToOutputType(const uint32_t* res,
                             size_t step,
                             const element::Type& elem_type,
                             T min_val,
@@ -373,15 +358,15 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
     uint32_t res[4];
     for (size_t k = 0; k < out_el_num; k += step) {
         // generate 4 random uint32 values using Philox algorithm
-        run_philox(key, counter_pair, n_pair, ROUNDS_NUMBER, res);
+        runPhilox(key, counter_pair, n_pair, res);
 
         // convert values to corresponding output_type
         switch (m_output_prc) {
             case element::Type_t::f32: {
-                convert_to_output_type<float>(res, step, m_output_prc, m_min_val.f32, m_max_val.f32, out, k, out_el_num, uint32_to_float);
+                convertToOutputType<float>(res, step, m_output_prc, m_min_val.f32, m_max_val.f32, out, k, out_el_num, uint32_to_float);
             } break;
             // case element::Type_t::f16: {
-            //     convert_to_output_type<float16>(res,
+            //     convertToOutputType<float16>(res,
             //                                     step,
             //                                     m_output_prc,
             //                                     min_val,
@@ -392,7 +377,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
             //                                     uint32_to_float16);
             // } break;
             // case element::Type_t::bf16: {
-            //     convert_to_output_type<bfloat16>(res,
+            //     convertToOutputType<bfloat16>(res,
             //                                     step,
             //                                     m_output_prc,
             //                                     min_val,
@@ -403,7 +388,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
             //                                     uint32_to_bfloat16);
             // } break;
             case element::Type_t::i32: {
-                convert_to_output_type<int>(res,
+                convertToOutputType<int>(res,
                                             step,
                                             m_output_prc,
                                             m_min_val.i32,
@@ -417,22 +402,8 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
                                                 return static_cast<int>(x % (mx - mn) + mn);
                                             });
             } break;
-            case element::Type_t::f64: {
-                convert_to_output_type<double>(res,
-                                            step,
-                                            m_output_prc,
-                                            m_min_val.f64,
-                                            m_max_val.f64,
-                                            out,
-                                            k,
-                                            out_el_num,
-                                            nullptr,
-                                            [](uint32_t a, uint32_t b, double mn, double mx) {
-                                                return uint32_to_double(a, b) * (mx - mn) + mn;
-                                            });
-            } break;
             case element::Type_t::i64: {
-                convert_to_output_type<int64_t>(res,
+                convertToOutputType<int64_t>(res,
                                             step,
                                             m_output_prc,
                                             m_min_val.i64,
@@ -495,7 +466,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTfParallel(void* out, size_t
 
     const auto groups_num = (out_el_num + PHILOX_GROUP_SIZE - 1) / PHILOX_GROUP_SIZE;
     auto threadBody = [&](const int ithr, const int nthr) {
-        auto groups_per_thr = (groups_num + nthr - 1) / nthr;
+        const auto groups_per_thr = (groups_num + nthr - 1) / nthr;
         auto start = ithr * groups_per_thr * PHILOX_GROUP_SIZE;
         auto end = (ithr + 1) * groups_per_thr * PHILOX_GROUP_SIZE;
         if (end > out_el_num) {
@@ -508,43 +479,44 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTfParallel(void* out, size_t
         PairType n_pair;
         n_pair[0] = static_cast<uint32_t>(n);
         n_pair[1] = static_cast<uint32_t>(n >> 32);
-// printf("[CPU][%d] exec start=%ld; end=%ld\n", ithr, start, end);
+// printf("[CPU][%d] exec out_el_num: %ld; step: %ld; start: %ld; end: %ld\n", ithr, out_el_num, step, start, end);
 
         uint32_t res[4];
         for (size_t k = start; k < end; k += step) {
             // generate 4 random uint32 values using Philox algorithm
-// printf("[CPU][%d] key: %ld; counter: %ld; n: %ld; ROUNDS_NUMBER: %ld\n", ithr, key, counter, n, ROUNDS_NUMBER);
-            run_philox(key, counter_pair, n_pair, ROUNDS_NUMBER, res);
+// printf("[CPU][%d] key: %ld; counter: %ld; n: %ld\n", ithr, key, counter, n);
+            runPhilox(key, counter_pair, n_pair, res);
+// printf("[CPU][%d] key: %u; counter: %ld; n: %ld; res={%u; %u; %u; %u}\n", ithr, key[0], counter, n, res[0], res[1], res[2], res[3]);
 
             // convert values to corresponding output_type
             switch (m_output_prc) {
                 case element::Type_t::f32: {
-                    convert_to_output_type<float>(res, step, m_output_prc, m_min_val.f32, m_max_val.f32, out, k, out_el_num, uint32_to_float);
+                    convertToOutputType<float>(res, step, m_output_prc, m_min_val.f32, m_max_val.f32, out, k, out_el_num, uint32_to_float);
                 } break;
-                // case element::Type_t::f16: {
-                //     convert_to_output_type<float16>(res,
-                //                                     step,
-                //                                     m_output_prc,
-                //                                     min_val,
-                //                                     max_val,
-                //                                     out,
-                //                                     k,
-                //                                     out_el_num,
-                //                                     uint32_to_float16);
-                // } break;
-                // case element::Type_t::bf16: {
-                //     convert_to_output_type<bfloat16>(res,
-                //                                     step,
-                //                                     m_output_prc,
-                //                                     min_val,
-                //                                     max_val,
-                //                                     out,
-                //                                     k,
-                //                                     out_el_num,
-                //                                     uint32_to_bfloat16);
-                // } break;
+                case element::Type_t::f16: {
+                    convertToOutputType<float16>(res,
+                                                step,
+                                                m_output_prc,
+                                                m_min_val.f16,
+                                                m_max_val.f16,
+                                                out,
+                                                k,
+                                                out_el_num,
+                                                uint32_to_float16);
+                } break;
+                case element::Type_t::bf16: {
+                    convertToOutputType<bfloat16>(res,
+                                                step,
+                                                m_output_prc,
+                                                m_min_val.bf16,
+                                                m_max_val.bf16,
+                                                out,
+                                                k,
+                                                out_el_num,
+                                                uint32_to_bfloat16);
+                } break;
                 case element::Type_t::i32: {
-                    convert_to_output_type<int>(res,
+                    convertToOutputType<int>(res,
                                                 step,
                                                 m_output_prc,
                                                 m_min_val.i32,
@@ -558,22 +530,8 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTfParallel(void* out, size_t
                                                     return static_cast<int>(x % (mx - mn) + mn);
                                                 });
                 } break;
-                case element::Type_t::f64: {
-                    convert_to_output_type<double>(res,
-                                                step,
-                                                m_output_prc,
-                                                m_min_val.f64,
-                                                m_max_val.f64,
-                                                out,
-                                                k,
-                                                out_el_num,
-                                                nullptr,
-                                                [](uint32_t a, uint32_t b, double mn, double mx) {
-                                                    return uint32_to_double(a, b) * (mx - mn) + mn;
-                                                });
-                } break;
                 case element::Type_t::i64: {
-                    convert_to_output_type<int64_t>(res,
+                    convertToOutputType<int64_t>(res,
                                                 step,
                                                 m_output_prc,
                                                 m_min_val.i64,
@@ -588,10 +546,6 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTfParallel(void* out, size_t
                 } break;
                 default: OPENVINO_THROW("Unsupported type of RandomUniform: ", m_output_prc.to_string());
             }
-//             if (++n == 0) {
-// std::cout << "[CPU] RandomUniform::computeTf (++n == 0)" << std::endl;
-//                 ++counter;
-//             }
 
             if (++n == 0) {
 std::cout << "[CPU] RandomUniform::computeTf (++n == 0)" << std::endl;
@@ -599,12 +553,15 @@ std::cout << "[CPU] RandomUniform::computeTf (++n == 0)" << std::endl;
                 counter_pair[0] = static_cast<uint32_t>(counter);
                 counter_pair[1] = static_cast<uint32_t>(counter >> 32);
             }
-            n_pair[0] = static_cast<uint32_t>(n);
-            n_pair[1] = static_cast<uint32_t>(n >> 32);
+            reinterpret_cast<uint64_t*>(n_pair.data())[0] = n;
         }
     };
 
-    parallel_nt(0, threadBody);
+    if (out_el_num < PHILOX_PARALLEL_EXECUTION_THRESHOLD) {
+        parallel_nt(1, threadBody);
+    } else {
+        parallel_nt(0, threadBody);
+    }
 
     // Calculate counter values for next RandomUniform run
     const uint64_t skip_count = out_el_num * SKIP_CONST;
@@ -612,7 +569,7 @@ std::cout << "[CPU] RandomUniform::computeTf (++n == 0)" << std::endl;
     if (n_state < skip_count)
         counter_state++;
 
-    return {n_state, counter_state};
+    return { n_state, counter_state };
 }
 //////////////////////////////
 

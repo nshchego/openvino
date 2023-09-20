@@ -14,10 +14,12 @@ namespace node {
 class RandomUniform : public Node {
 public:
     union OutputType {
-        int32_t i32;
-        int64_t i64;
-        float f32;
-        double f64;
+        int32_t  i32;
+        int64_t  i64;
+        float    f32;
+        float16  f16;
+        bfloat16 bf16;
+        double   f64;
     };
 
     RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
@@ -80,7 +82,6 @@ private:
 
     // Philox algorithm returns 4 elements of RNG sequence per each invocation
     static constexpr size_t PHILOX_GROUP_SIZE = 4;
-    static constexpr size_t ROUNDS_NUMBER = 10;
 
     static constexpr size_t PHILOX_PARALLEL_EXECUTION_THRESHOLD = 1000;
 };

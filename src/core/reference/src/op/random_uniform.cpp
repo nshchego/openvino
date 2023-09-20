@@ -196,6 +196,7 @@ std::pair<uint64_t, uint64_t> random_uniform(const uint64_t* out_shape,
         std::srand(static_cast<unsigned int>(std::time(nullptr)));
         seed = std::rand();
     }
+// printf("[REF] seed: %ld\n", seed);
 
     // Get previous counter state
     uint64_t n_state = prev_state.first;
@@ -223,11 +224,13 @@ std::pair<uint64_t, uint64_t> random_uniform(const uint64_t* out_shape,
     // Step indicates how many values we generate in one iteration.
     const size_t step = elem_type.size() > 4 ? 2 : 4;
 
+// printf("[REF] random_uniform elem_count: %ld; step: %ld\n", elem_count, step);
     for (size_t k = 0; k < elem_count; k += step) {
         // generate 4 random uint32 values using Philox algorithm
         std::vector<uint32_t> res(philox_output_size);
 // printf("[REF] key: %ld; counter: %ld; n: %ld; rounds_number: %ld\n", key, counter, n, rounds_number);
         run_philox(key, counter, n, rounds_number, res);
+// printf("[REF] random_uniform key: %ld; counter: %ld; n: %ld; res={%u; %u; %u; %u}\n", key, counter, n, res[0], res[1], res[2], res[3]);
 
         // convert values to corresponding output_type
         switch (elem_type) {
