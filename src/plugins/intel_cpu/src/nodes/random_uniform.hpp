@@ -26,12 +26,6 @@ public:
 
     void initSupportedPrimitiveDescriptors() override;
 
-    bool created() const override;
-
-    // bool canBeInPlace() const override {
-    //     return false;
-    // }
-
     bool needPrepareParams() const override;
 
     void execute(dnnl::stream strm) override;
@@ -39,6 +33,10 @@ public:
     void executeDynamicImpl(dnnl::stream strm) override;
 
     bool isExecutable() const override;
+
+    bool created() const override;
+
+    bool canBeInPlace() const override { return false; }
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
@@ -70,11 +68,12 @@ private:
     VectorDims m_out_shape;
     OutputType m_min_val;
     OutputType m_max_val;
-    AlgoType algo = TF;
+    AlgoType m_algo = TF;
 
     std::default_random_engine m_generator;
 
-    // TF PHILOX constants
+    ///// PHILOX constants /////
+
     // Determines how many sequence elements of RNG sequence are skipped between runs.
     // Can be any positive value, 256 is chosen for parity with Tensorflow.
     static constexpr uint64_t SKIP_CONST = 256;
@@ -82,6 +81,8 @@ private:
     // Philox algorithm returns 4 elements of RNG sequence per each invocation
     static constexpr size_t PHILOX_GROUP_SIZE = 4;
     static constexpr size_t ROUNDS_NUMBER = 10;
+
+    static constexpr size_t PHILOX_PARALLEL_EXECUTION_THRESHOLD = 1000;
 };
 
 }   // namespace node
