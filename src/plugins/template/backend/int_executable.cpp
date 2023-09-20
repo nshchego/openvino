@@ -199,13 +199,13 @@ std::cout << "INTExecutable::call 2 shape: " << host_tensor.get_shape() << std::
 
         {
 
-auto& map = ngraph::runtime::interpreter::get_evaluators_map();
-auto it = map.find(op->get_type_info());
-if (it == map.end()) {
-    std::cout << "Op " << op->get_type_info().name << " NOT IN evaluators_map" << std::endl;
-} else {
-    std::cout << "Op " << op->get_type_info().name << " IN evaluators_map" << std::endl;
-}
+// auto& map = ngraph::runtime::interpreter::get_evaluators_map();
+// auto it = map.find(op->get_type_info());
+// if (it == map.end()) {
+//     std::cout << "Op " << op->get_type_info().name << " NOT IN evaluators_map" << std::endl;
+// } else {
+//     std::cout << "Op " << op->get_type_info().name << " IN evaluators_map" << std::endl;
+// }
             PERF(op, collect_performance);
             // Call evaluate for cloned_node with static shapes
             if (!op->evaluate(op_outputs, op_inputs, context)) {

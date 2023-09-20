@@ -21,6 +21,7 @@ Reference::Reference(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     if (!op->has_evaluate()) {
         IE_THROW(NotImplemented) << "Cannot fallback on ngraph reference implementation (ov::Node::evaluate() is not implemented)";
     }
+constant = ConstantType::NoConst; // TODO: REMOVE
     setType(Type::Reference);
     setTypeStr("Reference");
 }

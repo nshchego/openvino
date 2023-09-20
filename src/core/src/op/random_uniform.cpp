@@ -31,8 +31,9 @@ RandomUniform::RandomUniform(const Output<Node>& out_shape,
       m_output_type(out_type),
       m_global_seed(global_seed),
       m_op_seed(op_seed) {
-std::cout << "ov::op::RandomUniform op_seed: " << op_seed << std::endl;
+std::cout << "[CORE] RandomUniform::RandomUniform op_seed: " << op_seed << std::endl;
     constructor_validate_and_infer_types();
+std::cout << "[CORE] RandomUniform::RandomUniform m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
 }
 
 void RandomUniform::validate_and_infer_types() {
@@ -88,7 +89,7 @@ bool RandomUniform::evaluate(TensorVector& outputs, const TensorVector& inputs) 
         input_shapes.emplace_back(t.get_shape());
     }
     const auto out_shape = shape_infer(this, input_shapes, make_tensor_accessor(inputs)).front().to_shape();
-std::cout << "RandomUniform::evaluate out_shape: " << out_shape << std::endl;
+// std::cout << "RandomUniform::evaluate out_shape: " << out_shape << std::endl;
     const auto out_dims = std::vector<uint64_t>(out_shape.begin(), out_shape.end());
 
     const auto& t_out = get_out_type();
@@ -117,6 +118,7 @@ std::cout << "RandomUniform::evaluate out_shape: " << out_shape << std::endl;
 
     outputs[0].set_shape(output_shape);
 
+std::cout << "[CORE] RandomUniform::evaluate m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
     auto state = ngraph::runtime::reference::random_uniform(out_dims.data(),
                                                             static_cast<const char*>(inputs[1].data()),
                                                             static_cast<const char*>(inputs[2].data()),

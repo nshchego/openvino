@@ -47,6 +47,7 @@ public:
 private:
     void computeOnnx(void* out, size_t work_amount);
     std::pair<uint64_t, uint64_t> computeTf(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
+    std::pair<uint64_t, uint64_t> computeTfParallel(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
 
     template <typename T, typename DISTR_TYPE>
     void generateData(DISTR_TYPE distribution, void* out, size_t work_amount);
@@ -62,9 +63,9 @@ private:
 
     ov::element::Type m_shape_prc;
     ov::element::Type m_output_prc;
-    int m_global_seed = 0;
-    int m_op_seed = 0;
-    std::pair<uint64_t, uint64_t> m_state;
+    uint64_t m_global_seed = 0;
+    uint64_t m_op_seed = 0;
+    std::pair<uint64_t, uint64_t> m_state {0llu, 0llu};
 
     VectorDims m_out_shape;
     OutputType m_min_val;
@@ -73,9 +74,14 @@ private:
 
     std::default_random_engine m_generator;
 
+    // TF PHILOX constants
     // Determines how many sequence elements of RNG sequence are skipped between runs.
     // Can be any positive value, 256 is chosen for parity with Tensorflow.
     static constexpr uint64_t SKIP_CONST = 256;
+
+    // Philox algorithm returns 4 elements of RNG sequence per each invocation
+    static constexpr size_t PHILOX_GROUP_SIZE = 4;
+    static constexpr size_t ROUNDS_NUMBER = 10;
 };
 
 }   // namespace node

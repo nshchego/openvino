@@ -226,6 +226,7 @@ std::pair<uint64_t, uint64_t> random_uniform(const uint64_t* out_shape,
     for (size_t k = 0; k < elem_count; k += step) {
         // generate 4 random uint32 values using Philox algorithm
         std::vector<uint32_t> res(philox_output_size);
+// printf("[REF] key: %ld; counter: %ld; n: %ld; rounds_number: %ld\n", key, counter, n, rounds_number);
         run_philox(key, counter, n, rounds_number, res);
 
         // convert values to corresponding output_type
