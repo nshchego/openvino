@@ -17,7 +17,9 @@ namespace intel_cpu {
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 public:
-    JitKernelBase(const char* name) : dnnl::impl::cpu::x64::jit_generator(name) {}
+    JitKernelBase(const char* name, dnnl::impl::cpu::x64::cpu_isa_t max_cpu_isa);
+
+    size_t getVectorLen() { return vlen; }
 
     void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
 
@@ -141,6 +143,7 @@ protected:
     }
 
     RegistersPool::Ptr registersPool;
+    size_t vlen;
 
     enum {
         // Comparison predicate operand (immediate byte) for single-precision floating-point values.
@@ -153,6 +156,42 @@ protected:
         CMP_NLE_PS,    // Not-less-than-or-equal (unordered, signaling)
         CMP_ORD_PS     // Ordered (non-signaling)
     };
+};
+
+template<typename CompileParams, typename CallArgs>
+class JitKernel : public JitKernelBase {
+public:
+    using KernelFunc = void (*)(const CallArgs *);
+
+    explicit JitKernel(const char* name, const CompileParams& jcp, dnnl::impl::cpu::x64::cpu_isa_t max_cpu_isa)
+        : JitKernelBase{name, max_cpu_isa}, m_jcp{jcp}, m_func{nullptr} {}
+
+    ~JitKernel() override = default;
+
+    dnnl::impl::status_t create_kernel() override {
+        const dnnl::impl::status_t code = jit_generator::create_kernel();
+        if (code != dnnl::impl::status::success) {
+            OPENVINO_THROW("Could not create kernel. Error code: ", std::to_string(code), ". ",
+                       "Xbyak error code: ", Xbyak::ConvertErrorToString(Xbyak::GetError()));
+        }
+        m_func = (decltype(m_func))jit_ker();
+        return code;
+    }
+
+    void operator()(const CallArgs* args) const {
+        assert(m_func);
+        m_func(args);
+    }
+
+    void operator()(const CallArgs& args) const {
+        this->operator()(&args);
+    }
+
+protected:
+    CompileParams m_jcp;
+
+private:
+    KernelFunc m_func;
 };
 
 } // namespace intel_cpu

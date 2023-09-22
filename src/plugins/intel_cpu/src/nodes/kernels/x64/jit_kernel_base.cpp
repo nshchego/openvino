@@ -8,6 +8,10 @@ using namespace ov;
 using namespace intel_cpu;
 using namespace dnnl::impl::cpu;
 
+JitKernelBase::JitKernelBase(const char* name, x64::cpu_isa_t isa)
+        : x64::jit_generator(name, nullptr, x64::MAX_CODE_SIZE, true, isa) {
+    vlen = x64::isa_max_vlen(isa);
+}
 
 void JitKernelBase::uni_vfmsub132ps(const Xbyak::Xmm& vDst,
                                     const Xbyak::Xmm& vSrc,

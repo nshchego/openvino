@@ -6,6 +6,7 @@
 
 #include <node.h>
 #include <random>
+#include "kernels/x64/random_uniform.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -36,6 +37,8 @@ public:
 
     bool isExecutable() const override;
 
+    void createPrimitive() override;
+
     bool created() const override;
 
     bool canBeInPlace() const override { return false; }
@@ -47,7 +50,6 @@ public:
 private:
     void computeOnnx(void* out, size_t work_amount);
     std::pair<uint64_t, uint64_t> computeTf(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
-    std::pair<uint64_t, uint64_t> computeTfParallel(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
 
     template <typename T, typename DISTR_TYPE>
     void generateData(DISTR_TYPE distribution, void* out, size_t work_amount);
@@ -84,6 +86,9 @@ private:
     static constexpr size_t PHILOX_GROUP_SIZE = 4;
 
     static constexpr size_t PHILOX_PARALLEL_EXECUTION_THRESHOLD = 1000;
+    /////////////////////////////////////////////////////////////////////////////////
+
+    std::shared_ptr<JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformExecArgs>> m_jit_kernel;
 };
 
 }   // namespace node
