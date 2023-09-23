@@ -116,9 +116,9 @@ void RandomUniform::initSupportedPrimitiveDescriptors() {
 void RandomUniform::createPrimitive() {
 #if defined(OPENVINO_ARCH_X86_64)
     if (m_algo == TF) {
-        kernel::RandomUniform::CompileParams jcp;
+        kernel::RandomUniformCompileParams jcp;
 
-        // jcp.inDataPrc     = dataPrecision;
+        jcp.out_data_type = m_output_prc;
         // jcp.gridPrc       = gridPrecision;
         // jcp.dynamicShapes = isDynamicNode();
         // jcp.alignCorners  = alignCorners;
@@ -139,18 +139,7 @@ void RandomUniform::createPrimitive() {
         //     jcp.cannelNum      = jcp.dynamicChannel ? 1lu : srcDataDims[1];
         // }
 
-        m_jit_kernel = kernel::createInstance<RandomUniform>(jcp);
-        // if (x64::mayiuse(x64::avx512_core)) {
-        //     m_jit_kernel.reset(new kernel::RandomUniform<x64::avx512_core>(jcp));
-        // } else if (x64::mayiuse(x64::avx2)) {
-        //     m_jit_kernel.reset(new kernel::RandomUniform<x64::avx2>(jcp));
-        // } else if (x64::mayiuse(x64::sse41)) {
-        //     m_jit_kernel.reset(new kernel::RandomUniform<x64::sse41>(jcp));
-        // }
-        // if (!m_jit_kernel) {
-        //     THROW_CPU_NODE_ERR << "could not create JIT kernel.";
-        // }
-        // m_jit_kernel->create_kernel();
+        m_jit_kernel = kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>::createInstance<kernel::RandomUniform>(jcp);
     }
 #endif // OPENVINO_ARCH_X86_64
 
@@ -280,6 +269,7 @@ void calculateRound(const uint32_t* key, uint32_t* counter, uint32_t* n) {
     n[1] = static_cast<uint32_t>(prod_1);
     counter[0] = static_cast<uint32_t>(prod_0 >> 32) ^ counter[1] ^ key[1];
     counter[1] = static_cast<uint32_t>(prod_0);
+printf("[CPU] calculateRound prod_0: %lu; prod_1: %lu; n_0: %d; n_1: %d; c_0: %d; c_1: %d\n", prod_0, prod_1, n[0], n[1], counter[0], counter[1]);
 }
 
 void raiseKey(uint32_t* key) {
@@ -413,13 +403,16 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
     const auto groups_num = (out_el_num + PHILOX_GROUP_SIZE - 1) / PHILOX_GROUP_SIZE;
 
     if (m_jit_kernel) {
-        const auto el_per_vec = m_jit_kernel->getVectorLen() / m_output_prc.size();
-        const size_t step = m_output_prc.size() > 4 ? el_per_vec : (el_per_vec * 2);
+printf("[CPU][KER] vec_len: %ld; out_el_size: %ld\n", m_jit_kernel->getVectorLen(), m_output_prc.size());
+        const size_t block_size = (m_jit_kernel->getVectorLen() / m_output_prc.size()) * 2;
+        const size_t step = m_output_prc.size() > 4 ? (block_size / 2) : block_size;
+        const size_t blocks_num = (out_el_num + block_size - 1) / block_size;
 
         auto threadBody = [&](const int ithr, const int nthr) {
-            const auto groups_per_thr = (groups_num + nthr - 1) / nthr;
-            auto start = ithr * groups_per_thr * PHILOX_GROUP_SIZE;
-            auto end = (ithr + 1) * groups_per_thr * PHILOX_GROUP_SIZE;
+            const auto blocks_per_thr = (blocks_num + nthr - 1) / nthr;
+
+            auto start = ithr * blocks_per_thr * block_size;
+            auto end = (ithr + 1) * blocks_per_thr * block_size;
             if (end > out_el_num) {
                 end = out_el_num;
             }
@@ -427,25 +420,34 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
                 return;
             }
             uint64_t n = n_state + start / PHILOX_GROUP_SIZE;
-// printf("[CPU][%d] exec out_el_num: %ld; step: %ld; start: %ld; end: %ld\n", ithr, out_el_num, step, start, end);
+printf("[CPU][KER][%d] exec out_el_num: %ld; step: %ld; start: %ld; end: %ld\n", ithr, out_el_num, step, start, end);
 
-            uint32_t res[4];
+            std::vector<uint32_t> res(block_size);
             for (size_t k = start; k < end; k += step) {
-                // generate 4 random uint32 values using Philox algorithm
-// printf("[CPU][%d] key: %ld; counter: %ld; n: %ld\n", ithr, key, counter, n);
-                // runPhilox(key, counter, n, res);
-// printf("[CPU][%d] key: %u; counter: %ld; n: %ld; res={%u; %u; %u; %u}\n", ithr, key[0], counter, n, res[0], res[1], res[2], res[3]);
+                kernel::RandomUniformCallArgs args;
 
-                kernel::RandomUniformExecArgs args;
+                args.dst_ptr     = res.data();
+                args.key_ptr     = &key;
+                args.counter_ptr = &counter;
+                args.n_ptr       = &n;
+                args.work_amount = end - start;
+
                 (*m_jit_kernel)(&args);
+
+// printf("[CPU][%d] key: %ld; counter: %ld; n: %ld\n", ithr, key, counter, n);
+    std::string res_str;
+for (int i = 0; i < step; i++) {
+    res_str += std::to_string(res[i]) + "; ";
+}
+printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counter, n, res_str.c_str());
 
                 // convert values to corresponding output_type
                 switch (m_output_prc) {
                     case element::Type_t::f32: {
-                        convertToOutputType<float>(res, step, m_output_prc, m_min_val.f32, m_max_val.f32, out_u8, k, out_el_num, uint32ToFloat);
+                        convertToOutputType<float>(res.data(), step, m_output_prc, m_min_val.f32, m_max_val.f32, out_u8, k, out_el_num, uint32ToFloat);
                     } break;
                     case element::Type_t::f16: {
-                        convertToOutputType<float16>(res,
+                        convertToOutputType<float16>(res.data(),
                                                     step,
                                                     m_output_prc,
                                                     m_min_val.f16,
@@ -456,7 +458,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
                                                     uint32ToFloat16);
                     } break;
                     case element::Type_t::bf16: {
-                        convertToOutputType<bfloat16>(res,
+                        convertToOutputType<bfloat16>(res.data(),
                                                     step,
                                                     m_output_prc,
                                                     m_min_val.bf16,
@@ -467,7 +469,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
                                                     uint32ToBfloat16);
                     } break;
                     case element::Type_t::i32: {
-                        convertToOutputType<int>(res,
+                        convertToOutputType<int>(res.data(),
                                                     step,
                                                     m_output_prc,
                                                     m_min_val.i32,
@@ -482,7 +484,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
                                                     });
                     } break;
                     case element::Type_t::i64: {
-                        convertToOutputType<int64_t>(res,
+                        convertToOutputType<int64_t>(res.data(),
                                                     step,
                                                     m_output_prc,
                                                     m_min_val.i64,
@@ -531,7 +533,12 @@ std::cout << "[CPU] RandomUniform::computeTf (++n == 0)" << std::endl;
                 // generate 4 random uint32 values using Philox algorithm
 // printf("[CPU][%d] key: %ld; counter: %ld; n: %ld\n", ithr, key, counter, n);
                 runPhilox(key, counter, n, res);
-// printf("[CPU][%d] key: %u; counter: %ld; n: %ld; res={%u; %u; %u; %u}\n", ithr, key[0], counter, n, res[0], res[1], res[2], res[3]);
+
+    std::string res_str;
+for (int i = 0; i < step; i++) {
+    res_str += std::to_string(res[i]) + "; ";
+}
+printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counter, n, res_str.c_str());
 
                 // convert values to corresponding output_type
                 switch (m_output_prc) {

@@ -12,22 +12,22 @@ namespace ov {
 namespace intel_cpu {
 namespace kernel {
 
-// struct RandomUniformCompileParams {
-//     element::Type out_data_type = element::f32;
-//     // bool dynamicShapes  = false;
-//     // bool dynamicBatch   = false;
-//     // bool dynamicChannel = false;
-//     // bool alignCorners  = false;
-//     // GridSampleInterpolationMode interpolationMode = GridSampleInterpolationMode::BILINEAR;
-//     // GridSamplePaddingMode paddingMode = GridSamplePaddingMode::ZEROS;
-//     // InferenceEngine::Precision inDataPrc;
-//     // InferenceEngine::Precision gridPrc;
-//     // uint64_t batchNum      = 1lu;
-//     // uint64_t cannelNum     = 1lu;
-//     // uint64_t srcBatchStepB = 0lu;
-// };
+struct RandomUniformCompileParams {
+    element::Type out_data_type = element::f32;
+    // bool dynamicShapes  = false;
+    // bool dynamicBatch   = false;
+    // bool dynamicChannel = false;
+    // bool alignCorners  = false;
+    // GridSampleInterpolationMode interpolationMode = GridSampleInterpolationMode::BILINEAR;
+    // GridSamplePaddingMode paddingMode = GridSamplePaddingMode::ZEROS;
+    // InferenceEngine::Precision inDataPrc;
+    // InferenceEngine::Precision gridPrc;
+    // uint64_t batchNum      = 1lu;
+    // uint64_t cannelNum     = 1lu;
+    // uint64_t srcBatchStepB = 0lu;
+};
 
-struct RandomUniformExecArgs {
+struct RandomUniformCallArgs {
     // const void* src;
     void* dst_ptr;
     // uint64_t batchNum    = 1lu;
@@ -53,49 +53,14 @@ struct RandomUniformExecArgs {
     uint64_t work_amount = 0lu;
 };
 
-// class GridSampleKernelBase: public JitKernelBase {
-// public:
-//     void (*ker_)(const RandomUniformExecArgs *);
-//     void operator()(const RandomUniformExecArgs *args) {
-//         assert(ker_);
-//         ker_(args);
-//     }
-//     explicit GridSampleKernelBase(const char* name, const RandomUniformCompileParams& jcp) : JitKernelBase(name), ker_(nullptr), jcp(jcp) {}
-
-//     virtual void create_ker() = 0;
-//     uint64_t getVecLen() {
-//         return vlen;
-//     }
-//     uint64_t getDataElPerVec() {
-//         return dataElPerVec;
-//     }
-//     uint64_t getGridElPerVec() {
-//         return gridElPerVec;
-//     }
-
-// protected:
-//     RandomUniformCompileParams jcp;
-//     uint64_t vlen         = 16lu;
-//     uint64_t dataTypeSize = 1lu;
-//     uint64_t gridTypeSize = 1lu;
-//     uint64_t dataElPerVec = 1lu;
-//     uint64_t gridElPerVec = 1lu;
-// };
-
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-class RandomUniform : public JitKernel<RandomUniformCompileParams, RandomUniformExecArgs> {
+class RandomUniform : public JitKernel<RandomUniformCompileParams, RandomUniformCallArgs> {
 public:
     DECLARE_CPU_JIT_AUX_FUNCTIONS(RandomUniform)
 
     explicit RandomUniform(const RandomUniformCompileParams& jcp);
 
     void generate() override;
-
-    static std::shared_ptr<RandomUniform> createInstance(const RandomUniformCompileParams& jcp);
-
-    struct CompileParams {
-        element::Type out_data_type = element::f32;
-    };
 
 private:
     using Vmm   = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::avx512_core, Xbyak::Zmm,
@@ -123,15 +88,16 @@ private:
     RegistersPool::Reg<Vmask> kTailMask;
 
     // Vector registers.
-    RegistersPool::Reg<Vmm> v_max_mul_n;
-    RegistersPool::Reg<Vmm> v_max_mul_c;
+    RegistersPool::Reg<Vmm> v_max_mul_n_64;
+    RegistersPool::Reg<Vmm> v_max_mul_c_64;
     RegistersPool::Reg<Vmm> v_add_low_k;
     RegistersPool::Reg<Vmm> v_add_up_k;
+    RegistersPool::Reg<Vmm> v_key_64;
+    RegistersPool::Reg<Vmm> v_counter_64;
+    RegistersPool::Reg<Vmm> v_n_64;
     RegistersPool::Reg<Vmm> v_sep_perm;
-    RegistersPool::Reg<Vmm> v_key;
-    RegistersPool::Reg<Vmm> v_counter;
-    RegistersPool::Reg<Vmm> v_n;
-    // RegistersPool::Reg<Vmm> vDataTypeSizeB;      // for ZEROS padding
+    RegistersPool::Reg<Vmm> v_sep_perm_1;
+    RegistersPool::Reg<Vmm> v_res_perm;
     // RegistersPool::Reg<Vmm> vSrcWidthB;          // for ZEROS padding
 
     // RegistersPool::Reg<Vmm> vSrcHeightSub1F;     // for BORDER padding
@@ -184,17 +150,16 @@ private:
 };
 
 
-template <typename KernelT>
-std::shared_ptr<KernelT> createInstance(const KernelT::CompileParams& jcp) {
-    using x64 = dnnl::impl::cpu::x64;
-    std::shared_ptr<KernelT> res;
+template <template<dnnl::impl::cpu::x64::cpu_isa_t isa> typename KernelT, typename CompileParams, typename CallArgs>
+std::shared_ptr<JitKernel<CompileParams, CallArgs>> createInstance(const CompileParams& jcp) {
+    std::shared_ptr<JitKernel<CompileParams, CallArgs>> res;
 
-    if (x64::mayiuse(x64::avx512_core)) {
-        res.reset(new KernelT<x64::avx512_core>(jcp));
-    } else if (x64::mayiuse(x64::avx2)) {
-        res.reset(new KernelT<x64::avx2>(jcp));
-    } else if (x64::mayiuse(x64::sse41)) {
-        res.reset(new KernelT<x64::sse41>(jcp));
+    if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core)) {
+        res.reset(new KernelT<dnnl::impl::cpu::x64::avx512_core>(jcp));
+    } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx2)) {
+        res.reset(new KernelT<dnnl::impl::cpu::x64::avx2>(jcp));
+    } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::sse41)) {
+        res.reset(new KernelT<dnnl::impl::cpu::x64::sse41>(jcp));
     }
     if (!res) {
         OPENVINO_THROW("Could not create JIT kernel.");
@@ -203,6 +168,25 @@ std::shared_ptr<KernelT> createInstance(const KernelT::CompileParams& jcp) {
 
     return res;
 }
+
+// template <template<dnnl::impl::cpu::x64::cpu_isa_t isa> typename KernelT>
+// std::shared_ptr<KernelT<dnnl::impl::cpu::x64::avx512_core>> createInstance(const typename KernelT<dnnl::impl::cpu::x64::avx512_core>::CompileParams& jcp) {
+//     std::shared_ptr<KernelT<isa>> res;
+
+//     if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core)) {
+//         res.reset(new KernelT<dnnl::impl::cpu::x64::avx512_core>(jcp));
+//     } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx2)) {
+//         res.reset(new KernelT<dnnl::impl::cpu::x64::avx2>(jcp));
+//     } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::sse41)) {
+//         res.reset(new KernelT<dnnl::impl::cpu::x64::sse41>(jcp));
+//     }
+//     if (!res) {
+//         OPENVINO_THROW("Could not create JIT kernel.");
+//     }
+//     res->create_kernel();
+
+//     return res;
+// }
 
 }   // namespace kernel
 }   // namespace intel_cpu

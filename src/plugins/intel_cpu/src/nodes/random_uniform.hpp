@@ -88,7 +88,7 @@ private:
     static constexpr size_t PHILOX_PARALLEL_EXECUTION_THRESHOLD = 1000;
     /////////////////////////////////////////////////////////////////////////////////
 
-    std::shared_ptr<JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformExecArgs>> m_jit_kernel;
+    std::shared_ptr<kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>> m_jit_kernel;
 };
 
 }   // namespace node

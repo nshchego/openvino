@@ -158,6 +158,8 @@ protected:
     };
 };
 
+namespace kernel {
+
 template<typename CompileParams, typename CallArgs>
 class JitKernel : public JitKernelBase {
 public:
@@ -187,12 +189,43 @@ public:
         this->operator()(&args);
     }
 
+    template <template<dnnl::impl::cpu::x64::cpu_isa_t isa> typename KernelT>
+    static std::shared_ptr<JitKernel<CompileParams, CallArgs>> createInstance(const CompileParams& jcp) {
+        std::shared_ptr<JitKernel<CompileParams, CallArgs>> res;
+
+#define IF_ISA_CASE(ISA)                                                                         \
+        (dnnl::impl::cpu::x64::mayiuse(ISA)) {                                                   \
+            res.reset(new KernelT<ISA>(jcp));                                                    \
+            if (!res)                                                                            \
+                OPENVINO_THROW("Could not create JIT kernel for ", typeid(KernelT<ISA>).name()); \
+        }
+
+        if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
+        else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
+        else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
+        // if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core)) {
+        //     ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
+        // } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx2)) {
+        //     ISA_CASE(dnnl::impl::cpu::x64::avx2)
+        // } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::sse41)) {
+        //     ISA_CASE(dnnl::impl::cpu::x64::sse41)
+        // }
+
+#undef IF_ISA_CASE
+
+        res->create_kernel();
+
+        return res;
+    }
+
 protected:
     CompileParams m_jcp;
 
 private:
     KernelFunc m_func;
 };
+
+} // namespace kernel
 
 } // namespace intel_cpu
 } // namespace ov

@@ -291,7 +291,7 @@ const std::vector<ElementType> output_prc = {
 };
 
 std::vector<ov::Shape> output_shapes = {
-        // {8},
+        {16},
         {500},
         {4, 3, 210}
 };
