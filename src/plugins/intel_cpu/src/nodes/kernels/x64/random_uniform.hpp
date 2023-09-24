@@ -97,7 +97,9 @@ private:
     RegistersPool::Reg<Vmm> v_n_64;
     RegistersPool::Reg<Vmm> v_sep_perm;
     RegistersPool::Reg<Vmm> v_sep_perm_1;
+    RegistersPool::Reg<Vmm> v_sep_perm_2;
     RegistersPool::Reg<Vmm> v_res_perm;
+    RegistersPool::Reg<Vmm> v_res_perm_1;
     // RegistersPool::Reg<Vmm> vSrcWidthB;          // for ZEROS padding
 
     // RegistersPool::Reg<Vmm> vSrcHeightSub1F;     // for BORDER padding

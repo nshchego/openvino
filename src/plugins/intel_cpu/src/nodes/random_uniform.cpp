@@ -269,7 +269,7 @@ void calculateRound(const uint32_t* key, uint32_t* counter, uint32_t* n) {
     n[1] = static_cast<uint32_t>(prod_1);
     counter[0] = static_cast<uint32_t>(prod_0 >> 32) ^ counter[1] ^ key[1];
     counter[1] = static_cast<uint32_t>(prod_0);
-printf("[CPU] calculateRound prod_0: %lu; prod_1: %lu; n_0: %d; n_1: %d; c_0: %d; c_1: %d\n", prod_0, prod_1, n[0], n[1], counter[0], counter[1]);
+// printf("[CPU] calculateRound prod_0: %lu; prod_1: %lu; n_0: %d; n_1: %d; c_0: %d; c_1: %d\n", prod_0, prod_1, n[0], n[1], counter[0], counter[1]);
 }
 
 void raiseKey(uint32_t* key) {
@@ -403,7 +403,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
     const auto groups_num = (out_el_num + PHILOX_GROUP_SIZE - 1) / PHILOX_GROUP_SIZE;
 
     if (m_jit_kernel) {
-printf("[CPU][KER] vec_len: %ld; out_el_size: %ld\n", m_jit_kernel->getVectorLen(), m_output_prc.size());
+// printf("[CPU][KER] vec_len: %ld; out_el_size: %ld\n", m_jit_kernel->getVectorLen(), m_output_prc.size());
         const size_t block_size = (m_jit_kernel->getVectorLen() / m_output_prc.size()) * 2;
         const size_t step = m_output_prc.size() > 4 ? (block_size / 2) : block_size;
         const size_t blocks_num = (out_el_num + block_size - 1) / block_size;
@@ -420,7 +420,7 @@ printf("[CPU][KER] vec_len: %ld; out_el_size: %ld\n", m_jit_kernel->getVectorLen
                 return;
             }
             uint64_t n = n_state + start / PHILOX_GROUP_SIZE;
-printf("[CPU][KER][%d] exec out_el_num: %ld; step: %ld; start: %ld; end: %ld\n", ithr, out_el_num, step, start, end);
+// printf("[CPU][KER][%d] exec out_el_num: %ld; step: %ld; start: %ld; end: %ld\n", ithr, out_el_num, step, start, end);
 
             std::vector<uint32_t> res(block_size);
             for (size_t k = start; k < end; k += step) {
@@ -435,11 +435,11 @@ printf("[CPU][KER][%d] exec out_el_num: %ld; step: %ld; start: %ld; end: %ld\n",
                 (*m_jit_kernel)(&args);
 
 // printf("[CPU][%d] key: %ld; counter: %ld; n: %ld\n", ithr, key, counter, n);
-    std::string res_str;
-for (int i = 0; i < step; i++) {
-    res_str += std::to_string(res[i]) + "; ";
-}
-printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counter, n, res_str.c_str());
+//     std::string res_str;
+// for (int i = 0; i < step; i++) {
+//     res_str += std::to_string(res[i]) + "; ";
+// }
+// printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counter, n, res_str.c_str());
 
                 // convert values to corresponding output_type
                 switch (m_output_prc) {
