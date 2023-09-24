@@ -42,6 +42,8 @@ struct RandomUniformCallArgs {
     const void* key_ptr;
     const void* counter_ptr;
     const void* n_ptr;
+    const void* min_ptr;
+    const void* max_ptr;
     // const void* srcHeightMul2F;
     // const void* srcWidthMul2F;
     // const void* srcHeightMul2Sub1F;
@@ -92,36 +94,26 @@ private:
     RegistersPool::Reg<Vmm> v_max_mul_c_64;
     RegistersPool::Reg<Vmm> v_add_low_k;
     RegistersPool::Reg<Vmm> v_add_up_k;
+    RegistersPool::Reg<Vmm> v_convert_0;
+    RegistersPool::Reg<Vmm> v_convert_1;
+    RegistersPool::Reg<Vmm> v_one;
+
     RegistersPool::Reg<Vmm> v_key_64;
     RegistersPool::Reg<Vmm> v_counter_64;
     RegistersPool::Reg<Vmm> v_n_64;
-    RegistersPool::Reg<Vmm> v_sep_perm;
+    RegistersPool::Reg<Vmm> v_min;
+    RegistersPool::Reg<Vmm> v_max_min;
+    // RegistersPool::Reg<Vmm> v_sep_perm;
     RegistersPool::Reg<Vmm> v_sep_perm_1;
     RegistersPool::Reg<Vmm> v_sep_perm_2;
     RegistersPool::Reg<Vmm> v_res_perm;
     RegistersPool::Reg<Vmm> v_res_perm_1;
-    // RegistersPool::Reg<Vmm> vSrcWidthB;          // for ZEROS padding
-
-    // RegistersPool::Reg<Vmm> vSrcHeightSub1F;     // for BORDER padding
-    // RegistersPool::Reg<Vmm> vSrcWidthSub1F;      // for BORDER padding
-
-    // RegistersPool::Reg<Vmm> vSrcHeightMul2F;     // for REFLECTION padding
-    // RegistersPool::Reg<Vmm> vSrcWidthMul2F;      // for REFLECTION padding
-    // RegistersPool::Reg<Vmm> vSrcHeightMul2Sub1F; // for REFLECTION padding
-    // RegistersPool::Reg<Vmm> vSrcWidthMul2Sub1F;  // for REFLECTION padding
-    // RegistersPool::Reg<Vmm> vAbsMask;            // for REFLECTION padding
-
-    // RegistersPool::Reg<Vmm> vConst_0_75;         // for BICUBIC interpolation
-    // RegistersPool::Reg<Vmm> vConst_1_25;         // for BICUBIC interpolation
-    // RegistersPool::Reg<Vmm> vConst_1_50;         // for BICUBIC interpolation
-    // RegistersPool::Reg<Vmm> vConst_2_00;         // for BICUBIC interpolation
-    // RegistersPool::Reg<Vmm> vConst_2_25;         // for BICUBIC interpolation
 
     void initVectors();
 
     void process();
 
-    void runPhilox(const std::vector<Vmm>& zmm_res, const Vmm& zmm_key, const Vmm& zmm_counter, const Vmm& zmm_n);
+    void runPhilox(const std::vector<Vmm>& vmm_res, const Vmm& vmm_key, const Vmm& vmm_counter, const Vmm& vmm_n);
 
     void calculateRound(const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, const Vmm& vmm_c_1, const Vmm& vmm_n_0, const Vmm& vmm_n_1);
 
@@ -143,7 +135,8 @@ private:
     // void borderPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
     // void reflectionPadding(const Vmm& vCoordDst, const Vmm& vCoordOrigin, const coord dim);
     // void bicubicCoefficients(const Vmm& vCoef, const Vmm& vDX, const uint8_t idx);
-    // void tail();
+
+    void tail(const std::vector<Vmm>& vmm_dst);
 
     // Aux
     // void dataTypeShiftPs2Dq(const Vmm& vDst, const Vmm& vSrc);

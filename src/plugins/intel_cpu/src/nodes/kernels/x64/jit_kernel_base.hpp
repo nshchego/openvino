@@ -203,13 +203,6 @@ public:
         if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
         else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
         else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
-        // if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core)) {
-        //     ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
-        // } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx2)) {
-        //     ISA_CASE(dnnl::impl::cpu::x64::avx2)
-        // } else if (dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::sse41)) {
-        //     ISA_CASE(dnnl::impl::cpu::x64::sse41)
-        // }
 
 #undef IF_ISA_CASE
 

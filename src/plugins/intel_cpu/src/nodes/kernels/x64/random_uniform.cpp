@@ -48,17 +48,24 @@ void RandomUniform<isa>::generate() {
 
 template <>
 void RandomUniform<x64::avx512_core>::initVectors() {
-    auto r64_aux = getReg64();
-    auto r32_aux = Xbyak::Reg32(r64_aux.getIdx());
+    const auto r64_aux = getReg64();
+    const auto r32_aux = Xbyak::Reg32(r64_aux.getIdx());
+    const auto r16_aux = Xbyak::Reg16(r64_aux.getIdx());
 
     v_max_mul_n_64 = getVmm();
     v_max_mul_c_64 = getVmm();
     v_add_low_k    = getVmm();
     v_add_up_k     = getVmm();
+    v_convert_0    = getVmm();
+    v_convert_1    = getVmm();
+    v_one          = getVmm();
+    v_max_min      = getVmm();
+    v_min          = getVmm();
+
     v_key_64       = getVmm();
     v_counter_64   = getVmm();
     v_n_64         = getVmm();
-    v_sep_perm     = getVmm();
+    // v_sep_perm     = getVmm();
     v_sep_perm_1   = getVmm();
     v_sep_perm_2   = getVmm();
     v_res_perm     = getVmm();
@@ -75,6 +82,32 @@ void RandomUniform<x64::avx512_core>::initVectors() {
     vpbroadcastq(v_add_low_k, r64_aux);
     mov(r32_aux, 0xbb67ae85);
     vpbroadcastd(v_add_up_k, r32_aux);
+
+    if (m_jcp.out_data_type == element::f32) {
+        mov(r32_aux, 0x3f800000);
+        vpbroadcastd(v_convert_0, r32_aux);
+        mov(r32_aux, 0x007fffff);
+        vpbroadcastd(v_convert_1, r32_aux);
+        // mov(r32_aux, 0x3f800000);
+        // vpbroadcastd(v_convert_1, r32_aux);
+        mov(r64_aux, ptr[regParams + GET_OFF(max_ptr)]);
+        vpbroadcastd(v_max_min, ptr[r64_aux]);
+        mov(r64_aux, ptr[regParams + GET_OFF(min_ptr)]);
+        vpbroadcastd(v_min, ptr[r64_aux]);
+        uni_vsubps(v_max_min, v_max_min, v_min);
+    } else if (m_jcp.out_data_type == element::f16) {
+        mov(r16_aux, 0x00003c00);
+        vpbroadcastw(v_convert_0, r16_aux);
+        mov(r16_aux, 0x000003ff);
+        vpbroadcastw(v_convert_1, r16_aux);
+    } else if (m_jcp.out_data_type == element::bf16) {
+        mov(r16_aux, 0x00003f80);
+        vpbroadcastw(v_convert_0, r16_aux);
+        mov(r16_aux, 0x0000007f);
+        vpbroadcastw(v_convert_1, r16_aux);
+    } else if (m_jcp.out_data_type == element::i32) {
+    } else if (m_jcp.out_data_type == element::i64) {
+    }
 
     // Initialize inputs.
     mov(r64_aux, ptr[regParams + GET_OFF(key_ptr)]);
@@ -96,9 +129,9 @@ void RandomUniform<x64::avx512_core>::initVectors() {
     vpaddq(v_n_64, v_n_64, ptr[r64_aux]);
 
     // Initialize auxiliary vectors.
-    static const uint32_t sep_perm_mask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask));
-    uni_vmovups(v_sep_perm, ptr[r64_aux]);
+    // static const uint32_t sep_perm_mask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask));
+    // uni_vmovups(v_sep_perm, ptr[r64_aux]);
 
     static const uint32_t sep_perm_mask_1[16]  = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
     mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_1));
@@ -133,38 +166,27 @@ void RandomUniform<isa>::process() {
     auto v_dst_1 = getVmm();
     std::vector<Vmm> v_res{ v_dst_0, v_dst_1 };
 
-    // Xbyak::Label lLoop, lEnd;
+    const auto step = vlen * 2 / sizeof(uint32_t);
 
-    {
-        // regBatch = getReg64();
-        // mov(regBatch, ptr[regParams + GET_OFF(batchNum)]);
-
-        // L(lBatchLoop);
-        // cmp(regBatch, 0);
-        // jle(lEnd, T_NEAR);
+    Xbyak::Label l_loop, l_tail;
+    L(l_loop); {
+        cmp(r64_work_amount, step);
+        jl(l_tail, T_NEAR);
 
         runPhilox(v_res, v_key_64, v_counter_64, v_n_64);
         convert(v_res, v_res);
 
-        // spatialLoop();
-
-        // if (jcp.dynamicShapes) {
-        //     add(regSrc,  ptr[regParams + GET_OFF(srcBatchStepB)]);
-        // } else {
-        //     add(regSrc, jcp.srcBatchStepB);
-        // }
-        // add(regGrid, ptr[regParams + GET_OFF(gridBatchStepB)]);
-        // add(r64_dst,  ptr[regParams + GET_OFF(dstBatchStepB)]);
-
-        // if (jcp.dynamicBatch) {
-        //     dec(regBatch);
-        //     jmp(lBatchLoop, T_NEAR);
-        //     L(lEnd);
-        // }
         uni_vmovups(ptr[r64_dst], v_dst_0);
         add(r64_dst, vlen);
         uni_vmovups(ptr[r64_dst], v_dst_1);
+        add(r64_dst, vlen);
+
+        sub(r64_work_amount, step);
+        jmp(l_loop, T_NEAR);
     }
+
+    L(l_tail);
+    tail(v_res);
 }
 
 template <> // TODO: use Zmm?
@@ -179,10 +201,22 @@ void RandomUniform<x64::avx512_core>::calculateRound(
     uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_0);       // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
     uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);         // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
     vpermt2d(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
+    // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
+    // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
+    // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
+    // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
+    // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
+    // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
 
     uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_0);       // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
     uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);         // {_,n0,_,n0} = {_,n0,_,n0} ^ {_,k0,_,k0}
     vpermt2d(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
+    // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
+    // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
+    // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
+    // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
+    // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
+    // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
 
 
     // uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_1);      // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
@@ -280,7 +314,56 @@ void RandomUniform<isa>::raiseKey(const Vmm& vmm_k_0, const Vmm& vmm_k_1) {
 
 template <x64::cpu_isa_t isa>
 void RandomUniform<isa>::convert(const std::vector<Vmm>& vmm_dst, const std::vector<Vmm>& vmm_src) {
-    //
+    for (const auto& v_dst : vmm_dst) {
+        uni_vandps(v_dst, v_dst, v_convert_1);
+        uni_vorps(v_dst, v_dst, v_convert_0);
+
+        if (m_jcp.out_data_type == element::f32) {
+            uni_vsubps(v_dst, v_dst, v_convert_0);
+            vfmadd132ps(v_dst, v_min, v_max_min);
+        } else if (m_jcp.out_data_type == element::f16) {
+            vsubph(v_dst, v_dst, v_one);
+        } else if (m_jcp.out_data_type == element::bf16) {
+            uni_vsubps(v_dst, v_dst, v_one);
+        } else if (m_jcp.out_data_type == element::i32) {
+            // TODO:
+        } else if (m_jcp.out_data_type == element::i64) {
+            // TODO:
+        }
+    }
+}
+
+template <>
+void RandomUniform<x64::avx512_core>::tail(const std::vector<Vmm>& vmm_dst) {
+    Xbyak::Label l_0, l_end;
+    const auto rest_mask = getMask();
+    const auto step = vlen / sizeof(uint32_t);
+
+    cmp(r64_work_amount, 0);
+    jle(l_end, T_NEAR);
+
+    runPhilox(vmm_dst, v_key_64, v_counter_64, v_n_64);
+    convert(vmm_dst, vmm_dst);
+
+    cmp(r64_work_amount, step);
+    jl(l_0, T_NEAR);
+
+    uni_vmovups(ptr[r64_dst], vmm_dst[0]);
+    add(r64_dst, vlen);
+    sub(r64_work_amount, step);
+    fillRestWorkMask(rest_mask, r64_work_amount);
+    uni_vmovups(ptr[r64_dst] | rest_mask, vmm_dst[1]);
+    jmp(l_end, T_NEAR);
+
+    L(l_0);
+    fillRestWorkMask(rest_mask, r64_work_amount);
+    uni_vmovups(ptr[r64_dst] | rest_mask, vmm_dst[0]);
+
+    L(l_end);
+}
+
+template <x64::cpu_isa_t isa>
+void RandomUniform<isa>::tail(const std::vector<Vmm>& vmm_dst) {
 }
 
 // template <x64::cpu_isa_t isa> // Works for AVX512, AVX2, AVX, SSE41
