@@ -1611,6 +1611,9 @@ IShapeInfer::Result Node::shapeInfer() const {
             }
         }
 
+        if (type == Type::RandomUniform) {
+            std::cout << std::endl;
+        }
         return shapeInference->infer(input_shapes, input_values);
     }
     catch (const std::runtime_error& exp) {

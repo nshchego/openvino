@@ -58,7 +58,8 @@ void RandomUniform<x64::avx512_core>::initVectors() {
     v_add_up_k     = getVmm();
     v_convert_0    = getVmm();
     v_convert_1    = getVmm();
-    v_one          = getVmm();
+    // v_one          = getVmm();
+    v_n_inc        = getVmm();
     v_max_min      = getVmm();
     v_min          = getVmm();
 
@@ -76,20 +77,18 @@ void RandomUniform<x64::avx512_core>::initVectors() {
     vpbroadcastq(v_max_mul_n_64, r64_aux);
     mov(r64_aux, 0xcd9e8d57);
     vpbroadcastq(v_max_mul_c_64, r64_aux);
-    // mov(r32_aux, 0x9e3779b9);
-    // vpbroadcastd(v_add_low_k, r32_aux);
     mov(r64_aux, 0x9e3779b900000000);
     vpbroadcastq(v_add_low_k, r64_aux);
     mov(r32_aux, 0xbb67ae85);
     vpbroadcastd(v_add_up_k, r32_aux);
+    mov(r64_aux, 0x0000000000000008);
+    vpbroadcastq(v_n_inc, r64_aux);
 
     if (m_jcp.out_data_type == element::f32) {
         mov(r32_aux, 0x3f800000);
         vpbroadcastd(v_convert_0, r32_aux);
         mov(r32_aux, 0x007fffff);
         vpbroadcastd(v_convert_1, r32_aux);
-        // mov(r32_aux, 0x3f800000);
-        // vpbroadcastd(v_convert_1, r32_aux);
         mov(r64_aux, ptr[regParams + GET_OFF(max_ptr)]);
         vpbroadcastd(v_max_min, ptr[r64_aux]);
         mov(r64_aux, ptr[regParams + GET_OFF(min_ptr)]);
@@ -106,6 +105,13 @@ void RandomUniform<x64::avx512_core>::initVectors() {
         mov(r16_aux, 0x0000007f);
         vpbroadcastw(v_convert_1, r16_aux);
     } else if (m_jcp.out_data_type == element::i32) {
+        mov(r64_aux, ptr[regParams + GET_OFF(max_ptr)]);
+        vpbroadcastd(v_max_min, ptr[r64_aux]);
+        mov(r64_aux, ptr[regParams + GET_OFF(min_ptr)]);
+        vpbroadcastd(v_min, ptr[r64_aux]);
+        uni_vpsubd(v_max_min, v_max_min, v_min);
+        const auto ymm_max_min = Xbyak::Ymm(v_max_min.getIdx());
+        vcvtdq2pd(v_max_min, ymm_max_min);
     } else if (m_jcp.out_data_type == element::i64) {
     }
 
@@ -158,6 +164,137 @@ void RandomUniform<x64::avx512_core>::initVectors() {
 
 template <x64::cpu_isa_t isa> // Works for AVX2, SSE41
 void RandomUniform<isa>::initVectors() {
+    const auto r64_aux = getReg64();
+    const auto r32_aux = Xbyak::Reg32(r64_aux.getIdx());
+    const auto r16_aux = Xbyak::Reg16(r64_aux.getIdx());
+
+    v_max_mul_n_64 = getVmm();
+    v_max_mul_c_64 = getVmm();
+    v_add_low_k    = getVmm();
+    v_add_up_k     = getVmm();
+    v_convert_0    = getVmm();
+    v_convert_1    = getVmm();
+    // v_one          = getVmm();
+    v_n_inc        = getVmm();
+    v_max_min      = getVmm();
+    v_min          = getVmm();
+
+    v_key_64       = getVmm();
+    v_counter_64   = getVmm();
+    v_n_64         = getVmm();
+    // v_sep_perm     = getVmm();
+    v_sep_perm_1   = getVmm();
+    v_sep_perm_2   = getVmm();
+    v_res_perm     = getVmm();
+    v_res_perm_1   = getVmm();
+
+    // Initialize constants.
+    static const uint64_t max_mul_n_64 = 0xd2511f53;
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&max_mul_n_64));
+    vpbroadcastq(v_max_mul_n_64, ptr[r64_aux]);
+
+    static const uint64_t max_mul_c_64 = 0xcd9e8d57;
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&max_mul_c_64));
+    vpbroadcastq(v_max_mul_c_64, ptr[r64_aux]);
+
+    static const uint64_t add_low_k = 0x9e3779b900000000;
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&add_low_k));
+    vpbroadcastq(v_add_low_k, ptr[r64_aux]);
+
+    static const uint32_t add_up_k = 0xbb67ae85;
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&add_up_k));
+    vpbroadcastd(v_add_up_k, ptr[r64_aux]);
+
+    static const uint64_t n_inc = 0x00000008;
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&n_inc));
+    vpbroadcastq(v_n_inc, ptr[r64_aux]);
+
+
+    if (m_jcp.out_data_type == element::f32) {
+        static const uint32_t convert_0 = 0x3f800000;
+        mov(r64_aux, reinterpret_cast<uintptr_t>(&convert_0));
+        vpbroadcastd(v_convert_0, ptr[r64_aux]);
+
+        static const uint32_t convert_1 = 0x007fffff;
+        mov(r64_aux, reinterpret_cast<uintptr_t>(&convert_1));
+        vpbroadcastd(v_convert_1, ptr[r64_aux]);
+
+        mov(r64_aux, ptr[regParams + GET_OFF(max_ptr)]);
+        vpbroadcastd(v_max_min, ptr[r64_aux]);
+
+        mov(r64_aux, ptr[regParams + GET_OFF(min_ptr)]);
+        vpbroadcastd(v_min, ptr[r64_aux]);
+
+        uni_vsubps(v_max_min, v_max_min, v_min);
+    } else if (m_jcp.out_data_type == element::f16) {
+        mov(r16_aux, 0x00003c00);
+        vpbroadcastw(v_convert_0, r16_aux);
+        mov(r16_aux, 0x000003ff);
+        vpbroadcastw(v_convert_1, r16_aux);
+    } else if (m_jcp.out_data_type == element::bf16) {
+        mov(r16_aux, 0x00003f80);
+        vpbroadcastw(v_convert_0, r16_aux);
+        mov(r16_aux, 0x0000007f);
+        vpbroadcastw(v_convert_1, r16_aux);
+    } else if (m_jcp.out_data_type == element::i32) {
+        const auto ymm_max_min = Xbyak::Ymm(v_max_min.getIdx());
+
+        mov(r64_aux, ptr[regParams + GET_OFF(max_ptr)]);
+        vpbroadcastd(v_max_min, ptr[r64_aux]);
+
+        mov(r64_aux, ptr[regParams + GET_OFF(min_ptr)]);
+        vpbroadcastd(v_min, ptr[r64_aux]);
+
+        uni_vpsubd(v_max_min, v_max_min, v_min);
+        vcvtdq2pd(v_max_min, ymm_max_min);
+    } else if (m_jcp.out_data_type == element::i64) {
+    }
+
+    // Initialize inputs.
+    mov(r64_aux, ptr[regParams + GET_OFF(key_ptr)]);
+    vpbroadcastq(v_key_64, ptr[r64_aux]);
+
+    mov(r64_aux, ptr[regParams + GET_OFF(counter_ptr)]);
+    vpbroadcastq(v_counter_64, ptr[r64_aux]);
+
+    mov(r64_aux, ptr[regParams + GET_OFF(n_ptr)]);
+    vpbroadcastq(v_n_64, ptr[r64_aux]);
+    if (m_jcp.out_data_type.size() <= 4) {
+        static const uint64_t n_inc[8]  = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        mov(r64_aux, reinterpret_cast<uintptr_t>(n_inc));
+    } else {
+        static const uint64_t n_inc[8]  = { 0, 1, 2, 3, 4, 5, 6, 7 }; // TODO: i64
+        mov(r64_aux, reinterpret_cast<uintptr_t>(n_inc));
+    }
+    // uni_vmovups(v_n_64, ptr[r64_aux]);
+    vpaddq(v_n_64, v_n_64, ptr[r64_aux]);
+
+    // Initialize auxiliary vectors.
+    // static const uint32_t sep_perm_mask[16]  = { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask));
+    // uni_vmovups(v_sep_perm, ptr[r64_aux]);
+
+    static const uint32_t sep_perm_mask_1[16]  = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
+    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_1));
+    uni_vmovups(v_sep_perm_1, ptr[r64_aux]);
+
+    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010000, 0b00000010, 0b00010010, 0b00000100, 0b00010100, 0b00000110, 0b00010110,
+    //                                              0b00001000, 0b00011000, 0b00001010, 0b00011010, 0b00001100, 0b00011100, 0b00001110, 0b00011110 };
+    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010001, 0b00001000, 0b00011001, 0b00000010, 0b00010011, 0b00001010, 0b00011011,
+    //                                              0b00000100, 0b00010101, 0b00001100, 0b00011101, 0b00000110, 0b00010111, 0b00001110, 0b00011111 };
+    static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000001, 0b00010000, 0b00010001, 0b00000010, 0b00000011, 0b00010010, 0b00010011,
+                                                 0b00000100, 0b00000101, 0b00010100, 0b00010101, 0b00000110, 0b00000111, 0b00010110, 0b00010111 };
+    mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask));
+    uni_vmovups(v_res_perm, ptr[r64_aux]);
+    static const uint32_t res_perm_mask_1[16]  = { 0b00001000, 0b00001001, 0b00011000, 0b00011001, 0b00001010, 0b00001011, 0b00011010, 0b00011011,
+                                                   0b00001100, 0b00001101, 0b00011100, 0b00011101, 0b00001110, 0b00001111, 0b00011110, 0b00011111 };
+    mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask_1));
+    uni_vmovups(v_res_perm_1, ptr[r64_aux]);
+
+    static const uint32_t sep_perm_mask_2[16]  = { 0b00000001, 0b00010000, 0b00000011, 0b00010010, 0b00000101, 0b00010100, 0b00000111, 0b00010110,
+                                                   0b00001001, 0b00011000, 0b00001011, 0b00011010, 0b00001101, 0b00011100, 0b00001111, 0b00011110 };
+    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_2));
+    uni_vmovups(v_sep_perm_2, ptr[r64_aux]);
 }
 
 template <x64::cpu_isa_t isa>
@@ -180,6 +317,8 @@ void RandomUniform<isa>::process() {
         add(r64_dst, vlen);
         uni_vmovups(ptr[r64_dst], v_dst_1);
         add(r64_dst, vlen);
+
+        uni_vpaddd(v_n_64, v_n_64, v_n_inc);
 
         sub(r64_work_amount, step);
         jmp(l_loop, T_NEAR);
@@ -205,7 +344,7 @@ void RandomUniform<x64::avx512_core>::calculateRound(
     // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
     // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
     // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
-    // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
+    // vshufps(vmm_c_0, vmm_c_1, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
     // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
 
     uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_0);       // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
@@ -215,7 +354,7 @@ void RandomUniform<x64::avx512_core>::calculateRound(
     // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
     // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
     // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
-    // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
+    // vshufps(vmm_n_0, vmm_n_1, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
     // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
 
 
@@ -308,29 +447,56 @@ void RandomUniform<isa>::runPhilox(const std::vector<Vmm>& vmm_dst, const Vmm& v
 
 template <x64::cpu_isa_t isa>
 void RandomUniform<isa>::raiseKey(const Vmm& vmm_k_0, const Vmm& vmm_k_1) {
-    uni_vpaddd(vmm_k_0, vmm_k_0, v_add_low_k); // {_,k0,_,k0} -> {_,l0,_,l0}
-    uni_vpaddd(vmm_k_1, vmm_k_1, v_add_up_k);  // {_,k1,_,k1} -> {_,u0,_,u0}
+    uni_vpaddd(vmm_k_0, vmm_k_0, v_add_low_k); // {_,k0,_,k0} + {_,l0,_,l0}
+    uni_vpaddd(vmm_k_1, vmm_k_1, v_add_up_k);  // {_,k1,_,k1} + {_,u0,_,u0}
 }
 
-template <x64::cpu_isa_t isa>
-void RandomUniform<isa>::convert(const std::vector<Vmm>& vmm_dst, const std::vector<Vmm>& vmm_src) {
+template <>
+void RandomUniform<x64::avx512_core>::convert(const std::vector<Vmm>& vmm_dst, const std::vector<Vmm>& vmm_src) {
     for (const auto& v_dst : vmm_dst) {
-        uni_vandps(v_dst, v_dst, v_convert_1);
-        uni_vorps(v_dst, v_dst, v_convert_0);
+        if (m_jcp.out_data_type.is_real()) {
+            uni_vandps(v_dst, v_dst, v_convert_1);
+            uni_vorps(v_dst, v_dst, v_convert_0);
+        }
 
         if (m_jcp.out_data_type == element::f32) {
             uni_vsubps(v_dst, v_dst, v_convert_0);
             vfmadd132ps(v_dst, v_min, v_max_min);
         } else if (m_jcp.out_data_type == element::f16) {
-            vsubph(v_dst, v_dst, v_one);
+            // vsubph(v_dst, v_dst, v_convert_0);
         } else if (m_jcp.out_data_type == element::bf16) {
-            uni_vsubps(v_dst, v_dst, v_one);
+            // uni_vsubps(v_dst, v_dst, v_one);
         } else if (m_jcp.out_data_type == element::i32) {
-            // TODO:
+            // x % (max - min) + min
+            const auto v_aux_0 = getVmm();
+            const auto v_aux_1 = getVmm();
+            const auto ymm_dst = Xbyak::Ymm(v_dst.getIdx());
+            const auto ymm_aux_1 = Xbyak::Ymm(v_aux_1.getIdx());
+
+            // Divide in the f64 due to the f32 loses accuracy here.
+            vcvtudq2pd(v_aux_0, ymm_dst);
+            vdivpd(v_aux_1, v_aux_0, v_max_min);
+            vrndscalepd(v_aux_1, v_aux_1, 3);
+            vfnmadd132pd(v_aux_1, v_aux_0, v_max_min);
+
+            vextractf64x4(ymm_dst, v_dst, 1);
+            vcvtudq2pd(v_aux_0, ymm_dst);
+            vcvtpd2dq(ymm_dst, v_aux_1);
+            vdivpd(v_aux_1, v_aux_0, v_max_min);
+            vrndscalepd(v_aux_1, v_aux_1, 3);
+            vfnmadd132pd(v_aux_1, v_aux_0, v_max_min);
+            vcvtpd2dq(ymm_aux_1, v_aux_1);
+            vshuff64x2(v_dst, v_dst, v_aux_1, 0b01000100);
+
+            uni_vpaddd(v_dst, v_dst, v_min);
         } else if (m_jcp.out_data_type == element::i64) {
             // TODO:
         }
     }
+}
+
+template <x64::cpu_isa_t isa>
+void RandomUniform<isa>::convert(const std::vector<Vmm>& vmm_dst, const std::vector<Vmm>& vmm_src) {
 }
 
 template <>

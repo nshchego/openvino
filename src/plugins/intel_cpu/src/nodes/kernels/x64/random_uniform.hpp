@@ -96,7 +96,8 @@ private:
     RegistersPool::Reg<Vmm> v_add_up_k;
     RegistersPool::Reg<Vmm> v_convert_0;
     RegistersPool::Reg<Vmm> v_convert_1;
-    RegistersPool::Reg<Vmm> v_one;
+    // RegistersPool::Reg<Vmm> v_one;
+    RegistersPool::Reg<Vmm> v_n_inc;
 
     RegistersPool::Reg<Vmm> v_key_64;
     RegistersPool::Reg<Vmm> v_counter_64;

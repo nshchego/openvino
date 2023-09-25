@@ -31,9 +31,9 @@ RandomUniform::RandomUniform(const Output<Node>& out_shape,
       m_output_type(out_type),
       m_global_seed(global_seed),
       m_op_seed(op_seed) {
-std::cout << "[CORE] RandomUniform::RandomUniform op_seed: " << op_seed << std::endl;
+// std::cout << "[CORE] RandomUniform::RandomUniform op_seed: " << op_seed << "; m_output_type: " << m_output_type << std::endl;
     constructor_validate_and_infer_types();
-std::cout << "[CORE] RandomUniform::RandomUniform m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
+// std::cout << "[CORE] RandomUniform::RandomUniform m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
 }
 
 void RandomUniform::validate_and_infer_types() {
@@ -56,6 +56,7 @@ void RandomUniform::validate_and_infer_types() {
     OPENVINO_SUPPRESS_DEPRECATED_END
     const auto output_shapes = shape_infer(this, input_shapes);
 
+// std::cout << "[CORE] RandomUniform::validate_and_infer_types m_output_type: " << out_et << std::endl;
     set_output_type(0, out_et, output_shapes.front());
 }
 

@@ -55,6 +55,7 @@ std::cout << "CPU m_global_seed: " << m_global_seed << std::endl;
 std::cout << "CPU m_op_seed: " << m_op_seed << std::endl;
 
     m_output_prc = op->get_output_element_type(0);
+    // if (m_output_prc.is_real() && !one_of(m_output_prc, element::f32)) {
     if (m_output_prc.is_real() && !one_of(m_output_prc, element::f32, element::f16, element::bf16)) {
         m_output_prc = element::f32;
     }
@@ -119,11 +120,7 @@ void RandomUniform::createPrimitive() {
         kernel::RandomUniformCompileParams jcp;
 
         jcp.out_data_type = m_output_prc;
-        // jcp.gridPrc       = gridPrecision;
         // jcp.dynamicShapes = isDynamicNode();
-        // jcp.alignCorners  = alignCorners;
-        // jcp.interpolationMode = interpolationMode;
-        // jcp.paddingMode   = paddingMode;
 
         // const auto& srcDataDims = getInputShapeAtPort(IN_DATA).getDims();
         // if (!jcp.dynamicShapes) {
@@ -280,6 +277,7 @@ void raiseKey(uint32_t* key) {
 // Helper function for converting uint32 values to float32. Sets fractional part of
 // floating value with bits from uint32 value. Resulting value is in interval [0,1).
 float uint32ToFloat(uint32_t x) {
+// std::cout << "uint32ToFloat" << std::endl;
     // float32 is formatted as follows: sign(1 bit) exponent(8 bits) mantissa(23 bits).
     // The value is interpreted using following formula:
     // (-1)^sign * 1, mantissa * 2 ^ (exponent - 127)
@@ -288,11 +286,11 @@ float uint32ToFloat(uint32_t x) {
     // exponent = 127, for obtaining a zero exponent.
     // mantissa = 23 right bits from generated uint32 random value.
 
+//     RandomUniform::OutputType out_val = {(static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu)};
+// std::cout << "Convert x: " << x << "; i: " << out_val.i32 << "; f: " << out_val.f32 << "; f - 1: " << out_val.f32 - 1.0f << std::endl;
+//     return out_val.f32;
     RandomUniform::OutputType out_val = {(static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu)};
-std::cout << "Convert x: " << x << "; i: " << out_val.i32 << "; f: " << out_val.f32 << "; f - 1: " << out_val.f32 - 1.0f << std::endl;
-    return out_val.f32;
-    // RandomUniform::OutputType out_val = {(static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu)};
-    // return out_val.f32 - 1.0f;
+    return out_val.f32 - 1.0f;
 }
 
 // Helper function for converting uint32 values to float16.Sets fractional part of
@@ -408,7 +406,6 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
     if (m_jit_kernel) {
 // printf("[CPU][KER] vec_len: %ld; out_el_size: %ld\n", m_jit_kernel->getVectorLen(), m_output_prc.size());
         const size_t block_size = (m_jit_kernel->getVectorLen() / m_output_prc.size()) * 2;
-        // const size_t step = m_output_prc.size() > 4 ? (block_size / 2) : block_size;
         const size_t blocks_num = (out_el_num + block_size - 1) / block_size;
 
         auto threadBody = [&](const int ithr, const int nthr) {
