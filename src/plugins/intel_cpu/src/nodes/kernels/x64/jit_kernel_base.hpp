@@ -39,6 +39,8 @@ public:
 
     void uni_vpsubd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
+    void uni_vpmuludq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& op_1, const Xbyak::Operand& op_2);
+
     void uni_vdivps(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
 
     void uni_vandps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);

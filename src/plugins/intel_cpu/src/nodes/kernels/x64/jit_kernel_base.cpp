@@ -131,6 +131,17 @@ void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
     }
 }
 
+void JitKernelBase::uni_vpmuludq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& op_1, const Xbyak::Operand& op_2) {
+    if (isValidIsa(x64::avx)) {
+        vpmuludq(v_dst, op_1, op_2);
+    } else {
+        if (v_dst.getIdx() != op_1.getIdx()) {
+            movups(v_dst, op_1);
+        }
+        pmuludq(v_dst, op_2);
+    }
+}
+
 void JitKernelBase::uni_vdivps(const Xbyak::Xmm& vDst,
                                const Xbyak::Operand& op1,
                                const Xbyak::Operand& op2) {

@@ -32,6 +32,9 @@ RandomUniform::RandomUniform(const Output<Node>& out_shape,
       m_global_seed(global_seed),
       m_op_seed(op_seed) {
 // std::cout << "[CORE] RandomUniform::RandomUniform op_seed: " << op_seed << "; m_output_type: " << m_output_type << std::endl;
+// if (m_output_type == element::f32) {
+//     std::cout << std::endl;
+// }
     constructor_validate_and_infer_types();
 // std::cout << "[CORE] RandomUniform::RandomUniform m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
 }
@@ -56,7 +59,10 @@ void RandomUniform::validate_and_infer_types() {
     OPENVINO_SUPPRESS_DEPRECATED_END
     const auto output_shapes = shape_infer(this, input_shapes);
 
-// std::cout << "[CORE] RandomUniform::validate_and_infer_types m_output_type: " << out_et << std::endl;
+// if (out_et == element::f32) {
+//     std::cout << std::endl;
+// }
+// std::cout << "[CORE] RandomUniform::validate_and_infer_types out_et: " << out_et << std::endl;
     set_output_type(0, out_et, output_shapes.front());
 }
 
@@ -119,7 +125,7 @@ bool RandomUniform::evaluate(TensorVector& outputs, const TensorVector& inputs) 
 
     outputs[0].set_shape(output_shape);
 
-std::cout << "[CORE] RandomUniform::evaluate m_state={" << m_state.first << ";" << m_state.second << "}" << std::endl;
+std::cout << "[CORE] RandomUniform::evaluate m_state={" << m_state.first << ";" << m_state.second << "} out_type: " << get_out_type() << std::endl;
     auto state = ngraph::runtime::reference::random_uniform(out_dims.data(),
                                                             static_cast<const char*>(inputs[1].data()),
                                                             static_cast<const char*>(inputs[2].data()),

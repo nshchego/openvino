@@ -79,19 +79,20 @@ protected:
         const auto& const_in_1 = std::get<6>(params);
         const auto& const_in_2 = std::get<7>(params);
         const auto& const_in_3 = std::get<8>(params);
-        const auto& config     = std::get<9>(params);
+        configuration          = std::get<9>(params);
         const auto& cpu_params = std::get<10>(params);
 
         m_min_val = std::get<0>(min_max);
         m_max_val = std::get<1>(min_max);
         std::tie(inFmts, outFmts, priority, selectedType) = cpu_params;
 
+configuration.insert({InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16, InferenceEngine::PluginConfigParams::YES});
         if (output_prc == ElementType::i64) {
-            updateSelectedType("ref", ElementType::i32, config);
-        } else if (output_prc == ElementType::bf16 || output_prc == ElementType::f16 || output_prc == ElementType::f64) {
-            updateSelectedType("ref", ElementType::f32, config);
+            updateSelectedType("ref", ElementType::i32, configuration);
+        } else if (/*output_prc == ElementType::bf16 || output_prc == ElementType::f16 ||*/ output_prc == ElementType::f64) {
+            updateSelectedType("ref", ElementType::f32, configuration);
         } else {
-            updateSelectedType("ref", output_prc, config);
+            updateSelectedType("ref", output_prc, configuration);
         }
 
         std::vector<InputShape> in_shapes;
@@ -358,9 +359,9 @@ INSTANTIATE_TEST_SUITE_P(nightly_Param, RandomUniformLayerTestCPU,
                 ::testing::ValuesIn(output_prc),
                 ::testing::Values(3),
                 ::testing::Values(1),
-                ::testing::Values(false),
-                ::testing::Values(false),
-                ::testing::Values(false),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
                 ::testing::Values(empty_plugin_config),
                 ::testing::Values(CPUSpecificParams{})),
         RandomUniformLayerTestCPU::getTestCaseName);

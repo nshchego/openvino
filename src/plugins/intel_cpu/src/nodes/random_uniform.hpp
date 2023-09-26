@@ -15,12 +15,14 @@ namespace node {
 class RandomUniform : public Node {
 public:
     union OutputType {
-        int32_t  i32;
-        int64_t  i64;
         float    f32;
         float16  f16;
         bfloat16 bf16;
         double   f64;
+        int32_t  i32;
+        uint32_t u32;
+        uint16_t u16;
+        int64_t  i64;
     };
 
     RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
@@ -46,6 +48,9 @@ public:
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     std::string getPrimitiveDescriptorType() const override;
+
+protected:
+    bool needShapeInfer() const override;
 
 private:
     void computeOnnx(void* out, size_t work_amount);

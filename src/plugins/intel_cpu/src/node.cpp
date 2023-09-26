@@ -1592,6 +1592,7 @@ std::vector<VectorDims> Node::shapeInferGeneric(const std::vector<Shape>& shapes
 
 IShapeInfer::Result Node::shapeInfer() const {
     try {
+std::cout << "[CPU] Node::shapeInfer " << typeStr << std::endl;
         std::vector<std::reference_wrapper<const VectorDims>> input_shapes;
         auto input_value_port_mask = shapeInference->get_port_mask();
 

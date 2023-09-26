@@ -334,8 +334,8 @@ void RandomUniform<x64::avx512_core>::calculateRound(
     auto vmm_aux_0 = getVmm();
     auto vmm_aux_1 = getVmm();
 
-    vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
 
     uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_0);       // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
     uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);         // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
@@ -391,6 +391,26 @@ void RandomUniform<x64::avx512_core>::calculateRound(
     // counter[1] = static_cast<uint32_t>(prod_0);
 }
 
+template <x64::cpu_isa_t isa> // Works for AVX2, SSE41
+void RandomUniform<isa>::calculateRound(
+        const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, const Vmm& vmm_c_1, const Vmm& vmm_n_0, const Vmm& vmm_n_1) {
+    auto vmm_aux_0 = getVmm();
+    auto vmm_aux_1 = getVmm();
+
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);     // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);     // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_0);              // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);                // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
+    uni_vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b10001101); // {c0,c0,c1,c1} = shuf {_,c0,_,c0},{p0,_,p0,_}
+    uni_vpshufd(vmm_c_0, vmm_c_0, 0b11011000);            // {c0,c1,c0,c1} = shuf {c0,c0,c1,c1}
+
+    uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_0);              // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);                // {_,n0,_,n0} = {_,n0,_,n0} ^ {_,k0,_,k0}
+    uni_vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b10001101); // {n0,n0,n1,n1} = shuf {_,n0,_,n0},{r0,_,r0,_}
+    uni_vpshufd(vmm_n_0, vmm_n_0, 0b11011000);            // {n0,n1,n0,n1} = shuf {n0,n0,n1,n1}
+}
+
 template <>
 void RandomUniform<x64::avx512_core>::runPhilox(const std::vector<Vmm>& vmm_dst, const Vmm& vmm_key, const Vmm& vmm_counter, const Vmm& vmm_n) {
     // Define sparse vectors.
@@ -443,6 +463,30 @@ void RandomUniform<x64::avx512_core>::runPhilox(const std::vector<Vmm>& vmm_dst,
 
 template <x64::cpu_isa_t isa>
 void RandomUniform<isa>::runPhilox(const std::vector<Vmm>& vmm_dst, const Vmm& vmm_key, const Vmm& vmm_counter, const Vmm& vmm_n) {
+    // Define sparse vectors.
+    auto vmm_k_0 = getVmm();
+    auto vmm_k_1 = getVmm();
+    auto vmm_c_0 = getVmm();
+    auto vmm_c_1 = getVmm();
+    auto vmm_n_0 = getVmm();
+    auto vmm_n_1 = getVmm();
+
+    uni_vmovups(vmm_k_1, vmm_key);               // {k0,k1,k0,k1} -> {_,k1,_,k1}
+    // vpermps(vmm_k_0, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
+    uni_vmovups(vmm_c_0, vmm_counter);           // {c0,c1,c0,c1} -> {c0,_,c0,_}
+    uni_vmovups(vmm_n_0, vmm_n);                 // {n0,n1,n0,n1} -> {n0,_,n0,_}
+
+    for (size_t i = 0lu; i < ROUNDS_NUMBER; i++) {
+        calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1);
+        if (i < ROUNDS_NUMBER - 1) {
+            raiseKey(vmm_k_0, vmm_k_1);
+        }
+    }
+
+    uni_vmovups(vmm_dst[0], vmm_n_0);            // {n0,n1,n0,n1}
+    uni_vmovups(vmm_dst[1], vmm_n_0);            // {n0,n1,n0,n1}
+    vpermt2d(vmm_dst[0], v_res_perm, vmm_c_0);   // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+    vpermt2d(vmm_dst[1], v_res_perm_1, vmm_c_0); // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
 }
 
 template <x64::cpu_isa_t isa>

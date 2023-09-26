@@ -8,6 +8,7 @@
 #include "ie_ngraph_utils.hpp"
 #include <openvino/op/constant.hpp>
 #include <openvino/op/random_uniform.hpp>
+#include "shape_inference/custom/random_uniform.hpp"
 
 using namespace dnnl::impl::cpu;
 
@@ -16,7 +17,7 @@ namespace intel_cpu {
 namespace node {
 
 bool RandomUniform::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
-std::cout << "RandomUniform::isSupportedOperation" << std::endl;
+std::cout << "[CPU] RandomUniform::isSupportedOperation" << std::endl;
 // return false;
     try {
         if (op->get_type_info() != op::v8::RandomUniform::get_type_info_static()) {
@@ -30,7 +31,7 @@ std::cout << "RandomUniform::isSupportedOperation" << std::endl;
 }
 
 RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-        : Node(op, context, NgraphShapeInferFactory(op, EMPTY_PORT_MASK)) {
+        : Node(op, context, RandomUniformShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         IE_THROW(NotImplemented) << errorMessage;
@@ -49,10 +50,10 @@ RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphCon
     auto rnd_op = as_type_ptr<op::v8::RandomUniform>(op);
     // m_output_prc = rnd_op->get_out_type();
     m_global_seed = rnd_op->get_global_seed();
-std::cout << "CPU m_global_seed: " << m_global_seed << std::endl;
+std::cout << "[CPU] m_global_seed: " << m_global_seed << std::endl;
     m_op_seed = rnd_op->get_op_seed();
     // m_op_seed = 284;
-std::cout << "CPU m_op_seed: " << m_op_seed << std::endl;
+std::cout << "[CPU] m_op_seed: " << m_op_seed << std::endl;
 
     m_output_prc = op->get_output_element_type(0);
     // if (m_output_prc.is_real() && !one_of(m_output_prc, element::f32)) {
@@ -62,7 +63,7 @@ std::cout << "CPU m_op_seed: " << m_op_seed << std::endl;
     if (m_output_prc.is_integral() && !one_of(m_output_prc, element::i32, element::i64)) {
         m_output_prc = element::i32;
     }
-std::cout << "CPU m_output_prc: " << m_output_prc << std::endl;
+std::cout << "[CPU] m_output_prc: " << m_output_prc << std::endl;
 
     for (int i = 0; i < op->get_input_size(); i++) {
         if (is_type<op::v0::Constant>(op->get_input_node_ptr(i))) {
@@ -71,24 +72,24 @@ std::cout << "CPU m_output_prc: " << m_output_prc << std::endl;
     }
 
     if (m_const_inputs[SHAPE]) {
-std::cout << "RandomUniform::RandomUniform m_const_inputs[SHAPE]; dyn: " << isDynamicNgraphNode(op) << std::endl;
+std::cout << "[CPU] RandomUniform::RandomUniform m_const_inputs[SHAPE]; dyn: " << isDynamicNgraphNode(op) << std::endl;
         initOutShape(m_out_shape, as_type<op::v0::Constant>(op->get_input_node_ptr(SHAPE))->get_data_ptr(), m_shape_prc,
                 op->get_input_shape(SHAPE)[0]);
-std::cout << "Out shape {";
+std::cout << "[CPU] Out shape {";
 for (auto val : m_out_shape) {
     std::cout << val << "; ";
 }
 std::cout << "}" << std::endl;
     }
     if (m_const_inputs[MIN_VAL]) {
-std::cout << "RandomUniform::RandomUniform m_const_inputs[MIN_VAL]" << std::endl;
+std::cout << "[CPU] RandomUniform::RandomUniform m_const_inputs[MIN_VAL]" << std::endl;
         initEdgeValues(m_min_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MIN_VAL))->get_data_ptr(), m_output_prc);
-std::cout << "CPU m_min_val: " << m_min_val.f32 << std::endl;
+std::cout << "[CPU]  m_min_val: " << m_min_val.f32 << std::endl;
     }
     if (m_const_inputs[MAX_VAL]) {
-std::cout << "RandomUniform::RandomUniform m_const_inputs[MAX_VAL]" << std::endl;
+std::cout << "[CPU] RandomUniform::RandomUniform m_const_inputs[MAX_VAL]" << std::endl;
         initEdgeValues(m_max_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MAX_VAL))->get_data_ptr(), m_output_prc);
-std::cout << "CPU m_max_val: " << m_max_val.f32 << std::endl;
+std::cout << "[CPU] m_max_val: " << m_max_val.f32 << std::endl;
     }
 
     m_generator = std::default_random_engine{m_op_seed};
@@ -136,7 +137,7 @@ void RandomUniform::createPrimitive() {
         //     jcp.cannelNum      = jcp.dynamicChannel ? 1lu : srcDataDims[1];
         // }
 
-        m_jit_kernel = kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>::createInstance<kernel::RandomUniform>(jcp);
+        // m_jit_kernel = kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>::createInstance<kernel::RandomUniform>(jcp);
     }
 #endif // OPENVINO_ARCH_X86_64
 
@@ -172,7 +173,7 @@ void RandomUniform::createPrimitive() {
 }
 
 void RandomUniform::execute(dnnl::stream strm) {
-// std::cout << "[CPU] RandomUniform::execute" << std::endl;
+std::cout << "[CPU] RandomUniform::execute" << std::endl;
     if (!m_const_inputs[SHAPE]) {
         auto memPtr = getParentEdgeAt(SHAPE)->getMemoryPtr();
         initOutShape(m_out_shape, memPtr->getData(), m_shape_prc, memPtr->getShape().getElementsCount());
@@ -204,7 +205,7 @@ void RandomUniform::executeDynamicImpl(dnnl::stream strm) {
     execute(strm);
 }
 
-///////// ONNX algo //////////
+///////// ONNX way //////////
 void RandomUniform::computeOnnx(void* out, size_t work_amount) {
     switch (m_output_prc) {
         case element::f32: {
@@ -237,7 +238,7 @@ void RandomUniform::generateData(DISTR_TYPE distribution, void* out, size_t work
     }
 }
 
-///////// TF algo //////////
+///////// TF way //////////
 
 namespace {
 // Following const values are taken from the original paper:
@@ -277,7 +278,6 @@ void raiseKey(uint32_t* key) {
 // Helper function for converting uint32 values to float32. Sets fractional part of
 // floating value with bits from uint32 value. Resulting value is in interval [0,1).
 float uint32ToFloat(uint32_t x) {
-// std::cout << "uint32ToFloat" << std::endl;
     // float32 is formatted as follows: sign(1 bit) exponent(8 bits) mantissa(23 bits).
     // The value is interpreted using following formula:
     // (-1)^sign * 1, mantissa * 2 ^ (exponent - 127)
@@ -286,10 +286,8 @@ float uint32ToFloat(uint32_t x) {
     // exponent = 127, for obtaining a zero exponent.
     // mantissa = 23 right bits from generated uint32 random value.
 
-//     RandomUniform::OutputType out_val = {(static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu)};
-// std::cout << "Convert x: " << x << "; i: " << out_val.i32 << "; f: " << out_val.f32 << "; f - 1: " << out_val.f32 - 1.0f << std::endl;
-//     return out_val.f32;
-    RandomUniform::OutputType out_val = {(static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu)};
+    RandomUniform::OutputType out_val;// = {(static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu)};
+    out_val.u32 = (static_cast<uint32_t>(127) << 23) | (x & 0x7fffffu);
     return out_val.f32 - 1.0f;
 }
 
@@ -304,8 +302,9 @@ float16 uint32ToFloat16(uint32_t x) {
     // exponent = 15, for obtaining a zero exponent.
     // mantissa = 10 right bits from generated uint32 random value.
 
+    RandomUniform::OutputType out_val;
     uint16_t x_uint16 = static_cast<uint16_t>(x);
-    RandomUniform::OutputType out_val = {(static_cast<uint16_t>(15) << 10) | (x_uint16 & 0x3ffu)};
+    out_val.u16 = (static_cast<uint16_t>(15) << 10) | (x_uint16 & 0x3ffu);
     return out_val.f16 - static_cast<float16>(1);
 }
 
@@ -320,8 +319,9 @@ bfloat16 uint32ToBfloat16(uint32_t x) {
     // exponent = 127, for obtaining a zero exponent.
     // mantissa = 7 right bits from generated uint32 random value.
 
+    RandomUniform::OutputType out_val;
     uint16_t x_uint16 = static_cast<uint16_t>(x);
-    RandomUniform::OutputType out_val = {(static_cast<uint16_t>(127) << 7) | (x_uint16 & 0x7fu)};
+    out_val.u16 = {(static_cast<uint16_t>(127) << 7) | (x_uint16 & 0x7fu)};
     return out_val.bf16 - static_cast<bfloat16>(1);
 }
 
@@ -475,11 +475,11 @@ std::pair<uint64_t, uint64_t> RandomUniform::computeTf(void* out, size_t out_el_
 // printf("[CPU][%d] key: %ld; counter: %ld; n: %ld\n", ithr, key, counter, n);
                 runPhilox(key, counter, n, res);
 
-    std::string res_str;
-for (int i = 0; i < step; i++) {
-    res_str += std::to_string(res[i]) + "; ";
-}
-printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counter, n, res_str.c_str());
+//     std::string res_str;
+// for (int i = 0; i < step; i++) {
+//     res_str += std::to_string(res[i]) + "; ";
+// }
+// printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counter, n, res_str.c_str());
 
                 // convert values to corresponding output_type
                 switch (m_output_prc) {
@@ -539,6 +539,7 @@ printf("[CPU][%d] key: %lu; counter: %ld; n: %ld; res={%s}\n", ithr, key, counte
                     } break;
                     default: OPENVINO_THROW("Unsupported type of RandomUniform: ", m_output_prc.to_string());
                 }
+// std::cout << std::endl;
 
                 if (++n == 0) {
 std::cout << "[CPU] RandomUniform::computeTf (++n == 0)" << std::endl;
@@ -580,22 +581,23 @@ void RandomUniform::initOutShape(VectorDims& dst, const void* src, const element
 }
 
 void RandomUniform::initEdgeValues(OutputType& dst, const void* src, const element::Type& output_type) {
+#define EL_CASE(E) \
+    case element::E: \
+        dst.E = *reinterpret_cast<const element_type_traits<element::E>::value_type *>(src); \
+        break;
+
     switch (output_type) {
-        case element::f32:
-            dst.f32 = *reinterpret_cast<const float*>(src);
-            break;
-        case element::i32:
-            dst.i32 = *reinterpret_cast<const int32_t*>(src);
-            break;
-        case element::i64:
-            dst.i64 = *reinterpret_cast<const int64_t*>(src);
-            break;
-        case element::f64:
-            dst.f64 = *reinterpret_cast<const double*>(src);
-            break;
+        EL_CASE(f32)
+        EL_CASE(f16)
+        EL_CASE(bf16)
+        EL_CASE(i32)
+        EL_CASE(i64)
+        EL_CASE(f64)
         default:
             THROW_CPU_NODE_ERR << "has unsupported output precision: " << output_type;
     }
+
+#undef EL_CASE
 }
 
 std::string RandomUniform::getPrimitiveDescriptorType() const {
@@ -611,6 +613,14 @@ std::string RandomUniform::getPrimitiveDescriptorType() const {
 
 bool RandomUniform::needPrepareParams() const {
     return false;
+}
+
+bool RandomUniform::needShapeInfer() const {
+    if (m_const_inputs[SHAPE]) {
+        return false;
+    } else {
+        return true;
+    }
 }
 
 bool RandomUniform::isExecutable() const {

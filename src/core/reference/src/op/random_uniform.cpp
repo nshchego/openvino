@@ -87,6 +87,8 @@ float16 uint32_to_float16(uint32_t x) {
 
     uint16_t x_uint16 = static_cast<uint16_t>(x);
     convert_types out_val = {(static_cast<uint16_t>(15) << 10) | (x_uint16 & 0x3ffu)};
+//     std::string val_str = "{" + std::to_string(x) + "; " + std::to_string(out_val.f16 - static_cast<float16>(1)) + "}; ";
+// std::cout << val_str;
     return out_val.f16 - static_cast<float16>(1);
 }
 
@@ -311,6 +313,7 @@ std::pair<uint64_t, uint64_t> random_uniform(const uint64_t* out_shape,
         default:
             OPENVINO_THROW("Unsupported type of RandomUniform: ", elem_type.to_string());
         }
+// std::cout << std::endl;
         if (++n == 0)
             ++counter;
     }
