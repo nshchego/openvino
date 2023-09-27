@@ -67,18 +67,19 @@ void RandomUniform<x64::avx512_core>::initVectors() {
     v_counter_64   = getVmm();
     v_n_64         = getVmm();
     // v_sep_perm     = getVmm();
-    v_sep_perm_1   = getVmm();
-    v_sep_perm_2   = getVmm();
+    // v_sep_perm_1   = getVmm();
+    // v_sep_perm_2   = getVmm();
     v_res_perm     = getVmm();
-    v_res_perm_1   = getVmm();
+    // v_res_perm_1   = getVmm();
 
     // Initialize constants.
     mov(r64_aux, 0xd2511f53);
     vpbroadcastq(v_max_mul_n_64, r64_aux);
     mov(r64_aux, 0xcd9e8d57);
     vpbroadcastq(v_max_mul_c_64, r64_aux);
-    mov(r64_aux, 0x9e3779b900000000);
-    vpbroadcastq(v_add_low_k, r64_aux);
+    // mov(r64_aux, 0x9e3779b900000000);
+    mov(r32_aux, 0x9e3779b9);
+    vpbroadcastd(v_add_low_k, r32_aux);
     mov(r32_aux, 0xbb67ae85);
     vpbroadcastd(v_add_up_k, r32_aux);
     mov(r64_aux, 0x0000000000000008);
@@ -139,27 +140,30 @@ void RandomUniform<x64::avx512_core>::initVectors() {
     // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask));
     // uni_vmovups(v_sep_perm, ptr[r64_aux]);
 
-    static const uint32_t sep_perm_mask_1[16]  = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_1));
-    uni_vmovups(v_sep_perm_1, ptr[r64_aux]);
+    // static const uint32_t sep_perm_mask_1[16]  = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_1));
+    // uni_vmovups(v_sep_perm_1, ptr[r64_aux]);
 
-    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010000, 0b00000010, 0b00010010, 0b00000100, 0b00010100, 0b00000110, 0b00010110,
-    //                                              0b00001000, 0b00011000, 0b00001010, 0b00011010, 0b00001100, 0b00011100, 0b00001110, 0b00011110 };
-    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010001, 0b00001000, 0b00011001, 0b00000010, 0b00010011, 0b00001010, 0b00011011,
-    //                                              0b00000100, 0b00010101, 0b00001100, 0b00011101, 0b00000110, 0b00010111, 0b00001110, 0b00011111 };
-    static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000001, 0b00010000, 0b00010001, 0b00000010, 0b00000011, 0b00010010, 0b00010011,
-                                                 0b00000100, 0b00000101, 0b00010100, 0b00010101, 0b00000110, 0b00000111, 0b00010110, 0b00010111 };
+    static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010000, 0b00001000, 0b00011000, 0b00000010, 0b00010010, 0b00001010, 0b00011010,
+                                                 0b00000100, 0b00010100, 0b00001100, 0b00011100, 0b00000110, 0b00010110, 0b00001110, 0b00011110 };
+    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000010, 0b00010000, 0b00010010, 0b00000001, 0b00000011, 0b00010001, 0b00010011,
+    //                                              0b00000100, 0b00000110, 0b00010100, 0b00010110, 0b00000101, 0b00000111, 0b00010101, 0b00010111 };
+    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000001, 0b00010000, 0b00010001, 0b00000010, 0b00000011, 0b00010010, 0b00010011,
+    //                                              0b00000100, 0b00000101, 0b00010100, 0b00010101, 0b00000110, 0b00000111, 0b00010110, 0b00010111 };
     mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask));
     uni_vmovups(v_res_perm, ptr[r64_aux]);
-    static const uint32_t res_perm_mask_1[16]  = { 0b00001000, 0b00001001, 0b00011000, 0b00011001, 0b00001010, 0b00001011, 0b00011010, 0b00011011,
-                                                   0b00001100, 0b00001101, 0b00011100, 0b00011101, 0b00001110, 0b00001111, 0b00011110, 0b00011111 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask_1));
-    uni_vmovups(v_res_perm_1, ptr[r64_aux]);
 
-    static const uint32_t sep_perm_mask_2[16]  = { 0b00000001, 0b00010000, 0b00000011, 0b00010010, 0b00000101, 0b00010100, 0b00000111, 0b00010110,
-                                                   0b00001001, 0b00011000, 0b00001011, 0b00011010, 0b00001101, 0b00011100, 0b00001111, 0b00011110 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_2));
-    uni_vmovups(v_sep_perm_2, ptr[r64_aux]);
+    // static const uint32_t res_perm_mask_1[16]  = { 0b00001000, 0b00001001, 0b00011000, 0b00011001, 0b00001010, 0b00001011, 0b00011010, 0b00011011,
+    //                                                0b00001100, 0b00001101, 0b00011100, 0b00011101, 0b00001110, 0b00001111, 0b00011110, 0b00011111 };
+    // static const uint32_t res_perm_mask_1[16]  = { 0b00001000, 0b00001010, 0b00011000, 0b00011010, 0b00001001, 0b00001011, 0b00011001, 0b00011011,
+    //                                                0b00001100, 0b00001110, 0b00011100, 0b00011110, 0b00001101, 0b00001111, 0b00011101, 0b00011111 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask_1));
+    // uni_vmovups(v_res_perm_1, ptr[r64_aux]);
+
+    // static const uint32_t sep_perm_mask_2[16]  = { 0b00000001, 0b00010000, 0b00000011, 0b00010010, 0b00000101, 0b00010100, 0b00000111, 0b00010110,
+    //                                                0b00001001, 0b00011000, 0b00001011, 0b00011010, 0b00001101, 0b00011100, 0b00001111, 0b00011110 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_2));
+    // uni_vmovups(v_sep_perm_2, ptr[r64_aux]);
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, SSE41
@@ -183,10 +187,10 @@ void RandomUniform<isa>::initVectors() {
     v_counter_64   = getVmm();
     v_n_64         = getVmm();
     // v_sep_perm     = getVmm();
-    v_sep_perm_1   = getVmm();
-    v_sep_perm_2   = getVmm();
+    // v_sep_perm_1   = getVmm();
+    // v_sep_perm_2   = getVmm();
     v_res_perm     = getVmm();
-    v_res_perm_1   = getVmm();
+    // v_res_perm_1   = getVmm();
 
     // Initialize constants.
     static const uint64_t max_mul_n_64 = 0xd2511f53;
@@ -274,27 +278,27 @@ void RandomUniform<isa>::initVectors() {
     // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask));
     // uni_vmovups(v_sep_perm, ptr[r64_aux]);
 
-    static const uint32_t sep_perm_mask_1[16]  = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_1));
-    uni_vmovups(v_sep_perm_1, ptr[r64_aux]);
+    // static const uint32_t sep_perm_mask_1[16]  = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_1));
+    // uni_vmovups(v_sep_perm_1, ptr[r64_aux]);
 
     // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010000, 0b00000010, 0b00010010, 0b00000100, 0b00010100, 0b00000110, 0b00010110,
     //                                              0b00001000, 0b00011000, 0b00001010, 0b00011010, 0b00001100, 0b00011100, 0b00001110, 0b00011110 };
-    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00010001, 0b00001000, 0b00011001, 0b00000010, 0b00010011, 0b00001010, 0b00011011,
+    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000010, 0b00010000, 0b00010010, 0b00000010, 0b00010011, 0b00001010, 0b00011011,
     //                                              0b00000100, 0b00010101, 0b00001100, 0b00011101, 0b00000110, 0b00010111, 0b00001110, 0b00011111 };
-    static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000001, 0b00010000, 0b00010001, 0b00000010, 0b00000011, 0b00010010, 0b00010011,
-                                                 0b00000100, 0b00000101, 0b00010100, 0b00010101, 0b00000110, 0b00000111, 0b00010110, 0b00010111 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask));
-    uni_vmovups(v_res_perm, ptr[r64_aux]);
-    static const uint32_t res_perm_mask_1[16]  = { 0b00001000, 0b00001001, 0b00011000, 0b00011001, 0b00001010, 0b00001011, 0b00011010, 0b00011011,
-                                                   0b00001100, 0b00001101, 0b00011100, 0b00011101, 0b00001110, 0b00001111, 0b00011110, 0b00011111 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask_1));
-    uni_vmovups(v_res_perm_1, ptr[r64_aux]);
+    // static const uint32_t res_perm_mask[16]  = { 0b00000000, 0b00000001, 0b00010000, 0b00010001, 0b00000010, 0b00000011, 0b00010010, 0b00010011,
+    //                                              0b00000100, 0b00000101, 0b00010100, 0b00010101, 0b00000110, 0b00000111, 0b00010110, 0b00010111 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask));
+    // uni_vmovups(v_res_perm, ptr[r64_aux]);
+    // static const uint32_t res_perm_mask_1[16]  = { 0b00001000, 0b00001001, 0b00011000, 0b00011001, 0b00001010, 0b00001011, 0b00011010, 0b00011011,
+    //                                                0b00001100, 0b00001101, 0b00011100, 0b00011101, 0b00001110, 0b00001111, 0b00011110, 0b00011111 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(res_perm_mask_1));
+    // uni_vmovups(v_res_perm_1, ptr[r64_aux]);
 
-    static const uint32_t sep_perm_mask_2[16]  = { 0b00000001, 0b00010000, 0b00000011, 0b00010010, 0b00000101, 0b00010100, 0b00000111, 0b00010110,
-                                                   0b00001001, 0b00011000, 0b00001011, 0b00011010, 0b00001101, 0b00011100, 0b00001111, 0b00011110 };
-    mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_2));
-    uni_vmovups(v_sep_perm_2, ptr[r64_aux]);
+    // static const uint32_t sep_perm_mask_2[16]  = { 0b00000001, 0b00010000, 0b00000011, 0b00010010, 0b00000101, 0b00010100, 0b00000111, 0b00010110,
+    //                                                0b00001001, 0b00011000, 0b00001011, 0b00011010, 0b00001101, 0b00011100, 0b00001111, 0b00011110 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(sep_perm_mask_2));
+    // uni_vmovups(v_sep_perm_2, ptr[r64_aux]);
 }
 
 template <x64::cpu_isa_t isa>
@@ -330,30 +334,161 @@ void RandomUniform<isa>::process() {
 
 template <> // TODO: use Zmm?
 void RandomUniform<x64::avx512_core>::calculateRound(
-        const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, const Vmm& vmm_c_1, const Vmm& vmm_n_0, const Vmm& vmm_n_1) {
-    auto vmm_aux_0 = getVmm();
-    auto vmm_aux_1 = getVmm();
+        const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, Vmm& vmm_c_1, const Vmm& vmm_n_0, Vmm& vmm_n_1, Vmm& vmm_aux_0, Vmm& vmm_aux_1) {
+    // auto vmm_aux_0 = getVmm();
+    // auto vmm_aux_1 = getVmm();
 
     uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
     uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
 
-    uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_0);       // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);         // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
-    vpermt2d(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
+    uni_vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    // vpsrldq(vmm_c_0, vmm_aux_0, 32);
+    // vpsraq(vmm_c_0, vmm_aux_0, 32);
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+    // uni_vmovups(vmm_c_1, vmm_aux_0);         // {c1,_,c1,_} = {p0,_,p0,_}
+
+    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    // vpsrldq(vmm_n_0, vmm_aux_1, 32);
+    // vpsraq(vmm_n_0, vmm_aux_1, 32);
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+    // uni_vmovups(vmm_n_1, vmm_aux_1);         // {n1,_,n1,_} = {r0,_,r0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    raiseKey(vmm_k_0, vmm_k_1);
+
+    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+
+    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
+
+    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
+
+    // uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_0);       // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
+    // uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);         // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
+    // vpermt2d(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
     // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
     // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
-    // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
-    // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
+    // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b10001101); // {c0,c0,c1,c1}
+    // vpshufd(vmm_c_0, vmm_c_0, 0b11011000); // {c0,c1,c0,c1}
     // vshufps(vmm_c_0, vmm_c_1, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
     // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
 
-    uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_0);       // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);         // {_,n0,_,n0} = {_,n0,_,n0} ^ {_,k0,_,k0}
-    vpermt2d(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
+    // uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_0);       // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
+    // uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);         // {_,n0,_,n0} = {_,n0,_,n0} ^ {_,k0,_,k0}
+    // vpermt2d(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
     // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
     // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
-    // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
-    // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
+    // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b10001101); // {n0,n0,n1,n1}
+    // vpshufd(vmm_n_0, vmm_n_0, 0b11011000); // {n0,n1,n0,n1}
     // vshufps(vmm_n_0, vmm_n_1, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
     // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
 
@@ -393,9 +528,9 @@ void RandomUniform<x64::avx512_core>::calculateRound(
 
 template <x64::cpu_isa_t isa> // Works for AVX2, SSE41
 void RandomUniform<isa>::calculateRound(
-        const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, const Vmm& vmm_c_1, const Vmm& vmm_n_0, const Vmm& vmm_n_1) {
-    auto vmm_aux_0 = getVmm();
-    auto vmm_aux_1 = getVmm();
+        const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, Vmm& vmm_c_1, const Vmm& vmm_n_0, Vmm& vmm_n_1, Vmm& vmm_aux_0, Vmm& vmm_aux_1) {
+    // auto vmm_aux_0 = getVmm();
+    // auto vmm_aux_1 = getVmm();
 
     uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);     // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
     uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);     // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
@@ -420,6 +555,8 @@ void RandomUniform<x64::avx512_core>::runPhilox(const std::vector<Vmm>& vmm_dst,
     auto vmm_c_1 = getVmm();
     auto vmm_n_0 = getVmm();
     auto vmm_n_1 = getVmm();
+    auto vmm_aux_0 = getVmm();
+    auto vmm_aux_1 = getVmm();
 
     // auto ymm_k_1 = Xbyak::Ymm(vmm_k_1.getIdx());
     // auto ymm_c_1 = Xbyak::Ymm(vmm_c_1.getIdx());
@@ -433,32 +570,56 @@ void RandomUniform<x64::avx512_core>::runPhilox(const std::vector<Vmm>& vmm_dst,
     // vpermps(vmm_n_0, v_sep_perm, vmm_n);       // {n0,n1,n2,n3} -> {n0,n2,n1,n3}
     // vextractf64x4(ymm_n_1, vmm_n_0, 1);
 
-    // uni_vmovups(vmm_k_0, vmm_key);               // {k0,k1,k0,k1} -> {k0,_,k0,_}
-    uni_vmovups(vmm_k_1, vmm_key);               // {k0,k1,k0,k1} -> {_,k1,_,k1}
-    vpermps(vmm_k_0, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
+    uni_vmovups(vmm_k_0, vmm_key);               // {k0,k1,k0,k1} -> {k0,_,k0,_}
+    vpshufd(vmm_k_1, vmm_key, 0b10110001);
+    // vpermps(vmm_k_1, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
+    // uni_vmovups(vmm_k_1, vmm_key);               // {k0,k1,k0,k1} -> {_,k1,_,k1}
+    // vpermps(vmm_k_0, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
     uni_vmovups(vmm_c_0, vmm_counter);           // {c0,c1,c0,c1} -> {c0,_,c0,_}
+    vpshufd(vmm_c_1, vmm_counter, 0b10110001);
     // uni_vmovups(vmm_c_1, vmm_counter);           // {c0,c1,c0,c1} -> {c0,_,c0,_}
     // vpermps(vmm_c_1, v_sep_perm_1, vmm_counter); // {c0,c1,c0,c1} -> {c1,_,c1,_}
     uni_vmovups(vmm_n_0, vmm_n);                 // {n0,n1,n0,n1} -> {n0,_,n0,_}
+    vpshufd(vmm_n_1, vmm_n, 0b10110001);
     // uni_vmovups(vmm_n_1, vmm_n);                 // {n0,n1,n0,n1} -> {n0,_,n0,_}
     // vpermps(vmm_n_1, v_sep_perm_1, vmm_n);       // {n0,n1,n0,n1} -> {n1,_,n1,_}
 
-    for (size_t i = 0lu; i < ROUNDS_NUMBER; i++) {
-        calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1);
-        if (i < ROUNDS_NUMBER - 1) {
-            raiseKey(vmm_k_0, vmm_k_1);
-        }
-    }
+    // for (size_t i = 0lu; i < ROUNDS_NUMBER; i++) {
+    //     calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1, vmm_aux_0, vmm_aux_1);
+    //     if (i < ROUNDS_NUMBER - 1) {
+    //         raiseKey(vmm_k_0, vmm_k_1);
+    //     }
+    // }
+    calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1, vmm_aux_0, vmm_aux_1);
 
-    // vpermt2d(vmm_n_0, v_res_perm, vmm_n_1);
-    // vpermt2d(vmm_c_0, v_res_perm, vmm_c_1);
-    // vshufpd(vmm_dst[0], vmm_n_0, vmm_c_0, 0b00000000);
-    // vshufpd(vmm_dst[1], vmm_n_0, vmm_c_0, 0b11111111);
+    vpermt2d(vmm_n_0, v_res_perm, vmm_n_1);
+    vpermt2d(vmm_c_0, v_res_perm, vmm_c_1);
+    vshufpd(vmm_dst[0], vmm_n_0, vmm_c_0, 0b00000000);
+    vshufpd(vmm_dst[1], vmm_n_0, vmm_c_0, 0b11111111);
 
-    uni_vmovups(vmm_dst[0], vmm_n_0);            // {n0,n1,n0,n1}
-    uni_vmovups(vmm_dst[1], vmm_n_0);            // {n0,n1,n0,n1}
-    vpermt2d(vmm_dst[0], v_res_perm, vmm_c_0);   // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
-    vpermt2d(vmm_dst[1], v_res_perm_1, vmm_c_0); // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+    // uni_vmovups(vmm_dst[0], vmm_n_0);            // {n0,n1,n0,n1}
+    // uni_vmovups(vmm_dst[1], vmm_n_0);            // {n0,n1,n0,n1}
+    // vpermt2d(vmm_dst[0], v_res_perm, vmm_c_0);   // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+    // vpermt2d(vmm_dst[1], v_res_perm_1, vmm_c_0); // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+
+    // vshufps(vmm_n_0, vmm_n_0, vmm_n_1, 0b10001000); // {n0,n0,n1,n1}
+    // vshufps(vmm_c_0, vmm_c_0, vmm_c_1, 0b10001000); // {c0,c0,c1,c1}
+    // vpermt2d(vmm_dst[0], v_res_perm, vmm_c_0);      // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+    // vpermt2d(vmm_dst[1], v_res_perm_1, vmm_c_0);    // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+
+    // vshufps(vmm_n_0, vmm_n_0, vmm_n_1, 0b10001000); // {n0,n0,n1,n1}
+    // vshufps(vmm_c_0, vmm_c_0, vmm_c_1, 0b10001000); // {c0,c0,c1,c1}
+
+    // vshufps(vmm_dst[0], vmm_n_0, vmm_c_0, 0b01000100); // {n0,n0,n1,n1}
+    // vshufps(vmm_dst[1], vmm_n_0, vmm_c_0, 0b01110001); // {n0,n0,n1,n1}
+
+    // vshufps(vmm_n_0, vmm_n_0, vmm_c_0, 0b10100000); // {n0,n0,n1,n1}
+    // vshufps(vmm_c_0, vmm_n_1, vmm_c_1, 0b10100000); // {c0,c0,c1,c1}
+
+    // vpunpckldq(vmm_dst[0], vmm_n_0, vmm_c_0); // {n0,n0,n1,n1}
+    // vpunpckldq(vmm_dst[1], vmm_n_0, vmm_c_0); // {n0,n0,n1,n1}
+
+    // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
 }
 
 template <x64::cpu_isa_t isa>
@@ -470,6 +631,8 @@ void RandomUniform<isa>::runPhilox(const std::vector<Vmm>& vmm_dst, const Vmm& v
     auto vmm_c_1 = getVmm();
     auto vmm_n_0 = getVmm();
     auto vmm_n_1 = getVmm();
+    auto vmm_aux_0 = getVmm();
+    auto vmm_aux_1 = getVmm();
 
     uni_vmovups(vmm_k_1, vmm_key);               // {k0,k1,k0,k1} -> {_,k1,_,k1}
     // vpermps(vmm_k_0, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
@@ -477,16 +640,16 @@ void RandomUniform<isa>::runPhilox(const std::vector<Vmm>& vmm_dst, const Vmm& v
     uni_vmovups(vmm_n_0, vmm_n);                 // {n0,n1,n0,n1} -> {n0,_,n0,_}
 
     for (size_t i = 0lu; i < ROUNDS_NUMBER; i++) {
-        calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1);
+        calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1, vmm_aux_0, vmm_aux_1);
         if (i < ROUNDS_NUMBER - 1) {
             raiseKey(vmm_k_0, vmm_k_1);
         }
     }
 
-    uni_vmovups(vmm_dst[0], vmm_n_0);            // {n0,n1,n0,n1}
-    uni_vmovups(vmm_dst[1], vmm_n_0);            // {n0,n1,n0,n1}
-    vpermt2d(vmm_dst[0], v_res_perm, vmm_c_0);   // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
-    vpermt2d(vmm_dst[1], v_res_perm_1, vmm_c_0); // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+    // uni_vmovups(vmm_dst[0], vmm_n_0);            // {n0,n1,n0,n1}
+    // uni_vmovups(vmm_dst[1], vmm_n_0);            // {n0,n1,n0,n1}
+    // vpermt2d(vmm_dst[0], v_res_perm, vmm_c_0);   // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
+    // vpermt2d(vmm_dst[1], v_res_perm_1, vmm_c_0); // {n0,n1,c0,c1,n0,n1,c0,c1} = perm( {n0,n1,n0,n1}, {c0,c1,c0,c1} )
 }
 
 template <x64::cpu_isa_t isa>

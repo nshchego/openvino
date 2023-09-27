@@ -105,8 +105,8 @@ private:
     RegistersPool::Reg<Vmm> v_min;
     RegistersPool::Reg<Vmm> v_max_min;
     // RegistersPool::Reg<Vmm> v_sep_perm;
-    RegistersPool::Reg<Vmm> v_sep_perm_1;
-    RegistersPool::Reg<Vmm> v_sep_perm_2;
+    // RegistersPool::Reg<Vmm> v_sep_perm_1;
+    // RegistersPool::Reg<Vmm> v_sep_perm_2;
     RegistersPool::Reg<Vmm> v_res_perm;
     RegistersPool::Reg<Vmm> v_res_perm_1;
 
@@ -116,7 +116,8 @@ private:
 
     void runPhilox(const std::vector<Vmm>& vmm_res, const Vmm& vmm_key, const Vmm& vmm_counter, const Vmm& vmm_n);
 
-    void calculateRound(const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, const Vmm& vmm_c_1, const Vmm& vmm_n_0, const Vmm& vmm_n_1);
+    void calculateRound(
+        const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, Vmm& vmm_c_1, const Vmm& vmm_n_0, Vmm& vmm_n_1, Vmm& vmm_aux_0, Vmm& vmm_aux_1);
 
     void raiseKey(const Vmm& vmm_k_0, const Vmm& vmm_k_1);
 

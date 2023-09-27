@@ -71,16 +71,16 @@ std::cout << "[CPU] m_output_prc: " << m_output_prc << std::endl;
         }
     }
 
-    if (m_const_inputs[SHAPE]) {
-std::cout << "[CPU] RandomUniform::RandomUniform m_const_inputs[SHAPE]; dyn: " << isDynamicNgraphNode(op) << std::endl;
-        initOutShape(m_out_shape, as_type<op::v0::Constant>(op->get_input_node_ptr(SHAPE))->get_data_ptr(), m_shape_prc,
-                op->get_input_shape(SHAPE)[0]);
-std::cout << "[CPU] Out shape {";
-for (auto val : m_out_shape) {
-    std::cout << val << "; ";
-}
-std::cout << "}" << std::endl;
-    }
+//     if (m_const_inputs[SHAPE]) {
+// std::cout << "[CPU] RandomUniform::RandomUniform m_const_inputs[SHAPE]; dyn: " << isDynamicNgraphNode(op) << std::endl;
+//         initOutShape(m_out_shape, as_type<op::v0::Constant>(op->get_input_node_ptr(SHAPE))->get_data_ptr(), m_shape_prc,
+//                 op->get_input_shape(SHAPE)[0]);
+// std::cout << "[CPU] Out shape {";
+// for (auto val : m_out_shape) {
+//     std::cout << val << "; ";
+// }
+// std::cout << "}" << std::endl;
+//     }
     if (m_const_inputs[MIN_VAL]) {
 std::cout << "[CPU] RandomUniform::RandomUniform m_const_inputs[MIN_VAL]" << std::endl;
         initEdgeValues(m_min_val, as_type<op::v0::Constant>(op->get_input_node_ptr(MIN_VAL))->get_data_ptr(), m_output_prc);
@@ -137,7 +137,7 @@ void RandomUniform::createPrimitive() {
         //     jcp.cannelNum      = jcp.dynamicChannel ? 1lu : srcDataDims[1];
         // }
 
-        // m_jit_kernel = kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>::createInstance<kernel::RandomUniform>(jcp);
+        m_jit_kernel = kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>::createInstance<kernel::RandomUniform>(jcp);
     }
 #endif // OPENVINO_ARCH_X86_64
 
@@ -173,13 +173,14 @@ void RandomUniform::createPrimitive() {
 }
 
 void RandomUniform::execute(dnnl::stream strm) {
-std::cout << "[CPU] RandomUniform::execute" << std::endl;
-    if (!m_const_inputs[SHAPE]) {
-        auto memPtr = getParentEdgeAt(SHAPE)->getMemoryPtr();
-        initOutShape(m_out_shape, memPtr->getData(), m_shape_prc, memPtr->getShape().getElementsCount());
+// std::cout << "[CPU] RandomUniform::execute" << std::endl;
+//     if (!m_const_inputs[SHAPE]) {
+//         // auto memPtr = getParentEdgeAt(SHAPE)->getMemoryPtr();
+//         // initOutShape(m_out_shape, memPtr->getData(), m_shape_prc, memPtr->getShape().getElementsCount());
 
-        redefineOutputMemory({m_out_shape});
-    }
+//         // redefineOutputMemory({m_out_shape});
+//         // m_out_shape = memPtr->getShape();
+//     }
     if (!m_const_inputs[MIN_VAL]) {
         initEdgeValues(m_min_val, getParentEdgeAt(MIN_VAL)->getMemoryPtr()->getData(), m_output_prc);
     }
@@ -267,12 +268,13 @@ void calculateRound(const uint32_t* key, uint32_t* counter, uint32_t* n) {
     n[1] = static_cast<uint32_t>(prod_1);
     counter[0] = static_cast<uint32_t>(prod_0 >> 32) ^ counter[1] ^ key[1];
     counter[1] = static_cast<uint32_t>(prod_0);
-// printf("[CPU] calculateRound prod_0: %lu; prod_1: %lu; n_0: %d; n_1: %d; c_0: %d; c_1: %d\n", prod_0, prod_1, n[0], n[1], counter[0], counter[1]);
+printf("[CPU] calculateRound prod_0: %lu; prod_1: %lu; n_0: %d; n_1: %d; c_0: %d; c_1: %d\n", prod_0, prod_1, n[0], n[1], counter[0], counter[1]);
 }
 
 void raiseKey(uint32_t* key) {
     key[0] += CRUSH_RESISTANCE_CONST_LOWER_VALUE;
     key[1] += CRUSH_RESISTANCE_CONST_UPPER_VALUE;
+printf("[CPU] raiseKey key_0: %d; key_1: %d\n", key[0], key[1]);
 }
 
 // Helper function for converting uint32 values to float32. Sets fractional part of
