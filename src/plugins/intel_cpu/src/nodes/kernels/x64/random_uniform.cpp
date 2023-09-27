@@ -332,206 +332,26 @@ void RandomUniform<isa>::process() {
     tail(v_res);
 }
 
-template <> // TODO: use Zmm?
+template <>
 void RandomUniform<x64::avx512_core>::calculateRound(
         const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, Vmm& vmm_c_1, const Vmm& vmm_n_0, Vmm& vmm_n_1, Vmm& vmm_aux_0, Vmm& vmm_aux_1) {
-    // auto vmm_aux_0 = getVmm();
-    // auto vmm_aux_1 = getVmm();
+    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64); // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
+    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64); // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
 
-    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
+    uni_vpshufd(vmm_c_0, vmm_aux_0, 0b10110001);      // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
+//     // vpsrldq(vmm_c_0, vmm_aux_0, 32);
+//     // vpsraq(vmm_c_0, vmm_aux_0, 32);
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);            // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
+    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);            // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
 
-    uni_vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    // vpsrldq(vmm_c_0, vmm_aux_0, 32);
-    // vpsraq(vmm_c_0, vmm_aux_0, 32);
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-    // uni_vmovups(vmm_c_1, vmm_aux_0);         // {c1,_,c1,_} = {p0,_,p0,_}
-
-    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    // vpsrldq(vmm_n_0, vmm_aux_1, 32);
-    // vpsraq(vmm_n_0, vmm_aux_1, 32);
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-    // uni_vmovups(vmm_n_1, vmm_aux_1);         // {n1,_,n1,_} = {r0,_,r0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_aux_0, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_c_1);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_aux_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    raiseKey(vmm_k_0, vmm_k_1);
-
-    uni_vpmuludq(vmm_c_1, vmm_n_0, v_max_mul_n_64);  // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
-    uni_vpmuludq(vmm_n_1, vmm_c_0, v_max_mul_c_64);  // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
-
-    vpshufd(vmm_c_0, vmm_c_1, 0b10110001); // {p1,p0,p1,p0} = shuf {p0,p1,p0,p1}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_aux_0);   // {c0,_,c0,_} = {p1,_,p1,_} ^ {c1,_,c1,_}
-    uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);   // {c0,_,c0,_} = {c0,_,c0,_} ^ {k1,_,k1,_}
-
-    vpshufd(vmm_n_0, vmm_n_1, 0b10110001); // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_aux_1);   // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
-    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);   // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-
-    // uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_0);       // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
-    // uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);         // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
-    // vpermt2d(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
-    // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
-    // vpermps(vmm_c_0, v_sep_perm_2, vmm_aux_0);    // {c0,c1,c0,c1} = perm {_,c0,_,c0},{p0,_,p0,_}
-    // vshufps(vmm_c_0, vmm_c_0, vmm_aux_0, 0b10001101); // {c0,c0,c1,c1}
-    // vpshufd(vmm_c_0, vmm_c_0, 0b11011000); // {c0,c1,c0,c1}
-    // vshufps(vmm_c_0, vmm_c_1, vmm_aux_0, 0b01110001); // {c0,c0,c1,c1}
-    // vpshufd(vmm_c_0, vmm_c_0, 0b00100111); // {c0,c1,c0,c1}
-
-    // uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_0);       // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
-    // uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);         // {_,n0,_,n0} = {_,n0,_,n0} ^ {_,k0,_,k0}
-    // vpermt2d(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
-    // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
-    // vpermps(vmm_n_0, v_sep_perm_2, vmm_aux_1);    // {n0,n1,n0,n1} = perm {_,n0,_,n0},{r0,_,r0,_}
-    // vshufps(vmm_n_0, vmm_n_0, vmm_aux_1, 0b10001101); // {n0,n0,n1,n1}
-    // vpshufd(vmm_n_0, vmm_n_0, 0b11011000); // {n0,n1,n0,n1}
-    // vshufps(vmm_n_0, vmm_n_1, vmm_aux_1, 0b01110001); // {n0,n0,n1,n1}
-    // vpshufd(vmm_n_0, vmm_n_0, 0b00100111); // {n0,n1,n0,n1}
-
-
-    // uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_1);      // {_,c0,_,c0} = {_,p1,_,p1} ^ {_,c1,_,c1}
-    // uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);        // {_,c0,_,c0} = {_,c0,_,c0} ^ {_,k1,_,k1}
-    // vpermps(vmm_c_0, v_sep_perm_1, vmm_c_0);      // {c0,_,c0,_} = {_,c0,_,c0}
-    // vpermps(vmm_c_1, v_sep_perm_1, vmm_aux_0);    // {_,c1,_,c1} = {p0,_,p0,_}
-
-    // uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_1);      // {_,n0,_,n0} = {_,r1,_,r1} ^ {_,n1,_,n1}
-    // vpermps(vmm_n_0, v_sep_perm_1, vmm_n_0);      // {n0,_,n0,_} = {_,n0,_,n0}
-    // uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);        // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
-    // vpermps(vmm_n_1, v_sep_perm_1, vmm_aux_1);    // {_,n1,_,n1} = {r0,_,r0,_}
-
-
-    // auto ymm_n_1 = Xbyak::Ymm(vmm_n_1.getIdx());
-    // auto ymm_c_1 = Xbyak::Ymm(vmm_c_1.getIdx());
-
-    // vpermps(vmm_aux_0, v_sep_perm, vmm_aux_0); // {a0,a1,a2,a3} -> {a0,a2,a1,a3}
-    // uni_vxorps(vmm_c_0, vmm_aux_0, vmm_c_1);
-    // uni_vxorps(vmm_c_0, vmm_c_0, vmm_k_1);
-    // vextractf64x4(ymm_c_1, vmm_aux_0, 1);          // {a1,a3} -> c_1
-
-    // vpermps(vmm_aux_1, v_sep_perm, vmm_aux_1); // {a0,a1,a2,a3} -> {a0,a2,a1,a3}
-    // uni_vxorps(vmm_n_0, vmm_aux_1, vmm_n_1);
-    // uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_1);
-    // vextractf64x4(ymm_n_1, vmm_aux_1, 1);          // {a1,a3} -> n_1
-
-
-    // uint64_t prod_0 = STATISTIC_MAXIMIZING_MULTIPLIER_N * n[0];
-    // uint64_t prod_1 = STATISTIC_MAXIMIZING_MULTIPLIER_COUNTER * counter[0];
-    // n[0] = static_cast<uint32_t>(prod_1 >> 32) ^ n[1] ^ key[0];
-    // n[1] = static_cast<uint32_t>(prod_1);
-    // counter[0] = static_cast<uint32_t>(prod_0 >> 32) ^ counter[1] ^ key[1];
-    // counter[1] = static_cast<uint32_t>(prod_0);
+    uni_vpshufd(vmm_n_0, vmm_aux_1, 0b10110001);      // {r1,r0,r1,r0} = shuf {r0,r1,r0,r1}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_n_1);            // {n0,_,n0,_} = {r1,_,r1,_} ^ {n1,_,n1,_}
+    uni_vxorps(vmm_n_0, vmm_n_0, vmm_k_0);            // {n0,_,n0,_} = {n0,_,n0,_} ^ {k0,_,k0,_}
 }
 
 template <x64::cpu_isa_t isa> // Works for AVX2, SSE41
 void RandomUniform<isa>::calculateRound(
         const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, Vmm& vmm_c_1, const Vmm& vmm_n_0, Vmm& vmm_n_1, Vmm& vmm_aux_0, Vmm& vmm_aux_1) {
-    // auto vmm_aux_0 = getVmm();
-    // auto vmm_aux_1 = getVmm();
-
     uni_vpmuludq(vmm_aux_0, vmm_n_0, v_max_mul_n_64);     // {p0,p1,p0,p1} = {n0,_,n0,_} * {m0,_,m0,_}
     uni_vpmuludq(vmm_aux_1, vmm_c_0, v_max_mul_c_64);     // {r0,r1,r0,r1} = {c0,_,c0,_} * {m0,_,m0,_}
 
@@ -551,46 +371,31 @@ void RandomUniform<x64::avx512_core>::runPhilox(const std::vector<Vmm>& vmm_dst,
     // Define sparse vectors.
     auto vmm_k_0 = getVmm();
     auto vmm_k_1 = getVmm();
+    auto vmm_n_0 = getVmm();
+    auto vmm_n_1 = vmm_dst[0];
     auto vmm_c_0 = getVmm();
     auto vmm_c_1 = getVmm();
-    auto vmm_n_0 = getVmm();
-    auto vmm_n_1 = getVmm();
     auto vmm_aux_0 = getVmm();
-    auto vmm_aux_1 = getVmm();
-
-    // auto ymm_k_1 = Xbyak::Ymm(vmm_k_1.getIdx());
-    // auto ymm_c_1 = Xbyak::Ymm(vmm_c_1.getIdx());
-    // auto ymm_n_1 = Xbyak::Ymm(vmm_n_1.getIdx());
-
-    // Divide 64bit elements on 32bit.
-    // vpermps(vmm_k_0, v_sep_perm, vmm_key);     // {k0,k1,k2,k3} -> {k0,k2,k1,k3}
-    // vextractf64x4(ymm_k_1, vmm_k_0, 1);
-    // vpermps(vmm_c_0, v_sep_perm, vmm_counter); // {c0,c1,c2,c3} -> {c0,c2,c1,c3}
-    // vextractf64x4(ymm_c_1, vmm_c_0, 1);
-    // vpermps(vmm_n_0, v_sep_perm, vmm_n);       // {n0,n1,n2,n3} -> {n0,n2,n1,n3}
-    // vextractf64x4(ymm_n_1, vmm_n_0, 1);
+    auto vmm_aux_1 = vmm_dst[1];
 
     uni_vmovups(vmm_k_0, vmm_key);               // {k0,k1,k0,k1} -> {k0,_,k0,_}
-    vpshufd(vmm_k_1, vmm_key, 0b10110001);
-    // vpermps(vmm_k_1, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
+    vpshufd(vmm_k_1, vmm_key, 0b10110001);       // {k0,k1,k0,k1} -> {k1,_,k1,_}
     // uni_vmovups(vmm_k_1, vmm_key);               // {k0,k1,k0,k1} -> {_,k1,_,k1}
-    // vpermps(vmm_k_0, v_sep_perm_1, vmm_key);     // {k0,k1,k0,k1} -> {_,k0,_,k0}
     uni_vmovups(vmm_c_0, vmm_counter);           // {c0,c1,c0,c1} -> {c0,_,c0,_}
     vpshufd(vmm_c_1, vmm_counter, 0b10110001);
     // uni_vmovups(vmm_c_1, vmm_counter);           // {c0,c1,c0,c1} -> {c0,_,c0,_}
-    // vpermps(vmm_c_1, v_sep_perm_1, vmm_counter); // {c0,c1,c0,c1} -> {c1,_,c1,_}
     uni_vmovups(vmm_n_0, vmm_n);                 // {n0,n1,n0,n1} -> {n0,_,n0,_}
     vpshufd(vmm_n_1, vmm_n, 0b10110001);
     // uni_vmovups(vmm_n_1, vmm_n);                 // {n0,n1,n0,n1} -> {n0,_,n0,_}
-    // vpermps(vmm_n_1, v_sep_perm_1, vmm_n);       // {n0,n1,n0,n1} -> {n1,_,n1,_}
 
-    // for (size_t i = 0lu; i < ROUNDS_NUMBER; i++) {
-    //     calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1, vmm_aux_0, vmm_aux_1);
-    //     if (i < ROUNDS_NUMBER - 1) {
-    //         raiseKey(vmm_k_0, vmm_k_1);
-    //     }
-    // }
-    calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1, vmm_aux_0, vmm_aux_1);
+    for (size_t i = 0lu; i < ROUNDS_NUMBER; i++) {
+        calculateRound(vmm_k_0, vmm_k_1, vmm_c_0, vmm_c_1, vmm_n_0, vmm_n_1, vmm_aux_0, vmm_aux_1);
+        if (i < ROUNDS_NUMBER - 1) {
+            raiseKey(vmm_k_0, vmm_k_1);
+        }
+        std::swap(vmm_c_1, vmm_aux_0);
+        std::swap(vmm_n_1, vmm_aux_1);
+    }
 
     vpermt2d(vmm_n_0, v_res_perm, vmm_n_1);
     vpermt2d(vmm_c_0, v_res_perm, vmm_c_1);
