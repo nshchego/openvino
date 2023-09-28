@@ -195,20 +195,24 @@ public:
     static std::shared_ptr<JitKernel<CompileParams, CallArgs>> createInstance(const CompileParams& jcp) {
         std::shared_ptr<JitKernel<CompileParams, CallArgs>> res;
 
-#define IF_ISA_CASE(ISA)                                                                         \
-        (dnnl::impl::cpu::x64::mayiuse(ISA)) {                                                   \
-            res.reset(new KernelT<ISA>(jcp));                                                    \
-            if (!res)                                                                            \
-                OPENVINO_THROW("Could not create JIT kernel for ", typeid(KernelT<ISA>).name()); \
-        }
+        try {
+#define IF_ISA_CASE(ISA)                             \
+            (dnnl::impl::cpu::x64::mayiuse(ISA)) {   \
+                res.reset(new KernelT<ISA>(jcp));    \
+            }
 
-        if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
-        else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
-        else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
+            if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
+            else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
+            else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
 
 #undef IF_ISA_CASE
 
-        res->create_kernel();
+            if (res) {
+                res->create_kernel();
+            }
+        } catch (...) {
+            return nullptr;
+        }
 
         return res;
     }
