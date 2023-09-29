@@ -112,7 +112,7 @@ void RandomUniform::initSupportedPrimitiveDescriptors() {
                           {LayoutType::ncsp, out_prc, m_const_inputs[MIN_VAL]},
                           {LayoutType::ncsp, out_prc, m_const_inputs[MAX_VAL]}},
                          {{LayoutType::ncsp, out_prc}},
-                         ref_any); // TODO: expand
+                         ref_any);
 }
 
 void RandomUniform::createPrimitive() {
@@ -138,6 +138,18 @@ void RandomUniform::createPrimitive() {
         // }
 
         m_jit_kernel = kernel::JitKernel<kernel::RandomUniformCompileParams, kernel::RandomUniformCallArgs>::createInstance<kernel::RandomUniform>(jcp);
+
+        if (m_jit_kernel) {
+            if (auto selectedPD = getSelectedPrimitiveDescriptor()) {
+                if (m_jit_kernel->getIsa() == x64::avx512_core) {
+                    selectedPD->setImplementationType(jit_avx512);
+                } else if (m_jit_kernel->getIsa() == x64::avx2) {
+                    selectedPD->setImplementationType(jit_avx2);
+                } else if (m_jit_kernel->getIsa() == x64::sse41) {
+                    selectedPD->setImplementationType(jit_sse42);
+                }
+            }
+        }
     }
 #endif // OPENVINO_ARCH_X86_64
 
@@ -603,13 +615,49 @@ void RandomUniform::initEdgeValues(OutputType& dst, const void* src, const eleme
 }
 
 std::string RandomUniform::getPrimitiveDescriptorType() const {
-    std::string str_type = "ref";
     auto selectedPrimitiveDesc = getSelectedPrimitiveDescriptor();
-    if (selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision() != InferenceEngine::Precision::U8) {
-        str_type += "_" + std::string(selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision().name());
-    } else {
-        str_type += "_I8";
+
+    impl_desc_type type = impl_desc_type::undef;
+    if (selectedPrimitiveDesc) {
+        type = selectedPrimitiveDesc->getImplementationType();
     }
+
+    std::string str_type;
+
+    auto add_type = [&](std::string t) {
+        if (!str_type.empty() && t.c_str()[0] != '_')
+            str_type += "_";
+        str_type += t;
+    };
+
+#define SEARCH_TYPE(_type)                                          \
+    if ((type & impl_desc_type::_type) == impl_desc_type::_type)    \
+        add_type(#_type)
+
+    SEARCH_TYPE(undef);
+    SEARCH_TYPE(jit);
+    SEARCH_TYPE(ref);
+
+    SEARCH_TYPE(avx512);
+    SEARCH_TYPE(avx2);
+    SEARCH_TYPE(sse42);
+    SEARCH_TYPE(any);
+
+#undef SEARCH_TYPE
+
+    if (type == impl_desc_type::unknown)
+        str_type = "unknown";
+    else if (str_type.empty())
+        str_type = "undef";
+
+    if (selectedPrimitiveDesc) {
+        if (selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision() != InferenceEngine::Precision::U8) {
+            str_type += "_" + std::string(selectedPrimitiveDesc->getConfig().outConfs[0].getMemDesc()->getPrecision().name());
+        } else {
+            str_type += "_I8";
+        }
+    }
+
     return str_type;
 }
 
@@ -618,11 +666,7 @@ bool RandomUniform::needPrepareParams() const {
 }
 
 bool RandomUniform::needShapeInfer() const {
-    if (m_const_inputs[SHAPE]) {
-        return false;
-    } else {
-        return true;
-    }
+    return !m_const_inputs[SHAPE];
 }
 
 bool RandomUniform::isExecutable() const {

@@ -265,7 +265,7 @@ void SubgraphBaseTest::infer() {
 precisions_map SubgraphBaseTest::get_ref_precisions_convert_map() {
     //TODO: remove this conversions as soon as function interpreter fully support bf16 and f16
     precisions_map precisions = {
-            // { ngraph::element::bf16, ngraph::element::f32 }
+            { ngraph::element::bf16, ngraph::element::f32 }
     };
 
     auto convert_added = false;
@@ -281,9 +281,9 @@ precisions_map SubgraphBaseTest::get_ref_precisions_convert_map() {
         }
     }
 
-    // if (!convert_added) {
-    //     precisions.insert({ ngraph::element::f16, ngraph::element::f32});
-    // }
+    if (!convert_added) {
+        precisions.insert({ ngraph::element::f16, ngraph::element::f32});
+    }
 
     return precisions;
 }

@@ -86,13 +86,24 @@ protected:
         m_max_val = std::get<1>(min_max);
         std::tie(inFmts, outFmts, priority, selectedType) = cpu_params;
 
-configuration.insert({InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16, InferenceEngine::PluginConfigParams::YES});
+// configuration.insert({InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16, InferenceEngine::PluginConfigParams::YES});
         if (output_prc == ElementType::i64) {
-            updateSelectedType("ref", ElementType::i32, configuration);
-        } else if (/*output_prc == ElementType::bf16 || output_prc == ElementType::f16 ||*/ output_prc == ElementType::f64) {
-            updateSelectedType("ref", ElementType::f32, configuration);
+            updateSelectedType(getPrimitiveType(), ElementType::i32, configuration);
+        } else if (output_prc == ElementType::f64) {
+            updateSelectedType(getPrimitiveType(), ElementType::f32, configuration);
+        } else if (output_prc == ElementType::f16) {
+            const auto it = configuration.find(ov::hint::inference_precision.name());
+            if (it != configuration.end() && it->second == ov::device::capability::FP16) {
+                if (InferenceEngine::with_cpu_x86_avx512_core_fp16()) {
+                    updateSelectedType(getPrimitiveType(), ElementType::f16, configuration);
+                } else {
+                    updateSelectedType("ref", ElementType::f16, configuration);
+                }
+            } else {
+                updateSelectedType(getPrimitiveType(), ElementType::f32, configuration);
+            }
         } else {
-            updateSelectedType("ref", output_prc, configuration);
+            updateSelectedType(getPrimitiveType(), output_prc, configuration);
         }
 
         std::vector<InputShape> in_shapes;
@@ -149,50 +160,42 @@ configuration.insert({InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16, Inf
             const auto& in_prc = func_input.get_element_type();
             auto tensor = ov::Tensor(in_prc, targetInputStaticShapes[i]);
 
+#define CASE(P, S, L)                                                              \
+case P :                                                                           \
+    fill_data(tensor.data<ov::element_type_traits<P>::value_type>(), S, L); break;
+
             if (name == "shape") {
                 switch (in_prc) {
-                    case ElementType::i32:
-                        fill_data(tensor.data<int32_t>(), m_output_shape.data(), m_output_shape.size()); break;
-                    case ElementType::i64:
-                        fill_data(tensor.data<int64_t>(), m_output_shape.data(), m_output_shape.size()); break;
+                    CASE(ElementType::i32, m_output_shape.data(), m_output_shape.size())
+                    CASE(ElementType::i64, m_output_shape.data(), m_output_shape.size())
                     default:
                         OPENVINO_THROW("RandomUniform does not support precision ", in_prc, " for the Shape input.");
                 }
             } else if (name == "minval") {
                 switch (in_prc) {
-                    case ElementType::i32:
-                        fill_data(tensor.data<int32_t>(), &m_min_val, 1); break;
-                    case ElementType::f32:
-                        fill_data(tensor.data<float>(), &m_min_val, 1); break;
-                    case ElementType::f16:
-                        fill_data(tensor.data<ov::float16>(), &m_min_val, 1); break;
-                    case ElementType::bf16:
-                        fill_data(tensor.data<ov::bfloat16>(), &m_min_val, 1); break;
-                    case ElementType::i64:
-                        fill_data(tensor.data<int64_t>(), &m_min_val, 1); break;
-                    case ElementType::f64:
-                        fill_data(tensor.data<double>(), &m_min_val, 1); break;
+                    CASE(ElementType::f32,  &m_min_val, 1)
+                    CASE(ElementType::f16,  &m_min_val, 1)
+                    CASE(ElementType::bf16, &m_min_val, 1)
+                    CASE(ElementType::i32,  &m_min_val, 1)
+                    CASE(ElementType::i64,  &m_min_val, 1)
+                    CASE(ElementType::f64,  &m_min_val, 1)
                     default:
                         OPENVINO_THROW("RandomUniform does not support precision ", in_prc, " for the Minval input.");
                 }
             } else if (name == "maxval") {
                 switch (in_prc) {
-                    case ElementType::i32:
-                        fill_data(tensor.data<int32_t>(), &m_max_val, 1); break;
-                    case ElementType::f32:
-                        fill_data(tensor.data<float>(), &m_max_val, 1); break;
-                    case ElementType::f16:
-                        fill_data(tensor.data<ov::float16>(), &m_max_val, 1); break;
-                    case ElementType::bf16:
-                        fill_data(tensor.data<ov::bfloat16>(), &m_max_val, 1); break;
-                    case ElementType::i64:
-                        fill_data(tensor.data<int64_t>(), &m_max_val, 1); break;
-                    case ElementType::f64:
-                        fill_data(tensor.data<double>(), &m_max_val, 1); break;
+                    CASE(ElementType::f32,  &m_max_val, 1)
+                    CASE(ElementType::f16,  &m_max_val, 1)
+                    CASE(ElementType::bf16, &m_max_val, 1)
+                    CASE(ElementType::i32,  &m_max_val, 1)
+                    CASE(ElementType::i64,  &m_max_val, 1)
+                    CASE(ElementType::f64,  &m_max_val, 1)
                     default:
                         OPENVINO_THROW("RandomUniform does not support precision ", in_prc, " for the Maxval input.");
                 }
             }
+
+#undef CASE
 
             inputs.insert({func_input.get_node_shared_ptr(), tensor});
         }
@@ -251,7 +254,6 @@ configuration.insert({InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16, Inf
         auto rel_mean = (exp_mean - act_mean) / (m_max_val - m_min_val);
         auto rel_variance = (exp_variance - act_variance) / std::pow(m_max_val - m_min_val, 2);
 
-std::cout << "exp_mean: " << exp_mean << "; act_mean: " << act_mean << std::endl;
         if (!(less_or_equal(rel_mean, m_mean_threshold) && less_or_equal(rel_variance, m_variance_threshold))) {
             std::ostringstream out_stream;
             out_stream << "rel_mean < m_mean_threshold && rel_variance < m_variance_threshold" <<
@@ -283,7 +285,7 @@ const std::vector<ElementType> shape_prc = {
         ElementType::i64
 };
 
-const std::vector<ElementType> output_prc = {
+const std::vector<ElementType> output_prc_nightly = {
         ElementType::f32,
         ElementType::f16,
         ElementType::bf16,
@@ -326,7 +328,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_Param, RandomUniformLayerTestCPU,
                 ::testing::ValuesIn(output_shapes),
                 ::testing::ValuesIn(min_max),
                 ::testing::ValuesIn(shape_prc),
-                ::testing::ValuesIn(output_prc),
+                ::testing::Values(ElementType::f32, ElementType::i32),
                 ::testing::ValuesIn(global_seed),
                 ::testing::ValuesIn(operational_seed),
                 ::testing::Values(false),
@@ -356,7 +358,7 @@ INSTANTIATE_TEST_SUITE_P(nightly_Param, RandomUniformLayerTestCPU,
                 ::testing::ValuesIn(output_shapes_nightly),
                 ::testing::Values(min_max[0]),
                 ::testing::Values(ElementType::i32),
-                ::testing::ValuesIn(output_prc),
+                ::testing::ValuesIn(output_prc_nightly),
                 ::testing::Values(3),
                 ::testing::Values(1),
                 ::testing::Values(true, false),

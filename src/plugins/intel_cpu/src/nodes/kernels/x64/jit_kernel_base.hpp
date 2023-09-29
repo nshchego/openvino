@@ -19,6 +19,8 @@ class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
 public:
     JitKernelBase(const char* name, dnnl::impl::cpu::x64::cpu_isa_t max_cpu_isa);
 
+    dnnl::impl::cpu::x64::cpu_isa_t getIsa() { return m_isa; }
+
     size_t getVectorLen() { return vlen; }
 
     void uni_vfmsub132ps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
@@ -144,6 +146,7 @@ protected:
         return dnnl::impl::cpu::x64::mayiuse(isa);
     }
 
+    const dnnl::impl::cpu::x64::cpu_isa_t m_isa;
     RegistersPool::Ptr registersPool;
     size_t vlen;
 
@@ -195,24 +198,25 @@ public:
     static std::shared_ptr<JitKernel<CompileParams, CallArgs>> createInstance(const CompileParams& jcp) {
         std::shared_ptr<JitKernel<CompileParams, CallArgs>> res;
 
-        try {
+        // try {
 #define IF_ISA_CASE(ISA)                             \
             (dnnl::impl::cpu::x64::mayiuse(ISA)) {   \
                 res.reset(new KernelT<ISA>(jcp));    \
             }
 
-            if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
-            else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
-            else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
+if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
+            // if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
+            // else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
+            // else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
 
 #undef IF_ISA_CASE
 
             if (res) {
                 res->create_kernel();
             }
-        } catch (...) {
-            return nullptr;
-        }
+        // } catch (...) {
+        //     return nullptr;
+        // }
 
         return res;
     }
