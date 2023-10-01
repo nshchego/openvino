@@ -360,7 +360,6 @@ void RandomUniform<isa>::runPhilox(const std::vector<Vmm>& vmm_dst, const Vmm& v
     } else if (isa == x64::avx2) {
         auto ymm_dst_0 = Xbyak::Ymm(vmm_dst[0].getIdx());
         auto ymm_dst_1 = Xbyak::Ymm(vmm_dst[1].getIdx());
-        // auto ymm_n_0 = Xbyak::Ymm(vmm_n_0.getIdx());
         auto ymm_c_0 = Xbyak::Ymm(vmm_c_0.getIdx());
 
         uni_vshufps(vmm_n_0, vmm_n_0, vmm_n_1, 0b10001000);   // {n0,n0,n1,n1} = shuf {n0,_,n0,_} {n1,_,n1,_}
@@ -497,13 +496,15 @@ void RandomUniform<isa>::convert(const std::vector<Vmm>& v_dst, const std::vecto
                 if (isa == x64::avx2) {
                     vfnmadd132pd(v_aux_1, v_aux_0, v_range);
                 } else {
-                    //
+                    uni_vmulpd(v_aux_1, v_aux_1, v_range);
+                    uni_vsubpd(v_aux_0, v_aux_0, v_aux_1);
+                    uni_vmovups(v_aux_1, v_aux_0);
                 }
 
                 if (isa == x64::avx2) {
                     vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0b00000001);
                 } else {
-                    //
+                    uni_vshufpd(vmm_dst, vmm_dst, vmm_dst, 0b00000001);
                 }
                 // Convert u32->f64. TODO: move to convert emitter after i64 enabling.
                 uni_vpmovzxdq(v_aux_0, xmm_dst);
@@ -516,13 +517,15 @@ void RandomUniform<isa>::convert(const std::vector<Vmm>& v_dst, const std::vecto
                 if (isa == x64::avx2) {
                     vfnmadd132pd(v_aux_1, v_aux_0, v_range);
                 } else {
-                    //
+                    uni_vmulpd(v_aux_1, v_aux_1, v_range);
+                    uni_vsubpd(v_aux_0, v_aux_0, v_aux_1);
+                    uni_vmovups(v_aux_1, v_aux_0);
                 }
                 uni_vcvtpd2dq(xmm_aux_1, v_aux_1);
                 if (isa == x64::avx2) {
                     vperm2f128(ymm_dst, ymm_dst, v_aux_1, 0b00100000);
                 } else {
-                    //
+                    uni_vshufpd(vmm_dst, vmm_dst, v_aux_1, 0b00000000);
                 }
 
                 uni_vpaddd(vmm_dst, vmm_dst, ptr[r64_min]);

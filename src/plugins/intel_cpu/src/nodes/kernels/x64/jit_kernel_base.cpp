@@ -157,6 +157,19 @@ void JitKernelBase::uni_vsubpd(const Xbyak::Xmm& v_dst,
     }
 }
 
+void JitKernelBase::uni_vmulpd(const Xbyak::Xmm& v_dst,
+                               const Xbyak::Xmm& v_src,
+                               const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx)) {
+        vmulpd(v_dst, v_src, op);
+    } else {
+        if (v_dst.getIdx() != v_src.getIdx()) {
+            movups(v_dst, v_src);
+        }
+        mulpd(v_dst, op);
+    }
+}
+
 void JitKernelBase::uni_vpmuludq(const Xbyak::Xmm& v_dst,
                                  const Xbyak::Xmm& v_src,
                                  const Xbyak::Operand& op) {
@@ -190,7 +203,7 @@ void JitKernelBase::uni_vdivpd(const Xbyak::Xmm& v_dst,
         vdivpd(v_dst, v_src, op);
     } else {
         if (v_dst.getIdx() != v_src.getIdx()) {
-            vdivpd(v_dst, v_src);
+            movups(v_dst, v_src);
         }
         divpd(v_dst, op);
     }
@@ -360,7 +373,8 @@ void JitKernelBase::uni_vroundpd(const Xbyak::Xmm& v_dst, const Xbyak::Operand& 
     }
 }
 
-void JitKernelBase::uni_vcvtdq2pd(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op) {
+void JitKernelBase::uni_vcvtdq2pd(const Xbyak::Xmm& v_dst,
+                                  const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx)) {
         vcvtdq2pd(v_dst, op);
     } else {
@@ -368,7 +382,8 @@ void JitKernelBase::uni_vcvtdq2pd(const Xbyak::Xmm& v_dst, const Xbyak::Operand&
     }
 }
 
-void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op) {
+void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm& v_dst,
+                                  const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx)) {
         vcvtpd2dq(v_dst, op);
     } else {
@@ -376,11 +391,26 @@ void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm& v_dst, const Xbyak::Operand&
     }
 }
 
-void JitKernelBase::uni_vpmovzxdq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op) {
+void JitKernelBase::uni_vpmovzxdq(const Xbyak::Xmm& v_dst,
+                                  const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx)) {
         vpmovzxdq(v_dst, op);
     } else {
         pmovzxdq(v_dst, op);
+    }
+}
+
+void JitKernelBase::uni_vshufpd(const Xbyak::Xmm& v_dst,
+                                const Xbyak::Xmm& v_src,
+                                const Xbyak::Operand& op,
+                                uint8_t imm) {
+    if (isValidIsa(x64::avx)) {
+        vshufpd(v_dst, v_src, op, imm);
+    } else {
+        if (v_dst.getIdx() != v_src.getIdx()) {
+            movups(v_dst, v_src);
+        }
+        shufpd(v_dst, op, imm);
     }
 }
 

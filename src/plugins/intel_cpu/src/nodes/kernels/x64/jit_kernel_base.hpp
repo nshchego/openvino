@@ -45,6 +45,8 @@ public:
 
     void uni_vsubpd(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src, const Xbyak::Operand& op);
 
+    void uni_vmulpd(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src, const Xbyak::Operand& op);
+
     void uni_vpmuludq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& op_1, const Xbyak::Operand& op_2);
 
     void uni_vdivps(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
@@ -84,6 +86,8 @@ public:
     void uni_vcvtpd2dq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op);
 
     void uni_vpmovzxdq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op);
+
+    void uni_vshufpd(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_srs, const Xbyak::Operand& op, uint8_t imm);
 
     void gatherdd(const Xbyak::Xmm&    vDst,
                   const Xbyak::Reg64&  rSrcPtr,
