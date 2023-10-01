@@ -35,15 +35,21 @@ public:
 
     void uni_vpaddd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
+    void uni_vpaddq(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op);
+
     void uni_vpsubd(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrc, const Xbyak::Operand& op) {
         jit_generator::uni_vpsubd(vDst, vSrc, op);
     }
 
     void uni_vpsubd(const Xbyak::Ymm& vDst, const Xbyak::Ymm& vSrc, const Xbyak::Operand& op);
 
+    void uni_vsubpd(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src, const Xbyak::Operand& op);
+
     void uni_vpmuludq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& op_1, const Xbyak::Operand& op_2);
 
     void uni_vdivps(const Xbyak::Xmm& vDst, const Xbyak::Operand& op1, const Xbyak::Operand& op2);
+
+    void uni_vdivpd(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src, const Xbyak::Operand& op2);
 
     void uni_vandps(const Xbyak::Xmm& vDst, const Xbyak::Xmm& vSrs, const Xbyak::Operand &op);
 
@@ -68,6 +74,16 @@ public:
     void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op);
 
     void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op);
+
+    void uni_vpbroadcastq(const Xbyak::Xmm &x, const Xbyak::Operand &op);
+
+    void uni_vroundpd(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op, const uint8_t imm);
+
+    void uni_vcvtdq2pd(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op);
+
+    void uni_vcvtpd2dq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op);
+
+    void uni_vpmovzxdq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op);
 
     void gatherdd(const Xbyak::Xmm&    vDst,
                   const Xbyak::Reg64&  rSrcPtr,
@@ -204,10 +220,10 @@ public:
                 res.reset(new KernelT<ISA>(jcp));    \
             }
 
-if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
-            // if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
-            // else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
-            // else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
+// if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
+            if IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
+            else if IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
+            else if IF_ISA_CASE(dnnl::impl::cpu::x64::sse41)
 
 #undef IF_ISA_CASE
 

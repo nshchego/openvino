@@ -49,6 +49,7 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> r64_convert_0;
     RegistersPool::Reg<Xbyak::Reg64> r64_convert_1;
     RegistersPool::Reg<Xbyak::Reg64> r64_min;
+    RegistersPool::Reg<Xbyak::Reg64> r64_f64_pow_52;
 
     const Xbyak::Reg64 regParams = Xbyak::Reg64(dnnl::impl::cpu::x64::abi_param_regs[0]);
 
@@ -59,19 +60,13 @@ private:
     RegistersPool::Reg<Vmm> v_add_up_k;
     RegistersPool::Reg<Vmm> v_convert_0;
     RegistersPool::Reg<Vmm> v_convert_1;
-    // RegistersPool::Reg<Vmm> v_one;
     RegistersPool::Reg<Vmm> v_n_inc;
-
     RegistersPool::Reg<Vmm> v_key_64;
     RegistersPool::Reg<Vmm> v_counter_64;
     RegistersPool::Reg<Vmm> v_n_64;
     RegistersPool::Reg<Vmm> v_min;
-    RegistersPool::Reg<Vmm> v_max_min;
-    // RegistersPool::Reg<Vmm> v_sep_perm;
-    // RegistersPool::Reg<Vmm> v_sep_perm_1;
-    // RegistersPool::Reg<Vmm> v_sep_perm_2;
+    RegistersPool::Reg<Vmm> v_range;
     RegistersPool::Reg<Vmm> v_res_perm;
-    // RegistersPool::Reg<Vmm> v_res_perm_1;
 
     void initVectors();
 

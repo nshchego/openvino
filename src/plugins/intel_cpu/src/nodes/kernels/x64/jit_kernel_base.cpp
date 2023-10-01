@@ -97,6 +97,19 @@ void JitKernelBase::uni_vpaddd(const Xbyak::Ymm& vDst,
     }
 }
 
+void JitKernelBase::uni_vpaddq(const Xbyak::Xmm& vDst,
+                               const Xbyak::Xmm& vSrc,
+                               const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx2)) {
+        vpaddq(vDst, vSrc, op);
+    } else {
+        if (vDst.getIdx() != vSrc.getIdx()) {
+            movups(vDst, vSrc);
+        }
+        paddq(vDst, op);
+    }
+}
+
 void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
                                const Xbyak::Ymm& vSrc,
                                const Xbyak::Operand& op) {
@@ -131,14 +144,29 @@ void JitKernelBase::uni_vpsubd(const Xbyak::Ymm& vDst,
     }
 }
 
-void JitKernelBase::uni_vpmuludq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& op_1, const Xbyak::Operand& op_2) {
+void JitKernelBase::uni_vsubpd(const Xbyak::Xmm& v_dst,
+                               const Xbyak::Xmm& v_src,
+                               const Xbyak::Operand& op) {
     if (isValidIsa(x64::avx)) {
-        vpmuludq(v_dst, op_1, op_2);
+        vsubpd(v_dst, v_src, op);
     } else {
-        if (v_dst.getIdx() != op_1.getIdx()) {
-            movups(v_dst, op_1);
+        if (v_dst.getIdx() != v_src.getIdx()) {
+            movups(v_dst, v_src);
         }
-        pmuludq(v_dst, op_2);
+        subpd(v_dst, op);
+    }
+}
+
+void JitKernelBase::uni_vpmuludq(const Xbyak::Xmm& v_dst,
+                                 const Xbyak::Xmm& v_src,
+                                 const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx)) {
+        vpmuludq(v_dst, v_src, op);
+    } else {
+        if (v_dst.getIdx() != v_src.getIdx()) {
+            movups(v_dst, v_src);
+        }
+        pmuludq(v_dst, op);
     }
 }
 
@@ -152,6 +180,19 @@ void JitKernelBase::uni_vdivps(const Xbyak::Xmm& vDst,
             movups(vDst, op1);
         }
         divps(vDst, op2);
+    }
+}
+
+void JitKernelBase::uni_vdivpd(const Xbyak::Xmm& v_dst,
+                               const Xbyak::Xmm& v_src,
+                               const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx)) {
+        vdivpd(v_dst, v_src, op);
+    } else {
+        if (v_dst.getIdx() != v_src.getIdx()) {
+            vdivpd(v_dst, v_src);
+        }
+        divpd(v_dst, op);
     }
 }
 
@@ -267,6 +308,15 @@ void JitKernelBase::gatherdd(const Xbyak::Ymm&   vDst,
     }
 }
 
+void JitKernelBase::uni_vpbroadcastq(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+    if (isValidIsa(x64::avx2)) {
+        vpbroadcastq(x, op);
+    } else {
+        movsd(x, op);
+        shufpd(x, x, 0x0);
+    }
+}
+
 void JitKernelBase::uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
     if (isValidIsa(x64::avx2)) {
         vpbroadcastd(x, op);
@@ -297,6 +347,40 @@ void JitKernelBase::uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &
             vinsertf128(x, x, t, 1);
             vshufps(x, x, x, 0);
         }
+    }
+}
+
+void JitKernelBase::uni_vroundpd(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op, const uint8_t imm) {
+    if (isValidIsa(x64::avx512_core)) {
+        vrndscalepd(v_dst, op, imm & 0x3);
+    } else if (isValidIsa(x64::avx)) {
+        vroundpd(v_dst, op, imm);
+    } else {
+        roundpd(v_dst, op, imm);
+    }
+}
+
+void JitKernelBase::uni_vcvtdq2pd(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx)) {
+        vcvtdq2pd(v_dst, op);
+    } else {
+        cvtdq2pd(v_dst, op);
+    }
+}
+
+void JitKernelBase::uni_vcvtpd2dq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx)) {
+        vcvtpd2dq(v_dst, op);
+    } else {
+        cvtpd2dq(v_dst, op);
+    }
+}
+
+void JitKernelBase::uni_vpmovzxdq(const Xbyak::Xmm& v_dst, const Xbyak::Operand& op) {
+    if (isValidIsa(x64::avx)) {
+        vpmovzxdq(v_dst, op);
+    } else {
+        pmovzxdq(v_dst, op);
     }
 }
 
