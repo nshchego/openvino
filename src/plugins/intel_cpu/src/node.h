@@ -41,8 +41,7 @@
 #include "nodes/executors/mvn_list.hpp"
 #include "nodes/executors/executor.hpp"
 
-#define THROW_CPU_NODE_ERR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
-// #define THROW_CPU_NODE_ERR IE_THROW() << getTypeStr() << " node with name '" << getName() << "' "
+#define THROW_CPU_NODE_ERR(...) OPENVINO_THROW(getTypeStr(), " node with name '", getName(), "' ", __VA_ARGS__)
 
 namespace ov {
 namespace intel_cpu {

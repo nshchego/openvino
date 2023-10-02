@@ -32,7 +32,7 @@ RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphCon
         : Node(op, context, RandomUniformShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
-        IE_THROW(NotImplemented) << errorMessage;
+        THROW_CPU_NODE_ERR(errorMessage);
     }
 
     // RandomUniform should generate new sequence each run even if all inputs are constants. So that method Node::IsConstant()
@@ -71,10 +71,10 @@ std::cout << "[CPU] RandomUniform::RandomUniform m_max_val: " << m_max_val.f32 <
 
 void RandomUniform::getSupportedDescriptors() {
     if (getParentEdges().size() != 3) {
-        THROW_CPU_NODE_ERR << "has incorrect number of input edges.";
+        THROW_CPU_NODE_ERR("has incorrect number of input edges.");
     }
     if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR << "has incorrect number of output edges.";
+        THROW_CPU_NODE_ERR("has incorrect number of output edges.");
     }
 }
 
@@ -199,7 +199,7 @@ void RandomUniform::execute(dnnl::stream strm) {
     } else if (m_algo == STL) {
         computeStl(dstMemPtr->getData(), out_el_num);
     } else {
-        THROW_CPU_NODE_ERR << "unsupported algorithm.";
+        THROW_CPU_NODE_ERR("unsupported algorithm.");
     }
 }
 
@@ -431,7 +431,7 @@ std::pair<uint64_t, uint64_t> RandomUniform::computePhilox(void* out, size_t out
                                                         return static_cast<int64_t>(uniteHighLow(b, a) % (mx - mn) + mn);
                                                     });
                     } break;
-                    default: OPENVINO_THROW("Unsupported type of RandomUniform: ", m_output_prc.to_string());
+                    default: THROW_CPU_NODE_ERR("Unsupported type of RandomUniform: ", m_output_prc.to_string());
                 }
 
                 if (++n == 0) {
@@ -478,7 +478,7 @@ void RandomUniform::computeStl(void* out, size_t work_amount) {
                     std::uniform_real_distribution<double>{m_min_val.f64, m_max_val.f64}, out, work_amount);
         } break;
         default:
-            THROW_CPU_NODE_ERR << "has unsupported output type: " << m_output_prc;
+            THROW_CPU_NODE_ERR("has unsupported output type: ", m_output_prc);
     }
 }
 
@@ -506,7 +506,7 @@ void RandomUniform::initEdgeValues(OutputType& dst, const void* src, const eleme
         EL_CASE(i64)
         EL_CASE(f64)
         default:
-            THROW_CPU_NODE_ERR << "has unsupported output precision: " << output_type;
+            THROW_CPU_NODE_ERR("has unsupported output precision: ", output_type);
     }
 
 #undef EL_CASE
