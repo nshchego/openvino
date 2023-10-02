@@ -86,7 +86,6 @@ protected:
         m_max_val = std::get<1>(min_max);
         std::tie(inFmts, outFmts, priority, selectedType) = cpu_params;
 
-// configuration.insert({InferenceEngine::PluginConfigParams::KEY_ENFORCE_BF16, InferenceEngine::PluginConfigParams::YES});
         if (output_prc == ElementType::i64) {
             updateSelectedType(getPrimitiveType(), ElementType::i32, configuration);
         } else if (output_prc == ElementType::f64) {
@@ -105,6 +104,7 @@ protected:
         } else {
             updateSelectedType(getPrimitiveType(), output_prc, configuration);
         }
+// updateSelectedType("ref_any", output_prc, configuration);
 
         std::vector<InputShape> in_shapes;
         ov::ParameterVector in_params;

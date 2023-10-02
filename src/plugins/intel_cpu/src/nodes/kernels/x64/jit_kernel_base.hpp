@@ -218,7 +218,7 @@ public:
     static std::shared_ptr<JitKernel<CompileParams, CallArgs>> createInstance(const CompileParams& jcp) {
         std::shared_ptr<JitKernel<CompileParams, CallArgs>> res;
 
-        // try {
+        try {
 #define IF_ISA_CASE(ISA)                             \
             (dnnl::impl::cpu::x64::mayiuse(ISA)) {   \
                 res.reset(new KernelT<ISA>(jcp));    \
@@ -234,9 +234,9 @@ public:
             if (res) {
                 res->create_kernel();
             }
-        // } catch (...) {
-        //     return nullptr;
-        // }
+        } catch (...) {
+            return nullptr;
+        }
 
         return res;
     }

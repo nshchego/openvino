@@ -33,6 +33,8 @@ public:
 
     bool needPrepareParams() const override;
 
+    void prepareParams() override;
+
     void execute(dnnl::stream strm) override;
 
     void executeDynamicImpl(dnnl::stream strm) override;
@@ -53,8 +55,9 @@ protected:
     bool needShapeInfer() const override;
 
 private:
-    void computeOnnx(void* out, size_t work_amount);
-    std::pair<uint64_t, uint64_t> computeTf(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
+    void computeStl(void* out, size_t work_amount);
+
+    std::pair<uint64_t, uint64_t> computePhilox(void* out, size_t work_amount, const std::pair<uint64_t, uint64_t>& prev_state);
 
     template <typename T, typename DISTR_TYPE>
     void generateData(DISTR_TYPE distribution, void* out, size_t work_amount);
@@ -64,22 +67,35 @@ private:
     void initEdgeValues(OutputType& dst, const void* src, const element::Type& output_type);
 
     enum { SHAPE = 0, MIN_VAL, MAX_VAL };
-    enum AlgoType { ONNX, TF };
+    enum AlgoType { STL, PHILOX };
 
     bool m_const_inputs[3] = {false, false, false};
 
-    ov::element::Type m_shape_prc;
+    // ov::element::Type m_shape_prc;
     ov::element::Type m_output_prc;
     uint64_t m_global_seed = 0;
     uint64_t m_op_seed = 0;
     std::pair<uint64_t, uint64_t> m_state {0llu, 0llu};
 
-    VectorDims m_out_shape;
+    VectorDims m_out_shape = {};
     OutputType m_min_val;
     OutputType m_max_val;
-    AlgoType m_algo = TF;
+    AlgoType m_algo = PHILOX;
 
     std::default_random_engine m_generator;
+
+    struct ThreadParams {
+        uint64_t work_amount = 0lu;
+        uint64_t dst_shift = 0lu;
+        uint64_t n_shift = 0lu;
+
+        uint64_t start = 0lu;
+        uint64_t end = 0lu;
+        uint64_t step = 0lu;
+    };
+
+    uint64_t m_threads_num = 0lu;
+    std::vector<ThreadParams> m_thread_params;
 
     ///// PHILOX constants /////
 
