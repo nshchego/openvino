@@ -121,9 +121,6 @@ void RandomUniform::createPrimitive() {
             }
         }
 #endif // OPENVINO_ARCH_X86_64
-
-        m_threads_num = parallel_get_max_threads();
-        m_thread_params.resize(m_threads_num);
     }
 
     if (m_const_inputs[SHAPE]) {
@@ -141,6 +138,13 @@ bool RandomUniform::needPrepareParams() const {
 void RandomUniform::prepareParams() {
     m_out_shape = getChildEdgeAt(0)->getMemoryPtr()->getShape().getStaticDims();
     const auto out_el_num = std::accumulate(m_out_shape.begin(), m_out_shape.end(), 1lu, std::multiplies<Dim>());
+
+    if (out_el_num < PHILOX_PARALLEL_EXECUTION_THRESHOLD) {
+        m_threads_num = 1;
+    } else {
+        m_threads_num = parallel_get_max_threads();
+    }
+    m_thread_params.resize(m_threads_num);
 
     parallel_nt(m_threads_num, [&](const int ithr, const int nthr) {
         auto& p = m_thread_params[ithr];

@@ -106,6 +106,7 @@ private:
     // Philox algorithm returns 4 elements of RNG sequence per each invocation
     static constexpr size_t PHILOX_GROUP_SIZE = 4;
 
+    // Output elements number threshold to execute on one thread.
     static constexpr size_t PHILOX_PARALLEL_EXECUTION_THRESHOLD = 1000;
     /////////////////////////////////////////////////////////////////////////////////
 

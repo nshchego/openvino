@@ -231,6 +231,17 @@ case P :                                                                        
 #undef CASE
     }
 
+    precisions_map get_ref_precisions_convert_map() override {
+        precisions_map precisions = {
+            { ov::element::f16, ov::element::f32 }
+        };
+        if (!InferenceEngine::with_cpu_x86_avx512_core()) {
+            precisions.insert({ ov::element::bf16, ov::element::f32 });
+        }
+
+        return precisions;
+    }
+
     inline double less_or_equal(double a, double b) {
         return (b - a) >= (std::fmax(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
     }
