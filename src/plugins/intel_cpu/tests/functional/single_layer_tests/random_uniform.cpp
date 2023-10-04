@@ -29,7 +29,7 @@ class RandomUniformLayerTestCPU : public testing::WithParamInterface<RandomUnifo
                                   public SubgraphBaseTest, public CPUTestUtils::CPUTestsBase {
 public:
     static std::string getTestCaseName(const testing::TestParamInfo<RandomUniformLayerTestCPUParamSet>& obj) {
-        const auto& out_sahpe        = std::get<0>(obj.param);
+        const auto& out_shape        = std::get<0>(obj.param);
         const auto& min_max          = std::get<1>(obj.param);
         const auto& shape_prc        = std::get<2>(obj.param);
         const auto& output_prc       = std::get<3>(obj.param);
@@ -42,19 +42,19 @@ public:
         const auto& cpu_params       = std::get<10>(obj.param);
 
         std::ostringstream result;
-        result << "IS={" << out_sahpe.size();
-        result << "}_OS=" << out_sahpe;
+        result << "IS={" << out_shape.size();
+        result << "}_OS=" << out_shape;
         result << "_Min=" << std::get<0>(min_max);
         result << "_Max=" << std::get<1>(min_max);
         result << "_ShapePrc=" << shape_prc;
         result << "_OutPrc=" << output_prc;
         result << "_GlobalSeed=" << global_seed;
         result << "_OperationalSeed=" << operational_seed;
-        result << "_ConstIn={" << (const_in_1 ? "True," : "False,") << (const_in_2 ? "True," : "False,") << (const_in_3 ? "True}" : "False}");
+        result << "_ConstIn={" << utils::bool2str(const_in_1) << "," << utils::bool2str(const_in_2) << "," << utils::bool2str(const_in_3) << "}";
         result << CPUTestsBase::getTestCaseName(cpu_params);
 
         if (!config.empty()) {
-            result << "_PluginConf{";
+            result << "_PluginConf={";
             for (const auto& conf_item : config) {
                 result << "_" << conf_item.first << "=";
                 conf_item.second.print(result);
