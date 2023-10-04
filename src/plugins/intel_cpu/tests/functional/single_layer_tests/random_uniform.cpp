@@ -337,8 +337,6 @@ const std::vector<uint64_t> operational_seed = {
         0, 3, 5
 };
 
-const ov::AnyMap empty_plugin_config{};
-
 INSTANTIATE_TEST_SUITE_P(smoke_Param, RandomUniformLayerTestCPU,
         ::testing::Combine(
                 ::testing::ValuesIn(output_shapes),

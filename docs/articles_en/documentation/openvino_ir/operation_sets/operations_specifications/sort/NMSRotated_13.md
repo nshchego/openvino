@@ -27,14 +27,14 @@ The general algorithm is described below:
 
 Here ``func(rotated_iou(b_i, b)) = 1 if rotated_iou(b_i, b) <= iou_threshold else 0``.
 
-Having two bouding boxes ``B1`` and ``B2`` the following steps are performed to calculate ``rotated_iou(B1, B2)``:
+Having two bounding boxes ``B1`` and ``B2`` the following steps are performed to calculate ``rotated_iou(B1, B2)``:
 
 1. Calculate rotated vertices, (x, y) coordinates of the 4 corners of each box transformed by the corresponding angle in radians according to the direction specified by the *clockwise* attribute.
 2. Find all intersection points between edges of ``B1`` and ``B2``. Add them to the ``intersection_points``.
 3. Find all corners of ``B1`` within area of ``B2``, and all corners of ``B2`` within area of ``B1``. Add them to the ``intersection_points``.
 4. Calculate ``intersection_area`` of the polygon described by ``intersection_points`` (see Sholeace formula).
 5. Calculate ``union_area`` (the common area of ``B1`` and ``B2``), `union_area = (B1_area + B2_area) - intersection_area`.
-6. Return intersection over union ``rotated_iou = intersection_area / (union_area - intersection_area)``.
+6. Return intersection over union ``rotated_iou = intersection_area / union_area``.
 
 
 This algorithm is applied independently to each class of each batch element. The total number of output boxes for each class must not exceed ``max_output_boxes_per_class``.
