@@ -19,6 +19,25 @@ enum NMSCandidateStatus {
     UPDATED = 2
 };
 
+struct Point2D {
+    float x, y;
+    Point2D(const float px = 0.f, const float py = 0.f) : x(px), y(py) {}
+    Point2D operator+(const Point2D& p) const {
+        return Point2D(x + p.x, y + p.y);
+    }
+    Point2D& operator+=(const Point2D& p) {
+        x += p.x;
+        y += p.y;
+        return *this;
+    }
+    Point2D operator-(const Point2D& p) const {
+        return Point2D(x - p.x, y - p.y);
+    }
+    Point2D operator*(const float coeff) const {
+        return Point2D(x * coeff, y * coeff);
+    }
+};
+
 
 class NonMaxSuppression : public Node {
 public:
@@ -78,7 +97,8 @@ private:
 
     float intersectionOverUnion(const float *boxesI, const float *boxesJ);
 
-    float rotatedIntersectionOverUnion(const float *boxesI, const float *boxesJ);
+    float rotatedIntersectionOverUnion(const Point2D (&vertices_0)[4], const float area_0, const float* box_1);
+    float rotatedIntersectionOverUnion_2(const float *boxesI, const float *boxesJ);
 
     void nmsWithSoftSigma(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
                 const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
@@ -131,8 +151,7 @@ private:
     const std::string inType = "input";
     const std::string outType = "output";
 
-    std::shared_ptr<JitKernelBase> m_nms_kernel;
-    std::shared_ptr<JitKernelBase> m_nms_rotated_kernel;
+    std::shared_ptr<JitKernelBase> m_jit_kernel;
 };
 
 }   // namespace node
