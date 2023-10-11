@@ -15,7 +15,7 @@ namespace intel_cpu {
 namespace kernel {
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::generate() {
+void NonMaxSuppression<isa>::generate() {
     load_vector_emitter.reset(new jit_load_emitter(this, isa, Precision::FP32, Precision::FP32, vector_step));
     load_scalar_emitter.reset(new jit_load_emitter(this, isa, Precision::FP32, Precision::FP32, scalar_step));
 
@@ -55,7 +55,7 @@ void jit_uni_nms_kernel_f32<isa>::generate() {
     uni_vbroadcastss(vmm_candidate_coord2, ptr[reg_candidate_box + 2 * sizeof(float)]);
     uni_vbroadcastss(vmm_candidate_coord3, ptr[reg_candidate_box + 3 * sizeof(float)]);
 
-    if (jcp.box_encode_type == NMSBoxEncodeType::CORNER) {
+    if (m_jcp.box_encode_type == NMSBoxEncodeType::CORNER) {
         // box format: y1, x1, y2, x2
         uni_vminps(vmm_temp1, vmm_candidate_coord0, vmm_candidate_coord2);
         uni_vmaxps(vmm_temp2, vmm_candidate_coord0, vmm_candidate_coord2);
@@ -119,7 +119,7 @@ void jit_uni_nms_kernel_f32<isa>::generate() {
 
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::hard_nms() {
+void NonMaxSuppression<isa>::hard_nms() {
     Xbyak::Label main_loop_label_hard;
     Xbyak::Label main_loop_end_label_hard;
     Xbyak::Label tail_loop_label_hard;
@@ -178,7 +178,7 @@ void jit_uni_nms_kernel_f32<isa>::hard_nms() {
 }
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::soft_nms() {
+void NonMaxSuppression<isa>::soft_nms() {
     uni_vbroadcastss(vmm_scale, ptr[reg_scale]);
 
     Xbyak::Label main_loop_label;
@@ -203,7 +203,7 @@ void jit_uni_nms_kernel_f32<isa>::soft_nms() {
         sub(reg_boxes_num, vector_step);
 
         // soft suppressed by iou_threshold
-        if (jcp.is_soft_suppressed_by_iou) {
+        if (m_jcp.is_soft_suppressed_by_iou) {
             suppressed_by_iou(false);
 
             // if zero continue soft suppression, else set result to suppressed and terminate
@@ -254,7 +254,7 @@ void jit_uni_nms_kernel_f32<isa>::soft_nms() {
         sub(reg_boxes_num, scalar_step);
 
         // soft suppressed by iou_threshold
-        if (jcp.is_soft_suppressed_by_iou) {
+        if (m_jcp.is_soft_suppressed_by_iou) {
             suppressed_by_iou(true);
 
             jz(tail_loop_label_soft, T_NEAR);
@@ -289,7 +289,7 @@ void jit_uni_nms_kernel_f32<isa>::soft_nms() {
 }
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::suppressed_by_iou(bool is_scalar) {
+void NonMaxSuppression<isa>::suppressed_by_iou(bool is_scalar) {
     if (x64::mayiuse(x64::avx512_core)) {
         vcmpps(k_mask, vmm_temp3, vmm_iou_threshold, 0x0D); // _CMP_GE_OS. vcmpps w/ kmask only on V5
         if (is_scalar)
@@ -323,7 +323,7 @@ void jit_uni_nms_kernel_f32<isa>::suppressed_by_iou(bool is_scalar) {
 }
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::suppressed_by_score() {
+void NonMaxSuppression<isa>::suppressed_by_score() {
     if (x64::mayiuse(x64::avx512_core)) {
         vcmpps(k_mask, vmm_temp3, vmm_score_threshold, 0x02); // vcmpps w/ kmask only on V5, w/o kmask version N/A on V5
         kandw(k_mask, k_mask, k_mask_one);
@@ -340,7 +340,7 @@ void jit_uni_nms_kernel_f32<isa>::suppressed_by_score() {
 }
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::iou(int ele_num) {
+void NonMaxSuppression<isa>::iou(int ele_num) {
     auto load = [&](Xbyak::Reg64 reg_src, Vmm vmm_dst) {
         if (ele_num != scalar_step && ele_num != vector_step)
             OPENVINO_THROW("NMS JIT implementation supports load emitter with only element count scalar_step or vector_step! Get: ", ele_num);
@@ -354,7 +354,7 @@ void jit_uni_nms_kernel_f32<isa>::iou(int ele_num) {
     load(reg_boxes_coord2, vmm_boxes_coord2);
     load(reg_boxes_coord3, vmm_boxes_coord3);
 
-    if (jcp.box_encode_type == NMSBoxEncodeType::CORNER) {
+    if (m_jcp.box_encode_type == NMSBoxEncodeType::CORNER) {
         // box format: y1, x1, y2, x2
         uni_vminps(vmm_temp1, vmm_boxes_coord0, vmm_boxes_coord2);
         uni_vmaxps(vmm_temp2, vmm_boxes_coord0, vmm_boxes_coord2);
@@ -415,14 +415,14 @@ void jit_uni_nms_kernel_f32<isa>::iou(int ele_num) {
 
 // std::exp(scale * iou * iou)
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::soft_coeff() {
+void NonMaxSuppression<isa>::soft_coeff() {
     uni_vmulps(vmm_temp3, vmm_temp3, vmm_temp3);
     uni_vmulps(vmm_temp3, vmm_temp3, vmm_scale);
     exp_injector->compute_vector_range(vmm_temp3.getIdx(), vmm_temp3.getIdx() + 1);
 }
 
 template <x64::cpu_isa_t isa>
-void jit_uni_nms_kernel_f32<isa>::horizontal_mul_xmm(const Xbyak::Xmm &xmm_weight, const Xbyak::Xmm &xmm_aux) {
+void NonMaxSuppression<isa>::horizontal_mul_xmm(const Xbyak::Xmm &xmm_weight, const Xbyak::Xmm &xmm_aux) {
     uni_vmovshdup(xmm_aux, xmm_weight);              //  weight:1,2,3,4; aux:2,2,4,4
     uni_vmulps(xmm_weight, xmm_weight, xmm_aux);     //  weight:1*2,2*2,3*4,4*4
     uni_vmovhlps(xmm_aux, xmm_aux, xmm_weight);      //  aux:3*4,4*4,4,4
@@ -431,7 +431,7 @@ void jit_uni_nms_kernel_f32<isa>::horizontal_mul_xmm(const Xbyak::Xmm &xmm_weigh
 
 // horizontal mul for vmm_weight(Vmm(3)), temp1 and temp2 as aux
 template <x64::cpu_isa_t isa>
-inline void jit_uni_nms_kernel_f32<isa>::horizontal_mul() {
+inline void NonMaxSuppression<isa>::horizontal_mul() {
     Xbyak::Xmm xmm_weight = Xbyak::Xmm(vmm_temp3.getIdx());
     Xbyak::Xmm xmm_temp1 = Xbyak::Xmm(vmm_temp1.getIdx());
     Xbyak::Xmm xmm_temp2 = Xbyak::Xmm(vmm_temp2.getIdx());
@@ -456,9 +456,9 @@ inline void jit_uni_nms_kernel_f32<isa>::horizontal_mul() {
     }
 }
 
-template class jit_uni_nms_kernel_f32<x64::avx512_core>;
-template class jit_uni_nms_kernel_f32<x64::avx2>;
-template class jit_uni_nms_kernel_f32<x64::sse41>;
+template class NonMaxSuppression<x64::avx512_core>;
+template class NonMaxSuppression<x64::avx2>;
+template class NonMaxSuppression<x64::sse41>;
 
 }   // namespace kernel
 }   // namespace intel_cpu

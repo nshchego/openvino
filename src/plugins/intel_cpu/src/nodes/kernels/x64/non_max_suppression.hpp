@@ -10,14 +10,15 @@
 
 namespace ov {
 namespace intel_cpu {
-namespace kernel {
-
-#define BOX_COORD_NUM 4
 
 enum class NMSBoxEncodeType {
     CORNER,
     CENTER
 };
+
+#if defined(OPENVINO_ARCH_X86_64)
+
+namespace kernel {
 
 struct NmsCompileParams {
     NMSBoxEncodeType box_encode_type;
@@ -25,7 +26,7 @@ struct NmsCompileParams {
 };
 
 struct NmsCallArgs {
-    const void* selected_boxes_coord[BOX_COORD_NUM];
+    const void* selected_boxes_coord[4];
     size_t selected_boxes_num;
     const void* candidate_box;
     const void* iou_threshold;
@@ -36,33 +37,13 @@ struct NmsCallArgs {
     void* score;
 };
 
-struct jit_uni_nms_kernel {
-    void (*ker_)(const NmsCallArgs *);
-
-    void operator()(const NmsCallArgs *args) {
-        assert(ker_);
-        ker_(args);
-    }
-
-    explicit jit_uni_nms_kernel(NmsCompileParams jcp_) : ker_(nullptr), jcp(jcp_) {}
-    virtual ~jit_uni_nms_kernel() {}
-
-    virtual void create_ker() = 0;
-
-    NmsCompileParams jcp;
-};
-
 
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
-struct jit_uni_nms_kernel_f32 : public jit_uni_nms_kernel, public dnnl::impl::cpu::x64::jit_generator {
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_nms_kernel_f32)
+class NonMaxSuppression : public JitKernel<NmsCompileParams, NmsCallArgs> {
+public:
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(NonMaxSuppression)
 
-    explicit jit_uni_nms_kernel_f32(NmsCompileParams jcp_) : jit_uni_nms_kernel(jcp_), dnnl::impl::cpu::x64::jit_generator(jit_name()) {}
-
-    void create_ker() override {
-        dnnl::impl::cpu::x64::jit_generator::create_kernel();
-        ker_ = (decltype(ker_))jit_ker();
-    }
+    explicit NonMaxSuppression(const NmsCompileParams& jcp) : JitKernel(jit_name(), jcp, isa) {}
 
     void generate() override;
 
@@ -161,5 +142,8 @@ private:
 };
 
 }   // namespace kernel
+
+#endif // OPENVINO_ARCH_X86_64
+
 }   // namespace intel_cpu
 }   // namespace ov

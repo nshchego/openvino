@@ -81,10 +81,13 @@ private:
     float rotatedIntersectionOverUnion(const float *boxesI, const float *boxesJ);
 
     void nmsWithSoftSigma(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
-                          const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
+                const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
 
     void nmsWithoutSoftSigma(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
-                             const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
+                const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
+
+    void nmsRotated(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
+                const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
 
     void checkPrecision(const InferenceEngine::Precision& prec,
                         const std::vector<InferenceEngine::Precision>& precList,
@@ -104,9 +107,11 @@ private:
     void createJitKernel();
 
 
-    kernel::NMSBoxEncodeType boxEncodingType = kernel::NMSBoxEncodeType::CORNER;
+    NMSBoxEncodeType boxEncodingType = NMSBoxEncodeType::CORNER;
     bool m_sort_result_descending = true;
     bool m_clockwise = false;
+    bool m_rotated_boxes = false;
+    size_t m_coord_num = 1lu;
 
     size_t m_batches_num = 0lu;
     size_t m_boxes_num = 0lu;
@@ -122,17 +127,12 @@ private:
 
     bool m_outStaticShape = false;
 
-    std::vector<std::vector<size_t>> numFiltBox;
+    std::vector<std::vector<size_t>> m_num_filtered_boxes;
     const std::string inType = "input";
     const std::string outType = "output";
 
-    bool m_rotated_boxes = false;
-    size_t m_coord_num = 1lu;
-
-    std::shared_ptr<kernel::jit_uni_nms_kernel> m_nms_kernel;
-
-    using NmsRotatedKernel = kernel::JitKernel<kernel::NmsRotatedCompileParams, kernel::NmsRotatedCallArgs>;
-    std::shared_ptr<NmsRotatedKernel> m_nms_rotated_kernel;
+    std::shared_ptr<JitKernelBase> m_nms_kernel;
+    std::shared_ptr<JitKernelBase> m_nms_rotated_kernel;
 };
 
 }   // namespace node

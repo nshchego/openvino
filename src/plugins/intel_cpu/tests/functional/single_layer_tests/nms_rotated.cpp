@@ -121,11 +121,11 @@ protected:
 #define CREATE_INPUT(C, P, S, N, H, L)                                                                                         \
         if (C) {                                                                                                               \
             switch (P) {                                                                                                       \
-                CONST_CASE(ElementType::f32, S.second[0], H, L)                                                                \
-                CONST_CASE(ElementType::f16, S.second[0], H, L)                                                                \
+                CONST_CASE(ElementType::f32,  S.second[0], H, L)                                                               \
+                CONST_CASE(ElementType::f16,  S.second[0], H, L)                                                               \
                 CONST_CASE(ElementType::bf16, S.second[0], H, L)                                                               \
-                CONST_CASE(ElementType::i32, S.second[0], H, L)                                                                \
-                CONST_CASE(ElementType::i64, S.second[0], H, L)                                                                \
+                CONST_CASE(ElementType::i32,  S.second[0], H, L)                                                               \
+                CONST_CASE(ElementType::i64,  S.second[0], H, L)                                                               \
             }                                                                                                                  \
         } else {                                                                                                               \
             actual_shapes.push_back(S);                                                                                        \
@@ -265,6 +265,12 @@ static const std::vector<std::vector<InputShape>> input_shapes = {
     }
 };
 
+static const std::vector<InputShape> input_shapes_nightly_dyn = {
+    {
+        { {-1, -1,  5}, {{7, 35, 5},  {7, 35,  5},  {7, 35,  5}} },
+        { {-1, -1, -1}, {{7, 30, 35}, {7, 100, 35}, {7, 133, 35}} }
+    }
+};
 
 INSTANTIATE_TEST_SUITE_P(smoke_, NmsRotatedLayerTestCPU,
         ::testing::Combine(
@@ -287,9 +293,30 @@ INSTANTIATE_TEST_SUITE_P(smoke_, NmsRotatedLayerTestCPU,
                 ::testing::Values(empty_plugin_config)),    // Additional plugin configuration
         NmsRotatedLayerTestCPU::getTestCaseName);
 
-INSTANTIATE_TEST_SUITE_P(nightly_, NmsRotatedLayerTestCPU,
+INSTANTIATE_TEST_SUITE_P(nightly_Static, NmsRotatedLayerTestCPU,
         ::testing::Combine(
-                ::testing::ValuesIn(input_shapes),
+                ::testing::Values(input_shapes[0], input_shapes[1], input_shapes[2], input_shapes[3]),
+                ::testing::Values(ElementType::f16, ElementType::bf16),
+                ::testing::Values(ElementType::i64),
+                ::testing::Values(ElementType::f16, ElementType::bf16),
+                ::testing::Values(ElementType::i64),
+                ::testing::Values(10),
+                ::testing::Values(0.5f),
+                ::testing::Values(0.4f),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
+                ::testing::Values(true, false),
+                ::testing::Values(true),
+                ::testing::Values(true),
+                ::testing::Values(true),
+                ::testing::Values(emptyCPUSpec),
+                ::testing::Values(empty_plugin_config)),
+        NmsRotatedLayerTestCPU::getTestCaseName);
+
+INSTANTIATE_TEST_SUITE_P(nightly_Dynamic, NmsRotatedLayerTestCPU,
+        ::testing::Combine(
+                ::testing::Values(input_shapes_nightly_dyn),
                 ::testing::Values(ElementType::f16, ElementType::bf16),
                 ::testing::Values(ElementType::i64),
                 ::testing::Values(ElementType::f16, ElementType::bf16),
