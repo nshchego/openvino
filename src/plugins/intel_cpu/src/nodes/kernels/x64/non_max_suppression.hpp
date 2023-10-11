@@ -24,7 +24,7 @@ struct NmsCompileParams {
     bool is_soft_suppressed_by_iou;
 };
 
-struct jit_nms_args {
+struct NmsCallArgs {
     const void* selected_boxes_coord[BOX_COORD_NUM];
     size_t selected_boxes_num;
     const void* candidate_box;
@@ -37,9 +37,9 @@ struct jit_nms_args {
 };
 
 struct jit_uni_nms_kernel {
-    void (*ker_)(const jit_nms_args *);
+    void (*ker_)(const NmsCallArgs *);
 
-    void operator()(const jit_nms_args *args) {
+    void operator()(const NmsCallArgs *args) {
         assert(ker_);
         ker_(args);
     }

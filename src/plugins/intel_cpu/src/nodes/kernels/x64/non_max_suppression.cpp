@@ -8,7 +8,7 @@
 using namespace InferenceEngine;
 using namespace dnnl::impl::cpu;
 
-#define GET_OFF(field) offsetof(jit_nms_args, field)
+#define GET_OFF(field) offsetof(NmsCallArgs, field)
 
 namespace ov {
 namespace intel_cpu {
@@ -19,7 +19,7 @@ void jit_uni_nms_kernel_f32<isa>::generate() {
     load_vector_emitter.reset(new jit_load_emitter(this, isa, Precision::FP32, Precision::FP32, vector_step));
     load_scalar_emitter.reset(new jit_load_emitter(this, isa, Precision::FP32, Precision::FP32, scalar_step));
 
-    exp_injector.reset(new x64::jit_uni_eltwise_injector_f32<isa>(this, dnnl::impl::alg_kind::eltwise_exp, 0.f, 0.f, 1.0f));
+    exp_injector.reset(new x64::jit_uni_eltwise_injector_f32<isa>(this, dnnl::impl::alg_kind::eltwise_exp, 0.f, 0.f, 1.f));
 
     this->preamble();
 

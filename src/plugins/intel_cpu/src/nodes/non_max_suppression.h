@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <node.h>
+#include "node.h"
+#include "kernels/x64/nms_rotated.hpp"
 #include "kernels/x64/non_max_suppression.hpp"
-
 
 
 namespace ov {
@@ -105,7 +105,8 @@ private:
 
 
     kernel::NMSBoxEncodeType boxEncodingType = kernel::NMSBoxEncodeType::CORNER;
-    bool sortResultDescending = true;
+    bool m_sort_result_descending = true;
+    bool m_clockwise = false;
 
     size_t m_batches_num = 0lu;
     size_t m_boxes_num = 0lu;
@@ -128,7 +129,10 @@ private:
     bool m_rotated_boxes = false;
     size_t m_coord_num = 1lu;
 
-    std::shared_ptr<kernel::jit_uni_nms_kernel> nms_kernel = nullptr;
+    std::shared_ptr<kernel::jit_uni_nms_kernel> m_nms_kernel;
+
+    using NmsRotatedKernel = kernel::JitKernel<kernel::NmsRotatedCompileParams, kernel::NmsRotatedCallArgs>;
+    std::shared_ptr<NmsRotatedKernel> m_nms_rotated_kernel;
 };
 
 }   // namespace node

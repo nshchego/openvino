@@ -2,14 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-// #include <tuple>
-// #include <string>
-
 #include "shared_test_classes/base/ov_subgraph.hpp"
 #include "ngraph_functions/builders.hpp"
-#include <common_test_utils/ov_tensor_utils.hpp>
 #include "test_utils/cpu_test_utils.hpp"
-#include "shared_test_classes/base/utils/ranges.hpp"
 #include "openvino/op/nms_rotated.hpp"
 
 using namespace ov::test;
@@ -41,19 +36,19 @@ class NmsRotatedLayerTestCPU : public testing::WithParamInterface<NmsRotatedPara
                                public SubgraphBaseTest, public CPUTestsBase {
 public:
     static std::string getTestCaseName(const testing::TestParamInfo<NmsRotatedParams>& obj) {
-        const auto& in_shape = std::get<0>(obj.param);
+        const auto& in_shapes = std::get<0>(obj.param);
 
         std::ostringstream result;
 
         result << "IS=(";
-        for (size_t i = 0lu; i < in_shape.size(); i++) {
-            result << utils::partialShape2str({in_shape[i].first}) << (i < in_shape.size() - 1lu ? "_" : "");
+        for (size_t i = 0lu; i < in_shapes.size(); i++) {
+            result << utils::partialShape2str({in_shapes[i].first}) << (i < in_shapes.size() - 1lu ? "_" : "");
         }
         result << ")_TS=";
-        for (size_t i = 0lu; i < in_shape.front().second.size(); i++) {
+        for (size_t i = 0lu; i < in_shapes.front().second.size(); i++) {
             result << "{";
-            for (size_t j = 0lu; j < in_shape.size(); j++) {
-                result << utils::vec2str(in_shape[j].second[i]) << (j < in_shape.size() - 1lu ? "_" : "");
+            for (size_t j = 0lu; j < in_shapes.size(); j++) {
+                result << utils::vec2str(in_shapes[j].second[i]) << (j < in_shapes.size() - 1lu ? "_" : "");
             }
             result << "}_";
         }
@@ -92,7 +87,7 @@ protected:
         targetDevice = utils::DEVICE_CPU;
 
         const auto& params          = this->GetParam();
-        const auto& in_shape        = std::get<0>(params);
+        const auto& in_shapes       = std::get<0>(params);
         const auto& boxes_prc       = std::get<1>(params);
         const auto& max_boxes_prc   = std::get<2>(params);
         const auto& thresholds_prc  = std::get<3>(params);
@@ -112,37 +107,47 @@ protected:
 
         std::tie(inFmts, outFmts, priority, selectedType) = cpu_params;
 
-        std::vector<InputShape> in_shapes;
+        std::vector<InputShape> actual_shapes;
         ov::ParameterVector in_params;
         std::vector<std::shared_ptr<ov::Node>> inputs;
         const auto in_shape_1d = InputShape{{1}, {{1}}};
 
-#define CREATE_INPUT(C, P, S, N, H, L)                                                                                    \
-        if (C) {                                                                                                          \
-            switch (P) {                                                                                                  \
-                case ElementType::f32:                                                                                    \
-                    inputs.push_back(ngraph::builder::makeConstant(P, S.second[0], std::vector<float>{}, true, float(H), float(L)));    \
-                    break;                                                                                                \
-                case ElementType::i32:                                                                                    \
-                    inputs.push_back(ngraph::builder::makeConstant(P, S.second[0], std::vector<int32_t>{}, true, int32_t(H), int32_t(L)));  \
-                    break;                                                                                \
-            }                                                                                             \
-        } else {                                                                                          \
-            in_shapes.push_back(S);                                                                       \
-            in_params.push_back(std::make_shared<ov::op::v0::Parameter>(P, S.first));                     \
-            in_params.back()->set_friendly_name(N);                                                       \
-            inputs.push_back(in_params.back());                                                           \
+#define CONST_CASE(P, S, H, L)                                                                                                 \
+        case P:                                                                                                                \
+            inputs.push_back(ngraph::builder::makeConstant(P, S, std::vector<ov::element_type_traits<P>::value_type>{}, true,  \
+                             ov::element_type_traits<P>::value_type(H), ov::element_type_traits<P>::value_type(L)));           \
+            break;
+
+#define CREATE_INPUT(C, P, S, N, H, L)                                                                                         \
+        if (C) {                                                                                                               \
+            switch (P) {                                                                                                       \
+                CONST_CASE(ElementType::f32, S.second[0], H, L)                                                                \
+                CONST_CASE(ElementType::f16, S.second[0], H, L)                                                                \
+                CONST_CASE(ElementType::bf16, S.second[0], H, L)                                                               \
+                CONST_CASE(ElementType::i32, S.second[0], H, L)                                                                \
+                CONST_CASE(ElementType::i64, S.second[0], H, L)                                                                \
+            }                                                                                                                  \
+        } else {                                                                                                               \
+            actual_shapes.push_back(S);                                                                                        \
+            if (S.first.rank() == 0) {                                                                                         \
+                in_params.push_back(std::make_shared<ov::op::v0::Parameter>(P, S.second.front()));                             \
+            } else {                                                                                                           \
+                in_params.push_back(std::make_shared<ov::op::v0::Parameter>(P, S.first));                                      \
+            }                                                                                                                  \
+            in_params.back()->set_friendly_name(N);                                                                            \
+            inputs.push_back(in_params.back());                                                                                \
         }
 
-        CREATE_INPUT(is_0_in_const, boxes_prc,      in_shape[0], "Boxes", 30, 10)
-        CREATE_INPUT(is_1_in_const, boxes_prc,      in_shape[1], "Scores", 1, 0)
+        CREATE_INPUT(is_0_in_const, boxes_prc,      in_shapes[0], "Boxes", 30, 10)
+        CREATE_INPUT(is_1_in_const, boxes_prc,      in_shapes[1], "Scores", 1, 0)
         CREATE_INPUT(is_2_in_const, max_boxes_prc,  in_shape_1d, "MaxOutputBoxesPerClass", m_max_out_boxes_per_class, m_max_out_boxes_per_class)
         CREATE_INPUT(is_3_in_const, thresholds_prc, in_shape_1d, "IouThreshold", m_iou_threshold, m_iou_threshold)
         CREATE_INPUT(is_4_in_const, thresholds_prc, in_shape_1d, "ScoreThreshold", m_score_threshold, m_score_threshold)
 
+#undef CONST_CASE
 #undef CREATE_INPUT
 
-        init_input_shapes(in_shapes);
+        init_input_shapes(actual_shapes);
 
         const auto nms_op = std::make_shared<ov::op::v13::NMSRotated>(inputs[0], inputs[1], inputs[2], inputs[3], inputs[4],
                                                                       sort_descending, out_prc, clockwise);
@@ -175,19 +180,23 @@ protected:
 case P :                                                                            \
     fill_data(tensor.data<ov::element_type_traits<P>::value_type>(), S, L); break;
 
+#define GEN_DATA(P, R, S, K)                                                                                                               \
+case P :                                                                                                                                   \
+    utils::fill_data_random(tensor.data<ov::element_type_traits<P>::value_type>(), shape_size(targetInputStaticShapes[i]), R, S, K); break;
+
             if (name == "Boxes") {
                 switch (in_prc) {
-                    case ElementType::f32:
-                        utils::fill_data_random(tensor.data<float>(), shape_size(targetInputStaticShapes[i]), 30, 20);
-                        break;
+                    GEN_DATA(ElementType::f32, 30, 20, 1)
+                    GEN_DATA(ElementType::f16, 30, 20, 1)
+                    GEN_DATA(ElementType::bf16, 30, 20, 1)
                     default:
                         OPENVINO_THROW("NmsRotated does not support precision ", in_prc, " for the Scores input.");
                 }
             } else if (name == "Scores") {
                 switch (in_prc) {
-                    case ElementType::f32:
-                        utils::fill_data_random(tensor.data<float>(), shape_size(targetInputStaticShapes[i]), 1, 0, 100);
-                        break;
+                    GEN_DATA(ElementType::f32, 1, 0, 100)
+                    GEN_DATA(ElementType::f16, 1, 0, 100)
+                    GEN_DATA(ElementType::bf16, 1, 0, 100)
                     default:
                         OPENVINO_THROW("NmsRotated does not support precision ", in_prc, " for the Scores input.");
                 }
@@ -216,7 +225,10 @@ case P :                                                                        
                 }
             }
 
+#undef GEN_DATA
 #undef FILL_DATA
+
+            inputs.insert({func_input.get_node_shared_ptr(), tensor});
         }
     }
 
@@ -253,32 +265,45 @@ static const std::vector<std::vector<InputShape>> input_shapes = {
     }
 };
 
-static const std::vector<ElementType> boxes_prc = { ElementType::f32, ElementType::f16, ElementType::bf16 };
-static const std::vector<ElementType> max_out_boxes_prc = { ElementType::i32, ElementType::i64 };
-static const std::vector<ElementType> threshods_prc = { ElementType::f32, ElementType::f16, ElementType::bf16 };
-static const std::vector<ElementType> output_prc = { ElementType::i32, ElementType::i64 };
-static const std::vector<int64_t> max_out_box_per_class = { 5, 20 };
-static const std::vector<float> iou_threshold = { 0.3f, 0.7f };
-static const std::vector<float> score_threshold = { 0.3f, 0.7f };
 
+INSTANTIATE_TEST_SUITE_P(smoke_, NmsRotatedLayerTestCPU,
+        ::testing::Combine(
+                ::testing::ValuesIn(input_shapes),          // Input shapes
+                ::testing::Values(ElementType::f32),        // Boxes and scores input precisions
+                ::testing::Values(ElementType::i32),        // Max output boxes input precisions
+                ::testing::Values(ElementType::f32),        // Thresholds precisions
+                ::testing::Values(ElementType::i32),        // Output type
+                ::testing::Values(5, 20),                   // Max output boxes per class
+                ::testing::Values(0.3f, 0.7f),              // IOU threshold
+                ::testing::Values(0.3f, 0.7f),              // Score threshold
+                ::testing::Values(true, false),             // Sort result descending
+                ::testing::Values(true, false),             // Clockwise
+                ::testing::Values(false),                   // Is 1st input constant
+                ::testing::Values(false),                   // Is 2nd input constant
+                ::testing::Values(false),                   // Is 3rd input constant
+                ::testing::Values(false),                   // Is 4th input constant
+                ::testing::Values(false),                   // Is 5th input constant
+                ::testing::Values(emptyCPUSpec),            // CPU specific params
+                ::testing::Values(empty_plugin_config)),    // Additional plugin configuration
+        NmsRotatedLayerTestCPU::getTestCaseName);
 
-INSTANTIATE_TEST_SUITE_P(smoke_Param, NmsRotatedLayerTestCPU,
+INSTANTIATE_TEST_SUITE_P(nightly_, NmsRotatedLayerTestCPU,
         ::testing::Combine(
                 ::testing::ValuesIn(input_shapes),
-                ::testing::ValuesIn(boxes_prc),
-                ::testing::ValuesIn(max_out_boxes_prc),
-                ::testing::ValuesIn(threshods_prc),
-                ::testing::ValuesIn(output_prc),
-                ::testing::ValuesIn(max_out_box_per_class),
-                ::testing::ValuesIn(iou_threshold),
-                ::testing::ValuesIn(score_threshold),
+                ::testing::Values(ElementType::f16, ElementType::bf16),
+                ::testing::Values(ElementType::i64),
+                ::testing::Values(ElementType::f16, ElementType::bf16),
+                ::testing::Values(ElementType::i64),
+                ::testing::Values(10),
+                ::testing::Values(0.5f),
+                ::testing::Values(0.4f),
                 ::testing::Values(true, false),
                 ::testing::Values(true, false),
                 ::testing::Values(true, false),
                 ::testing::Values(true, false),
-                ::testing::Values(true, false),
-                ::testing::Values(true, false),
-                ::testing::Values(true, false),
+                ::testing::Values(true),
+                ::testing::Values(true),
+                ::testing::Values(true),
                 ::testing::Values(emptyCPUSpec),
                 ::testing::Values(empty_plugin_config)),
         NmsRotatedLayerTestCPU::getTestCaseName);

@@ -93,6 +93,7 @@ void nms_rotated(const float* boxes_data,
                  int64_t* valid_outputs,
                  const bool sort_result_descending,
                  const bool clockwise) {
+printf("[REF] nms_rotated +\n");
     using iou_rotated::RotatedBox;
     using nms_detail::BoxInfo;
     using nms_detail::SelectedIndex;
@@ -108,6 +109,7 @@ void nms_rotated(const float* boxes_data,
     }
 
     auto get_score_scale = [iou_threshold, scale, soft_nms](float iou) {
+        // const float weight = 1.f;
         const float weight = std::exp(scale * iou * iou);
         return (soft_nms || iou <= iou_threshold) ? weight : 0.0f;
     };
@@ -142,11 +144,12 @@ void nms_rotated(const float* boxes_data,
                         r[box_idx].a *= -1;
                     }
                     candidate_boxes.emplace_back(r[box_idx], box_idx, scoresPtr[box_idx], 0, batch, class_idx);
+// printf("[REF] selected score: %f; box_idx: %ld\n", scoresPtr[box_idx], box_idx);
                 }
             }
 
             std::priority_queue<BoxInfo> sorted_boxes(std::less<BoxInfo>(), std::move(candidate_boxes));
-
+// printf("[REF] sorted_boxes.size: %lu; boxes_per_class: %lu\n", sorted_boxes.size(), boxes_per_class);
             std::vector<BoxInfo> selected;
             // Get the next box with top score, filter by iou_threshold
 
@@ -154,6 +157,7 @@ void nms_rotated(const float* boxes_data,
             float original_score;
 
             while (!sorted_boxes.empty() && selected.size() < boxes_per_class) {
+// printf("[REF] sorted_boxes.size: %lu; selected.size: %lu; boxes_per_class: %lu\n", sorted_boxes.size(), selected.size(), boxes_per_class);
                 next_candidate = sorted_boxes.top();
                 original_score = next_candidate.score;
                 sorted_boxes.pop();
@@ -161,16 +165,20 @@ void nms_rotated(const float* boxes_data,
                 bool should_hard_suppress = false;
                 for (int64_t j = static_cast<int64_t>(selected.size()) - 1; j >= next_candidate.suppress_begin_index;
                      --j) {
+// printf("[REF] selected_idx: %ld\n", j);
                     // The main difference between NMS and NMSRotated is the calculation of iou for rotated boxes
                     float iou = nms_detail::rotated_intersection_over_union(next_candidate.box, selected[j].box);
+// printf("[REF] nms_rotated iou: %f; get_score_scale: %f\n", iou, get_score_scale(iou));
                     next_candidate.score *= get_score_scale(iou);
 
                     if ((iou > iou_threshold) && !soft_nms) {
+// printf("[REF] iou > iou_threshold; iou: %f; iou_threshold: %f\n", iou, iou_threshold);
                         should_hard_suppress = true;
                         break;
                     }
 
                     if (next_candidate.score <= score_threshold) {
+printf("[REF] next_candidate.score <= score_threshold; next_candidate.score: %f\n", next_candidate.score);
                         break;
                     }
                 }
@@ -179,16 +187,19 @@ void nms_rotated(const float* boxes_data,
 
                 if (!should_hard_suppress) {
                     if (next_candidate.score == original_score) {
+// printf("[REF] selected.push_back(next_candidate); score: %f\n", next_candidate.score);
                         selected.push_back(next_candidate);
                         continue;
                     }
                     if (next_candidate.score > score_threshold) {
+printf("[REF] next_candidate.score > score_threshold; next_candidate.score: %f\n", next_candidate.score);
                         sorted_boxes.push(next_candidate);
                     }
                 }
             }
 
             for (const auto& box_info : selected) {
+// printf("[REF] selected index: %ld; class_index: %ld; score: %f\n", box_info.index, box_info.class_index, box_info.score);
                 filteredBoxes.push_back(box_info);
             }
         }
@@ -197,6 +208,10 @@ void nms_rotated(const float* boxes_data,
     if (sort_result_descending) {
         std::reverse(filteredBoxes.begin(), filteredBoxes.end());
     }
+// for (const auto& box_info : filteredBoxes) {
+//     printf("[REF] batch_index: %ld; class_index: %ld; index: %ld; score: %f\n",
+//         box_info.batch_index, box_info.class_index, box_info.index, box_info.score);
+// }
 
     size_t max_num_of_selected_indices = selected_indices_shape[0];
     size_t output_size = std::min(filteredBoxes.size(), max_num_of_selected_indices);
