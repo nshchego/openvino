@@ -61,7 +61,7 @@ static bool shouldBeDumped(const NodePtr& node, const DebugCapsConfig& config, c
         bool matched = false;
 
         while (ss >> type) {
-            if (NameFromType(node->getType()) == type) {// type does not match
+            if (node->getTypeStr() == type) { // type does not match
                 matched = true;
                 break;
             }

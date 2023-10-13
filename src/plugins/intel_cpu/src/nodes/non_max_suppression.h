@@ -143,13 +143,14 @@ private:
     float m_soft_nms_sigma = 0.f;
     float m_scale = 1.f;
     // control placeholder for NMS in new opset.
-    bool isSoftSuppressedByIOU = false;
+    bool m_is_soft_suppressed_by_iou = false;
 
     bool m_outStaticShape = false;
 
     std::vector<std::vector<size_t>> m_num_filtered_boxes;
     const std::string inType = "input";
     const std::string outType = "output";
+    bool m_defined_outputs[3] = { false, false, false };
 
     std::shared_ptr<JitKernelBase> m_jit_kernel;
 };
