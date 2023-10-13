@@ -49,17 +49,19 @@ public:
 
     void execute(dnnl::stream strm) override;
 
+    void executeDynamicImpl(dnnl::stream strm) override;
+
     bool created() const override;
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
-    struct filteredBoxes {
+    struct FilteredBox {
         float score;
         int batch_index;
         int class_index;
         int box_index;
-        filteredBoxes() = default;
-        filteredBoxes(float _score, int _batch_index, int _class_index, int _box_index) :
+        FilteredBox() = default;
+        FilteredBox(float _score, int _batch_index, int _class_index, int _box_index) :
                 score(_score), batch_index(_batch_index), class_index(_class_index), box_index(_box_index) {}
     };
 
@@ -69,13 +71,17 @@ public:
         int suppress_begin_index;
     };
 
-    void executeDynamicImpl(dnnl::stream strm) override;
-
     bool isExecutable() const override;
+    // bool isExecutable() const override { return true; }
 
     bool needShapeInfer() const override { return false; }
 
     void prepareParams() override;
+
+    void executeDynamic(dnnl::stream strm) override;
+
+// protected:
+//     void updateLastInputDims() {}
 
 private:
     // input
@@ -101,13 +107,13 @@ private:
     float rotatedIntersectionOverUnion_2(const float *boxesI, const float *boxesJ);
 
     void nmsWithSoftSigma(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
-                const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
+                const InferenceEngine::SizeVector &scoresStrides, std::vector<FilteredBox> &filtBoxes);
 
     void nmsWithoutSoftSigma(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
-                const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
+                const InferenceEngine::SizeVector &scoresStrides, std::vector<FilteredBox> &filtBoxes);
 
     void nmsRotated(const float *boxes, const float *scores, const InferenceEngine::SizeVector &boxesStrides,
-                const InferenceEngine::SizeVector &scoresStrides, std::vector<filteredBoxes> &filtBoxes);
+                const InferenceEngine::SizeVector &scoresStrides, std::vector<FilteredBox> &filtBoxes);
 
     void checkPrecision(const InferenceEngine::Precision& prec,
                         const std::vector<InferenceEngine::Precision>& precList,
@@ -141,16 +147,17 @@ private:
     float m_iou_threshold = 0.f;
     float m_score_threshold = 0.f;
     float m_soft_nms_sigma = 0.f;
-    float m_scale = 1.f;
+    float m_scale = 0.f;
     // control placeholder for NMS in new opset.
     bool m_is_soft_suppressed_by_iou = false;
 
-    bool m_outStaticShape = false;
+    bool m_out_static_shape = false;
 
     std::vector<std::vector<size_t>> m_num_filtered_boxes;
     const std::string inType = "input";
     const std::string outType = "output";
-    bool m_defined_outputs[3] = { false, false, false };
+    bool m_const_inputs[NMS_SOFT_NMS_SIGMA + 1] = { false, false, false, false, false, false };
+    bool m_defined_outputs[NMS_VALID_OUTPUTS + 1] = { false, false, false };
 
     std::shared_ptr<JitKernelBase> m_jit_kernel;
 };

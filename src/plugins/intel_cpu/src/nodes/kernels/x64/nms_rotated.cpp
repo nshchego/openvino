@@ -24,10 +24,12 @@ void NmsRotated<isa>::generate() {
     registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
     r64_dst = getReg64();
+    r64_boxes = getReg64();
     r64_work_amount = getReg64();
 
+    mov(r64_dst, ptr[regParams + GET_OFF(dst_ptr)]);
+    mov(r64_dst, ptr[regParams + GET_OFF(boxes_ptr)]);
     mov(r64_work_amount, ptr[regParams + GET_OFF(work_amount)]);
-    mov(r64_dst,  ptr[regParams + GET_OFF(dst_ptr)]);
 
     initVectors();
     process();

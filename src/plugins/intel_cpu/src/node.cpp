@@ -614,6 +614,9 @@ bool Node::outputShapeDataDependency() const {
 }
 
 void Node::redefineOutputMemory(const std::vector<VectorDims> &newOutputShapes) {
+if (type == Type::NonMaxSuppression) {
+    printf("[CPU] Node::redefineOutputMemory\n");
+}
     if (newOutputShapes.size() != outputShapes.size()) {
         IE_THROW() << "Number shapes mismatch with real outputs number for node with name: " << getName();
     }
@@ -635,6 +638,9 @@ void Node::redefineOutputMemory(const std::vector<VectorDims> &newOutputShapes) 
         for (size_t j = 0; j < edges.size(); j++) {
             edges[j]->getMemoryPtr()->redefineDesc(memDesc);
         }
+if (type == Type::NonMaxSuppression) {
+    printf("[CPU] Node::redefineOutputMemory redefined; isStatic: %d\n", currDesc.getShape().isStatic());
+}
     }
 }
 
@@ -1616,6 +1622,9 @@ IShapeInfer::Result Node::shapeInfer() const {
 }
 
 void Node::updateLastInputDims() {
+// if (type == Type::NonMaxSuppression) {
+//     return;
+// }
     if (lastInputDims.size() != getParentEdges().size()) {
         if (!lastInputDims.empty())
             IE_THROW() << "Input dims and parent edges number mismatch!";

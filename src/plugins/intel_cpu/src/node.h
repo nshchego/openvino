@@ -364,7 +364,7 @@ public:
     virtual void execute(dnnl::stream strm) = 0;
     void updateShapes();
     void updateDynamicParams();
-    void executeDynamic(dnnl::stream strm);
+    virtual void executeDynamic(dnnl::stream strm);
     virtual void redefineOutputMemory(const std::vector<VectorDims> &newShapes);
     bool outputShapeDataDependency() const;
 

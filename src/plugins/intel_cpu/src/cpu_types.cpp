@@ -314,7 +314,6 @@ std::string NameFromType(const Type type) {
         CASE(NonMaxSuppression);
         CASE(MatrixNms);
         CASE(MulticlassNms);
-        CASE(NMSRotated);
         CASE(Reference);
         CASE(Subgraph);
         CASE(PriorBox);

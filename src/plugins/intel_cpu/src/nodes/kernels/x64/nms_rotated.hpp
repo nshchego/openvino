@@ -47,6 +47,7 @@ private:
                                                                                                      Xbyak::Ymm>::type;
 
     RegistersPool::Reg<Xbyak::Reg64> r64_dst;
+    RegistersPool::Reg<Xbyak::Reg64> r64_boxes;
     RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
     RegistersPool::Reg<Xbyak::Reg64> r64_n_inc;
     RegistersPool::Reg<Xbyak::Reg64> r64_convert_0;
