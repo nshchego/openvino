@@ -158,6 +158,7 @@ private:
     const std::string outType = "output";
     bool m_const_inputs[NMS_SOFT_NMS_SIGMA + 1] = { false, false, false, false, false, false };
     bool m_defined_outputs[NMS_VALID_OUTPUTS + 1] = { false, false, false };
+    std::vector<FilteredBox> m_filtered_boxes;
 
     std::shared_ptr<JitKernelBase> m_jit_kernel;
 };

@@ -119,27 +119,28 @@ std::cout << "[CPU] NMS_SOFT_NMS_SIGMA size: " << sizeof(NMS_SOFT_NMS_SIGMA) << 
         switch (op->get_input_element_type(NMS_MAX_OUTPUT_BOXES_PER_CLASS)) {
             case element::i64: val = as_type<op::v0::Constant>(op->get_input_node_ptr(NMS_MAX_OUTPUT_BOXES_PER_CLASS))->get_data_ptr<int64_t>()[0]; break;
             case element::i32: val = as_type<op::v0::Constant>(op->get_input_node_ptr(NMS_MAX_OUTPUT_BOXES_PER_CLASS))->get_data_ptr<int32_t>()[0]; break;
-            default: THROW_CPU_NODE_ERR("has input with unsupported precision.");
+            default: THROW_CPU_NODE_ERR("has input MAX_OUTPUT_BOXES_PER_CLASS with unsupported precision ",
+                                        op->get_input_element_type(NMS_MAX_OUTPUT_BOXES_PER_CLASS));
         }
         m_max_output_boxes_per_class = val < 0l ? 0lu : static_cast<size_t>(val);
     }
     if (m_const_inputs[NMS_IOU_THRESHOLD] && op_inputs_num > NMS_IOU_THRESHOLD) {
         switch (op->get_input_element_type(NMS_IOU_THRESHOLD)) {
             case element::f32: m_iou_threshold = as_type<op::v0::Constant>(op->get_input_node_ptr(NMS_IOU_THRESHOLD))->get_data_ptr<float>()[0]; break;
-            default: THROW_CPU_NODE_ERR("has input with unsupported precision.");
+            default: THROW_CPU_NODE_ERR("has input IOU_THRESHOLD with unsupported precision ", op->get_input_element_type(NMS_IOU_THRESHOLD));
         }
     }
     if (m_const_inputs[NMS_SCORE_THRESHOLD] && op_inputs_num > NMS_SCORE_THRESHOLD) {
         switch (op->get_input_element_type(NMS_SCORE_THRESHOLD)) {
             case element::f32: m_score_threshold = as_type<op::v0::Constant>(op->get_input_node_ptr(NMS_SCORE_THRESHOLD))->get_data_ptr<float>()[0]; break;
-            default: THROW_CPU_NODE_ERR("has input with unsupported precision.");
+            default: THROW_CPU_NODE_ERR("has input SCORE_THRESHOLD with unsupported precision ", op->get_input_element_type(NMS_SCORE_THRESHOLD));
         }
-        // m_score_threshold = 0.0001f; // TODO: REMOVE
+        m_score_threshold = 0.0001f; // TODO: REMOVE
     }
     if (m_const_inputs[NMS_SOFT_NMS_SIGMA] && op_inputs_num > NMS_SOFT_NMS_SIGMA) {
         switch (op->get_input_element_type(NMS_SOFT_NMS_SIGMA)) {
             case element::f32: m_soft_nms_sigma = as_type<op::v0::Constant>(op->get_input_node_ptr(NMS_SOFT_NMS_SIGMA))->get_data_ptr<float>()[0]; break;
-            default: THROW_CPU_NODE_ERR("has input with unsupported precision.");
+            default: THROW_CPU_NODE_ERR("has input SOFT_NMS_SIGMA with unsupported precision ", op->get_input_element_type(NMS_SOFT_NMS_SIGMA));
         }
         if (m_soft_nms_sigma > 0.f) {
             m_scale = -0.5f / m_soft_nms_sigma;
@@ -226,6 +227,8 @@ printf("[CPU] NonMaxSuppression::prepareParams\n");
 
     if (m_const_inputs[NMS_MAX_OUTPUT_BOXES_PER_CLASS]) {
         m_max_output_boxes_per_class = std::min(m_max_output_boxes_per_class, m_boxes_num);
+        const auto max_number_of_boxes = m_max_output_boxes_per_class * m_batches_num * m_classes_num;
+        m_filtered_boxes.resize(max_number_of_boxes);
     }
 
     m_num_filtered_boxes.resize(m_batches_num);
@@ -262,9 +265,9 @@ void NonMaxSuppression::executeDynamicImpl(dnnl::stream strm) {
 }
 
 void NonMaxSuppression::execute(dnnl::stream strm) {
-static double elps = 0lu;
-static uint64_t counter = 0lu;
-auto t1 = std::chrono::high_resolution_clock::now();
+// static double elps = 0lu;
+// static uint64_t counter = 0lu;
+// auto t1 = std::chrono::high_resolution_clock::now();
 
 // printf("[CPU] NonMaxSuppression::execute +\n");
 // auto box_shape = getParentEdgeAt(NMS_BOXES)->getMemoryPtr()->getShape().getStaticDims();
@@ -272,12 +275,21 @@ auto t1 = std::chrono::high_resolution_clock::now();
 
     const auto inputs_num = inputShapes.size();
 
+    size_t max_number_of_boxes = m_max_output_boxes_per_class * m_batches_num * m_classes_num;
     if (!m_const_inputs[NMS_MAX_OUTPUT_BOXES_PER_CLASS] && inputs_num > NMS_MAX_OUTPUT_BOXES_PER_CLASS) {
-        m_max_output_boxes_per_class = reinterpret_cast<int32_t *>(getParentEdgeAt(NMS_MAX_OUTPUT_BOXES_PER_CLASS)->getMemoryPtr()->getData())[0];
-        m_max_output_boxes_per_class = std::min(m_max_output_boxes_per_class, m_boxes_num);
-    }
-    if (m_max_output_boxes_per_class == 0lu) {
-        return;
+        auto max_boxes_memory = getParentEdgeAt(NMS_MAX_OUTPUT_BOXES_PER_CLASS)->getMemoryPtr();
+        int64_t val = 0l;
+        switch (max_boxes_memory->getDesc().getPrecision()) {
+            case Precision::I32: val = reinterpret_cast<int32_t *>(max_boxes_memory->getData())[0]; break;
+            case Precision::I64: val = reinterpret_cast<int64_t *>(max_boxes_memory->getData())[0]; break;
+            default: THROW_CPU_NODE_ERR("has input MAX_OUTPUT_BOXES_PER_CLASS with unsupported precision ", max_boxes_memory->getDesc().getPrecision());
+        }
+        if (val <= 0l) {
+            return;
+        }
+        m_max_output_boxes_per_class = std::min(static_cast<size_t>(val), m_boxes_num);
+        max_number_of_boxes = m_max_output_boxes_per_class * m_batches_num * m_classes_num;
+        m_filtered_boxes.resize(max_number_of_boxes);
     }
 
     if (!m_const_inputs[NMS_IOU_THRESHOLD] && inputs_num > NMS_IOU_THRESHOLD) {
@@ -291,121 +303,122 @@ auto t1 = std::chrono::high_resolution_clock::now();
         m_scale = (m_soft_nms_sigma > 0.f) ? (-0.5f / m_soft_nms_sigma) : 0.f;
     }
 
-    // auto boxes_memory = getParentEdgeAt(NMS_BOXES)->getMemoryPtr();
-    const auto boxes = reinterpret_cast<const float *>(getParentEdgeAt(NMS_BOXES)->getMemoryPtr()->getData());
-    const auto scores = reinterpret_cast<const float *>(getParentEdgeAt(NMS_SCORES)->getMemoryPtr()->getData());
+    auto boxes_memory = getParentEdgeAt(NMS_BOXES)->getMemoryPtr();
+    auto scores_memory = getParentEdgeAt(NMS_SCORES)->getMemoryPtr();
 
-    auto boxesStrides = getParentEdgeAt(NMS_BOXES)->getMemory().getDescWithType<BlockedMemoryDesc>()->getStrides();
-    auto scoresStrides = getParentEdgeAt(NMS_SCORES)->getMemory().getDescWithType<BlockedMemoryDesc>()->getStrides();
+    auto boxes = reinterpret_cast<const float *>(boxes_memory->getData());
+    auto scores = reinterpret_cast<const float *>(scores_memory->getData());
 
-    const auto maxNumberOfBoxes = m_max_output_boxes_per_class * m_batches_num * m_classes_num;
-    // std::vector<FilteredBox> filtered_boxes(maxNumberOfBoxes);
+    const auto& boxes_strides = boxes_memory->getDescWithType<BlockedMemoryDesc>()->getStrides();
+    const auto& scores_strides = scores_memory->getDescWithType<BlockedMemoryDesc>()->getStrides();
 
-//     // if (m_rotated_boxes) {
-//     //     nmsRotated(boxes, scores, boxesStrides, scoresStrides, filtered_boxes);
-//     // } else
-//     if (m_soft_nms_sigma == 0.f) {
-//         nmsWithoutSoftSigma(boxes, scores, boxesStrides, scoresStrides, filtered_boxes);
-//     } else {
-//         nmsWithSoftSigma(boxes, scores, boxesStrides, scoresStrides, filtered_boxes);
-//     }
+    nmsRotated(boxes, scores, boxes_strides, scores_strides, m_filtered_boxes);
+    // nmsWithoutSoftSigma(boxes, scores, boxes_strides, scores_strides, m_filtered_boxes);
+
+    // if (m_rotated_boxes) {
+    //     nmsRotated(boxes, scores, boxes_strides, scores_strides, m_filtered_boxes);
+    // } else if (m_soft_nms_sigma == 0.f) {
+    //     nmsWithoutSoftSigma(boxes, scores, boxes_strides, scores_strides, m_filtered_boxes);
+    // } else {
+    //     nmsWithSoftSigma(boxes, scores, boxes_strides, scores_strides, m_filtered_boxes);
+    // }
 // // printf("rotatedBoxesIntersection: %lu; getRotatedVertices: %lu\n", counter_0, counter_1);
 
-//     size_t startOffset = m_num_filtered_boxes[0][0];
-//     for (size_t b = 0; b < m_num_filtered_boxes.size(); b++) {
-//         size_t batchOffset = b * m_classes_num * m_max_output_boxes_per_class;
-//         for (size_t c = (b == 0 ? 1 : 0); c < m_num_filtered_boxes[b].size(); c++) {
-//             size_t offset = batchOffset + c * m_max_output_boxes_per_class;
-//             for (size_t i = 0; i < m_num_filtered_boxes[b][c]; i++) {
-//                 filtered_boxes[startOffset + i] = filtered_boxes[offset + i];
-//             }
-//             startOffset += m_num_filtered_boxes[b][c];
-//         }
-//     }
-//     filtered_boxes.resize(startOffset);
+    size_t startOffset = m_num_filtered_boxes[0][0];
+    for (size_t b = 0; b < m_num_filtered_boxes.size(); b++) {
+        size_t batchOffset = b * m_classes_num * m_max_output_boxes_per_class;
+        for (size_t c = (b == 0 ? 1 : 0); c < m_num_filtered_boxes[b].size(); c++) {
+            size_t offset = batchOffset + c * m_max_output_boxes_per_class;
+            for (size_t i = 0; i < m_num_filtered_boxes[b][c]; i++) {
+                m_filtered_boxes[startOffset + i] = m_filtered_boxes[offset + i];
+            }
+            startOffset += m_num_filtered_boxes[b][c];
+        }
+    }
+    m_filtered_boxes.resize(startOffset);
 
-//     // need more particular comparator to get deterministic behaviour
-//     // escape situation when filtred boxes with same score have different position from launch to launch
-//     if (m_sort_result_descending) {
-//         parallel_sort(filtered_boxes.begin(), filtered_boxes.end(),
-//                       [](const FilteredBox& l, const FilteredBox& r) {
-//                           return (l.score > r.score) ||
-//                                  (l.score == r.score && l.batch_index < r.batch_index) ||
-//                                  (l.score == r.score && l.batch_index == r.batch_index && l.class_index < r.class_index) ||
-//                                  (l.score == r.score && l.batch_index == r.batch_index && l.class_index == r.class_index && l.box_index < r.box_index);
-//                       });
-//     }
-// // for (const auto& box_info : filtered_boxes) {
-// //     printf("[CPU] batch_index: %ld; class_index: %ld; score: %f\n",
-// //         box_info.batch_index, box_info.class_index, box_info.score);
-// // }
+    // need more particular comparator to get deterministic behaviour
+    // escape situation when filtred boxes with same score have different position from launch to launch
+    if (m_sort_result_descending) {
+        parallel_sort(m_filtered_boxes.begin(), m_filtered_boxes.end(),
+                      [](const FilteredBox& l, const FilteredBox& r) {
+                          return (l.score > r.score) ||
+                                 (l.score == r.score && l.batch_index < r.batch_index) ||
+                                 (l.score == r.score && l.batch_index == r.batch_index && l.class_index < r.class_index) ||
+                                 (l.score == r.score && l.batch_index == r.batch_index && l.class_index == r.class_index && l.box_index < r.box_index);
+                      });
+    }
+// for (const auto& box_info : m_filtered_boxes) {
+//     printf("[CPU] batch_index: %ld; class_index: %ld; score: %f\n",
+//         box_info.batch_index, box_info.class_index, box_info.score);
+// }
 
-//     auto indicesMemPtr = getChildEdgesAtPort(NMS_SELECTED_INDICES)[0]->getMemoryPtr();
-//     const size_t validOutputs = std::min(filtered_boxes.size(), maxNumberOfBoxes);
-// printf("validOutputs: %lu\n", validOutputs);
+    auto indicesMemPtr = getChildEdgesAtPort(NMS_SELECTED_INDICES)[0]->getMemoryPtr();
+    const size_t valid_outputs = std::min(m_filtered_boxes.size(), max_number_of_boxes);
+// printf("valid_outputs: %lu\n", valid_outputs);
 
-static bool call_mem = true;
-    // if (!m_out_static_shape) {
+// static bool call_mem = true;
+    if (!m_out_static_shape) {
     // if (!getChildEdges()[0].lock()->getMemory().getDesc().getShape().isStatic()) {
-    if (call_mem) {
-        call_mem = false;
-        const size_t validOutputs = 220;
+    // if (call_mem) {
+    //     call_mem = false;
+    //     const size_t valid_outputs = 220;
     // if (!getChildEdgesAtPort(0)[0]->getMemory().getDesc().getShape().isStatic()) {
-        VectorDims newDims{validOutputs, 3};
+        VectorDims newDims{valid_outputs, 3};
         redefineOutputMemory({newDims, newDims, {1}});
     }
 
-    // const auto selectedIndicesStride = indicesMemPtr->getDescWithType<BlockedMemoryDesc>()->getStrides()[0];
+    const auto selectedIndicesStride = indicesMemPtr->getDescWithType<BlockedMemoryDesc>()->getStrides()[0];
 
-    // if (m_defined_outputs[NMS_SELECTED_INDICES]) {
-    //     auto selectedIndicesPtr = reinterpret_cast<int32_t *>(indicesMemPtr->getData());
-    //     int* boxes_ptr = &(filtered_boxes[0].batch_index);
+    if (m_defined_outputs[NMS_SELECTED_INDICES]) {
+        auto selectedIndicesPtr = reinterpret_cast<int32_t *>(indicesMemPtr->getData());
+        int* boxes_ptr = &(m_filtered_boxes[0].batch_index);
 
-    //     size_t idx = 0lu;
-    //     for (; idx < validOutputs; idx++) {
-    //         // selectedIndicesPtr[0] = filtered_boxes[idx].batch_index;
-    //         // selectedIndicesPtr[1] = filtered_boxes[idx].class_index;
-    //         // selectedIndicesPtr[2] = filtered_boxes[idx].box_index;
-    //         // memcpy(selectedIndicesPtr, &(filtered_boxes[idx].batch_index), 12);
-    //         memcpy(selectedIndicesPtr, boxes_ptr, 12);
-    //         selectedIndicesPtr += selectedIndicesStride;
-    //         boxes_ptr += 4;
-    //     }
+        size_t idx = 0lu;
+        for (; idx < valid_outputs; idx++) {
+            // selectedIndicesPtr[0] = m_filtered_boxes[idx].batch_index;
+            // selectedIndicesPtr[1] = m_filtered_boxes[idx].class_index;
+            // selectedIndicesPtr[2] = m_filtered_boxes[idx].box_index;
+            // memcpy(selectedIndicesPtr, &(m_filtered_boxes[idx].batch_index), 12);
+            memcpy(selectedIndicesPtr, boxes_ptr, 12);
+            selectedIndicesPtr += selectedIndicesStride;
+            boxes_ptr += 4;
+        }
 
-    //     if (m_out_static_shape) {
-    //         std::fill(selectedIndicesPtr, selectedIndicesPtr + (maxNumberOfBoxes - idx) * selectedIndicesStride, -1);
-    //     }
-    // }
+        if (m_out_static_shape) {
+            std::fill(selectedIndicesPtr, selectedIndicesPtr + (max_number_of_boxes - idx) * selectedIndicesStride, -1);
+        }
+    }
 
-    // if (m_defined_outputs[NMS_SELECTED_SCORES]) {
-    //     auto selectedScoresPtr = reinterpret_cast<float *>(getChildEdgesAtPort(NMS_SELECTED_SCORES)[0]->getMemoryPtr()->getData());
+    if (m_defined_outputs[NMS_SELECTED_SCORES]) {
+        auto selectedScoresPtr = reinterpret_cast<float *>(getChildEdgesAtPort(NMS_SELECTED_SCORES)[0]->getMemoryPtr()->getData());
 
-    //     size_t idx = 0lu;
-    //     for (; idx < validOutputs; idx++) {
-    //         selectedScoresPtr[0] = static_cast<float>(filtered_boxes[idx].batch_index);
-    //         selectedScoresPtr[1] = static_cast<float>(filtered_boxes[idx].class_index);
-    //         selectedScoresPtr[2] = static_cast<float>(filtered_boxes[idx].score);
-    //         selectedScoresPtr += selectedIndicesStride;
-    //     }
+        size_t idx = 0lu;
+        for (; idx < valid_outputs; idx++) {
+            selectedScoresPtr[0] = static_cast<float>(m_filtered_boxes[idx].batch_index);
+            selectedScoresPtr[1] = static_cast<float>(m_filtered_boxes[idx].class_index);
+            selectedScoresPtr[2] = static_cast<float>(m_filtered_boxes[idx].score);
+            selectedScoresPtr += selectedIndicesStride;
+        }
 
-    //     if (m_out_static_shape) {
-    //         std::fill(selectedScoresPtr, selectedScoresPtr + (maxNumberOfBoxes - idx) * selectedIndicesStride, -1.f);
-    //     }
-    // }
+        if (m_out_static_shape) {
+            std::fill(selectedScoresPtr, selectedScoresPtr + (max_number_of_boxes - idx) * selectedIndicesStride, -1.f);
+        }
+    }
 
-    // if (m_defined_outputs[NMS_VALID_OUTPUTS]) {
-    //     auto valid_outputs = reinterpret_cast<int *>(getChildEdgesAtPort(NMS_VALID_OUTPUTS)[0]->getMemoryPtr()->getData());
-    //     *valid_outputs = static_cast<int>(validOutputs);
-    // }
+    if (m_defined_outputs[NMS_VALID_OUTPUTS]) {
+        auto valid_outputs_out = reinterpret_cast<int *>(getChildEdgesAtPort(NMS_VALID_OUTPUTS)[0]->getMemoryPtr()->getData());
+        *valid_outputs_out = static_cast<int>(valid_outputs);
+    }
 
-auto t2 = std::chrono::high_resolution_clock::now();
-if (counter > 0lu) {
-    std::chrono::duration<double, std::nano> ms_double = t2 - t1;
-    double elps_cur = ms_double.count();
-    elps += elps_cur;
-    printf("[CPU] execute elps cur: %f; avg: %f nsec\n", elps_cur, elps/counter);
-}
-counter++;
+// auto t2 = std::chrono::high_resolution_clock::now();
+// if (counter > 0lu) {
+//     std::chrono::duration<double, std::nano> ms_double = t2 - t1;
+//     double elps_cur = ms_double.count();
+//     elps += elps_cur;
+//     printf("[CPU] execute elps cur: %f; avg: %f nsec\n", elps_cur, elps/counter);
+// }
+// counter++;
 }
 
 void NonMaxSuppression::nmsWithSoftSigma(const float *boxes, const float *scores, const VectorDims &boxesStrides,
@@ -533,12 +546,16 @@ void NonMaxSuppression::nmsWithSoftSigma(const float *boxes, const float *scores
 
 void NonMaxSuppression::nmsWithoutSoftSigma(const float *boxes, const float *scores, const VectorDims &boxesStrides,
                                                                 const VectorDims &scoresStrides, std::vector<FilteredBox> &filtBoxes) {
+static double elps = 0lu;
+static uint64_t counter = 0lu;
+auto t1 = std::chrono::high_resolution_clock::now();
+
 // printf("[CPU] NonMaxSuppression::nmsWithoutSoftSigma +\n");
 // printf("[CPU] FilteredBox size: %ld\n", sizeof(FilteredBox));
     const auto max_out_boxes = static_cast<int64_t>(m_max_output_boxes_per_class);
-    parallel_for2d(m_batches_num, m_classes_num, [&](int64_t batch_idx, int64_t class_idx) {
-// for (int64_t batch_idx = 0l; batch_idx < m_batches_num; batch_idx++) {
-// for (int64_t class_idx = 0l; class_idx < m_classes_num; class_idx++) {
+    // parallel_for2d(m_batches_num, m_classes_num, [&](int64_t batch_idx, int64_t class_idx) {
+for (int64_t batch_idx = 0l; batch_idx < m_batches_num; batch_idx++) {
+for (int64_t class_idx = 0l; class_idx < m_classes_num; class_idx++) {
         const float *boxesPtr = boxes + batch_idx * boxesStrides[0];
         const float *scoresPtr = scores + batch_idx * scoresStrides[0] + class_idx * scoresStrides[1];
 
@@ -568,44 +585,44 @@ void NonMaxSuppression::nmsWithoutSoftSigma(const float *boxes, const float *sco
 //     filtBoxes[offset + io_selection_size].score, filtBoxes[offset + io_selection_size].box_index);
             io_selection_size++;
             if (sorted_boxes_size > 1lu) {
-                if (m_jit_kernel) {
-                    std::vector<float> boxCoord0(sorted_boxes_size, 0.0f);
-                    std::vector<float> boxCoord1(sorted_boxes_size, 0.0f);
-                    std::vector<float> boxCoord2(sorted_boxes_size, 0.0f);
-                    std::vector<float> boxCoord3(sorted_boxes_size, 0.0f);
+//                 if (m_jit_kernel) {
+//                     std::vector<float> boxCoord0(sorted_boxes_size, 0.0f);
+//                     std::vector<float> boxCoord1(sorted_boxes_size, 0.0f);
+//                     std::vector<float> boxCoord2(sorted_boxes_size, 0.0f);
+//                     std::vector<float> boxCoord3(sorted_boxes_size, 0.0f);
 
-                    boxCoord0[0] = boxesPtr[sorted_boxes[0].second * m_coord_num];
-                    boxCoord1[0] = boxesPtr[sorted_boxes[0].second * m_coord_num + 1];
-                    boxCoord2[0] = boxesPtr[sorted_boxes[0].second * m_coord_num + 2];
-                    boxCoord3[0] = boxesPtr[sorted_boxes[0].second * m_coord_num + 3];
+//                     boxCoord0[0] = boxesPtr[sorted_boxes[0].second * m_coord_num];
+//                     boxCoord1[0] = boxesPtr[sorted_boxes[0].second * m_coord_num + 1];
+//                     boxCoord2[0] = boxesPtr[sorted_boxes[0].second * m_coord_num + 2];
+//                     boxCoord3[0] = boxesPtr[sorted_boxes[0].second * m_coord_num + 3];
 
-                    auto arg = kernel::NmsCallArgs();
-                    arg.iou_threshold = static_cast<float*>(&m_iou_threshold);
-                    arg.score_threshold = static_cast<float*>(&m_score_threshold);
-                    arg.scale = static_cast<float*>(&m_scale);
-                    // box start index do not change for hard supresion
-                    arg.selected_boxes_coord[0] = static_cast<float*>(&boxCoord0[0]);
-                    arg.selected_boxes_coord[1] = static_cast<float*>(&boxCoord1[0]);
-                    arg.selected_boxes_coord[2] = static_cast<float*>(&boxCoord2[0]);
-                    arg.selected_boxes_coord[3] = static_cast<float*>(&boxCoord3[0]);
+//                     auto arg = kernel::NmsCallArgs();
+//                     arg.iou_threshold = static_cast<float*>(&m_iou_threshold);
+//                     arg.score_threshold = static_cast<float*>(&m_score_threshold);
+//                     arg.scale = static_cast<float*>(&m_scale);
+//                     // box start index do not change for hard supresion
+//                     arg.selected_boxes_coord[0] = static_cast<float*>(&boxCoord0[0]);
+//                     arg.selected_boxes_coord[1] = static_cast<float*>(&boxCoord1[0]);
+//                     arg.selected_boxes_coord[2] = static_cast<float*>(&boxCoord2[0]);
+//                     arg.selected_boxes_coord[3] = static_cast<float*>(&boxCoord3[0]);
 
-                    for (size_t candidate_idx = 1; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
-                        int candidateStatus = NMSCandidateStatus::SELECTED; // 0 for suppressed, 1 for selected
-                        arg.selected_boxes_num = io_selection_size;
-                        arg.candidate_box = static_cast<const float*>(&boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num]);
-                        arg.candidate_status = static_cast<int*>(&candidateStatus);
-                        (*m_jit_kernel)(&arg);
-                        if (candidateStatus == NMSCandidateStatus::SELECTED) {
-                            boxCoord0[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num];
-                            boxCoord1[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num + 1];
-                            boxCoord2[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num + 2];
-                            boxCoord3[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num + 3];
-                            filtBoxes[offset + io_selection_size] =
-                                FilteredBox(sorted_boxes[candidate_idx].first, batch_idx, class_idx, sorted_boxes[candidate_idx].second);
-                            io_selection_size++;
-                        }
-                    }
-                } else {
+//                     for (size_t candidate_idx = 1; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
+//                         int candidateStatus = NMSCandidateStatus::SELECTED; // 0 for suppressed, 1 for selected
+//                         arg.selected_boxes_num = io_selection_size;
+//                         arg.candidate_box = static_cast<const float*>(&boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num]);
+//                         arg.candidate_status = static_cast<int*>(&candidateStatus);
+//                         (*m_jit_kernel)(&arg);
+//                         if (candidateStatus == NMSCandidateStatus::SELECTED) {
+//                             boxCoord0[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num];
+//                             boxCoord1[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num + 1];
+//                             boxCoord2[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num + 2];
+//                             boxCoord3[io_selection_size] = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num + 3];
+//                             filtBoxes[offset + io_selection_size] =
+//                                 FilteredBox(sorted_boxes[candidate_idx].first, batch_idx, class_idx, sorted_boxes[candidate_idx].second);
+//                             io_selection_size++;
+//                         }
+//                     }
+//                 } else {
                     // TODO: Declare function ptr rotatedIntersectionOverUnion
                     for (size_t candidate_idx = 1lu; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
 // printf("[CPU] candidate_idx: %lu; io_selection_size: %ld\n", candidate_idx, io_selection_size);
@@ -637,13 +654,22 @@ void NonMaxSuppression::nmsWithoutSoftSigma(const float *boxes, const float *sco
                             io_selection_size++;
                         }
                     }
-                }
+//                 }
             }
         }
 
         m_num_filtered_boxes[batch_idx][class_idx] = io_selection_size;
-    });
-// }}
+    // });
+}} // for m_batches_num and m_classes_num
+
+auto t2 = std::chrono::high_resolution_clock::now();
+if (counter > 0lu) {
+    std::chrono::duration<double, std::nano> ms_double = t2 - t1;
+    double elps_cur = ms_double.count();
+    elps += elps_cur;
+    printf("[CPU] nmsWithoutSoftSigma elps cur: %f; avg: %f nsec\n", elps_cur, elps/counter);
+}
+counter++;
 }
 
 ////////// Rotated boxes //////////
@@ -963,103 +989,41 @@ inline float NonMaxSuppression::rotatedIntersectionOverUnion_2(const float* box_
 
 /////////////// End of Rotated boxes ///////////////
 
-void NonMaxSuppression::nmsRotated(const float *boxes, const float *scores, const VectorDims &boxesStrides,
-                                                                const VectorDims &scoresStrides, std::vector<FilteredBox> &filtBoxes) {
-// printf("[CPU] NonMaxSuppression::nmsRotated +\n");
-// printf("[CPU] FilteredBox size: %ld\n", sizeof(FilteredBox));
-    const auto max_out_boxes = static_cast<int64_t>(m_max_output_boxes_per_class);
-    parallel_for2d(m_batches_num, m_classes_num, [&](int64_t batch_idx, int64_t class_idx) {
-// for (int64_t batch_idx = 0l; batch_idx < m_batches_num; batch_idx++) {
-// for (int64_t class_idx = 0l; class_idx < m_classes_num; class_idx++) {
-        const float *boxesPtr = boxes + batch_idx * boxesStrides[0];
-        const float *scoresPtr = scores + batch_idx * scoresStrides[0] + class_idx * scoresStrides[1];
+// void NonMaxSuppression::nmsRotated(const float* boxes, const float* scores, const VectorDims& boxesStrides,
+//                                    const VectorDims& scoresStrides, std::vector<FilteredBox>& filtered_boxes) {
+// static double elps = 0lu;
+// static uint64_t counter = 0lu;
+// auto t1 = std::chrono::high_resolution_clock::now();
 
-        std::vector<std::pair<float, int>> sorted_boxes;  // score, box_idx
-        sorted_boxes.reserve(m_boxes_num);
-        for (size_t box_idx = 0; box_idx < m_boxes_num; box_idx++) {
-            if (scoresPtr[box_idx] > m_score_threshold) {
-                sorted_boxes.emplace_back(std::make_pair(scoresPtr[box_idx], box_idx));
-// printf("[CPU] sorted_boxes_1 score: %f; box_idx: %d\n", sorted_boxes.back().first, sorted_boxes.back().second);
-// auto data_f = reinterpret_cast<float *>(sorted_boxes.data());
-// auto data_i = reinterpret_cast<int32_t *>(sorted_boxes.data());
-// printf("[CPU] sorted_boxes_2 score: %f; box_idx: %d\n", data_f[(sorted_boxes.size() - 1) * 2], data_i[(sorted_boxes.size() - 1) * 2 + 1]);
-            }
-        }
-
-        int64_t io_selection_size = 0l;
-        const size_t sorted_boxes_size = sorted_boxes.size();
-// printf("[CPU] sorted_boxes_size: %lu; max_out_boxes: %ld\n", sorted_boxes_size, max_out_boxes);
-        if (sorted_boxes_size > 0lu) {
-            parallel_sort(sorted_boxes.begin(), sorted_boxes.end(),
-                          [](const std::pair<float, int>& l, const std::pair<float, int>& r) {
-                              return (l.first > r.first || ((l.first == r.first) && (l.second < r.second)));
-                          });
-            int64_t offset = batch_idx * m_classes_num * m_max_output_boxes_per_class + class_idx * m_max_output_boxes_per_class;
-            filtBoxes[offset + 0] = FilteredBox(sorted_boxes[0].first, batch_idx, class_idx, sorted_boxes[0].second);
-// printf("[CPU] selected class_index: %d; score: %f; box_index: %d\n", filtBoxes[offset + io_selection_size].class_index,
-//     filtBoxes[offset + io_selection_size].score, filtBoxes[offset + io_selection_size].box_index);
-            io_selection_size++;
-            if (sorted_boxes_size > 1lu) {
-                // TODO: Declare function ptr rotatedIntersectionOverUnion
-                for (size_t candidate_idx = 1lu; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
-// printf("[CPU] candidate_idx: %lu; io_selection_size: %ld\n", candidate_idx, io_selection_size);
-                    NMSCandidateStatus candidateStatus = NMSCandidateStatus::SELECTED;
-                    // auto ref_box = boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num];
-                    for (int64_t selected_idx = io_selection_size - 1l; selected_idx >= 0l; selected_idx--) {
-// printf("[CPU] selected_idx: %ld\n", selected_idx);
-                        float iou = rotatedIntersectionOverUnion_2(&boxesPtr[sorted_boxes[candidate_idx].second * m_coord_num],
-                            &boxesPtr[filtBoxes[offset + selected_idx].box_index * m_coord_num]);
-// printf("[CPU] nmsWithoutSoftSigma iou: %f\n", iou);
-                        if (iou > m_iou_threshold) {
-// printf("[CPU] nmsWithoutSoftSigma (iou > m_iou_threshold) iou: %f; m_iou_threshold: %f\n", iou, m_iou_threshold);
-                            candidateStatus = NMSCandidateStatus::SUPPRESSED;
-                            break;
-                        }
-                    }
-
-                    if (candidateStatus == NMSCandidateStatus::SELECTED) {
-                        filtBoxes[offset + io_selection_size] =
-                            FilteredBox(sorted_boxes[candidate_idx].first, batch_idx, class_idx, sorted_boxes[candidate_idx].second);
-// printf("[CPU] selected class_index: %d; score: %f; box_index: %d\n", filtBoxes[offset + io_selection_size].class_index,
-//     filtBoxes[offset + io_selection_size].score, filtBoxes[offset + io_selection_size].box_index);
-                        io_selection_size++;
-                    }
-                }
-            }
-        }
-
-        m_num_filtered_boxes[batch_idx][class_idx] = io_selection_size;
-    });
-// }}
-}
-
-// void NonMaxSuppression::nmsRotated(const float* boxes, const float* scores, const VectorDims& boxes_strides,
-//                                    const VectorDims& scores_strides, std::vector<FilteredBox>& filtered_boxes) {
 // // printf("[CPU] NonMaxSuppression::nmsRotated +\n");
 // // printf("[CPU] FilteredBox size: %ld\n", sizeof(FilteredBox));
 //     const auto max_out_boxes = static_cast<int64_t>(m_max_output_boxes_per_class);
-//     const auto class_box_offset = m_classes_num * m_max_output_boxes_per_class;
+//     // parallel_for2d(m_batches_num, m_classes_num, [&](int64_t batch_idx, int64_t class_idx) {
+// for (size_t batch_idx = 0l; batch_idx < m_batches_num; batch_idx++) {
+// for (size_t class_idx = 0l; class_idx < m_classes_num; class_idx++) {
+//         const float *boxes_ptr = boxes + batch_idx * boxesStrides[0];
+//         const float *scores_ptr = scores + batch_idx * scoresStrides[0] + class_idx * scoresStrides[1];
 
-//     parallel_for2d(m_batches_num, m_classes_num, [&](size_t batch_idx, size_t class_idx) {
-// // for (int64_t batch_idx = 0l; batch_idx < m_batches_num; batch_idx++) {
-// // for (int64_t class_idx = 0l; class_idx < m_classes_num; class_idx++) {
-//         const float *boxes_ptr = boxes + batch_idx * boxes_strides[0];
-//         const float *scores_ptr = scores + batch_idx * scores_strides[0] + class_idx * scores_strides[1];
-
+// //         std::vector<std::pair<float, int32_t>> sorted_indices;  // score, box_idx
+// //         sorted_indices.reserve(m_boxes_num);
+// //         for (size_t box_idx = 0lu; box_idx < m_boxes_num; box_idx++, scores_ptr++) {
+// //             if (*scores_ptr > m_score_threshold) {
+// //                 sorted_indices.emplace_back(std::make_pair(*scores_ptr, box_idx));
+// // // printf("[CPU] sorted_boxes_1 score: %f; box_idx: %d\n", sorted_indices.back().first, sorted_indices.back().second);
+// // // auto data_f = reinterpret_cast<float *>(sorted_indices.data());
+// // // auto data_i = reinterpret_cast<int32_t *>(sorted_indices.data());
+// // // printf("[CPU] sorted_boxes_2 score: %f; box_idx: %d\n", data_f[(sorted_indices.size() - 1) * 2], data_i[(sorted_indices.size() - 1) * 2 + 1]);
+// //             }
+// //         }
 //         std::vector<std::pair<float, size_t>> sorted_indices;  // score, box_idx
 //         sorted_indices.reserve(m_boxes_num);
-//         for (size_t box_idx = 0lu; box_idx < m_boxes_num; box_idx++) {
-//             if (scores_ptr[box_idx] > m_score_threshold) {
-//                 sorted_indices.emplace_back(std::make_pair(scores_ptr[box_idx], box_idx));
-// // printf("[CPU] sorted_boxes_1 score: %f; box_idx: %d\n", sorted_indices.back().first, sorted_indices.back().second);
-// // auto data_f = reinterpret_cast<float *>(sorted_indices.data());
-// // auto data_i = reinterpret_cast<int32_t *>(sorted_indices.data());
-// // printf("[CPU] sorted_boxes_2 score: %f; box_idx: %d\n", data_f[(sorted_indices.size() - 1) * 2], data_i[(sorted_indices.size() - 1) * 2 + 1]);
+//         for (size_t box_idx = 0lu; box_idx < m_boxes_num; box_idx++, scores_ptr++) {
+//             if (*scores_ptr > m_score_threshold) {
+//                 sorted_indices.emplace_back(std::make_pair(*scores_ptr, box_idx));
 //             }
 //         }
 
-//         // size_t io_selection_size = 0lu;
-//         int64_t io_selection_size = 0l;
+//         size_t io_selection_size = 0lu;
 //         const size_t sorted_boxes_size = sorted_indices.size();
 // // printf("[CPU] sorted_boxes_size: %lu; max_out_boxes: %ld\n", sorted_boxes_size, max_out_boxes);
 //         if (sorted_boxes_size > 0lu) {
@@ -1067,24 +1031,43 @@ void NonMaxSuppression::nmsRotated(const float *boxes, const float *scores, cons
 //                           [](const std::pair<float, size_t>& l, const std::pair<float, size_t>& r) {
 //                               return (l.first > r.first || ((l.first == r.first) && (l.second < r.second)));
 //                           });
-//             size_t offset = class_box_offset * batch_idx + m_max_output_boxes_per_class * class_idx;
+//             // parallel_sort(sorted_indices.begin(), sorted_indices.end(),
+//             //               [](const std::pair<float, int32_t>& l, const std::pair<float, int32_t>& r) {
+//             //                   return (l.first > r.first || ((l.first == r.first) && (l.second < r.second)));
+//             //               });
+//             size_t offset = batch_idx * m_classes_num * m_max_output_boxes_per_class + class_idx * m_max_output_boxes_per_class;
 //             filtered_boxes[offset] = FilteredBox(sorted_indices[0].first, batch_idx, class_idx, sorted_indices[0].second);
 // // printf("[CPU] selected class_index: %d; score: %f; box_index: %d\n", filtered_boxes[offset + io_selection_size].class_index,
 // //     filtered_boxes[offset + io_selection_size].score, filtered_boxes[offset + io_selection_size].box_index);
 //             io_selection_size++;
 //             if (sorted_boxes_size > 1lu) {
-//                 // if (m_jit_kernel) {
-//                 //     auto arg = kernel::NmsRotatedCallArgs();
+// //                 for (size_t candidate_idx = 1lu; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
+// // // printf("[CPU] candidate_idx: %lu; io_selection_size: %ld\n", candidate_idx, io_selection_size);
+// //                     NMSCandidateStatus candidateStatus = NMSCandidateStatus::SELECTED;
+// //                     // auto ref_box = boxes_ptr[sorted_indices[candidate_idx].second * m_coord_num];
+// //                     for (int64_t selected_idx = io_selection_size - 1l; selected_idx >= 0l; selected_idx--) {
+// // // printf("[CPU] selected_idx: %ld\n", selected_idx);
+// //                         float iou = rotatedIntersectionOverUnion_2(&boxes_ptr[sorted_indices[candidate_idx].second * m_coord_num],
+// //                             &boxes_ptr[filtered_boxes[offset + selected_idx].box_index * m_coord_num]);
+// // // printf("[CPU] nmsWithoutSoftSigma iou: %f\n", iou);
+// //                         if (iou > m_iou_threshold) {
+// // // printf("[CPU] nmsWithoutSoftSigma (iou > m_iou_threshold) iou: %f; m_iou_threshold: %f\n", iou, m_iou_threshold);
+// //                             candidateStatus = NMSCandidateStatus::SUPPRESSED;
+// //                             break;
+// //                         }
+// //                     }
 
-//                 //     arg.boxes_ptr = boxes_ptr;
-//                 //     arg.sorted_indices_ptr = sorted_indices.data();
-//                 //     arg.sorted_boxes_size = sorted_boxes_size;
-//                 //     arg.max_out_boxes = max_out_boxes;
-//                 //     arg.io_selection_size = io_selection_size;
+// //                     if (candidateStatus == NMSCandidateStatus::SELECTED) {
+// //                         filtered_boxes[offset + io_selection_size] =
+// //                             FilteredBox(sorted_indices[candidate_idx].first, batch_idx, class_idx, sorted_indices[candidate_idx].second);
+// // // printf("[CPU] selected class_index: %d; score: %f; box_index: %d\n", filtered_boxes[offset + io_selection_size].class_index,
+// // //     filtered_boxes[offset + io_selection_size].score, filtered_boxes[offset + io_selection_size].box_index);
+// //                         io_selection_size++;
+// //                     }
+// //                 }
 
-//                 //     (*m_jit_kernel)(&arg);
-//                 // } else {
 //                     NMSCandidateStatus candidate_status;
+//                     const size_t start_idx = io_selection_size - 1lu;
 
 //                     for (size_t candidate_idx = 1lu; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
 // // printf("[CPU] candidate_idx: %lu; io_selection_size: %ld\n", candidate_idx, io_selection_size);
@@ -1122,14 +1105,120 @@ void NonMaxSuppression::nmsRotated(const float *boxes, const float *scores, cons
 //                             io_selection_size++;
 //                         }
 //                     }
-//                 // }
 //             }
 //         }
 
 //         m_num_filtered_boxes[batch_idx][class_idx] = io_selection_size;
-//     });
-// // }}
+//     // });
+// }} // for m_batches_num and m_classes_num
+
+// auto t2 = std::chrono::high_resolution_clock::now();
+// if (counter > 0lu) {
+//     std::chrono::duration<double, std::nano> ms_double = t2 - t1;
+//     double elps_cur = ms_double.count();
+//     elps += elps_cur;
+//     printf("[CPU] nmsRotated elps cur: %f; avg: %f nsec\n", elps_cur, elps/counter);
 // }
+// counter++;
+// }
+
+void NonMaxSuppression::nmsRotated(const float* boxes, const float* scores, const VectorDims& boxes_strides,
+                                   const VectorDims& scores_strides, std::vector<FilteredBox>& filtered_boxes) {
+// printf("[CPU] NonMaxSuppression::nmsRotated +\n");
+// printf("[CPU] FilteredBox size: %ld\n", sizeof(FilteredBox));
+    const auto max_out_boxes = static_cast<int64_t>(m_max_output_boxes_per_class);
+    const auto class_box_offset = m_classes_num * m_max_output_boxes_per_class;
+
+    parallel_for2d(m_batches_num, m_classes_num, [&](size_t batch_idx, size_t class_idx) {
+// for (int64_t batch_idx = 0l; batch_idx < m_batches_num; batch_idx++) {
+// for (int64_t class_idx = 0l; class_idx < m_classes_num; class_idx++) {
+        const float *boxes_ptr = boxes + batch_idx * boxes_strides[0];
+        const float *scores_ptr = scores + batch_idx * scores_strides[0] + class_idx * scores_strides[1];
+
+        std::vector<std::pair<float, size_t>> sorted_indices;  // score, box_idx
+        sorted_indices.reserve(m_boxes_num);
+        for (size_t box_idx = 0lu; box_idx < m_boxes_num; box_idx++) {
+            if (scores_ptr[box_idx] > m_score_threshold) {
+                sorted_indices.emplace_back(std::make_pair(scores_ptr[box_idx], box_idx));
+// printf("[CPU] sorted_boxes_1 score: %f; box_idx: %d\n", sorted_indices.back().first, sorted_indices.back().second);
+// auto data_f = reinterpret_cast<float *>(sorted_indices.data());
+// auto data_i = reinterpret_cast<int32_t *>(sorted_indices.data());
+// printf("[CPU] sorted_boxes_2 score: %f; box_idx: %d\n", data_f[(sorted_indices.size() - 1) * 2], data_i[(sorted_indices.size() - 1) * 2 + 1]);
+            }
+        }
+
+        // size_t io_selection_size = 0lu;
+        int64_t io_selection_size = 0l;
+        const size_t sorted_boxes_size = sorted_indices.size();
+// printf("[CPU] sorted_boxes_size: %lu; max_out_boxes: %ld\n", sorted_boxes_size, max_out_boxes);
+        if (sorted_boxes_size > 0lu) {
+            parallel_sort(sorted_indices.begin(), sorted_indices.end(),
+                          [](const std::pair<float, size_t>& l, const std::pair<float, size_t>& r) {
+                              return (l.first > r.first || ((l.first == r.first) && (l.second < r.second)));
+                          });
+            size_t offset = class_box_offset * batch_idx + m_max_output_boxes_per_class * class_idx;
+            filtered_boxes[offset] = FilteredBox(sorted_indices[0].first, batch_idx, class_idx, sorted_indices[0].second);
+// printf("[CPU] selected class_index: %d; score: %f; box_index: %d\n", filtered_boxes[offset + io_selection_size].class_index,
+//     filtered_boxes[offset + io_selection_size].score, filtered_boxes[offset + io_selection_size].box_index);
+            io_selection_size++;
+            if (sorted_boxes_size > 1lu) {
+                // if (m_jit_kernel) {
+                //     auto arg = kernel::NmsRotatedCallArgs();
+
+                //     arg.boxes_ptr = boxes_ptr;
+                //     arg.sorted_indices_ptr = sorted_indices.data();
+                //     arg.sorted_boxes_size = sorted_boxes_size;
+                //     arg.max_out_boxes = max_out_boxes;
+                //     arg.io_selection_size = io_selection_size;
+
+                //     (*m_jit_kernel)(&arg);
+                // } else {
+                    NMSCandidateStatus candidate_status;
+
+                    for (size_t candidate_idx = 1lu; (candidate_idx < sorted_boxes_size) && (io_selection_size < max_out_boxes); candidate_idx++) {
+// printf("[CPU] candidate_idx: %lu; io_selection_size: %ld\n", candidate_idx, io_selection_size);
+                        candidate_status = NMSCandidateStatus::SELECTED;
+                        auto box_0 = boxes_ptr + sorted_indices[candidate_idx].second * m_coord_num;
+                        Point2D vertices_0[4];
+                        getRotatedVertices(box_0, vertices_0, m_clockwise);
+                        const auto area_0 = box_0[2] * box_0[3]; // W x H
+// printf("[CPU] nmsRotated area_0: %f\n", area_0);
+
+                        if (area_0 > 0.f) {
+                            // size_t indices_num = io_selection_size - 1lu;
+                            // for (size_t selected_idx = 0lu; selected_idx < indices_num; selected_idx++) {
+                            for (int64_t selected_idx = io_selection_size - 1l; selected_idx >= 0l; selected_idx--) {
+// printf("[CPU] selected_idx: %ld\n", selected_idx);
+                                auto iou = rotatedIntersectionOverUnion(vertices_0, area_0,
+                                        boxes_ptr + filtered_boxes[offset + selected_idx].box_index * m_coord_num);
+// printf("[CPU] nmsRotated iou: %f\n", iou);
+                                if (iou > m_iou_threshold) {
+// printf("[CPU] nmsRotated (iou > m_iou_threshold) iou: %f; m_iou_threshold: %f\n", iou, m_iou_threshold);
+                                    candidate_status = NMSCandidateStatus::SUPPRESSED;
+                                    break;
+                                }
+                            }
+                        } else if (0.f > m_iou_threshold) {
+// printf("[CPU] nmsRotated (iou > m_iou_threshold) iou: %f; m_iou_threshold: %f\n", iou, m_iou_threshold);
+                            candidate_status = NMSCandidateStatus::SUPPRESSED;
+                        }
+
+                        if (candidate_status == NMSCandidateStatus::SELECTED) {
+                            filtered_boxes[offset + io_selection_size] =
+                                FilteredBox(sorted_indices[candidate_idx].first, batch_idx, class_idx, sorted_indices[candidate_idx].second);
+// printf("[CPU] selected class_index: %d; score: %f; box_index: %d\n", filtered_boxes[offset + io_selection_size].class_index,
+//     filtered_boxes[offset + io_selection_size].score, filtered_boxes[offset + io_selection_size].box_index);
+                            io_selection_size++;
+                        }
+                    }
+                // }
+            }
+        }
+
+        m_num_filtered_boxes[batch_idx][class_idx] = io_selection_size;
+    });
+// }}
+}
 
 float NonMaxSuppression::intersectionOverUnion(const float *boxesI, const float *boxesJ) {
 std::cout << "[CPU] NonMaxSuppression::intersectionOverUnion +" << std::endl;
