@@ -28,7 +28,7 @@ void NmsRotated<isa>::generate() {
     r64_work_amount = getReg64();
 
     mov(r64_dst, ptr[regParams + GET_OFF(dst_ptr)]);
-    mov(r64_dst, ptr[regParams + GET_OFF(boxes_ptr)]);
+    mov(r64_boxes, ptr[regParams + GET_OFF(boxes_ptr)]);
     mov(r64_work_amount, ptr[regParams + GET_OFF(work_amount)]);
 
     initVectors();
@@ -302,6 +302,13 @@ void NmsRotated<isa>::process() {
 
     L(l_tail);
     tail(v_res);
+}
+
+template <x64::cpu_isa_t isa>
+void NmsRotated<isa>::getRotatedVertices(const Vmm& vmm_boxes, const Vmm& vmm_vertices) {
+    auto v_aux = getVmm();
+    auto ymm_aux = Xbyak::Ymm(v_aux.getIdx());
+    uni_vpbroadcastq(ymm_aux, ptr[r64_boxes]);
 }
 
 template <x64::cpu_isa_t isa>

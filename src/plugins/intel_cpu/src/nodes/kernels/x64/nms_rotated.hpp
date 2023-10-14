@@ -76,6 +76,8 @@ private:
 
     void process();
 
+    void getRotatedVertices(const Vmm& vmm_boxes, const Vmm& vmm_vertices);
+
     void runPhilox(const std::vector<Vmm>& vmm_res, const Vmm& vmm_key, const Vmm& vmm_counter, const Vmm& vmm_n);
 
     void calculateRound(const Vmm& vmm_k_0, const Vmm& vmm_k_1, const Vmm& vmm_c_0, const Vmm& vmm_c_1,
