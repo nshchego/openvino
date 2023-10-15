@@ -614,9 +614,6 @@ bool Node::outputShapeDataDependency() const {
 }
 
 void Node::redefineOutputMemory(const std::vector<VectorDims> &newOutputShapes) {
-if (type == Type::NonMaxSuppression) {
-    printf("[CPU] Node::redefineOutputMemory\n");
-}
     if (newOutputShapes.size() != outputShapes.size()) {
         IE_THROW() << "Number shapes mismatch with real outputs number for node with name: " << getName();
     }
@@ -638,9 +635,6 @@ if (type == Type::NonMaxSuppression) {
         for (size_t j = 0; j < edges.size(); j++) {
             edges[j]->getMemoryPtr()->redefineDesc(memDesc);
         }
-if (type == Type::NonMaxSuppression) {
-    printf("[CPU] Node::redefineOutputMemory redefined; isStatic: %d\n", currDesc.getShape().isStatic());
-}
     }
 }
 
