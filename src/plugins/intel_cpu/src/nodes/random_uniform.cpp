@@ -27,7 +27,8 @@ bool RandomUniform::isSupportedOperation(const std::shared_ptr<const ov::Node>& 
 }
 
 RandomUniform::RandomUniform(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-        : Node(op, context, RandomUniformShapeInferFactory(op)) {
+        // : Node(op, context, RandomUniformShapeInferFactory(op)) {
+        : Node(op, context, NgraphShapeInferFactory(op, PortMask(1))) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         THROW_CPU_NODE_ERR(errorMessage);
