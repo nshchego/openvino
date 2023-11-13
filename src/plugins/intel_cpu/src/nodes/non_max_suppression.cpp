@@ -330,6 +330,10 @@ void NonMaxSuppression::execute(dnnl::stream strm) {
     }
 
     if (m_defined_outputs[NMS_VALID_OUTPUTS]) {
+        if (!m_out_static_shape) {
+            redefineOutputMemory(NMS_VALID_OUTPUTS, { valid_outputs, stride });
+        }
+
         auto out_ptr = reinterpret_cast<int32_t *>(getChildEdgesAtPort(NMS_VALID_OUTPUTS)[0]->getMemoryPtr()->getData());
         *out_ptr = static_cast<int32_t>(valid_outputs);
     }
