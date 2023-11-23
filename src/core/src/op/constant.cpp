@@ -146,6 +146,7 @@ Constant::Constant(bool memset_allocation, const element::Type& type, const Shap
 void Constant::allocate_buffer(bool memset_allocation) {
     // memset_allocation flag is to switch on initialization of objects in memory for element::string type
     // and set memory to zero for numeric element types
+std::cout << "allocate_buffer size: " << mem_size() << "; string size: " << sizeof(std::string) << std::endl;
     if (m_element_type == ov::element::string) {
         auto num_elements = shape_size(m_shape);
         m_data = std::make_shared<StringAlignedBuffer>(num_elements, mem_size(), host_alignment(), memset_allocation);
@@ -158,6 +159,7 @@ void Constant::allocate_buffer(bool memset_allocation) {
 }
 
 Constant::Constant(const element::Type& type, const Shape& shape, const void* data) : Constant(false, type, shape) {
+std::cout << "Constant ctr 6" << std::endl;
     if (m_element_type == ov::element::string) {
         auto num_elements = shape_size(m_shape);
         const std::string* src_strings = static_cast<const std::string*>(data);
