@@ -32,6 +32,7 @@ bool Convert::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
 
 Convert::Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
         : Node(op, context, PassThroughShapeInferFactory()) {
+std::cout << "[CPU] Convert 1 prc: " << op->get_element_type() << std::endl;
     std::string errorMessage;
     if (isSupportedOperation(op, errorMessage)) {
         errorPrefix = "Convert node with name '" + getName() + "'";
@@ -46,6 +47,7 @@ Convert::Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr c
 Convert::Convert(const Shape &shape, const ov::element::Type &inPrc, const ov::element::Type &outPrc,
                  const std::string &nodeName, const GraphContext::CPtr context)
         : Node("Convert", nodeName, context) {
+std::cout << "[CPU] Convert 2 inPrc: " << inPrc << "; outPrc: " << outPrc << std::endl;
     convertParams.origPrc = outPrc;
     inputShapes.push_back(shape);
     addOriginalInputPrecision(inPrc);

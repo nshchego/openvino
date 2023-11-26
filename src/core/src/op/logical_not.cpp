@@ -26,6 +26,8 @@ struct Evaluate : element::NoAction<bool> {
 namespace v1 {
 
 LogicalNot::LogicalNot(const Output<Node>& arg) : Op({arg}) {
+// std::cout << "[CORE] LogicalNot node " << arg.get_node_shared_ptr()->get_type_info().name <<
+    // " from " << arg.get_node_shared_ptr()->get_output_element_type(0) << std::endl;
     constructor_validate_and_infer_types();
 }
 

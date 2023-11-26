@@ -481,6 +481,11 @@ void SubgraphBaseTest::validate() {
     t_device.join();
     t_ref.join();
 #endif
+// auto expData = expectedOutputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
+// std::cout << "[TEST] SubgraphBaseTest::validate expected: " << std::endl;
+// for (size_t i = 0lu; i < expectedOutputs[0].get_size(); i++) {
+//     std::cout << "expData: \"" << expData[i] << "\"" << std::endl;
+// }
 
     if (expectedOutputs.empty()) {
         return;

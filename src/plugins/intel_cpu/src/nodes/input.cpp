@@ -233,6 +233,7 @@ jit_has_subnormals_base::fn_t jit_has_subnormals_function() {
 
 Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context)
         : Node(op, context, PassThroughShapeInferFactory()) {
+std::cout << "[CPU] Input 1 prc: " << op->get_element_type() << "; name: " << getName() << std::endl;
     if (!one_of(op->get_type_info(),
             v0::Parameter::get_type_info_static(),
             v0::Constant::get_type_info_static(),
@@ -394,6 +395,7 @@ Input::Input(const Shape& shape,
              const std::string& type,
              const GraphContext::CPtr context)
     : Node(type, name, context) {
+std::cout << "[CPU] Input 2 prc: " << prc << std::endl;
     constant = ConstantType::NoConst;
     isDynamic = shape.isDynamic();
     if (isDynamic) {
@@ -410,6 +412,7 @@ Input::Input(const Shape& shape,
 
 Input::Input(MemoryDescPtr memDesc, const std::string& name, const std::string& type, const GraphContext::CPtr context)
     : Input(memDesc->getShape(), memDesc->getPrecision(), name, type, context) {
+std::cout << "[CPU] Input 3 type: " << type << std::endl;
     extMemDesc = memDesc;
 }
 
@@ -420,14 +423,14 @@ MemoryCPtr Input::getMemoryPtr() const {
 void Input::getSupportedDescriptors() {
     if (getType() == Type::Input) {
         if (!getParentEdges().empty())
-            OPENVINO_THROW("Incorrect number of input edges for layer ", getName());
+            THROW_CPU_NODE_ERR("has incorrect number of input edges.");
         if (getChildEdges().empty())
-            OPENVINO_THROW("Incorrect number of output edges for layer ", getName());
+            THROW_CPU_NODE_ERR("has incorrect number of output edges.");
     } else if (getType() == Type::Output) {
         if (getParentEdges().size() != 1)
-            OPENVINO_THROW("Incorrect number of input edges for layer ", getName());
+            THROW_CPU_NODE_ERR("has incorrect number of input edges.");
         if (!getChildEdges().empty())
-            OPENVINO_THROW("Incorrect number of output edges for layer ", getName());
+            THROW_CPU_NODE_ERR("has incorrect number of output edges.");
     }
 }
 
@@ -446,19 +449,19 @@ void Input::createPrimitive() {
     for (size_t i = 0; i < getChildEdges().size(); i++) {
         auto dstMemPtr = getChildEdgeAt(i)->getMemoryPtr();
         if (!dstMemPtr || !dstMemPtr->isAllocated())
-            OPENVINO_THROW("Destination memory didn't allocate for node ", getName()
-                              , " to node ", getChildEdgeAt(i)->getChild()->getName(), ".");
+            THROW_CPU_NODE_ERR("has unallocated memory at port ", i,
+                              " to node ", getChildEdgeAt(i)->getChild()->getName(), ".");
     }
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         auto srcMemPtr = getParentEdgeAt(i)->getMemoryPtr();
         if (!srcMemPtr || !srcMemPtr->isAllocated())
-            OPENVINO_THROW("Destination memory didn't allocate for node ", getName()
-                              , " from node ", getParentEdgeAt(i)->getParent()->getName(), ".");
+            THROW_CPU_NODE_ERR("has unallocated memory at port ", i,
+                              " from node ", getParentEdgeAt(i)->getParent()->getName(), ".");
     }
 
     const NodeDesc *selected_pd = getSelectedPrimitiveDescriptor();
     if (selected_pd == nullptr)
-        OPENVINO_THROW("Preferable primitive descriptor is not set for node ", getName(), ".");
+        THROW_CPU_NODE_ERR("doesn't have selected primitive descriptor.");
 }
 
 bool Input::created() const {

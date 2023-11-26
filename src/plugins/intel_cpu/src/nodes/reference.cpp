@@ -18,6 +18,7 @@ namespace node {
 Reference::Reference(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context,
                                          const std::string& errorMessage) :
         Node(op, context, NgraphShapeInferFactory(op, FULL_PORT_MASK)), ovCoreNode(op), additionalErrorMessage(errorMessage) {
+std::cout << "[CPU] Reference prc: " << op->get_input_element_type(0) << std::endl;
     if (!op->has_evaluate()) {
         OPENVINO_THROW_NOT_IMPLEMENTED(
             "Cannot fallback on ngraph reference implementation (Ngraph::Node::evaluate() is not implemented");
@@ -51,6 +52,7 @@ void Reference::initSupportedPrimitiveDescriptors() {
 void Reference::createPrimitive() {}
 
 void Reference::execute(dnnl::stream strm) {
+std::cout << "[CPU] Reference execute prc: " << getOriginalOutputPrecisionAtPort(0) << std::endl;
     auto inputs = prepareInputs();
     auto outputs = prepareOutputs();
     if (!ovCoreNode->evaluate(outputs, inputs)) {
@@ -59,6 +61,7 @@ void Reference::execute(dnnl::stream strm) {
 }
 
 void Reference::executeDynamicImpl(dnnl::stream strm) {
+std::cout << "[CPU] Reference executeDynamicImpl prc: " << getOriginalOutputPrecisionAtPort(0) << std::endl;
     auto inputs = prepareInputs();
     ov::TensorVector outputs;
     auto result = Node::shapeInfer();
@@ -108,9 +111,26 @@ bool Reference::needShapeInfer() const {
 }
 
 ov::TensorVector Reference::prepareInputs() const {
+std::cout << "[CPU] Reference::prepareInputs" << std::endl;
     ov::TensorVector inputs;
     for (size_t i = 0lu; i < inputShapes.size(); i++) {
-        void *srcDataPtr = getParentEdgesAtPort(i)[0]->getMemory().getData();
+        auto srcDataPtr = getParentEdgesAtPort(i)[0]->getMemory().getData();
+std::cout << "    In prc: " << getParentEdgesAtPort(i)[0]->getMemory().getDesc().getPrecision() <<
+    "; in ptr: " << srcDataPtr << std::endl;
+
+// auto InData = reinterpret_cast<std::string *>(srcDataPtr);
+// std::cout << "[CPU] Reference::prepareInputs input " << getParentEdgesAtPort(i)[0]->getMemory().getSize() << std::endl;
+// for (size_t i = 0lu; i < getParentEdgesAtPort(i)[0]->getMemory().getSize() / sizeof(std::string *); i++) {
+// for (size_t i = 0lu; i < 5lu; i++) {
+//     std::cout << "    InData: \"" << InData[i] << "\"; ptr: " << (InData + i) << std::endl;
+// }
+
+// auto OutData = op_outputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
+// std::cout << "[TEST] INTExecutable::call expected out: " << std::endl;
+// for (size_t i = 0lu; i < op_outputs[0].get_size(); i++) {
+//     std::cout << "    OutData: \"" << OutData[i] << "\"" << std::endl;
+// }
+
         ov::Shape shape = ovCoreNode->get_input_partial_shape(i).rank().get_length() == 0 ?
                 ov::Shape{} : getParentEdgesAtPort(i)[0]->getMemory().getStaticDims();
 
@@ -125,6 +145,7 @@ ov::TensorVector Reference::prepareInputs() const {
 }
 
 ov::TensorVector Reference::prepareOutputs() const {
+std::cout << "[CPU] Reference::prepareOutputs" << std::endl;
     ov::TensorVector outputs;
     for (size_t i = 0lu; i < outputShapes.size(); i++) {
         void *dstDataPtr = getChildEdgesAtPort(i)[0]->getMemory().getData();

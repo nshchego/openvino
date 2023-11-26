@@ -78,6 +78,7 @@ bool ov::runtime::interpreter::INTExecutable::call(std::vector<ov::Tensor>& outp
                                                    const std::vector<ov::Tensor>& inputs,
                                                    const ov::EvaluationContext& context,
                                                    bool collect_performance) {
+std::cout << "[TEST] INTExecutable::call +" << std::endl;
 #define CHECK_TERMINATE()                          \
     if (m_cancel_execution) {                      \
         std::lock_guard<std::mutex> lock(m_mutex); \
@@ -108,6 +109,7 @@ bool ov::runtime::interpreter::INTExecutable::call(std::vector<ov::Tensor>& outp
 
     // for each ordered op in the graph
     for (const auto& op : m_nodes) {
+std::cout << "[TEST] INTExecutable::call node " << op->get_type_info().name << ", " << op->get_name() << std::endl;
         CHECK_TERMINATE()
         if (std::dynamic_pointer_cast<ov::op::v0::Parameter>(op)) {
             continue;
@@ -139,6 +141,18 @@ bool ov::runtime::interpreter::INTExecutable::call(std::vector<ov::Tensor>& outp
                 // TODO: extend evaluate map for the context
                 evaluate_node(op, op_outputs, op_inputs);
             }
+
+// auto InData = op_inputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
+// std::cout << "[TEST] INTExecutable::call expected in: " << std::endl;
+// for (size_t i = 0lu; i < op_inputs[0].get_size(); i++) {
+//     std::cout << "    InData: \"" << InData[i] << "\"" << std::endl;
+// }
+
+// auto OutData = op_outputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
+// std::cout << "[TEST] INTExecutable::call expected out: " << std::endl;
+// for (size_t i = 0lu; i < op_outputs[0].get_size(); i++) {
+//     std::cout << "    OutData: \"" << OutData[i] << "\"" << std::endl;
+// }
         }
         // Update tensors in tensor map
         for (size_t i = 0; i < op->get_output_size(); ++i) {

@@ -107,6 +107,8 @@ namespace v0 {
 Convert::Convert(const Output<Node>& arg, const element::Type& destination_type)
     : Op({arg}),
       m_destination_type(destination_type) {
+std::cout << "[CORE] Convert node " << arg.get_node_shared_ptr()->get_type_info().name <<
+    " from " << arg.get_node_shared_ptr()->get_output_element_type(0) << " to " << destination_type << std::endl;
     constructor_validate_and_infer_types();
 }
 
@@ -173,6 +175,7 @@ bool Convert::has_evaluate() const {
         case element::u32:
         case element::u64:
         case element::nf4:
+        case element::string:
             return true;
         default:
             return false;

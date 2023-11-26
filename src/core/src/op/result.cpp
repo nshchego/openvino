@@ -36,6 +36,7 @@ std::shared_ptr<Node> Result::clone_with_new_inputs(const OutputVector& new_args
 }
 
 bool Result::evaluate(TensorVector& outputs, const TensorVector& inputs) const {
+std::cout << "[CORE] Result::evaluate" << std::endl;
     OV_OP_SCOPE(v0_Result_evaluate);
     OPENVINO_ASSERT(inputs.size() == 1);
 
@@ -58,6 +59,18 @@ bool Result::evaluate(TensorVector& outputs, const TensorVector& inputs) const {
         const void* input = inputs[0].data();
         memcpy(output, input, outputs[0].get_byte_size());
     }
+
+// auto InData = inputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
+// std::cout << "[TEST] Result::evaluate in: " << std::endl;
+// for (size_t i = 0lu; i < inputs[0].get_size(); i++) {
+//     std::cout << "    InData: \"" << InData[i] << "\"" << std::endl;
+// }
+
+// auto OutData = outputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
+// std::cout << "[TEST] Result::evaluate out: " << std::endl;
+// for (size_t i = 0lu; i < outputs[0].get_size(); i++) {
+//     std::cout << "    OutData: \"" << OutData[i] << "\"" << std::endl;
+// }
 
     return true;
 }
