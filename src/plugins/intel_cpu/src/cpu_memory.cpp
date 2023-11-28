@@ -10,13 +10,12 @@
 #include <dnnl_types.h>
 #include <common/memory_desc_wrapper.hpp>
 #include "cpu_memory.h"
-#include "nodes/common/cpu_memcpy.h"
 #include "nodes/common/cpu_convert.h"
 #include "onednn/dnnl.h"
 #include "cpu_shape.h"
 #include "memory_desc/dnnl_blocked_memory_desc.h"
 #include "nodes/reorder.h"
-#include "memory_desc/cpu_memory_desc.h"
+// #include "memory_desc/cpu_memory_desc.h"
 
 using namespace InferenceEngine;
 using namespace dnnl;

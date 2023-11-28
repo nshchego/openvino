@@ -3,7 +3,6 @@
 //
 
 #include "input.h"
-#include "common/cpu_memcpy.h"
 #include <dnnl_extension_utils.h>
 
 #include <string>
@@ -14,7 +13,6 @@
 #include "openvino/core/parallel.hpp"
 #include <ie_ngraph_utils.hpp>
 #include "caseless.hpp"
-#include "common/cpu_memcpy.h"
 #include "common/cpu_convert.h"
 #include "utils/cpu_utils.hpp"
 #include <cpu/x64/jit_generator.hpp>
@@ -279,7 +277,15 @@ void Input::cloneBlobIfRequired() {
             memory = std::make_shared<Memory>(getEngine(), memDesc, constOp->get_data_ptr());
         } else {
             memory = std::make_shared<Memory>(getEngine(), memDesc);
-            memcpy(memory->getData(), constOp->get_data_ptr(), constOp->get_byte_size());
+            if (constOp->get_element_type() == ov::element::string) {
+                auto dst = reinterpret_cast<ov::element_type_traits<ov::element::string>::value_type *>(memory->getData());
+                auto src = constOp->get_data_ptr<ov::element_type_traits<ov::element::string>::value_type>();
+                for (size_t i = 0lu; i < size; i++) {
+                    *(dst++) = *(src++);
+                }
+            } else {
+                memcpy(memory->getData(), constOp->get_data_ptr(), constOp->get_byte_size());
+            }
         }
 
         MemoryPtr ptr = std::make_shared<StaticMemory>(getEngine(), memDesc);

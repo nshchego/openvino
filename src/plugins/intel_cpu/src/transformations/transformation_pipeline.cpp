@@ -110,6 +110,7 @@
 #include "transformations/cpu_opset/common/pass/decompose_integer_divide.hpp"
 #include "transformations/cpu_opset/common/pass/convert_fq_rnn_to_quantized_rnn.hpp"
 #include "transformations/cpu_opset/common/pass/insert_convert_after_extension.hpp"
+#include "transformations/cpu_opset/common/pass/insert_string_u8_convert_for_extension.hpp"
 #include "transformations/cpu_opset/common/pass/move_eltwise_up_data_movement.hpp"
 #include "transformations/cpu_opset/common/pass/swap_convert_transpose.hpp"
 #include "transformations/cpu_opset/common/pass/rope_fusion.hpp"
@@ -358,6 +359,7 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
     // However, if the extension operation produces an output precision that is not natively supported, this may lead to inconsistency during
     // element type propagation. This transformation is called before the ConvertPrecision pass to align the actual precisions with the list of supported ones.
     CPU_REGISTER_PASS_COMMON(manager, ov::pass::InsertConvertAfterExtension);
+    // CPU_REGISTER_PASS_COMMON(manager, ov::intel_cpu::ConvertStringU8ForExtension);
     // element type convert is disabled.
     CPU_REGISTER_PASS_COMMON(manager, ov::pass::ConvertPrecision, precisions, type_to_fuse, false, false);
 

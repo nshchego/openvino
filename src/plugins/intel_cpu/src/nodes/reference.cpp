@@ -91,7 +91,7 @@ std::cout << "[CPU] Reference executeDynamicImpl prc: " << getOriginalOutputPrec
             newOutputDims.emplace_back(tensor.get_shape());
         }
         Node::redefineOutputMemory(newOutputDims);
-        for (size_t i = 0; i < outputShapes.size(); ++i) {
+        for (size_t i = 0lu; i < outputShapes.size(); ++i) {
             auto memory = getChildEdgesAtPort(i)[0]->getMemoryPtr();
             auto& tensor = outputs[i];
             if (memory->getSize() != tensor.get_byte_size()) {
