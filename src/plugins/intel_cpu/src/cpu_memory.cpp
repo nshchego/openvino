@@ -215,7 +215,7 @@ void* MemoryMngrWithReuse::getRawPtr() const noexcept {
 }
 
 void MemoryMngrWithReuse::setExtBuff(void *ptr, size_t size) {
-std::cout << "[CPU] MemoryMngrWithReuse::setExtBuff size: " << size << "; old ptr: " << m_data.get() << "; new ptr: " << ptr << std::endl;
+printf("[CPU] MemoryMngrWithReuse::setExtBuff size: %lu; old ptr: %p; new ptr: %p\n", size, m_data.get(), ptr);
     m_useExternalStorage = true;
     m_memUpperBound = size;
     m_data = decltype(m_data)(ptr, release);
@@ -223,29 +223,35 @@ std::cout << "[CPU] MemoryMngrWithReuse::setExtBuff size: " << size << "; old pt
 
 bool MemoryMngrWithReuse::resize(size_t size, const ov::element::Type& type) {
     if (type == ov::element::string) {
-std::cout << "[CPU][STRING] MemoryMngrWithReuse::resize size: " << size << std::endl;
+printf("[CPU][STRING] MemoryMngrWithReuse::resize size: %lu\n", size);
         bool sizeChanged = false;
         if (size > m_memUpperBound) {
+            constexpr int cacheLineSize = 64;
             // auto ptr = (std::string *)malloc(size);
-            auto ptr = new std::string[size / 32];
-std::cout << "    ptr: " << ptr << std::endl;
+            // auto ptr = new std::string[size / 32];
+            auto ptr = dnnl::impl::malloc(size, cacheLineSize);
+            auto ptr_s = reinterpret_cast<std::string *>(ptr);
+            std::uninitialized_fill_n(ptr_s, size / 32, std::string());
+            // void* ptr_v = reinterpret_cast<void *>(ptr);
+printf("    ptr: %p\n", ptr);
             if (!ptr) {
                 OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
             }
             m_memUpperBound = size;
             m_useExternalStorage = false;
-            m_data = decltype(m_data)(ptr, delete_a);
+            m_data = decltype(m_data)(ptr, destroy);
+            // m_data = decltype(m_data)(ptr_v, delete_a);
             sizeChanged = true;
         }
 
         return sizeChanged;
     } else {
-std::cout << "[CPU] MemoryMngrWithReuse::resize size: " << size << "; type: " << type << std::endl;
+printf("[CPU] MemoryMngrWithReuse::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
         constexpr int cacheLineSize = 64;
         bool sizeChanged = false;
         if (size > m_memUpperBound) {
             void *ptr = dnnl::impl::malloc(size, cacheLineSize);
-std::cout << "    ptr: " << ptr << std::endl;
+printf("    new ptr: %p\n", ptr);
             if (!ptr) {
                 OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
             }
@@ -253,6 +259,8 @@ std::cout << "    ptr: " << ptr << std::endl;
             m_useExternalStorage = false;
             m_data = decltype(m_data)(ptr, destroy);
             sizeChanged = true;
+        } else {
+printf("    the same ptr: %p\n", m_data.get());
         }
         return sizeChanged;
     }
@@ -269,7 +277,9 @@ void MemoryMngrWithReuse::destroy(void *ptr) {
 }
 
 void MemoryMngrWithReuse::delete_a(void *ptr) {
-    delete[] ptr;
+printf("[CPU] MemoryMngrWithReuse::delete_a ptr: %p\n", ptr);
+    // auto ptr_s = reinterpret_cast<std::string *>(ptr);
+    // delete[] ptr_s;
 }
 
 void* MemoryMngrRealloc::getRawPtr() const noexcept {
@@ -329,7 +339,7 @@ void DnnlMemoryMngr::setExtBuff(void *ptr, size_t size) {
 }
 
 bool DnnlMemoryMngr::resize(size_t size, const ov::element::Type& type) {
-std::cout << "[CPU] DnnlMemoryMngr::resize size: " << size << std::endl;
+printf("[CPU] DnnlMemoryMngr::resize size: %lu\n", size);
     bool sizeChanged = m_pMemMngr->resize(size, (*m_setMemPtrs.begin())->getDesc().getPrecision());
     if (sizeChanged) {
         notifyUpdate();
@@ -338,7 +348,7 @@ std::cout << "[CPU] DnnlMemoryMngr::resize size: " << size << std::endl;
 }
 
 // bool DnnlMemoryMngr::resizeForString(size_t size) {
-// std::cout << "[CPU] DnnlMemoryMngr::resizeForString size: " << size << std::endl;
+// printf("[CPU] DnnlMemoryMngr::resizeForString size: %lu\n", size);
 //     bool sizeChanged = m_pMemMngr->resizeForString(size);
 //     if (sizeChanged) {
 //         notifyUpdate();
@@ -476,7 +486,7 @@ void StaticMemory::StaticMemoryMngr::setExtBuff(void* ptr, size_t size) {
 }
 
 bool StaticMemory::StaticMemoryMngr::resize(size_t size, const ov::element::Type& type) {
-std::cout << "[CPU] StaticMemoryMngr::resize size: " << size << std::endl;
+printf("[CPU] StaticMemoryMngr::resize size: %lu\n", size);
     if (size != m_size) {
         OPENVINO_THROW("Unexpected: StaticMemoryMngr may not resize the memory");
     }
@@ -484,7 +494,7 @@ std::cout << "[CPU] StaticMemoryMngr::resize size: " << size << std::endl;
 }
 
 // bool StaticMemory::StaticMemoryMngr::resizeForString(size_t size) {
-// std::cout << "[CPU] StaticMemoryMngr::resizeForString size: " << size << std::endl;
+// printf("[CPU] StaticMemoryMngr::resizeForString size: %lu\n", size);
 //     if (size != m_size) {
 //         OPENVINO_THROW("Unexpected: StaticMemoryMngr may not resize the memory");
 //     }

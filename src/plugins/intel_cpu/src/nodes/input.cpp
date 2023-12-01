@@ -278,6 +278,7 @@ void Input::cloneBlobIfRequired() {
         } else {
             memory = std::make_shared<Memory>(getEngine(), memDesc);
             if (constOp->get_element_type() == ov::element::string) {
+printf("[CPU][STRING] Input cloneBlob\n");
                 auto dst = reinterpret_cast<ov::element_type_traits<ov::element::string>::value_type *>(memory->getData());
                 auto src = constOp->get_data_ptr<ov::element_type_traits<ov::element::string>::value_type>();
                 for (size_t i = 0lu; i < size; i++) {
@@ -401,7 +402,7 @@ Input::Input(const Shape& shape,
              const std::string& type,
              const GraphContext::CPtr context)
     : Node(type, name, context) {
-std::cout << "[CPU] Input 2 prc: " << prc << std::endl;
+printf("[CPU] Input 2 prc: %s\n", prc.get_type_name().c_str());
     constant = ConstantType::NoConst;
     isDynamic = shape.isDynamic();
     if (isDynamic) {
@@ -418,7 +419,7 @@ std::cout << "[CPU] Input 2 prc: " << prc << std::endl;
 
 Input::Input(MemoryDescPtr memDesc, const std::string& name, const std::string& type, const GraphContext::CPtr context)
     : Input(memDesc->getShape(), memDesc->getPrecision(), name, type, context) {
-std::cout << "[CPU] Input 3 type: " << type << std::endl;
+printf("[CPU] Input 3 type: %s\n", type.c_str());
     extMemDesc = memDesc;
 }
 

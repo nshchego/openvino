@@ -18,7 +18,17 @@ class MemoryAccessor : public ov::ITensorAccessor {
 
 public:
     MemoryAccessor(const container_type& ptrs, const std::vector<int64_t>& ranks)
-        : m_ptrs{ptrs}, m_ranks(ranks) {}
+        : m_ptrs{ptrs}, m_ranks(ranks) {
+if (m_ptrs.size() > 0) {
+    printf("[CPU] MemoryAccessor ctr m_ptrs.size: %lu\n", m_ptrs.size());
+    for (auto& ptr : m_ptrs) {
+        if (ptr.second->getSize() == 7260269407829122528) {
+            printf("ptr.second->getSize() == 7260269407829122528\n");
+        }
+        printf("    port: %lu; size: %lu; ptr: %p\n", ptr.first, ptr.second->getSize(), ptr.second->getData());
+    }
+}
+        }
 
     ~MemoryAccessor() = default;
 
@@ -28,6 +38,14 @@ public:
             auto memPtr = t_iter->second;
             // use scalar shape {} instead of {1} if required by shapeInference
             const auto shape = (m_ranks[port] != 0) ? ov::Shape(memPtr->getStaticDims()) : ov::Shape();
+if (memPtr->getDesc().getPrecision() == ov::element::string) {
+    printf("[CPU][STRING] MemoryAccessor size: %lu; ptr: %p\n", memPtr->getSize(), memPtr->getData());
+    auto strdata = reinterpret_cast<std::string *>(memPtr->getData());
+    // for (size_t i = 0lu; i < memPtr->getSize() / 32; i++) {
+    for (size_t i = 0lu; i < memPtr->getShape().getElementsCount(); i++) {
+        std::cout << "    \"" << strdata[i] << "\"" << std::endl;
+    }
+}
             return {memPtr->getDesc().getPrecision(),
                     shape,
                     memPtr->getData()

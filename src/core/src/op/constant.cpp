@@ -85,7 +85,7 @@ std::cout << "[CORE] Constant ctr 0" << std::endl;
     // And copy data in other cas
     if (auto hostTensor = std::dynamic_pointer_cast<ngraph::runtime::HostTensor>(tensor)) {
         m_data = std::make_shared<SharedBuffer<std::shared_ptr<ngraph::runtime::Tensor>>>(
-            static_cast<char*>(hostTensor->get_data_ptr()),
+            reinterpret_cast<char*>(hostTensor->get_data_ptr()),
             tensor->get_size_in_bytes(),
             tensor);
     } else {
@@ -103,7 +103,7 @@ Constant::Constant(const Tensor& tensor)
     : m_element_type{tensor.get_element_type()},
       m_shape{tensor.get_shape()},
       m_data{
-          std::make_shared<SharedBuffer<Tensor>>(static_cast<char*>(tensor.data()), tensor.get_byte_size(), tensor)} {
+          std::make_shared<SharedBuffer<Tensor>>(reinterpret_cast<char*>(tensor.data()), tensor.get_byte_size(), tensor)} {
 std::cout << "[CORE] Constant ctr 1" << std::endl;
     constructor_validate_and_infer_types();
 }
@@ -150,8 +150,8 @@ std::cout << "[CORE] Constant ctr 4" << std::endl;
 void Constant::allocate_buffer(bool memset_allocation) {
     // memset_allocation flag is to switch on initialization of objects in memory for element::string type
     // and set memory to zero for numeric element types
-std::cout << "allocate_buffer size: " << mem_size() << "; string size: " << sizeof(std::string) << std::endl;
     if (m_element_type == ov::element::string) {
+std::cout << "[CORE][STRING] Constant allocate_buffer size: " << mem_size() << "; ptr: " << m_data << std::endl;
         auto num_elements = shape_size(m_shape);
         m_data = std::make_shared<StringAlignedBuffer>(num_elements, mem_size(), host_alignment(), memset_allocation);
     } else {
@@ -166,8 +166,8 @@ Constant::Constant(const element::Type& type, const Shape& shape, const void* da
 std::cout << "[CORE] Constant ctr 5" << std::endl;
     if (m_element_type == ov::element::string) {
         auto num_elements = shape_size(m_shape);
-        const std::string* src_strings = static_cast<const std::string*>(data);
-        std::string* dst_strings = static_cast<std::string*>(get_data_ptr_nc());
+        const std::string* src_strings = reinterpret_cast<const std::string*>(data);
+        std::string* dst_strings = reinterpret_cast<std::string*>(get_data_ptr_nc());
         std::uninitialized_copy_n(src_strings, num_elements, dst_strings);
     } else {
         std::memcpy(get_data_ptr_nc(), data, mem_size());

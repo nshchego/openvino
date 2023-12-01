@@ -697,6 +697,11 @@ void Graph::AllocateWithReuse() {
                 // !! Fallback to individual memory allocation !!
                 // if you like to check infer without reuse just call this function without arguments.
                 edge->allocate(workspace_ptr + offset * alignment);  // alignment in byte
+                if (edge->getMemory().getDesc().getPrecision() == ov::element::string) {
+                    auto str_ptr = reinterpret_cast<std::string *>(edge->getMemory().getData());
+                    std::uninitialized_fill_n(str_ptr, edge->getMemory().getSize() / 32, std::string());
+printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", str_ptr);
+                }
 
                 // TODO: WA for some test (like strided_slice_test) which use tensors with
                 //       shapes {0}. And it is implicitly converted into {1} tensor.

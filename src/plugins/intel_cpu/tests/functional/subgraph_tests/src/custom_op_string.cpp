@@ -62,7 +62,7 @@ public:
     bool visit_attributes(ov::AttributeVisitor& visitor) override { return true; }
 
     bool evaluate(ov::TensorVector& outputs, const ov::TensorVector& inputs) const override {
-std::cout << "[TEST] CustomOpStringString::evaluate" << std::endl;
+printf("[TEST] CustomOpStringString::evaluate\n");
         for (size_t i = 0lu; i < inputs.size(); i++) {
             OPENVINO_ASSERT(inputs[i].get_shape().size() == static_cast<size_t>(get_input_partial_shape(i).rank().get_length()),
                 "Invalid input shape rank: ", inputs[i].get_shape().size());
@@ -76,30 +76,37 @@ std::cout << "[TEST] CustomOpStringString::evaluate" << std::endl;
         auto in_data_1 = inputs[1].data<ov::element_type_traits<ov::element::string>::value_type>();
         auto out_data_0 = outputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
         auto out_data_1 = outputs[1].data<ov::element_type_traits<ov::element::string>::value_type>();
-// std::cout << "[TEST] Out ptr: " << out_data_0 << std::endl;
+// printf("[TEST] Out ptr: ", out_data_0);
+        // auto tmp_out_0 = (std::string *) malloc(outputs[0].get_byte_size());
+        // auto tmp_out_0 = new std::string[outputs[0].get_size()];
 
         const auto el_num_0 = outputs[0].get_size();
         // std::copy(in_data, in_data + el_num);
-std::cout << "[TEST] evaluate in_0: " << in_data_0 << "; in_1: " << in_data_1 << "; out_0: " << out_data_0 << "; out_1: " << out_data_1 << std::endl;
+printf("    in_0[%s]: %p; out_0[%s]: %p\n", inputs[0].get_element_type().get_type_name().c_str(), in_data_0,
+    outputs[0].get_element_type().get_type_name().c_str(), out_data_0);
         for (size_t i = 0lu; i < el_num_0; i++) {
             out_data_0[i] = in_data_0[i];
-// std::cout << "    \"" << in_data_0[i] << "\"" << std::endl;
-std::cout << "    \"" << out_data_0[i] << "\" : \"" << in_data_0[i] << "\"" << std::endl;
+            // tmp_out_0[i] = in_data_0[i];
+// printf("    \"", in_data_0[i], "\"");
+printf("        \"%s\" : \"%s\"\n", out_data_0[i].c_str(), in_data_0[i].c_str());
         }
+        // delete[] tmp_out_0;
+        // std::copy_n(in_data_0, el_num_0, out_data_0);
 
         const auto el_num_1 = outputs[1].get_size();
         // std::copy(in_data, in_data + el_num);
         // std::string strtmp = "const_1";
-std::cout << "[TEST] evaluate in 1" << std::endl;
+printf("    in_1[%s]: %p; out_1[%s]: %p\n", inputs[1].get_element_type().get_type_name().c_str(), in_data_1,
+    outputs[1].get_element_type().get_type_name().c_str(), out_data_1);
         for (size_t i = 0lu; i < el_num_1; i++) {
             out_data_1[i] = in_data_1[i];
             // auto instr = in_data_1[i];
             // out_data_1[i] = strtmp;//std::string("out");
             // std::string tmp = out_data_1[i];
             // out_data_1[i] = "tmp const";
-// std::cout << "    \"" << in_data_1[i] << "\"" << std::endl;
-// std::cout << "\"" << out_data_1[i] << "\"" << std::endl;
-std::cout << "    \"" << out_data_1[i] << "\" : \"" << in_data_1[i] << "\"" << std::endl;
+// printf("    \"", in_data_1[i], "\"");
+// printf("\"", out_data_1[i], "\"");
+printf("        \"%s\" : \"%s\"\n", out_data_1[i].c_str(), in_data_1[i].c_str());
         }
 
         return true;
@@ -138,7 +145,7 @@ public:
     }
 
     bool evaluate(ov::TensorVector& outputs, const ov::TensorVector& inputs) const override {
-std::cout << "[Test] CustomOpStringU8::evaluate" << std::endl;
+printf("[Test] CustomOpStringU8::evaluate\n");
         for (size_t i = 0lu; i < inputs.size(); i++) {
             OPENVINO_ASSERT(inputs[i].get_shape().size() == static_cast<size_t>(get_input_partial_shape(i).rank().get_length()),
                 "Invalid input shape rank: ", inputs[i].get_shape().size());
@@ -150,19 +157,19 @@ std::cout << "[Test] CustomOpStringU8::evaluate" << std::endl;
 
         auto in_data_0 = inputs[0].data<ov::element_type_traits<ov::element::string>::value_type>();
         auto out_data_0 = outputs[0].data<ov::element_type_traits<ov::element::u8>::value_type>();
-// std::cout << "[TEST] Out ptr: " << out_data_0 << std::endl;
+// printf("[TEST] Out ptr: ", out_data_0);
 
         const auto el_num_0 = outputs[0].get_size();
         // std::copy(in_data, in_data + el_num);
-        ov::element_type_traits<ov::element::u8>::value_type ttt = '_';
-std::cout << "[TEST] evaluate in 0 ptr: " << in_data_0 << "; " << ttt << std::endl;
+        // ov::element_type_traits<ov::element::u8>::value_type ttt = '_';
+printf("[TEST] evaluate in 0 ptr: %p\n", in_data_0);
         for (size_t i = 0lu; i < el_num_0; i++) {
             if (in_data_0[i].empty()) {
                 out_data_0[i] = '_';
             } else {
                 out_data_0[i] = in_data_0[i][0];
             }
-std::cout << "    \"" << out_data_0[i] << "\" : \"" << in_data_0[i] << "\"" << std::endl;
+printf("    \"%d\" : \"%s\n", out_data_0[i], in_data_0[i].c_str());
         }
 
         return true;
@@ -229,9 +236,9 @@ protected:
             auto tensor = utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i]);
 
 auto inData = tensor.data<ov::element_type_traits<ov::element::string>::value_type>();
-std::cout << "[TEST] generate_inputs " << i << std::endl;
+printf("[TEST] generate_inputs %lu\n", i);
 for (size_t i = 0lu; i < tensor.get_size(); i++) {
-    std::cout << "    inData: \"" << inData[i] << "\"; ptr: " << (inData + i) << std::endl;
+    printf("    inData: \"%s\"; ptr: %p\n", inData[i].c_str(), (inData + i));
 }
 
             inputs.insert({funcInput.get_node_shared_ptr(), tensor});
@@ -239,7 +246,7 @@ for (size_t i = 0lu; i < tensor.get_size(); i++) {
     }
 
     void compare(const std::vector<ov::Tensor>& expected, const std::vector<ov::Tensor>& actual) override {
-std::cout << "CustomOpStringString::compare" << std::endl;
+printf("CustomOpStringString::compare\n");
         ASSERT_EQ(expected.size(), actual.size());
         ASSERT_EQ(expected.size(), function->get_results().size());
 
@@ -248,7 +255,7 @@ std::cout << "CustomOpStringString::compare" << std::endl;
         const auto size_0 = expected[0].get_size();
 
         for (size_t i = 0lu; i < size_0; i++) {
-std::cout << "\"" << expected_data_0[i] << "\" : \"" << actual_data_0[i] << "\"" << std::endl;
+printf("\"%d\" : \"%d\"\n", expected_data_0[i], actual_data_0[i]);
             OPENVINO_ASSERT(expected_data_0[i] == actual_data_0[i], "At index ", i,
                 " expected: '", expected_data_0[i], "' actual: '", actual_data_0[i], "'");
         }
@@ -258,7 +265,7 @@ std::cout << "\"" << expected_data_0[i] << "\" : \"" << actual_data_0[i] << "\""
         const auto size_1 = expected[1].get_size();
 
         for (size_t i = 0lu; i < size_1; i++) {
-std::cout << "\"" << expected_data_1[i] << "\" : \"" << actual_data_1[i] << "\"" << std::endl;
+printf("\"%s\" : \"%s\"\n", expected_data_1[i].c_str(), actual_data_1[i].c_str());
             OPENVINO_ASSERT(expected_data_1[i] == actual_data_1[i], "At index ", i,
                 " expected: '", expected_data_1[i], "' actual: '", actual_data_1[i], "'");
         }
