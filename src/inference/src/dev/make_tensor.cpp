@@ -185,7 +185,12 @@ public:
                          init(data, element_type, shape);
                          return data;
                      }()},
-          m_allocator{allocator} {}
+          m_allocator{allocator} {
+size_t intval = 0x55555671bc20;
+if (m_ptr ==  ((void*)(intptr_t)intval)) {
+    printf("[CORE] AllocatedTensor ctr ptr: %p\n", m_ptr);
+}
+}
 
     ~AllocatedTensor() {
         auto num_elements = get_size();
@@ -207,6 +212,7 @@ public:
             destroy(0, old_num_elements);
             m_allocator.deallocate(m_ptr, old_byte_size);
             m_ptr = m_allocator.allocate(get_byte_size());
+printf("[CORE] AllocatedTensor set_shape ptr: %p\n", m_ptr);
             init(m_ptr, m_element_type, m_shape);
         } else {
             // destroy only not needed objects
@@ -220,13 +226,14 @@ public:
 private:
     void destroy(size_t begin_ind, size_t end_ind) {
         // it removes elements from tail
-        if (get_element_type() == element::Type_t::string) {
-            auto strings = static_cast<std::string*>(m_ptr);
-            for (size_t ind = begin_ind; ind < end_ind; ++ind) {
-                using std::string;
-                strings[ind].~string();
-            }
-        }
+//         if (get_element_type() == element::Type_t::string) {
+// printf("[CORE] AllocatedTensor destroy ptr: %p\n", m_ptr);
+//             auto strings = static_cast<std::string*>(m_ptr);
+//             for (size_t ind = begin_ind; ind < end_ind; ++ind) {
+//                 using std::string;
+//                 strings[ind].~string();
+//             }
+//         }
     }
 
     void init(void* data, const element::Type& element_type, const Shape& shape) {
