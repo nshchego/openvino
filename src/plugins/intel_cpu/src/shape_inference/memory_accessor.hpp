@@ -22,9 +22,9 @@ public:
 if (m_ptrs.size() > 0) {
     printf("[CPU] MemoryAccessor ctr m_ptrs.size: %lu\n", m_ptrs.size());
     for (auto& ptr : m_ptrs) {
-        if (ptr.second->getSize() == 7260269407829122528) {
-            printf("ptr.second->getSize() == 7260269407829122528\n");
-        }
+        // if (ptr.second->getSize() == 7260269407829122528) {
+        //     printf("ptr.second->getSize() == 7260269407829122528\n");
+        // }
         printf("    port: %lu; size: %lu; ptr: %p\n", ptr.first, ptr.second->getSize(), ptr.second->getData());
     }
 }
@@ -40,11 +40,11 @@ if (m_ptrs.size() > 0) {
             const auto shape = (m_ranks[port] != 0) ? ov::Shape(memPtr->getStaticDims()) : ov::Shape();
 if (memPtr->getDesc().getPrecision() == ov::element::string) {
     printf("[CPU][STRING] MemoryAccessor size: %lu; ptr: %p\n", memPtr->getSize(), memPtr->getData());
-    auto strdata = reinterpret_cast<std::string *>(memPtr->getData());
-    // for (size_t i = 0lu; i < memPtr->getSize() / 32; i++) {
-    for (size_t i = 0lu; i < memPtr->getShape().getElementsCount(); i++) {
-        std::cout << "    \"" << strdata[i] << "\"" << std::endl;
-    }
+    // auto strdata = reinterpret_cast<std::string *>(memPtr->getData());
+    // // for (size_t i = 0lu; i < memPtr->getSize() / 32; i++) {
+    // for (size_t i = 0lu; i < memPtr->getShape().getElementsCount(); i++) {
+    //     std::cout << "    \"" << strdata[i] << "\"" << std::endl;
+    // }
 }
             return {memPtr->getDesc().getPrecision(),
                     shape,

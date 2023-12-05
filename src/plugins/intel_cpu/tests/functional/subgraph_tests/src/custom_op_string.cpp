@@ -88,7 +88,7 @@ printf("    in_0[%s]: %p; out_0[%s]: %p\n", inputs[0].get_element_type().get_typ
             out_data_0[i] = in_data_0[i];
             // tmp_out_0[i] = in_data_0[i];
 // printf("    \"", in_data_0[i], "\"");
-printf("        \"%s\" : \"%s\"\n", out_data_0[i].c_str(), in_data_0[i].c_str());
+// printf("        \"%s\" : \"%s\"\n", out_data_0[i].c_str(), in_data_0[i].c_str());
         }
         // delete[] tmp_out_0;
         // std::copy_n(in_data_0, el_num_0, out_data_0);
@@ -106,7 +106,7 @@ printf("    in_1[%s]: %p; out_1[%s]: %p\n", inputs[1].get_element_type().get_typ
             // out_data_1[i] = "tmp const";
 // printf("    \"", in_data_1[i], "\"");
 // printf("\"", out_data_1[i], "\"");
-printf("        \"%s\" : \"%s\"\n", out_data_1[i].c_str(), in_data_1[i].c_str());
+// printf("        \"%s\" : \"%s\"\n", out_data_1[i].c_str(), in_data_1[i].c_str());
         }
 
         return true;
@@ -235,11 +235,11 @@ protected:
             const auto& funcInput = funcInputs[i];
             auto tensor = utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i]);
 
-auto inData = tensor.data<ov::element_type_traits<ov::element::string>::value_type>();
-printf("[TEST] generate_inputs %lu\n", i);
-for (size_t i = 0lu; i < tensor.get_size(); i++) {
-    printf("    inData: \"%s\"; ptr: %p\n", inData[i].c_str(), (inData + i));
-}
+// auto inData = tensor.data<ov::element_type_traits<ov::element::string>::value_type>();
+// printf("[TEST] generate_inputs %lu\n", i);
+// for (size_t i = 0lu; i < tensor.get_size(); i++) {
+//     printf("    inData: \"%s\"; ptr: %p\n", inData[i].c_str(), (inData + i));
+// }
 
             inputs.insert({funcInput.get_node_shared_ptr(), tensor});
         }
@@ -255,7 +255,7 @@ printf("CustomOpStringString::compare\n");
         const auto size_0 = expected[0].get_size();
 
         for (size_t i = 0lu; i < size_0; i++) {
-printf("\"%d\" : \"%d\"\n", expected_data_0[i], actual_data_0[i]);
+// printf("\"%d\" : \"%d\"\n", expected_data_0[i], actual_data_0[i]);
             OPENVINO_ASSERT(expected_data_0[i] == actual_data_0[i], "At index ", i,
                 " expected: '", expected_data_0[i], "' actual: '", actual_data_0[i], "'");
         }
@@ -265,7 +265,7 @@ printf("\"%d\" : \"%d\"\n", expected_data_0[i], actual_data_0[i]);
         const auto size_1 = expected[1].get_size();
 
         for (size_t i = 0lu; i < size_1; i++) {
-printf("\"%s\" : \"%s\"\n", expected_data_1[i].c_str(), actual_data_1[i].c_str());
+// printf("\"%s\" : \"%s\"\n", expected_data_1[i].c_str(), actual_data_1[i].c_str());
             OPENVINO_ASSERT(expected_data_1[i] == actual_data_1[i], "At index ", i,
                 " expected: '", expected_data_1[i], "' actual: '", actual_data_1[i], "'");
         }

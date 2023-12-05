@@ -173,6 +173,8 @@ std::shared_ptr<ITensor> make_tensor(const element::Type element_type,
  * @brief Tensor with allocated memory
  * Tensor owns the memory
  */
+
+constexpr size_t terget_ptr = 0x55555680be10;
 class AllocatedTensor : public ViewTensor {
 public:
     AllocatedTensor(const element::Type element_type, const Shape& shape, const Allocator& allocator)
@@ -186,14 +188,14 @@ public:
                          return data;
                      }()},
           m_allocator{allocator} {
-size_t intval = 0x55555671bc20;
-if (m_ptr ==  ((void*)(intptr_t)intval)) {
+if (m_ptr ==  ((void*)(intptr_t)terget_ptr)) {
     printf("[CORE] AllocatedTensor ctr ptr: %p\n", m_ptr);
 }
 }
 
     ~AllocatedTensor() {
         auto num_elements = get_size();
+printf("[CORE] ~AllocatedTensor size: %lu; ptr: %p\n", num_elements, m_ptr);
         destroy(0, num_elements);
         m_allocator.deallocate(m_ptr, get_byte_size());
     }
@@ -226,17 +228,21 @@ printf("[CORE] AllocatedTensor set_shape ptr: %p\n", m_ptr);
 private:
     void destroy(size_t begin_ind, size_t end_ind) {
         // it removes elements from tail
-//         if (get_element_type() == element::Type_t::string) {
-// printf("[CORE] AllocatedTensor destroy ptr: %p\n", m_ptr);
-//             auto strings = static_cast<std::string*>(m_ptr);
-//             for (size_t ind = begin_ind; ind < end_ind; ++ind) {
-//                 using std::string;
-//                 strings[ind].~string();
-//             }
-//         }
+        if (get_element_type() == element::Type_t::string) {
+printf("[CORE] AllocatedTensor destroy size: %lu; ptr: %p\n", end_ind - begin_ind, m_ptr);
+            auto strings = static_cast<std::string*>(m_ptr);
+            for (size_t ind = begin_ind; ind < end_ind; ++ind) {
+printf("    %s\n", strings[ind].c_str());
+                using std::string;
+                strings[ind].~string();
+            }
+        }
     }
 
     void init(void* data, const element::Type& element_type, const Shape& shape) {
+if (data ==  ((void*)(intptr_t)terget_ptr)) {
+    printf("[CORE] AllocatedTensor init size: %lu; ptr: %p\n", shape_size(shape), data);
+}
         if (element_type == element::Type_t::string) {
             auto num_elements = shape_size(shape);
             auto string_ptr = static_cast<std::string*>(data);

@@ -90,7 +90,7 @@ private:
 
     static void release(void *ptr);
     static void destroy(void *ptr);
-    static void delete_a(void *ptr);
+    static void delete_str(void *ptr);
 };
 
 class MemoryMngrRealloc : public IMemoryMngr {

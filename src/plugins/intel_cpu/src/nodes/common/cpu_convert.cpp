@@ -583,7 +583,12 @@ void cpu_convert(const void *srcPtr,
     if (srcPrc == dstPrc && srcPrc == interimPrc) {
         const size_t L2_cache_size = dnnl::utils::get_cache_size(2, true);
         const size_t totalSize = size * dstPrc.size();
-        if (totalSize >= L2_cache_size) {
+        if (srcPrc == ov::element::string) {
+            auto str_src = reinterpret_cast<const std::string *>(srcPtr);
+            auto str_dst = reinterpret_cast<std::string *>(dstPtr);
+printf("[CPU] cpu_convert src: %p; dst: %p\n", srcPtr, dstPtr);
+            std::copy(str_src, str_src + size, str_dst);
+        } else if (totalSize >= L2_cache_size) {
             auto src = static_cast<const uint8_t *>(srcPtr);
             auto dst = static_cast<uint8_t *>(dstPtr);
             parallel_nt(0, [&](const size_t ithr, const size_t nthr) {

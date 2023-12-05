@@ -219,6 +219,7 @@ printf("[CPU] MemoryMngrWithReuse::setExtBuff size: %lu; old ptr: %p; new ptr: %
     m_useExternalStorage = true;
     m_memUpperBound = size;
     m_data = decltype(m_data)(ptr, release);
+printf("    new ptr: %p\n", m_data.get());
 }
 
 bool MemoryMngrWithReuse::resize(size_t size, const ov::element::Type& type) {
@@ -228,20 +229,24 @@ printf("[CPU][STRING] MemoryMngrWithReuse::resize size: %lu\n", size);
         if (size > m_memUpperBound) {
             constexpr int cacheLineSize = 64;
             // auto ptr = (std::string *)malloc(size);
-            // auto ptr = new std::string[size / 32];
-            auto ptr = dnnl::impl::malloc(size, cacheLineSize);
-            auto ptr_s = reinterpret_cast<std::string *>(ptr);
-            std::uninitialized_fill_n(ptr_s, size / 32, std::string());
-            // void* ptr_v = reinterpret_cast<void *>(ptr);
-printf("    ptr: %p\n", ptr);
+            auto str_ptr = new std::string[size / ov::element::string.size()];
+
+            // auto ptr = dnnl::impl::malloc(size, cacheLineSize);
+            // auto ptr_s = reinterpret_cast<std::string *>(ptr);
+            // std::uninitialized_fill_n(ptr_s, size / ov::element::string.size(), std::string());
+
+            auto ptr = reinterpret_cast<void *>(str_ptr);
+printf("    old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
             if (!ptr) {
                 OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
             }
             m_memUpperBound = size;
             m_useExternalStorage = false;
-            m_data = decltype(m_data)(ptr, destroy);
-            // m_data = decltype(m_data)(ptr_v, delete_a);
+            // m_data = decltype(m_data)(ptr, destroy);
+            m_data = decltype(m_data)(ptr, delete_str);
             sizeChanged = true;
+        } else {
+printf("    the same ptr: %p\n", m_data.get());
         }
 
         return sizeChanged;
@@ -251,7 +256,7 @@ printf("[CPU] MemoryMngrWithReuse::resize size: %lu; type: %s\n", size, type.get
         bool sizeChanged = false;
         if (size > m_memUpperBound) {
             void *ptr = dnnl::impl::malloc(size, cacheLineSize);
-printf("    new ptr: %p\n", ptr);
+printf("    old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
             if (!ptr) {
                 OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
             }
@@ -273,11 +278,12 @@ bool MemoryMngrWithReuse::hasExtBuffer() const noexcept {
 void MemoryMngrWithReuse::release(void *ptr) {}
 
 void MemoryMngrWithReuse::destroy(void *ptr) {
+printf("[CPU] MemoryMngrWithReuse::destroy ptr: %p\n", ptr);
     dnnl::impl::free(ptr);
 }
 
-void MemoryMngrWithReuse::delete_a(void *ptr) {
-printf("[CPU] MemoryMngrWithReuse::delete_a ptr: %p\n", ptr);
+void MemoryMngrWithReuse::delete_str(void *ptr) {
+printf("[CPU] MemoryMngrWithReuse::delete_str ptr: %p\n", ptr);
     // auto ptr_s = reinterpret_cast<std::string *>(ptr);
     // delete[] ptr_s;
 }
@@ -340,7 +346,7 @@ void DnnlMemoryMngr::setExtBuff(void *ptr, size_t size) {
 
 bool DnnlMemoryMngr::resize(size_t size, const ov::element::Type& type) {
 printf("[CPU] DnnlMemoryMngr::resize size: %lu\n", size);
-    bool sizeChanged = m_pMemMngr->resize(size, (*m_setMemPtrs.begin())->getDesc().getPrecision());
+    bool sizeChanged = m_pMemMngr->resize(size, type);
     if (sizeChanged) {
         notifyUpdate();
     }

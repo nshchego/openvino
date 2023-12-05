@@ -699,7 +699,7 @@ void Graph::AllocateWithReuse() {
                 edge->allocate(workspace_ptr + offset * alignment);  // alignment in byte
                 if (edge->getMemory().getDesc().getPrecision() == ov::element::string) {
                     auto str_ptr = reinterpret_cast<std::string *>(edge->getMemory().getData());
-                    std::uninitialized_fill_n(str_ptr, edge->getMemory().getSize() / 32, std::string());
+                    std::uninitialized_fill_n(str_ptr, edge->getMemory().getSize() / ov::element::string.size(), std::string());
 printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", str_ptr);
                 }
 

@@ -453,6 +453,7 @@ void SyncInferRequest::set_tensor(const ov::Output<const ov::Node>& in_port, con
             m_external_ptr.erase(name);
         }
 
+printf("[CPU] SyncInferRequest::set_tensor name: %s\n", name.c_str());
         m_outputs[name] = tensor;
         m_outputControlBlocks.erase(name); // now the memory is under user's control
     }
@@ -591,6 +592,7 @@ void SyncInferRequest::init_tensor(const std::string& name) {
                                    " for output.");
                 }
             }
+printf("[CPU] SyncInferRequest::init_tensor name: %s\n", name.c_str());
             m_outputs[name] = tensor;
             if (!port_shape.is_dynamic() && !m_external_ptr.count(name)) {
                 auto desc = MemoryDescUtils::generateCpuBlockedMemoryDesc(tensor);
