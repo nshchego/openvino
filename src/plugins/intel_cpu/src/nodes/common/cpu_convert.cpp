@@ -3,23 +3,16 @@
 //
 
 #include "cpu_convert.h"
+
 #include "cpu_memcpy.h"
 #include "openvino/core/parallel.hpp"
-#include <utils/bfloat16.hpp>
-#include <utils/general_utils.h>
-#include <selective_build.h>
-#include <openvino/core/type/float16.hpp>
-#include <algorithm>
-#include <type_traits>
-#include <tuple>
-#include <cmath>
-#include <onednn/dnnl.h>
+#include "utils/bfloat16.hpp"
 #if defined(OPENVINO_ARCH_X86_64)
 #include "nodes/kernels/x64/jit_kernel.hpp"
-#include <cpu/x64/jit_generator.hpp>
 #endif
 
-using namespace InferenceEngine;
+using OvString = ov::element_type_traits<ov::element::string>::value_type;
+
 
 
 namespace ov {
@@ -584,8 +577,8 @@ void cpu_convert(const void *srcPtr,
         const size_t L2_cache_size = dnnl::utils::get_cache_size(2, true);
         const size_t totalSize = size * dstPrc.size();
         if (srcPrc == ov::element::string) {
-            auto str_src = reinterpret_cast<const std::string *>(srcPtr);
-            auto str_dst = reinterpret_cast<std::string *>(dstPtr);
+            auto str_src = reinterpret_cast<const OvString *>(srcPtr);
+            auto str_dst = reinterpret_cast<OvString *>(dstPtr);
 printf("[CPU] cpu_convert src: %p; dst: %p\n", srcPtr, dstPtr);
             std::copy(str_src, str_src + size, str_dst);
         } else if (totalSize >= L2_cache_size) {

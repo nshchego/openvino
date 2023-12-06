@@ -3,26 +3,14 @@
 //
 
 #include "input.h"
-#include <dnnl_extension_utils.h>
 
-#include <string>
-#include <tuple>
-#include <algorithm>
-#include <cmath>
-#include <utils/general_utils.h>
+#include "cpu/x64/jit_generator.hpp"
 #include "openvino/core/parallel.hpp"
-#include <ie_ngraph_utils.hpp>
-#include "caseless.hpp"
-#include "common/cpu_convert.h"
-#include "utils/cpu_utils.hpp"
-#include <cpu/x64/jit_generator.hpp>
-#include "memory_desc/dnnl_blocked_memory_desc.h"
 #include "shape_inference/shape_inference_pass_through.hpp"
 
+using OvString = ov::element_type_traits<ov::element::string>::value_type;
+
 using namespace dnnl;
-using namespace InferenceEngine;
-using namespace details;
-using namespace ov::op;
 using namespace dnnl::impl::cpu::x64;
 using namespace Xbyak;
 
@@ -233,11 +221,11 @@ Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr conte
         : Node(op, context, PassThroughShapeInferFactory()) {
 std::cout << "[CPU] Input 1 prc: " << op->get_element_type() << "; name: " << getName() << std::endl;
     if (!one_of(op->get_type_info(),
-            v0::Parameter::get_type_info_static(),
-            v0::Constant::get_type_info_static(),
-            v0::Result::get_type_info_static(),
-            v3::ReadValue::get_type_info_static(),
-            v6::ReadValue::get_type_info_static()))
+            op::v0::Parameter::get_type_info_static(),
+            op::v0::Constant::get_type_info_static(),
+            op::v0::Result::get_type_info_static(),
+            op::v3::ReadValue::get_type_info_static(),
+            op::v6::ReadValue::get_type_info_static()))
         OPENVINO_THROW_NOT_IMPLEMENTED("CPU Input node doesn't support ngraph operation ",
                                        op->get_type_name(),
                                        " with name ",
@@ -245,7 +233,7 @@ std::cout << "[CPU] Input 1 prc: " << op->get_element_type() << "; name: " << ge
 
     constant = ConstantType::NoConst;
 
-    constOp = ov::as_type_ptr<ov::op::v0::Constant>(op);
+    constOp = ov::as_type_ptr<op::v0::Constant>(op);
     if (constOp) {
         constant = ConstantType::Const;
         cloneBlobIfRequired();
@@ -279,11 +267,9 @@ void Input::cloneBlobIfRequired() {
             memory = std::make_shared<Memory>(getEngine(), memDesc);
             if (constOp->get_element_type() == ov::element::string) {
 printf("[CPU][STRING] Input cloneBlob\n");
-                auto dst = reinterpret_cast<ov::element_type_traits<ov::element::string>::value_type *>(memory->getData());
-                auto src = constOp->get_data_ptr<ov::element_type_traits<ov::element::string>::value_type>();
-                for (size_t i = 0lu; i < size; i++) {
-                    *(dst++) = *(src++);
-                }
+                auto dst = reinterpret_cast<OvString *>(memory->getData());
+                auto src = constOp->get_data_ptr<OvString>();
+                std::copy(src, src + size, dst);
             } else {
                 memcpy(memory->getData(), constOp->get_data_ptr(), constOp->get_byte_size());
             }
