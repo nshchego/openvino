@@ -265,7 +265,7 @@ void Input::cloneBlobIfRequired() {
             memory = std::make_shared<Memory>(getEngine(), memDesc, constOp->get_data_ptr());
         } else {
             memory = std::make_shared<Memory>(getEngine(), memDesc);
-            if (constOp->get_element_type() == ov::element::string) {
+            if (constOp->get_element_type() == element::string) {
 printf("[CPU][STRING] Input cloneBlob\n");
                 auto dst = reinterpret_cast<OvString *>(memory->getData());
                 auto src = constOp->get_data_ptr<OvString>();

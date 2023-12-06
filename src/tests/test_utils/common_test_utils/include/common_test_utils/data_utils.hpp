@@ -476,7 +476,6 @@ inline void fill_random_string(std::string* dst,
     testing::internal::Random random_char(seed);
     random_char.Generate(char_range);
 
-
     for (size_t i = 0lu; i < size; i++) {
         const auto len = start_from + static_cast<size_t>(random_len.Generate(len_range));
         auto& str = dst[i];

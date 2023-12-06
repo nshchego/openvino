@@ -9,10 +9,10 @@
 #include "utils/bfloat16.hpp"
 #if defined(OPENVINO_ARCH_X86_64)
 #include "nodes/kernels/x64/jit_kernel.hpp"
+#include "openvino/core/type/element_type_traits.hpp"
 #endif
 
 using OvString = ov::element_type_traits<ov::element::string>::value_type;
-
 
 
 namespace ov {
@@ -576,7 +576,7 @@ void cpu_convert(const void *srcPtr,
     if (srcPrc == dstPrc && srcPrc == interimPrc) {
         const size_t L2_cache_size = dnnl::utils::get_cache_size(2, true);
         const size_t totalSize = size * dstPrc.size();
-        if (srcPrc == ov::element::string) {
+        if (srcPrc == element::string) {
             auto str_src = reinterpret_cast<const OvString *>(srcPtr);
             auto str_dst = reinterpret_cast<OvString *>(dstPtr);
 printf("[CPU] cpu_convert src: %p; dst: %p\n", srcPtr, dstPtr);

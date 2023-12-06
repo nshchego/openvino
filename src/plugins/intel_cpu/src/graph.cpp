@@ -54,9 +54,11 @@
 #    include <tbb/task.h>
 #endif
 
+
+using OvString = ov::element_type_traits<ov::element::string>::value_type;
+
 using namespace dnnl;
 using namespace InferenceEngine;
-using namespace InferenceEngine::details;
 
 namespace ov {
 namespace intel_cpu {
@@ -697,9 +699,9 @@ void Graph::AllocateWithReuse() {
                 // !! Fallback to individual memory allocation !!
                 // if you like to check infer without reuse just call this function without arguments.
                 edge->allocate(workspace_ptr + offset * alignment);  // alignment in byte
-                if (edge->getMemory().getDesc().getPrecision() == ov::element::string) {
-                    auto str_ptr = reinterpret_cast<std::string *>(edge->getMemory().getData());
-                    std::uninitialized_fill_n(str_ptr, edge->getMemory().getSize() / ov::element::string.size(), std::string());
+                if (edge->getMemory().getDesc().getPrecision() == element::string) {
+                    auto str_ptr = reinterpret_cast<OvString *>(edge->getMemory().getData());
+                    std::uninitialized_fill_n(str_ptr, edge->getMemory().getSize() / element::string.size(), OvString());
 printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", str_ptr);
                 }
 

@@ -212,14 +212,14 @@ printf("[CPU] MemoryMngrWithReuse::setExtBuff size: %lu; old ptr: %p; new ptr: %
 printf("    new ptr: %p\n", m_data.get());
 }
 
-bool MemoryMngrWithReuse::resize(size_t size, const ov::element::Type& type) {
+bool MemoryMngrWithReuse::resize(size_t size, const element::Type& type) {
 printf("[CPU] MemoryMngrWithReuse::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
         constexpr int cacheLineSize = 64;
         bool sizeChanged = false;
         if (size > m_memUpperBound) {
             void* ptr = nullptr;
-            if (type == ov::element::string) {
-                ptr = new OvString[size / ov::element::string.size()];
+            if (type == element::string) {
+                ptr = new OvString[size / element::string.size()];
             } else {
                 ptr = dnnl::impl::malloc(size, cacheLineSize);
             }
@@ -229,7 +229,7 @@ printf("    old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
             }
             m_memUpperBound = size;
             m_useExternalStorage = false;
-            if (type == ov::element::string) {
+            if (type == element::string) {
                 m_data = decltype(m_data)(ptr, delete_str);
             } else {
                 m_data = decltype(m_data)(ptr, destroy);
@@ -268,15 +268,15 @@ void MemoryMngrRealloc::setExtBuff(void *ptr, size_t size) {
     m_data = decltype(m_data)(ptr, release);
 }
 
-bool MemoryMngrRealloc::resize(size_t size, const ov::element::Type& type) {
+bool MemoryMngrRealloc::resize(size_t size, const element::Type& type) {
     constexpr int cacheLineSize = 64;
     constexpr size_t growFactor = 2;
     bool sizeChanged = false;
     if (size > m_memUpperBound) {
         size *= growFactor;
         void* ptr = nullptr;
-        if (type == ov::element::string) {
-            ptr = new OvString[size / ov::element::string.size()];
+        if (type == element::string) {
+            ptr = new OvString[size / element::string.size()];
         } else {
             ptr = dnnl::impl::malloc(size, cacheLineSize);
         }
@@ -285,12 +285,18 @@ bool MemoryMngrRealloc::resize(size_t size, const ov::element::Type& type) {
         }
 
         if (auto src = m_data.get()) {
-            std::memcpy(ptr, src, m_memUpperBound);
+            if (type == element::string) {
+                auto srcPtr = reinterpret_cast<OvString *>(src);
+                auto dstPtr = reinterpret_cast<OvString *>(ptr);
+                std::copy(srcPtr, srcPtr + m_memUpperBound / element::string.size(), dstPtr);
+            } else {
+                std::memcpy(ptr, src, m_memUpperBound);
+            }
         }
 
         m_memUpperBound = size;
         m_useExternalStorage = false;
-        if (type == ov::element::string) {
+        if (type == element::string) {
             m_data = decltype(m_data)(ptr, delete_str);
         } else {
             m_data = decltype(m_data)(ptr, destroy);
@@ -325,7 +331,7 @@ void DnnlMemoryMngr::setExtBuff(void *ptr, size_t size) {
     notifyUpdate();
 }
 
-bool DnnlMemoryMngr::resize(size_t size, const ov::element::Type& type) {
+bool DnnlMemoryMngr::resize(size_t size, const element::Type& type) {
 printf("[CPU] DnnlMemoryMngr::resize size: %lu\n", size);
     bool sizeChanged = m_pMemMngr->resize(size, type);
     if (sizeChanged) {
@@ -333,15 +339,6 @@ printf("[CPU] DnnlMemoryMngr::resize size: %lu\n", size);
     }
     return sizeChanged;
 }
-
-// bool DnnlMemoryMngr::resizeForString(size_t size) {
-// printf("[CPU] DnnlMemoryMngr::resizeForString size: %lu\n", size);
-//     bool sizeChanged = m_pMemMngr->resizeForString(size);
-//     if (sizeChanged) {
-//         notifyUpdate();
-//     }
-//     return sizeChanged;
-// }
 
 bool DnnlMemoryMngr::hasExtBuffer() const noexcept {
     return m_pMemMngr->hasExtBuffer();
@@ -456,11 +453,11 @@ void StaticMemory::nullify() {
         memset(dataPtr, 0, getSize());
 }
 
-StaticMemory::StaticMemoryMngr::StaticMemoryMngr(size_t size, const ov::element::Type& type) : m_size(size) {
+StaticMemory::StaticMemoryMngr::StaticMemoryMngr(size_t size, const element::Type& type) : m_size(size) {
     memMngrImpl.resize(m_size, type);
 }
 
-StaticMemory::StaticMemoryMngr::StaticMemoryMngr(void* data, size_t size, const ov::element::Type& type) : m_size(size) {
+StaticMemory::StaticMemoryMngr::StaticMemoryMngr(void* data, size_t size, const element::Type& type) : m_size(size) {
     memMngrImpl.setExtBuff(data, m_size);
 }
 
@@ -472,21 +469,13 @@ void StaticMemory::StaticMemoryMngr::setExtBuff(void* ptr, size_t size) {
     OPENVINO_THROW("Unexpected: StaticMemoryMngr may not be modified");
 }
 
-bool StaticMemory::StaticMemoryMngr::resize(size_t size, const ov::element::Type& type) {
+bool StaticMemory::StaticMemoryMngr::resize(size_t size, const element::Type& type) {
 printf("[CPU] StaticMemoryMngr::resize size: %lu\n", size);
     if (size != m_size) {
         OPENVINO_THROW("Unexpected: StaticMemoryMngr may not resize the memory");
     }
     return false;
 }
-
-// bool StaticMemory::StaticMemoryMngr::resizeForString(size_t size) {
-// printf("[CPU] StaticMemoryMngr::resizeForString size: %lu\n", size);
-//     if (size != m_size) {
-//         OPENVINO_THROW("Unexpected: StaticMemoryMngr may not resize the memory");
-//     }
-//     return false;
-// }
 
 bool StaticMemory::StaticMemoryMngr::hasExtBuffer() const noexcept {
     return memMngrImpl.hasExtBuffer();
