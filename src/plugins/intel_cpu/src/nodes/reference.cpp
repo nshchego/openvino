@@ -3,13 +3,9 @@
 //
 
 #include "reference.h"
-
 #include "common/cpu_memcpy.h"
-#include <ie_ngraph_utils.hpp>
-#include "openvino/core/shape_util.hpp"
 
-using namespace InferenceEngine;
-using namespace InferenceEngine::details;
+using OvString = ov::element_type_traits<ov::element::string>::value_type;
 
 namespace ov {
 namespace intel_cpu {
@@ -98,8 +94,8 @@ std::cout << "[CPU] Reference executeDynamicImpl prc: " << getOriginalOutputPrec
                 THROW_CPU_NODE_ERR("output tensor data size mismatch occurred during the inference on output port number ", i);
             }
             if (tensor.get_element_type() == ov::element::string) {
-                auto srcPtr = reinterpret_cast<std::string *>(tensor.data());
-                auto dstPtr = reinterpret_cast<std::string *>(memory->getData());
+                auto srcPtr = reinterpret_cast<OvString *>(tensor.data());
+                auto dstPtr = reinterpret_cast<OvString *>(memory->getData());
                 std::copy(srcPtr, srcPtr + tensor.get_size(), dstPtr);
             } else {
                 cpu_memcpy(memory->getData(), tensor.data(), tensor.get_byte_size());
