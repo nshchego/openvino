@@ -4,19 +4,8 @@
 
 #pragma once
 
-#include "ie_layouts.h"
-#include "memory_desc/cpu_memory_desc.h"
-#include "dnnl_extension_utils.h"
-#include "memory_desc/cpu_memory_desc_utils.h"
-#include <onednn/dnnl.h>
-#include <cpu_shape.h>
-
 #include "memory_desc/dnnl_memory_desc.h"
 
-#include <string>
-#include <functional>
-#include <memory>
-#include <vector>
 
 /**
  * @file contains a concept classes to work with memory/tensor/blob abstractions on plugin level.
@@ -80,7 +69,6 @@ public:
     void* getRawPtr() const noexcept override;
     void setExtBuff(void* ptr, size_t size) override;
     bool resize(size_t size, const ov::element::Type& type) override;
-    // bool resizeForString(size_t size) override;
     bool hasExtBuffer() const noexcept override;
 
 private:
@@ -98,7 +86,7 @@ public:
     MemoryMngrRealloc() : m_data(nullptr, release) {}
     void* getRawPtr() const noexcept override;
     void setExtBuff(void* ptr, size_t size) override;
-    bool resize(size_t size) override;
+    bool resize(size_t size, const ov::element::Type& type) override;
     bool hasExtBuffer() const noexcept override;
 
 private:
@@ -108,6 +96,7 @@ private:
 
     static void release(void *ptr);
     static void destroy(void *ptr);
+    static void delete_str(void *ptr);
 };
 
 class IMemoryMngrObserver : public IMemoryMngr {

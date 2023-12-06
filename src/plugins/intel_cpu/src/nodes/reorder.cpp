@@ -6,8 +6,8 @@
 #include <memory>
 #include <string>
 #include <algorithm>
-#include <dnnl_types.h>
-#include <dnnl_extension_utils.h>
+// #include <dnnl_types.h>
+// #include <dnnl_extension_utils.h>
 #include "openvino/core/parallel.hpp"
 #include "utils/general_utils.h"
 #include <cpu/x64/cpu_isa_traits.hpp>
@@ -448,11 +448,17 @@ void Reorder::reorderData(const IMemory &input, const IMemory &output, MultiCach
     }
 
     if (input.getDesc().isCompatible(output.getDesc())) {
-        auto srcPtr = static_cast<uint8_t*>(input.getData());
-        auto dstPtr = static_cast<uint8_t*>(output.getData());
+        if (input.getDesc().getPrecision() == ov::element::string) {
+            auto srcPtr = reinterpret_cast<std::string *>(input.getData());
+            auto dstPtr = reinterpret_cast<std::string *>(output.getData());
+            std::copy(srcPtr, srcPtr + output.getShape().getElementsCount(), dstPtr);
+        } else {
+            auto srcPtr = static_cast<uint8_t*>(input.getData());
+            auto dstPtr = static_cast<uint8_t*>(output.getData());
 
-        auto copySize = output.getSize();
-        cpu_memcpy(dstPtr, srcPtr, copySize);
+            auto copySize = output.getSize();
+            cpu_memcpy(dstPtr, srcPtr, copySize);
+        }
     } else {
         dnnl::reorder reorder;
         std::vector<uint8_t> tmpBuff;

@@ -278,10 +278,9 @@ TEST_P(CustomOpStringCPUTest, CompareWithRefs) {
 
 const std::vector<InputShape> inputShapes = {
     {{}, {{2, 5}}},
-    {{-1, -1}, {{1, 3}, {5, 17}}},
-    // {{}, {{2, 3, 16}}},
-    // {{2, 3, -1}, {{2, 3, 0}}},
-    // {{}, {{}}}
+    {{}, {{17, 9}}},
+    {{-1, -1}, {{1, 3}, {5, 17}, {99, 51}}},
+    {{}, {{}}}
 };
 
 INSTANTIATE_TEST_SUITE_P(smoke_CustomOp,

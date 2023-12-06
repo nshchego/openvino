@@ -97,7 +97,13 @@ std::cout << "[CPU] Reference executeDynamicImpl prc: " << getOriginalOutputPrec
             if (memory->getSize() != tensor.get_byte_size()) {
                 THROW_CPU_NODE_ERR("output tensor data size mismatch occurred during the inference on output port number ", i);
             }
-            cpu_memcpy(memory->getData(), tensor.data(), tensor.get_byte_size());
+            if (tensor.get_element_type() == ov::element::string) {
+                auto srcPtr = reinterpret_cast<std::string *>(tensor.data());
+                auto dstPtr = reinterpret_cast<std::string *>(memory->getData());
+                std::copy(srcPtr, srcPtr + tensor.get_size(), dstPtr);
+            } else {
+                cpu_memcpy(memory->getData(), tensor.data(), tensor.get_byte_size());
+            }
         }
     }
 }

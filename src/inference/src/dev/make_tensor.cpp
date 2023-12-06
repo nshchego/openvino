@@ -188,9 +188,9 @@ public:
                          return data;
                      }()},
           m_allocator{allocator} {
-if (m_ptr ==  ((void*)(intptr_t)terget_ptr)) {
+// if (m_ptr ==  ((void*)(intptr_t)terget_ptr)) {
     printf("[CORE] AllocatedTensor ctr ptr: %p\n", m_ptr);
-}
+// }
 }
 
     ~AllocatedTensor() {
@@ -232,7 +232,7 @@ private:
 printf("[CORE] AllocatedTensor destroy size: %lu; ptr: %p\n", end_ind - begin_ind, m_ptr);
             auto strings = static_cast<std::string*>(m_ptr);
             for (size_t ind = begin_ind; ind < end_ind; ++ind) {
-printf("    %s\n", strings[ind].c_str());
+// printf("    %s\n", strings[ind].c_str());
                 using std::string;
                 strings[ind].~string();
             }

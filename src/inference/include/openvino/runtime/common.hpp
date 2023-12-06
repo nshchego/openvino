@@ -39,6 +39,13 @@
 #    define OPENVINO_PLUGIN_API OPENVINO_EXTERN_C
 #endif
 
+
+// inline void operator delete(void* p)
+// {
+//     printf("delete %p\n", p);
+//     free(p);
+// }
+
 namespace ov {
 
 /**
