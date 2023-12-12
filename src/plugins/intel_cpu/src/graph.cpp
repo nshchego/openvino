@@ -607,6 +607,19 @@ void Graph::AllocateWithReuse() {
                 erase = true;
                 break;
             }
+
+            // Special allocation for string tensors
+            // if (edge->getDesc().getPrecision() == element::string && edge->getStatus() == Edge::Status::NeedAllocation) {
+            //     auto memory = std::make_shared<StringMemory>(getEngine(), edge->getDesc());
+            //     edge->reuse(memory);
+            //     // for (auto& edge : cluster) {
+            //     //     // check for NotAllocated
+            //     //     auto memory = std::make_shared<StringMemory>(getEngine(), edge->getDesc(), mngr);
+            //     // }
+            //     erase = true;
+            //     continue;
+            // }
+
             // Special allocation for constants
             if (edge->getStatus() != Edge::Status::NeedAllocation || !edge->getParent()->isConstant()) {
                 continue;
@@ -633,6 +646,8 @@ void Graph::AllocateWithReuse() {
     // Markup the boxes
     std::vector<ov::MemorySolver::Box> definedBoxes;
     std::vector<ov::MemorySolver::Box> undefinedBoxes;
+    std::vector<ov::MemorySolver::Box> definedBoxesString;
+    std::vector<ov::MemorySolver::Box> undefinedBoxesString;
     for (size_t i = 0; i < remaining_edge_clusters_count; i++) {
         ov::MemorySolver::Box box = { std::numeric_limits<int>::max(), 0, 0, static_cast<int64_t>(i) };
         int64_t boxSize = 0;
@@ -673,23 +688,35 @@ void Graph::AllocateWithReuse() {
 
         if (boxSize != -1) {
             box.size = div_up(boxSize, alignment);
-            definedBoxes.push_back(box);
+            if ((*edge_clusters[i].begin())->getDesc().getPrecision() == element::string) {
+                definedBoxesString.push_back(box);
+            } else {
+                definedBoxes.push_back(box);
+            }
         } else {
             box.size = boxSize;
-            undefinedBoxes.push_back(box);
+            if ((*edge_clusters[i].begin())->getDesc().getPrecision() == element::string) {
+                undefinedBoxesString.push_back(box);
+            } else {
+                undefinedBoxes.push_back(box);
+            }
         }
     }
 
     // Process defined boxes (static shapes)
     ov::MemorySolver staticMemSolver(definedBoxes);
-    size_t total_size = static_cast<size_t>(staticMemSolver.solve()) * alignment;
+    ov::MemorySolver staticMemSolverString(definedBoxesString);
+    const auto total_size = static_cast<size_t>(staticMemSolver.solve()) * alignment;
+    const auto total_size_string = static_cast<size_t>(staticMemSolverString.solve()) * alignment / element::string.size();
 
     memWorkspace = std::make_shared<Memory>(getEngine(), DnnlBlockedMemoryDesc(ov::element::i8, Shape(VectorDims{total_size})));
+    memWorkspaceString = std::make_shared<StringMemory>(getEngine(), CpuBlockedMemoryDesc(element::string, Shape(VectorDims{total_size_string})));
 
     if (edge_clusters.empty())
         return;
 
-    auto* workspace_ptr = static_cast<int8_t*>(memWorkspace->getData());
+    auto workspace_ptr = static_cast<int8_t*>(memWorkspace->getData());
+    auto workspace_ptr_string = reinterpret_cast<OvString *>(memWorkspaceString->getData());
 
     for (const auto& box : definedBoxes) {
         int count = 0;
@@ -699,11 +726,27 @@ void Graph::AllocateWithReuse() {
                 // !! Fallback to individual memory allocation !!
                 // if you like to check infer without reuse just call this function without arguments.
                 edge->allocate(workspace_ptr + offset * alignment);  // alignment in byte
-                if (edge->getMemory().getDesc().getPrecision() == element::string) {
-                    auto str_ptr = reinterpret_cast<OvString *>(edge->getMemory().getData());
-                    std::uninitialized_fill_n(str_ptr, edge->getMemory().getSize() / element::string.size(), OvString());
-printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", str_ptr);
-                }
+// printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", str_ptr);
+
+                // TODO: WA for some test (like strided_slice_test) which use tensors with
+                //       shapes {0}. And it is implicitly converted into {1} tensor.
+                //       Zeroing of input data allow pass tests.
+                if (edge->getParent()->type == Type::Input && edge->hasDefinedMaxSize())
+                    edge->getMemoryPtr()->nullify();
+
+                count++;
+            }
+        }
+        OPENVINO_ASSERT(count == 1);
+    }
+
+    for (const auto& box : definedBoxesString) {
+        int count = 0;
+        for (auto& edge : edge_clusters[box.id]) {
+            if (edge->getStatus() == Edge::Status::NeedAllocation) {
+                int64_t offset = staticMemSolverString.get_offset(box.id);
+printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", workspace_ptr_string + offset * alignment / element::string.size());
+                edge->allocateStr(workspace_ptr_string + offset * alignment / element::string.size());
 
                 // TODO: WA for some test (like strided_slice_test) which use tensors with
                 //       shapes {0}. And it is implicitly converted into {1} tensor.
@@ -725,10 +768,17 @@ printf("[CPU][STRING] Graph AllocateWithReuse ptr: %p\n", str_ptr);
                 const auto child = edge->getChild();
                 if (child->getType() == Type::Output &&
                     edge->getStatus() == Edge::Status::NeedAllocation) {
-                    auto proxyMemMngr =
-                        std::make_shared<ProxyMemoryMngr>();
-                    DEBUG_LOG("ProxyMemoryMngr ", proxyMemMngr, " ", this);
-                    edge->allocate(proxyMemMngr);
+                    // std::shared_ptr<IMemoryMngr> proxyMemMngr;
+                    if (edge->getDesc().getPrecision() == element::string) {
+                        // auto str_manager = std::make_shared<StringMemory::StringMemoryMngr>();
+                        // proxyMemMngr = std::make_shared<StringMemory::StringMemoryMngr>(str_manager); // TODO that does not make sence
+                        edge->allocateStr();
+                    } else {
+                        auto proxyMemMngr = std::make_shared<ProxyMemoryMngr>();
+                        edge->allocate(proxyMemMngr);
+                    }
+                    // DEBUG_LOG("ProxyMemoryMngr ", proxyMemMngr, " ", this);
+printf("[CPU] Graph AllocateWithReuse undefinedBoxes prc: %s\n",  edge->getDesc().getPrecision().get_type_name().c_str());
 
                     // Store the output memory managers.
                     // So that, the infer requests can be able to access them.

@@ -438,10 +438,14 @@ void Reorder::reorderData(const IMemory &input, const IMemory &output, MultiCach
     }
 
     if (input.getDesc().isCompatible(output.getDesc())) {
-        if (input.getDesc().getPrecision() == ov::element::string) {
-            auto srcPtr = reinterpret_cast<OvString *>(input.getData());
-            auto dstPtr = reinterpret_cast<OvString *>(output.getData());
-            std::copy(srcPtr, srcPtr + output.getShape().getElementsCount(), dstPtr);
+        if (input.getDesc().getPrecision() == element::string) {
+            try {
+                auto srcPtr = reinterpret_cast<OvString *>(input.getData());
+                auto dstPtr = reinterpret_cast<OvString *>(output.getData());
+                std::copy(srcPtr, srcPtr + output.getShape().getElementsCount(), dstPtr);
+            } catch (...) {
+                OPENVINO_THROW("Reorder could not copy string data.");
+            }
         } else {
             auto srcPtr = static_cast<uint8_t*>(input.getData());
             auto dstPtr = static_cast<uint8_t*>(output.getData());

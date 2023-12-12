@@ -4,8 +4,6 @@
 
 #include "edge.h"
 #include "node.h"
-#include "dnnl_extension_utils.h"
-#include "nodes/input.h"
 
 using namespace dnnl;
 namespace ov {
@@ -255,6 +253,17 @@ void Edge::allocate(const void* mem_ptr) {
         return std::make_shared<Memory>(parentPtr->getEngine(), inputDesc, mem_ptr, false);  // no pads zeroing
     };
 
+printf("[CPU] Edge::allocate void parent: %s; child: %s\n", getParent()->getName().c_str(), getChild()->getName().c_str());
+    allocateCommon(allocateFunc);
+}
+
+void Edge::allocateStr(const OvString* mem_ptr) {
+    auto allocateFunc = [=](const MemoryDesc& inputDesc) -> MemoryPtr {
+        auto parentPtr = getParent();
+        return std::make_shared<StringMemory>(parentPtr->getEngine(), inputDesc, mem_ptr);
+    };
+
+printf("[CPU] Edge::allocate OvString parent: %s; child: %s\n", getParent()->getName().c_str(), getChild()->getName().c_str());
     allocateCommon(allocateFunc);
 }
 
@@ -264,8 +273,11 @@ void Edge::allocate(MemoryMngrPtr memMngr) {
     }
 
     auto allocateFunc = [=](const MemoryDesc& inputDesc) -> MemoryPtr {
-        auto parentPtr = getParent();
-        return std::make_shared<Memory>(parentPtr->getEngine(), inputDesc, memMngr);
+        if (inputDesc.getPrecision() == element::string) {
+            return std::make_shared<StringMemory>(getParent()->getEngine(), inputDesc);
+        } else {
+            return std::make_shared<Memory>(getParent()->getEngine(), inputDesc, memMngr);
+        }
     };
 
     allocateCommon(allocateFunc);
@@ -426,6 +438,7 @@ void Edge::validate() {
     getChild();
 
     if (status != Status::Allocated || !memoryPtr) {
+printf("[CPU] Edge::sharedMemFrom parent: %s; child: %s\n", getParent()->getName().c_str(), getChild()->getName().c_str());
         OPENVINO_THROW("Error memory is not allocated!");
     }
     status = Status::Validated;

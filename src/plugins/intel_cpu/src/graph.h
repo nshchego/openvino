@@ -218,6 +218,7 @@ protected:
     bool reuse_io_tensors = true;
 
     MemoryPtr memWorkspace;
+    StringMemoryPtr memWorkspaceString;
 
     std::vector<NodePtr> graphNodes;
     std::vector<EdgePtr> graphEdges;

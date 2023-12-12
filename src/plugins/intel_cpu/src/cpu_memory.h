@@ -51,8 +51,6 @@ public:
      */
     virtual bool resize(size_t size, const ov::element::Type& type) = 0;
 
-    // virtual bool resizeForString(size_t size) = 0;
-
     /**
      * @brief Check if the object has control over underlying memory buffer
      * @return status whether the object has control over underlying memory buffer
@@ -78,7 +76,6 @@ private:
 
     static void release(void *ptr);
     static void destroy(void *ptr);
-    static void delete_str(void *ptr);
 };
 
 class MemoryMngrRealloc : public IMemoryMngr {
@@ -96,7 +93,6 @@ private:
 
     static void release(void *ptr);
     static void destroy(void *ptr);
-    static void delete_str(void *ptr);
 };
 
 class IMemoryMngrObserver : public IMemoryMngr {
@@ -114,7 +110,6 @@ public:
     void* getRawPtr() const noexcept override;
     void setExtBuff(void* ptr, size_t size) override;
     bool resize(size_t size, const ov::element::Type& type) override;
-    // bool resizeForString(size_t size) override;
     bool hasExtBuffer() const noexcept override;
     void registerMemory(Memory* memPtr) override;
     void unregisterMemory(Memory* memPtr) override;
@@ -217,7 +212,6 @@ public:
         void* getRawPtr() const noexcept override;
         void setExtBuff(void* ptr, size_t size) override;
         bool resize(size_t size, const ov::element::Type& type = ov::element::undefined) override;
-        // bool resizeForString(size_t size) override;
         bool hasExtBuffer() const noexcept override;
         void registerMemory(Memory* memPtr) override;
         void unregisterMemory(Memory* memPtr) override;
@@ -359,8 +353,107 @@ private:
     }
 };
 
+class StringMemory : public IMemory {
+public:
+    using OvString = ov::element_type_traits<ov::element::string>::value_type;
+
+    class StringMemoryMngr : public IMemoryMngr {
+    public:
+        StringMemoryMngr() : m_data(nullptr, release) {}
+        OvString* getStringPtr() const noexcept;
+        void setExtStringBuff(OvString* ptr, size_t size);
+
+        void* getRawPtr() const noexcept override;
+        void setExtBuff(void* ptr, size_t size) override;
+        bool resize(size_t size, const ov::element::Type& type = ov::element::undefined) override;
+        bool hasExtBuffer() const noexcept override;
+
+    private:
+        bool m_use_external_storage = false;
+        size_t m_str_upper_bound = 0lu;
+        std::unique_ptr<OvString, void (*)(OvString *)> m_data;
+
+        static void release(OvString* ptr) {}
+        static void destroy(OvString* ptr);
+    };
+
+    using StringMemoryMngrPtr = std::shared_ptr<StringMemoryMngr>;
+
+    StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const OvString* data = nullptr);
+
+    StringMemory(const dnnl::engine& engine, const MemoryDesc& desc, const OvString* data = nullptr) : StringMemory(engine, desc.clone(), data) {}
+
+    StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const StringMemoryMngrPtr& manager)
+        : m_engine(engine), m_mem_desc(desc), m_manager(manager) {}
+
+    bool isAllocated() const noexcept override {
+       return true;
+    }
+
+    const MemoryDesc& getDesc() const override {
+        return *m_mem_desc;
+    }
+
+    MemoryDescPtr getDescPtr() const override {
+        return m_mem_desc;
+    }
+
+    void* getData() const override;
+
+    size_t getSize() const override { // In bytes
+        return m_size;
+    }
+
+    const Shape& getShape() const override {
+        return m_mem_desc->getShape();
+    }
+
+    const VectorDims& getStaticDims() const override {
+        return m_mem_desc->getShape().getStaticDims();
+    }
+
+    void redefineDesc(MemoryDescPtr desc) override {
+        m_mem_desc = desc;
+    }
+
+    void load(const IMemory& src, bool ftz = true) const override;// {
+    //     OPENVINO_THROW("Unexpected call of StringMemory::load()");
+    //     transferData(src, *this, ftz);
+    // }
+
+    MemoryMngrPtr getMemoryMngr() const override;
+
+    StringMemoryMngrPtr getStringMemoryMngrPtr() const {
+        // blabla bla
+        return m_manager;
+    }
+
+    dnnl::memory getPrimitive() const override {
+        OPENVINO_THROW("Unexpected call of StringMemory::getPrimitive()");
+    }
+
+    void nullify() override {
+        // nothing to do
+    }
+
+private:
+    dnnl::engine m_engine;
+    MemoryDescPtr m_mem_desc;
+    StringMemoryMngrPtr m_manager;
+    size_t m_size;
+};
+
+
+// allocateStringTensors() {
+//     auto haupt_memory = std::make_shared<StringMemory>(eng, desc);
+//     StringMemoryMngrPtr mngr = haupt_memory->getMemoryMngrStringPtr();
+//     //for all other edges in claster
+//     auto memory = std::make_shared<StringMemory>(eng, desc, mngr);
+// }
+
 using MemoryPtr = std::shared_ptr<IMemory>;
 using MemoryCPtr = std::shared_ptr<const IMemory>;
+using StringMemoryPtr = std::shared_ptr<StringMemory>;
 
 }   // namespace intel_cpu
 }   // namespace ov

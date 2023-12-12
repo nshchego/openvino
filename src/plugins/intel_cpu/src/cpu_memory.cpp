@@ -5,8 +5,6 @@
 #include "cpu_memory.h"
 #include "nodes/reorder.h"
 
-using OvString = ov::element_type_traits<ov::element::string>::value_type;
-
 namespace ov {
 namespace intel_cpu {
 template <>
@@ -214,31 +212,23 @@ printf("    new ptr: %p\n", m_data.get());
 
 bool MemoryMngrWithReuse::resize(size_t size, const element::Type& type) {
 printf("[CPU] MemoryMngrWithReuse::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
-        constexpr int cacheLineSize = 64;
-        bool sizeChanged = false;
-        if (size > m_memUpperBound) {
-            void* ptr = nullptr;
-            if (type == element::string) {
-                ptr = new OvString[size / element::string.size()];
-            } else {
-                ptr = dnnl::impl::malloc(size, cacheLineSize);
-            }
+if (type == element::string) {
+    OPENVINO_THROW("[CPU] MemoryMngrWithReuse::resize() called for string");
+}
+    constexpr int cacheLineSize = 64;
+    bool sizeChanged = false;
+    if (size > m_memUpperBound) {
+        void *ptr = dnnl::impl::malloc(size, cacheLineSize);
 printf("    old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
-            if (!ptr) {
-                OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
-            }
-            m_memUpperBound = size;
-            m_useExternalStorage = false;
-            if (type == element::string) {
-                m_data = decltype(m_data)(ptr, delete_str);
-            } else {
-                m_data = decltype(m_data)(ptr, destroy);
-            }
-            sizeChanged = true;
-        } else {
-printf("    the same ptr: %p\n", m_data.get());
+        if (!ptr) {
+            OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
         }
-        return sizeChanged;
+        m_memUpperBound = size;
+        m_useExternalStorage = false;
+        m_data = decltype(m_data)(ptr, destroy);
+        sizeChanged = true;
+    }
+    return sizeChanged;
 }
 
 bool MemoryMngrWithReuse::hasExtBuffer() const noexcept {
@@ -252,12 +242,6 @@ printf("[CPU] MemoryMngrWithReuse::destroy ptr: %p\n", ptr);
     dnnl::impl::free(ptr);
 }
 
-void MemoryMngrWithReuse::delete_str(void *ptr) {
-printf("[CPU] MemoryMngrWithReuse::delete_str ptr: %p\n", ptr);
-    auto ptr_s = reinterpret_cast<OvString *>(ptr);
-    delete[] ptr_s;
-}
-
 void* MemoryMngrRealloc::getRawPtr() const noexcept {
     return m_data.get();
 }
@@ -269,38 +253,26 @@ void MemoryMngrRealloc::setExtBuff(void *ptr, size_t size) {
 }
 
 bool MemoryMngrRealloc::resize(size_t size, const element::Type& type) {
+if (type == element::string) {
+    OPENVINO_THROW("[CPU] MemoryMngrRealloc::resize() called for string");
+}
     constexpr int cacheLineSize = 64;
     constexpr size_t growFactor = 2;
     bool sizeChanged = false;
     if (size > m_memUpperBound) {
         size *= growFactor;
-        void* ptr = nullptr;
-        if (type == element::string) {
-            ptr = new OvString[size / element::string.size()];
-        } else {
-            ptr = dnnl::impl::malloc(size, cacheLineSize);
-        }
+        void *ptr = dnnl::impl::malloc(size, cacheLineSize);
         if (!ptr) {
             OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
         }
 
         if (auto src = m_data.get()) {
-            if (type == element::string) {
-                auto srcPtr = reinterpret_cast<OvString *>(src);
-                auto dstPtr = reinterpret_cast<OvString *>(ptr);
-                std::copy(srcPtr, srcPtr + m_memUpperBound / element::string.size(), dstPtr);
-            } else {
-                std::memcpy(ptr, src, m_memUpperBound);
-            }
+            std::memcpy(ptr, src, m_memUpperBound);
         }
 
         m_memUpperBound = size;
         m_useExternalStorage = false;
-        if (type == element::string) {
-            m_data = decltype(m_data)(ptr, delete_str);
-        } else {
-            m_data = decltype(m_data)(ptr, destroy);
-        }
+        m_data = decltype(m_data)(ptr, destroy);
         sizeChanged = true;
     }
     return sizeChanged;
@@ -316,11 +288,89 @@ void MemoryMngrRealloc::destroy(void *ptr) {
     dnnl::impl::free(ptr);
 }
 
-void MemoryMngrRealloc::delete_str(void *ptr) {
-printf("[CPU] MemoryMngrRealloc::delete_str ptr: %p\n", ptr);
-    auto ptr_s = reinterpret_cast<OvString *>(ptr);
-    delete[] ptr_s;
+/////////////// StringMemory ///////////////
+
+StringMemory::StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const OvString* data) : m_engine(engine), m_mem_desc(desc) {
+    m_manager = std::make_shared<StringMemoryMngr>();
+    m_size = m_mem_desc->getCurrentMemSize(); // Remove?
+    auto string_size = m_mem_desc->getShape().getElementsCount();
+
+    if (data != nullptr) {
+        m_manager->setExtStringBuff(const_cast<OvString *>(data), string_size);
+    } else {
+        m_manager->resize(string_size);
+    }
 }
+
+StringMemory::OvString* StringMemory::StringMemoryMngr::getStringPtr() const noexcept {
+printf("[CPU] StringMemoryMngr::getStringPtr ptr: %p\n", m_data.get());
+// constexpr size_t ptr_val = 0x7fffe8005868;
+// if (m_data.get() == (reinterpret_cast<void *>((intptr_t)ptr_val))) {
+//     printf("[CPU] StringMemoryMngr::getStringPtr ptr found\n");
+// }
+    return m_data.get();
+}
+
+void StringMemory::load(const IMemory& src, bool ftz) const {
+    transferData(src, *this, ftz);
+}
+
+void* StringMemory::getData() const  {
+    return m_manager->getRawPtr();
+}
+
+MemoryMngrPtr StringMemory::getMemoryMngr() const {
+    OPENVINO_THROW("Unexpected call of StringMemory::getMemoryMngr()");
+}
+
+void StringMemory::StringMemoryMngr::setExtStringBuff(OvString* ptr, size_t size) {
+printf("[CPU] StringMemoryMngr::setExtStringBuff size: %lu; old ptr: %p; new ptr: %p\n", size, m_data.get(), ptr);
+    m_use_external_storage = true;
+    m_str_upper_bound = size;
+    m_data = decltype(m_data)(ptr, release);
+printf("    new ptr: %p\n", m_data.get());
+}
+
+bool StringMemory::StringMemoryMngr::resize(size_t size, const element::Type& type) {
+printf("[CPU] StringMemoryMngr::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
+// if (type != element::string) {
+//     OPENVINO_THROW("[CPU] StringMemoryMngr::resize() called for non string");
+// }
+    bool sizeChanged = false;
+    if (size > m_str_upper_bound) {
+        auto ptr = new OvString[size];
+printf("    old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
+        if (!ptr) {
+            OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
+        }
+        m_str_upper_bound = size;
+        m_use_external_storage = false;
+        m_data = decltype(m_data)(ptr, destroy);
+        sizeChanged = true;
+    } else {
+printf("    the same ptr: %p\n", m_data.get());
+    }
+    return sizeChanged;
+}
+
+bool StringMemory::StringMemoryMngr::hasExtBuffer() const noexcept {
+    return m_use_external_storage;
+}
+
+void StringMemory::StringMemoryMngr::destroy(OvString* ptr) {
+printf("[CPU] StringMemoryMngr::destroy ptr: %p\n", ptr);
+    delete[] ptr;
+}
+
+void* StringMemory::StringMemoryMngr::getRawPtr() const noexcept {
+    return reinterpret_cast<void *>(m_data.get());
+}
+
+void StringMemory::StringMemoryMngr::setExtBuff(void* ptr, size_t size) {
+    OPENVINO_THROW("Unexpected call of StringMemoryMngr::setExtBuff()");
+}
+
+/////////////// DnnlMemoryMngr ///////////////
 
 void* DnnlMemoryMngr::getRawPtr() const noexcept {
     return m_pMemMngr->getRawPtr();
