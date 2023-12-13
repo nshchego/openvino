@@ -54,9 +54,6 @@
 #    include <tbb/task.h>
 #endif
 
-
-using OvString = ov::element_type_traits<ov::element::string>::value_type;
-
 using namespace dnnl;
 using namespace InferenceEngine;
 
