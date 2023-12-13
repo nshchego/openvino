@@ -100,7 +100,7 @@ void Memory::create(MemoryDescPtr desc, const void* data, bool pads_zeroing) {
     if (nullptr != data) {
         m_mgrHandle->setExtBuff(const_cast<void*>(data), memSize);
     } else {
-        m_mgrHandle->resize(memSize, m_pMemDesc->getPrecision());
+        m_mgrHandle->resize(memSize);
     }
 }
 
@@ -210,11 +210,11 @@ printf("[CPU] MemoryMngrWithReuse::setExtBuff size: %lu; old ptr: %p; new ptr: %
 printf("    new ptr: %p\n", m_data.get());
 }
 
-bool MemoryMngrWithReuse::resize(size_t size, const element::Type& type) {
-printf("[CPU] MemoryMngrWithReuse::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
-if (type == element::string) {
-    OPENVINO_THROW("[CPU] MemoryMngrWithReuse::resize() called for string");
-}
+bool MemoryMngrWithReuse::resize(size_t size) {
+// printf("[CPU] MemoryMngrWithReuse::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
+// if (type == element::string) {
+//     OPENVINO_THROW("[CPU] MemoryMngrWithReuse::resize() called for string");
+// }
     constexpr int cacheLineSize = 64;
     bool sizeChanged = false;
     if (size > m_memUpperBound) {
@@ -252,10 +252,10 @@ void MemoryMngrRealloc::setExtBuff(void *ptr, size_t size) {
     m_data = decltype(m_data)(ptr, release);
 }
 
-bool MemoryMngrRealloc::resize(size_t size, const element::Type& type) {
-if (type == element::string) {
-    OPENVINO_THROW("[CPU] MemoryMngrRealloc::resize() called for string");
-}
+bool MemoryMngrRealloc::resize(size_t size) {
+// if (type == element::string) {
+//     OPENVINO_THROW("[CPU] MemoryMngrRealloc::resize() called for string");
+// }
     constexpr int cacheLineSize = 64;
     constexpr size_t growFactor = 2;
     bool sizeChanged = false;
@@ -331,7 +331,7 @@ void StringMemory::redefineDesc(MemoryDescPtr desc) {
 
     m_mem_desc = desc;
     const auto string_size = m_mem_desc->getShape().getElementsCount();
-    m_manager->resize(string_size, m_mem_desc->getPrecision());
+    m_manager->resize(string_size);
 }
 
 void StringMemory::nullify() {
@@ -357,8 +357,8 @@ printf("[CPU] StringMemoryMngr::setExtStringBuff size: %lu; old ptr: %p; new ptr
 printf("    new ptr: %p\n", m_data.get());
 }
 
-bool StringMemory::StringMemoryMngr::resize(size_t size, const element::Type& type) {
-printf("[CPU] StringMemoryMngr::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
+bool StringMemory::StringMemoryMngr::resize(size_t size) {
+// printf("[CPU] StringMemoryMngr::resize size: %lu; type: %s\n", size, type.get_type_name().c_str());
 // if (type != element::string) {
 //     OPENVINO_THROW("[CPU] StringMemoryMngr::resize() called for non string");
 // }
@@ -411,9 +411,9 @@ void DnnlMemoryMngr::setExtBuff(void *ptr, size_t size) {
     notifyUpdate();
 }
 
-bool DnnlMemoryMngr::resize(size_t size, const element::Type& type) {
+bool DnnlMemoryMngr::resize(size_t size) {
 printf("[CPU] DnnlMemoryMngr::resize size: %lu\n", size);
-    bool sizeChanged = m_pMemMngr->resize(size, type);
+    bool sizeChanged = m_pMemMngr->resize(size);
     if (sizeChanged) {
         notifyUpdate();
     }
@@ -534,7 +534,7 @@ void StaticMemory::nullify() {
 }
 
 StaticMemory::StaticMemoryMngr::StaticMemoryMngr(size_t size, const element::Type& type) : m_size(size) {
-    memMngrImpl.resize(m_size, type);
+    memMngrImpl.resize(m_size);
 }
 
 StaticMemory::StaticMemoryMngr::StaticMemoryMngr(void* data, size_t size, const element::Type& type) : m_size(size) {
@@ -549,7 +549,7 @@ void StaticMemory::StaticMemoryMngr::setExtBuff(void* ptr, size_t size) {
     OPENVINO_THROW("Unexpected: StaticMemoryMngr may not be modified");
 }
 
-bool StaticMemory::StaticMemoryMngr::resize(size_t size, const element::Type& type) {
+bool StaticMemory::StaticMemoryMngr::resize(size_t size) {
 printf("[CPU] StaticMemoryMngr::resize size: %lu\n", size);
     if (size != m_size) {
         OPENVINO_THROW("Unexpected: StaticMemoryMngr may not resize the memory");
