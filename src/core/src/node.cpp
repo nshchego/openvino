@@ -247,9 +247,6 @@ void ov::Node::constructor_validate_and_infer_types() {
 }
 
 void ov::Node::set_output_size(size_t n) {
-if (m_outputs.size() == 2 && n == 1) {
-    std::cout << std::endl;
-}
     OPENVINO_ASSERT(n >= m_outputs.size(), "shrinking ", m_outputs.size(), " to ", n);
     for (size_t i = m_outputs.size(); i < n; ++i) {
         // create the descriptors

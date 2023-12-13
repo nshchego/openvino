@@ -207,8 +207,8 @@ class StaticMemory final : public IMemory {
 public:
     class StaticMemoryMngr : public IMemoryMngrObserver {
     public:
-        explicit StaticMemoryMngr(size_t size, const ov::element::Type& type);
-        StaticMemoryMngr(void* data, size_t size, const ov::element::Type& type);
+        explicit StaticMemoryMngr(size_t size);
+        StaticMemoryMngr(void* data, size_t size);
         void* getRawPtr() const noexcept override;
         void setExtBuff(void* ptr, size_t size) override;
         bool resize(size_t size) override;

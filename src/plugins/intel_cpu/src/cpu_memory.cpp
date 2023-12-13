@@ -453,9 +453,9 @@ StaticMemory::StaticMemory(const dnnl::engine& eng, MemoryDescPtr desc, const vo
     m_size = m_pMemDesc->getCurrentMemSize();
 
     if (data) {
-        m_pMemMngr = std::make_shared<StaticMemoryMngr>(const_cast<void*>(data), m_size, m_pMemDesc->getPrecision());
+        m_pMemMngr = std::make_shared<StaticMemoryMngr>(const_cast<void*>(data), m_size);
     } else {
-        m_pMemMngr = std::make_shared<StaticMemoryMngr>(m_size, m_pMemDesc->getPrecision());
+        m_pMemMngr = std::make_shared<StaticMemoryMngr>(m_size);
     }
 
     try {
@@ -533,11 +533,11 @@ void StaticMemory::nullify() {
         memset(dataPtr, 0, getSize());
 }
 
-StaticMemory::StaticMemoryMngr::StaticMemoryMngr(size_t size, const element::Type& type) : m_size(size) {
+StaticMemory::StaticMemoryMngr::StaticMemoryMngr(size_t size) : m_size(size) {
     memMngrImpl.resize(m_size);
 }
 
-StaticMemory::StaticMemoryMngr::StaticMemoryMngr(void* data, size_t size, const element::Type& type) : m_size(size) {
+StaticMemory::StaticMemoryMngr::StaticMemoryMngr(void* data, size_t size) : m_size(size) {
     memMngrImpl.setExtBuff(data, m_size);
 }
 
