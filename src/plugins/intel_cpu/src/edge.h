@@ -4,8 +4,15 @@
 
 #pragma once
 
+#include <ie_blob.h>
+#include "cpu_shape.h"
+#include "memory_desc/cpu_memory_desc.h"
 #include "nodes/node_config.h"
 #include "weights_cache.hpp"
+
+#include <map>
+#include <memory>
+#include <vector>
 
 namespace ov {
 namespace intel_cpu {
@@ -18,8 +25,6 @@ using EdgeWeakPtr = std::weak_ptr<Edge>;
 
 class Edge {
 public:
-using OvString = ov::element_type_traits<ov::element::string>::value_type;
-
     Edge(const std::shared_ptr<Node>& parent,
          const std::shared_ptr<Node>& child,
          int pr_port = 0, int ch_port = 0);
@@ -49,7 +54,6 @@ using OvString = ov::element_type_traits<ov::element::string>::value_type;
 
     void init();
     void allocate(const void* mem_ptr = nullptr);
-    void allocateStr(const OvString* mem_ptr = nullptr);
     void allocate(MemoryMngrPtr memMngr);
     void externalAllocate(WeightsSharing::Ptr weightsCache);
     void reuse(MemoryPtr ptr);

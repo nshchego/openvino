@@ -4,6 +4,8 @@
 
 #include "edge.h"
 #include "node.h"
+#include "dnnl_extension_utils.h"
+#include "nodes/input.h"
 
 using namespace dnnl;
 namespace ov {
@@ -257,27 +259,14 @@ printf("[CPU] Edge::allocate void parent: %s; child: %s\n", getParent()->getName
     allocateCommon(allocateFunc);
 }
 
-void Edge::allocateStr(const OvString* mem_ptr) {
-    auto allocateFunc = [=](const MemoryDesc& inputDesc) -> MemoryPtr {
-        auto parentPtr = getParent();
-        return std::make_shared<StringMemory>(parentPtr->getEngine(), inputDesc, mem_ptr);
-    };
-
-printf("[CPU] Edge::allocate OvString parent: %s; child: %s\n", getParent()->getName().c_str(), getChild()->getName().c_str());
-    allocateCommon(allocateFunc);
-}
-
 void Edge::allocate(MemoryMngrPtr memMngr) {
     if (!memMngr) {
         OPENVINO_THROW("Unexpected: Memory manager ptr is NULL");
     }
 
     auto allocateFunc = [=](const MemoryDesc& inputDesc) -> MemoryPtr {
-        if (inputDesc.getPrecision() == element::string) {
-            return std::make_shared<StringMemory>(getParent()->getEngine(), inputDesc);
-        } else {
-            return std::make_shared<Memory>(getParent()->getEngine(), inputDesc, memMngr);
-        }
+        auto parentPtr = getParent();
+        return std::make_shared<Memory>(parentPtr->getEngine(), inputDesc, memMngr);
     };
 
     allocateCommon(allocateFunc);
