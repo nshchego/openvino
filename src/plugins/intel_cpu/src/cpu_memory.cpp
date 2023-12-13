@@ -190,6 +190,7 @@ void* Memory::getData() const {
         m_pMemDesc->getShape().isStatic() &&
         m_pMemDesc->getShape().getElementsCount() != 0)
         OPENVINO_THROW("Memory has not been allocated");
+printf("[CPU] Memory::getData ptr: %p\n", data);
     return data;
 }
 
@@ -219,7 +220,7 @@ bool MemoryMngrWithReuse::resize(size_t size) {
     bool sizeChanged = false;
     if (size > m_memUpperBound) {
         void *ptr = dnnl::impl::malloc(size, cacheLineSize);
-printf("    old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
+printf("[CPU] MemoryMngrWithReuse::resize old_ptr: %p; new_ptr: %p\n", m_data.get(), ptr);
         if (!ptr) {
             OPENVINO_THROW("Failed to allocate ", size, " bytes of memory");
         }
@@ -243,6 +244,7 @@ printf("[CPU] MemoryMngrWithReuse::destroy ptr: %p\n", ptr);
 }
 
 void* MemoryMngrRealloc::getRawPtr() const noexcept {
+printf("[CPU] MemoryMngrRealloc::getRawPtr ptr: %p\n", m_data.get());
     return m_data.get();
 }
 
@@ -285,12 +287,13 @@ bool MemoryMngrRealloc::hasExtBuffer() const noexcept {
 void MemoryMngrRealloc::release(void *ptr) {}
 
 void MemoryMngrRealloc::destroy(void *ptr) {
+printf("[CPU] MemoryMngrRealloc::destroy ptr: %p\n", ptr);
     dnnl::impl::free(ptr);
 }
 
 /////////////// StringMemory ///////////////
 
-StringMemory::StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const OvString* data) : m_engine(engine), m_mem_desc(desc) {
+StringMemory::StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const void* data) : m_engine(engine), m_mem_desc(desc) {
     m_manager = std::make_shared<StringMemoryMngr>();
 
     if (!m_mem_desc->isDefined()) {
@@ -301,7 +304,8 @@ StringMemory::StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc
     const auto string_size = m_mem_desc->getShape().getElementsCount();
 
     if (data != nullptr) {
-        m_manager->setExtStringBuff(const_cast<OvString *>(data), string_size);
+        auto not_const_data = const_cast<void *>(data);
+        m_manager->setExtStringBuff(reinterpret_cast<OvString *>(not_const_data), string_size);
     } else {
         m_manager->resize(string_size);
     }
@@ -317,10 +321,17 @@ printf("[CPU] StringMemoryMngr::getStringPtr ptr: %p\n", m_data.get());
 }
 
 void StringMemory::load(const IMemory& src, bool ftz) const {
+    try {
+        auto str_mem = dynamic_cast<const StringMemory &>(src);
+    } catch (...) {
+        OPENVINO_THROW("[CPU] String memory cannot load a non-string object.");
+    }
+
     transferData(src, *this, false);
 }
 
 void* StringMemory::getData() const  {
+printf("[CPU] StringMemory::getData ptr: %p\n", m_manager->getRawPtr());
     return m_manager->getRawPtr();
 }
 
@@ -393,6 +404,7 @@ printf("[CPU] StringMemoryMngr::destroy ptr: %p\n", ptr);
 }
 
 void* StringMemory::StringMemoryMngr::getRawPtr() const noexcept {
+printf("[CPU] StringMemoryMngr::getRawPtr ptr: %p\n", m_data.get());
     return reinterpret_cast<void *>(m_data.get());
 }
 
@@ -403,6 +415,7 @@ void StringMemory::StringMemoryMngr::setExtBuff(void* ptr, size_t size) {
 /////////////// DnnlMemoryMngr ///////////////
 
 void* DnnlMemoryMngr::getRawPtr() const noexcept {
+printf("[CPU] DnnlMemoryMngr::getRawPtr ptr: %p\n", m_pMemMngr->getRawPtr());
     return m_pMemMngr->getRawPtr();
 }
 
@@ -492,6 +505,7 @@ MemoryDescPtr StaticMemory::getDescPtr() const {
 }
 
 void* StaticMemory::getData() const {
+printf("[CPU] StaticMemory::getData ptr: %p\n", m_pMemMngr->getRawPtr());
     return m_pMemMngr->getRawPtr();
 }
 
@@ -542,6 +556,7 @@ StaticMemory::StaticMemoryMngr::StaticMemoryMngr(void* data, size_t size) : m_si
 }
 
 void* StaticMemory::StaticMemoryMngr::getRawPtr() const noexcept {
+printf("[CPU] StaticMemoryMngr::getRawPtr ptr: %p\n", memMngrImpl.getRawPtr());
     return memMngrImpl.getRawPtr();
 }
 

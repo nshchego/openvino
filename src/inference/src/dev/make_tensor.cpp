@@ -174,7 +174,7 @@ std::shared_ptr<ITensor> make_tensor(const element::Type element_type,
  * Tensor owns the memory
  */
 
-constexpr size_t terget_ptr = 0x55555680be10;
+constexpr size_t terget_ptr = 0x5555568fff20;
 class AllocatedTensor : public ViewTensor {
 public:
     AllocatedTensor(const element::Type element_type, const Shape& shape, const Allocator& allocator)
@@ -240,9 +240,9 @@ printf("[CORE] AllocatedTensor destroy size: %lu; ptr: %p\n", end_ind - begin_in
     }
 
     void init(void* data, const element::Type& element_type, const Shape& shape) {
-if (data ==  ((void*)(intptr_t)terget_ptr)) {
+// if (data == ((void*)(intptr_t)terget_ptr)) {
     printf("[CORE] AllocatedTensor init size: %lu; ptr: %p\n", shape_size(shape), data);
-}
+// }
         if (element_type == element::Type_t::string) {
             auto num_elements = shape_size(shape);
             auto string_ptr = static_cast<std::string*>(data);
