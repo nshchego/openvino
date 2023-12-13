@@ -78,7 +78,7 @@ std::shared_ptr<AlignedBuffer> Constant::legacy_to_ov_aligned_buffer(
 }
 
 Constant::Constant(const std::shared_ptr<ngraph::runtime::Tensor>& tensor) {
-std::cout << "[CORE] Constant ctr 0" << std::endl;
+// std::cout << "[CORE] Constant ctr 0" << std::endl;
     m_element_type = tensor->get_element_type();
     m_shape = tensor->get_shape();
     // Share data from HostTensor if we work with it
@@ -104,7 +104,7 @@ Constant::Constant(const Tensor& tensor)
       m_shape{tensor.get_shape()},
       m_data{
           std::make_shared<SharedBuffer<Tensor>>(reinterpret_cast<char*>(tensor.data()), tensor.get_byte_size(), tensor)} {
-std::cout << "[CORE] Constant ctr 1" << std::endl;
+// std::cout << "[CORE] Constant ctr 1" << std::endl;
     constructor_validate_and_infer_types();
 }
 
@@ -137,12 +137,13 @@ Constant::Constant(const element::Type& type, const Shape& shape, const std::vec
 }
 
 Constant::Constant(const element::Type& type, const Shape& shape) : Constant(true, type, shape) {
-std::cout << "[CORE] Constant ctr 3" << std::endl;}
+// std::cout << "[CORE] Constant ctr 3" << std::endl;
+}
 
 Constant::Constant(bool memset_allocation, const element::Type& type, const Shape& shape)
     : m_element_type(type),
       m_shape(shape) {
-std::cout << "[CORE] Constant ctr 4" << std::endl;
+// std::cout << "[CORE] Constant ctr 4" << std::endl;
     allocate_buffer(memset_allocation);
     constructor_validate_and_infer_types();
 }
@@ -153,7 +154,7 @@ void Constant::allocate_buffer(bool memset_allocation) {
     if (m_element_type == ov::element::string) {
         auto num_elements = shape_size(m_shape);
         m_data = std::make_shared<StringAlignedBuffer>(num_elements, mem_size(), host_alignment(), memset_allocation);
-std::cout << "[CORE][STRING] Constant allocate_buffer size: " << mem_size() << "; ptr: " << m_data << std::endl;
+// std::cout << "[CORE][STRING] Constant allocate_buffer size: " << mem_size() << "; ptr: " << m_data << std::endl;
     } else {
         m_data = std::make_shared<AlignedBuffer>(mem_size(), host_alignment());
         if (memset_allocation) {
@@ -163,7 +164,7 @@ std::cout << "[CORE][STRING] Constant allocate_buffer size: " << mem_size() << "
 }
 
 Constant::Constant(const element::Type& type, const Shape& shape, const void* data) : Constant(false, type, shape) {
-std::cout << "[CORE] Constant ctr 5" << std::endl;
+// std::cout << "[CORE] Constant ctr 5" << std::endl;
     if (m_element_type == ov::element::string) {
         auto num_elements = shape_size(m_shape);
         const std::string* src_strings = reinterpret_cast<const std::string*>(data);
@@ -180,7 +181,7 @@ Constant::Constant(const Constant& other)
       m_data{other.m_data},
       m_all_elements_bitwise_identical{other.m_all_elements_bitwise_identical.load()},
       m_all_elements_bitwise_identical_checked{other.m_all_elements_bitwise_identical_checked.load()} {
-printf("[CORE] Constant ctr 6\n");
+// printf("[CORE] Constant ctr 6\n");
     constructor_validate_and_infer_types();
 }
 
@@ -190,7 +191,7 @@ Constant::Constant(const Constant& other, const Shape& new_shape)
       m_data{other.m_data},
       m_all_elements_bitwise_identical{other.m_all_elements_bitwise_identical.load()},
       m_all_elements_bitwise_identical_checked{other.m_all_elements_bitwise_identical_checked.load()} {
-printf("[CORE] Constant ctr 7\n");
+// printf("[CORE] Constant ctr 7\n");
     const auto new_size = shape_size(new_shape);
     const auto other_size = shape_size(other.m_shape);
     OPENVINO_ASSERT(other_size == new_size, "ov::Shape size ", new_size, " is not equal to ", other_size);

@@ -362,6 +362,7 @@ public:
         StringMemoryMngr() : m_data(nullptr, release) {}
         OvString* getStringPtr() const noexcept;
         void setExtStringBuff(OvString* ptr, size_t size);
+        size_t getStrLen() const noexcept;
 
         void* getRawPtr() const noexcept override;
         void setExtBuff(void* ptr, size_t size) override;
@@ -412,14 +413,9 @@ public:
         return m_mem_desc->getShape().getStaticDims();
     }
 
-    void redefineDesc(MemoryDescPtr desc) override {
-        m_mem_desc = desc;
-    }
+    void redefineDesc(MemoryDescPtr desc) override;
 
-    void load(const IMemory& src, bool ftz = true) const override;// {
-    //     OPENVINO_THROW("Unexpected call of StringMemory::load()");
-    //     transferData(src, *this, ftz);
-    // }
+    void load(const IMemory& src, bool ftz = false) const override;
 
     MemoryMngrPtr getMemoryMngr() const override;
 
@@ -428,13 +424,9 @@ public:
         return m_manager;
     }
 
-    dnnl::memory getPrimitive() const override {
-        OPENVINO_THROW("Unexpected call of StringMemory::getPrimitive()");
-    }
+    dnnl::memory getPrimitive() const override;
 
-    void nullify() override {
-        // nothing to do
-    }
+    void nullify() override;
 
 private:
     dnnl::engine m_engine;
@@ -442,14 +434,6 @@ private:
     StringMemoryMngrPtr m_manager;
     size_t m_size;
 };
-
-
-// allocateStringTensors() {
-//     auto haupt_memory = std::make_shared<StringMemory>(eng, desc);
-//     StringMemoryMngrPtr mngr = haupt_memory->getMemoryMngrStringPtr();
-//     //for all other edges in claster
-//     auto memory = std::make_shared<StringMemory>(eng, desc, mngr);
-// }
 
 using MemoryPtr = std::shared_ptr<IMemory>;
 using MemoryCPtr = std::shared_ptr<const IMemory>;

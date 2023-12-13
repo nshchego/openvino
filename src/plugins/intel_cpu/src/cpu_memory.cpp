@@ -292,8 +292,13 @@ void MemoryMngrRealloc::destroy(void *ptr) {
 
 StringMemory::StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const OvString* data) : m_engine(engine), m_mem_desc(desc) {
     m_manager = std::make_shared<StringMemoryMngr>();
+
+    if (!m_mem_desc->isDefined()) {
+        return;
+    }
+
     m_size = m_mem_desc->getCurrentMemSize(); // Remove?
-    auto string_size = m_mem_desc->getShape().getElementsCount();
+    const auto string_size = m_mem_desc->getShape().getElementsCount();
 
     if (data != nullptr) {
         m_manager->setExtStringBuff(const_cast<OvString *>(data), string_size);
@@ -312,15 +317,36 @@ printf("[CPU] StringMemoryMngr::getStringPtr ptr: %p\n", m_data.get());
 }
 
 void StringMemory::load(const IMemory& src, bool ftz) const {
-    transferData(src, *this, ftz);
+    transferData(src, *this, false);
 }
 
 void* StringMemory::getData() const  {
     return m_manager->getRawPtr();
 }
 
+void StringMemory::redefineDesc(MemoryDescPtr desc) {
+    if (!desc->hasDefinedMaxSize()) {
+        OPENVINO_THROW("Can not reset descriptor. Memory upper bound is unknown.");
+    }
+
+    m_mem_desc = desc;
+    const auto string_size = m_mem_desc->getShape().getElementsCount();
+    m_manager->resize(string_size, m_mem_desc->getPrecision());
+}
+
+void StringMemory::nullify() {
+    auto data_ptr = m_manager->getStringPtr();
+    if (data_ptr != nullptr) {
+        std::fill(data_ptr, data_ptr + m_manager->getStrLen(), OvString());
+    }
+}
+
 MemoryMngrPtr StringMemory::getMemoryMngr() const {
     OPENVINO_THROW("Unexpected call of StringMemory::getMemoryMngr()");
+}
+
+dnnl::memory StringMemory::getPrimitive() const {
+    OPENVINO_THROW("Unexpected call of StringMemory::getPrimitive()");
 }
 
 void StringMemory::StringMemoryMngr::setExtStringBuff(OvString* ptr, size_t size) {
@@ -355,6 +381,10 @@ printf("    the same ptr: %p\n", m_data.get());
 
 bool StringMemory::StringMemoryMngr::hasExtBuffer() const noexcept {
     return m_use_external_storage;
+}
+
+size_t StringMemory::StringMemoryMngr::getStrLen() const noexcept {
+    return m_str_upper_bound;
 }
 
 void StringMemory::StringMemoryMngr::destroy(OvString* ptr) {
