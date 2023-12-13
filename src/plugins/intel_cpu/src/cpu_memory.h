@@ -387,9 +387,7 @@ public:
     StringMemory(const dnnl::engine& engine, const MemoryDescPtr& desc, const StringMemoryMngrPtr& manager)
         : m_engine(engine), m_mem_desc(desc), m_manager(manager) {}
 
-    bool isAllocated() const noexcept override {
-       return true;
-    }
+    bool isAllocated() const noexcept override;
 
     const MemoryDesc& getDesc() const override {
         return *m_mem_desc;
