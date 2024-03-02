@@ -812,7 +812,7 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
 
     const std::string& type_name = translate_type_name(params.type);
 if (type_name == "RoPE") {
-    printf("RoPE found\n");
+    // printf("RoPE found\n");
 }
 
     std::shared_ptr<ov::Node> ovNode;
