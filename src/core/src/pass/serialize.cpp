@@ -76,9 +76,32 @@ size_t hash_combine(const void* v, int64_t size) {
     // The constant value used as a magic number has been
     // traditionally used e.g. in boost library's hash_combine.
     // It happens to be derived from the golden ratio.
-    for (auto d = data; d != d_end; ++d) {
+    static const size_t cnst[8] = {0x9e3779b9, 0x9e3779b9, 0x9e3779b9, 0x9e3779b9, 0x9e3779b9, 0x9e3779b9, 0x9e3779b9, 0x9e3779b9};
+    size_t buf[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    const size_t vecs = size / cel_size / 8;
+    auto d = data;
+    for (size_t i = 0lu; i < vecs; i++, d += 8) {
+        buf[0] += d[0] + cnst[0];
+        buf[1] += d[1] + cnst[1];
+        buf[2] += d[2] + cnst[2];
+        buf[3] += d[3] + cnst[3];
+        buf[4] += d[4] + cnst[4];
+        buf[5] += d[5] + cnst[5];
+        buf[6] += d[6] + cnst[6];
+        buf[7] += d[7] + cnst[7];
+
+        for (size_t k = 0lu; k < 8lu; k++) {
+            seed ^= buf[k] + (seed << 6) + (seed >> 2);
+        }
+    }
+    const size_t vecs_rest = (size / cel_size) % 8;
+    for (size_t i = 0lu; i < vecs_rest; i++) {
         seed ^= *d + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     }
+
+    //for (auto d = data; d != d_end; ++d) {
+    //    seed ^= *d + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    //}
     size_t last_bytes{0};
     std::memcpy(&last_bytes, d_end, size % cel_size);
     seed ^= last_bytes + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -1373,19 +1396,23 @@ public:
         //while (i++ < n64) {
         //    m_res += *(intS++);
         //}
-        std::streamsize buf[4] = {0l, 0l, 0l, 0l};
-        for (; i < n64; i += 4l, intS += 4) {
+        std::streamsize buf[8] = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l};
+        for (; i < n64; i += 8l, intS += 8) {
             buf[0] += intS[0];
             buf[1] += intS[1];
             buf[2] += intS[2];
             buf[3] += intS[3];
+            buf[4] += intS[4];
+            buf[5] += intS[5];
+            buf[6] += intS[6];
+            buf[7] += intS[7];
         }
-        for (int k = 0; k < 4; k++) {
+        for (int k = 0; k < 8; k++) {
             m_res += buf[k];
         }
         if (i > n64) {
-            i -= 4l;
-            intS -= 4;
+            i -= 8l;
+            intS -= 8;
             while (i++ < n64) {
                 m_res += *(intS++);
             }
