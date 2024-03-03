@@ -1369,9 +1369,26 @@ public:
         std::streamsize n64 = n / static_cast<std::streamsize>(sizeof(std::streamsize));
         std::streamsize i = 0;
         // Using 64-bit values executes much faster than char
-        while (i++ < n64) {
-            m_res += *(intS++);
+        ////printf("xsputn n64: %lu\n", n64);
+        //while (i++ < n64) {
+        //    m_res += *(intS++);
+        //}
+        for (; i < n64; i += 4l, intS += 4) {
+            m_res += intS[0];
+            m_res += intS[1];
+            m_res += intS[2];
+            m_res += intS[3];
         }
+        if (i > n64) {
+            i -= 4l;
+            intS -= 4;
+            while (i++ < n64) {
+                m_res += *(intS++);
+            }
+        }
+        //for (; i > n64; i--) {
+        //    m_res += *(--intS);
+        //}
 
         std::streamsize rest = n % static_cast<std::streamsize>(sizeof(std::streamsize));
         for (i = 0; i < rest; i++) {

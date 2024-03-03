@@ -44,7 +44,8 @@ bool normalize_single_value(std::vector<T> vec, float& value, bool check_value_r
 template <class T>
 bool has_op_with_type(const std::shared_ptr<const ov::Model>& function) {
     for (const auto& op : function->get_ops()) {
-        if (std::dynamic_pointer_cast<T>(op)) {
+        //if (is_type<T>(op)) {
+        if (op->get_type_info() == T::get_type_info_static()) {
             return true;
         }
     }

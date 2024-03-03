@@ -284,6 +284,7 @@ std::vector<shared_ptr<ov::Node>> ov::Model::get_ordered_ops() const {
     lock_guard<mutex> lock(m_model_mutex);
 
     NodeVector nodes;
+    //nodes.reserve(get_graph_size());
     if (m_shared_rt_info->get_use_topological_cache()) {
         for (const auto& node : m_cached_ordered_ops) {
             if (auto locked_node = node.lock()) {

@@ -88,6 +88,7 @@ void ModelDeserializer::operator>>(std::shared_ptr<ov::Model>& model) {
     }
 
     // read blob content
+    //printf("_istream.seekg offset: %lu; consts_size %lu\n", hdr.consts_offset, hdr.consts_size);
     _istream.seekg(hdr.consts_offset);
     if (hdr.consts_size) {
         dataBlob = ov::Tensor(ov::element::u8, ov::Shape({hdr.consts_size}));

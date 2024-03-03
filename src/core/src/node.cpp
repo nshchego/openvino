@@ -613,8 +613,10 @@ ov::Output<const ov::Node> ov::Node::output(size_t output_index) const {
 
 vector<ov::Input<ov::Node>> ov::Node::inputs() {
     vector<Input<Node>> result;
+    const auto size = get_input_size();
+    result.reserve(size);
 
-    for (size_t i = 0; i < get_input_size(); i++) {
+    for (size_t i = 0lu; i < size; i++) {
         result.emplace_back(this, i);
     }
 

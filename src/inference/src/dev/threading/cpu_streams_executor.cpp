@@ -321,6 +321,7 @@ struct CPUStreamsExecutor::Impl {
         } else {
             _usedNumaNodes = numaNodes;
         }
+        _threads.reserve(streams_num);
         for (auto streamId = 0; streamId < streams_num; ++streamId) {
             _threads.emplace_back([this, streamId] {
                 openvino::itt::threadName(_config.get_name() + "_" + std::to_string(streamId));
