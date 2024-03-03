@@ -1373,11 +1373,15 @@ public:
         //while (i++ < n64) {
         //    m_res += *(intS++);
         //}
+        std::streamsize buf[4] = {0l, 0l, 0l, 0l};
         for (; i < n64; i += 4l, intS += 4) {
-            m_res += intS[0];
-            m_res += intS[1];
-            m_res += intS[2];
-            m_res += intS[3];
+            buf[0] += intS[0];
+            buf[1] += intS[1];
+            buf[2] += intS[2];
+            buf[3] += intS[3];
+        }
+        for (int k = 0; k < 4; k++) {
+            m_res += buf[k];
         }
         if (i > n64) {
             i -= 4l;
