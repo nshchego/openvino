@@ -124,7 +124,7 @@ void ModelDeserializer::parse_buffer(std::shared_ptr<ov::Model>& model) {
 
     ov::Tensor data_blob;
     auto buffer_base = m_model_buffer->data();
-    auto hdr_pos = m_model_buffer->get_offset();
+    const auto hdr_pos = m_model_buffer->get_offset();
     const auto file_size = m_model_buffer->size();
 
     StreamSerialize::DataHeader hdr = {};
@@ -136,16 +136,15 @@ void ModelDeserializer::parse_buffer(std::shared_ptr<ov::Model>& model) {
                           (hdr.consts_size == hdr.model_offset - hdr.consts_offset) &&
                           (hdr.model_size = file_size - hdr.model_offset);
     if (!is_valid_model) {
-        OPENVINO_THROW("Failed to read CPU device xml header");
+        OPENVINO_THROW("[CPU] Could not deserialize xml header.");
     }
 
     // Read model input/output precisions.
     pugi::xml_document xml_in_out_doc;
     if (hdr.custom_data_size > 0) {
-        std::string xml_in_out_string(buffer_base + hdr.custom_data_offset, hdr.custom_data_size); // Pass pointer directly?
-        auto res = xml_in_out_doc.load_string(xml_in_out_string.c_str());
+        auto res = xml_in_out_doc.load_string(buffer_base + hdr.custom_data_offset);
         if (res.status != pugi::status_ok) {
-            OPENVINO_THROW("NetworkNotRead: The inputs and outputs information is invalid.");
+            OPENVINO_THROW("[CPU] Could to deserialize custom data.");
         }
     }
 
@@ -155,7 +154,7 @@ void ModelDeserializer::parse_buffer(std::shared_ptr<ov::Model>& model) {
     }
 
     // XML content
-    std::string xml_string(buffer_base + hdr.model_offset, hdr.model_size);
+    const std::string xml_string(buffer_base + hdr.model_offset, hdr.model_size);
 
     model = m_model_builder(xml_string, std::move(data_blob));
 

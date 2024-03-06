@@ -49,7 +49,7 @@ public:
         return m_runtimeInfo;
     }
 
-    friend void operator>>(std::string& xmlStr, CompiledBlobHeader& header);
+    friend void operator>>(const char* xml_str, CompiledBlobHeader& header);
 
     friend std::istream& operator>>(std::istream& stream, CompiledBlobHeader& header);
 

@@ -1410,8 +1410,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                                      "Core::load_model_from_cache::ReadStreamAndImport");
                         try {
                             ov::CompiledBlobHeader header;
-                            std::string xmlStr = std::string(reinterpret_cast<char*>(shared_buffer->data()));
-                            xmlStr >> header;
+                            shared_buffer->data() >> header;
                             if (header.getFileInfo() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                                 // Original file is changed, don't use cache
                                 OPENVINO_THROW("Original model file is changed");
@@ -1432,7 +1431,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                                 }
                             }
 
-                            shared_buffer->set_offset(xmlStr.size() - 1);
+                            shared_buffer->set_offset(strlen(shared_buffer->data()) - 1lu);
                         } catch (...) {
                             throw HeaderException();
                         }
