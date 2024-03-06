@@ -110,7 +110,7 @@ public:
     }
 };
 
-std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::string& path) {
+std::shared_ptr<MappedMemory> load_mmap_object(const std::string& path) {
     auto holder = std::make_shared<MapHolder>();
     holder->set(path);
     return holder;
@@ -118,7 +118,7 @@ std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::string& path) {
 
 #ifdef OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
 
-std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::wstring& path) {
+std::shared_ptr<MappedMemory> load_mmap_object(const std::wstring& path) {
     auto s_path = ov::util::wstring_to_string(path);
     return load_mmap_object(s_path);
 }
