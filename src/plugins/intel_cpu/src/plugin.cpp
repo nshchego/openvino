@@ -16,6 +16,7 @@
 #include "transformations/utils/utils.hpp"
 #include "utils/denormals.hpp"
 #include "weights_cache.hpp"
+#include <fstream>
 
 #if defined(__linux__)
 #    include <signal.h>
@@ -317,7 +318,12 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
             denormals_as_zero(false);
         }
     }
-    return std::make_shared<CompiledModel>(cloned_model, shared_from_this(), conf, false);
+    auto cm = std::make_shared<CompiledModel>(cloned_model, shared_from_this(), conf, false);
+    std::string f_name = std::string("./compiled_model");
+    std::ofstream exp_model(f_name);
+    cm->export_model(exp_model);
+    return cm;
+    // return std::make_shared<CompiledModel>(cloned_model, shared_from_this(), conf, false);
 }
 
 void Plugin::set_property(const ov::AnyMap& config) {

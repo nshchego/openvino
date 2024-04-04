@@ -263,6 +263,9 @@ ov::SupportedOpsMap Plugin::query_model(const std::shared_ptr<const ov::Model>& 
             transform_model(model, config);
         },
         [&prog](std::shared_ptr<ov::Node> node) {
+            if (node->get_output_element_type(0) == ov::element::string) {
+                return false;
+            }
             return prog.is_op_supported(node);
         });
 

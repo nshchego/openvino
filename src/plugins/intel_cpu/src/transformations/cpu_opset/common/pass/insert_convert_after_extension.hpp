@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <openvino/pass/graph_rewrite.hpp>
+#include "openvino/pass/graph_rewrite.hpp"
 
 namespace ov {
 namespace pass {
@@ -15,7 +15,7 @@ namespace pass {
 class InsertConvertAfterExtension: public ov::pass::MatcherPass {
 public:
     OPENVINO_RTTI("InsertConvertAfterExtension", "0");
-    InsertConvertAfterExtension();
+    InsertConvertAfterExtension(bool convert_output_precision = true);
 };
 
 }  // namespace pass

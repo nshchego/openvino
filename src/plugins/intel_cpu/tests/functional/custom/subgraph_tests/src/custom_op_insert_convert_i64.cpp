@@ -7,6 +7,11 @@
 #include <shared_test_classes/base/ov_subgraph.hpp>
 #include "utils/cpu_test_utils.hpp"
 
+// DESCRIPTION //
+
+// PARAMETER
+//
+
 using namespace ov::test;
 using namespace CPUTestUtils;
 
@@ -108,8 +113,9 @@ protected:
             paramsOuts.push_back(param);
         }
         auto customOp = std::make_shared<CustomOpI64>(paramsOuts);
+        auto logical_op = std::make_shared<op::v1::LogicalNot>(customOp);
 
-        ov::ResultVector results{std::make_shared<ov::op::v0::Result>(customOp)};
+        ov::ResultVector results{std::make_shared<op::v0::Result>(logical_op)};
         function = std::make_shared<ov::Model>(results, inputParams, "customOpTest");
     }
 

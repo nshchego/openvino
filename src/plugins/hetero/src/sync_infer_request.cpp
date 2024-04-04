@@ -14,14 +14,18 @@
 #include "itt.hpp"
 #include "openvino/core/except.hpp"
 #include "plugin.hpp"
+#include <fstream>
 
 ov::hetero::InferRequest::InferRequest(const std::shared_ptr<const ov::hetero::CompiledModel>& compiled_model)
     : ov::ISyncInferRequest(compiled_model) {
+    int sub_counter = 0;
     for (auto&& comp_model_desc : compiled_model->m_compiled_submodels) {
         auto& comp_model = comp_model_desc.compiled_model;
+        std::string f_name = std::string("./subgraph_") + comp_model_desc.device + "_" + std::to_string(sub_counter++);
+        std::ofstream exp_model(f_name);
+        comp_model->export_model(exp_model);
         m_subrequests.push_back({comp_model->create_infer_request(), comp_model._so});
     }
-
     for (size_t i = 0; i < compiled_model->inputs().size(); i++) {
         const auto& port = compiled_model->inputs()[i];
         const auto& submodel_idx = compiled_model->m_mapping_info._inputs_to_submodels_inputs[i].first;

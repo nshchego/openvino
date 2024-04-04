@@ -108,6 +108,19 @@ namespace v0 {
 Convert::Convert(const Output<Node>& arg, const element::Type& destination_type)
     : Op({arg}),
       m_destination_type(destination_type) {
+if (destination_type == element::i32 && arg.get_element_type() == element::i32) {
+// if () {
+    printf("[CORE][OP] Convert i32-i32 name: %s\n", get_friendly_name().c_str());
+}
+if (get_friendly_name() == "Convert_22757") {
+    printf("[CORE][OP] Convert_22757 parent: %s\n", arg.get_node()->get_friendly_name().c_str());
+}
+if (get_friendly_name() == "Convert_22749") { // created to keep orig_result_types
+    printf("[CORE][OP] Convert_22749 parent: %s\n", arg.get_node()->get_friendly_name().c_str());
+}
+if (get_friendly_name() == "RaggedToDense_105.0") {
+    printf("[CORE][OP] RaggedToDense_105.0 parent: %s\n", arg.get_node()->get_friendly_name().c_str());
+}
     constructor_validate_and_infer_types();
 }
 

@@ -48,6 +48,7 @@ inline void ConvertToCPUSpecificOpset(std::shared_ptr<ov::Model> &nGraphFunc) {
                              type_to_fuse_map{{}},
                              false,
                              false);
+    CPU_REGISTER_PASS_COMMON(manager, ov::pass::EliminateConvert); // Need to clean up after the ConvertPrecision
     CPU_REGISTER_PASS_COMMON(manager, ov::pass::Validate);
 
     manager.run_passes(nGraphFunc);

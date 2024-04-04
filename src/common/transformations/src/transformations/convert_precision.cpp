@@ -220,6 +220,9 @@ bool convert_function_precision(const std::shared_ptr<Model>& f,
         const auto& results = f->get_results();
         orig_result_types.reserve(results.size());
         for (const auto& result : results) {
+if (result->get_input_element_type(0) == ov::element::i64) {
+    printf("[PASS][ConvertPrecision] has origin prc i64\n");
+}
             orig_result_types.push_back(result->get_input_element_type(0));
         }
     }
@@ -329,6 +332,12 @@ bool convert_function_precision(const std::shared_ptr<Model>& f,
             auto& result = results[i];
             if (result->get_input_element_type(0) != orig_result_types[i]) {
                 auto result_input = result->input_value(0);
+printf("[PASS][ConvertPrecision] input val name: %s\n", result_input.get_node()->get_friendly_name().c_str());
+if (result_input.get_node()->get_friendly_name() == "RaggedToDense_105" ||
+        result_input.get_node()->get_friendly_name() == "RaggedToDense_105.0") {
+    printf("[PASS][ConvertPrecision] %s in prc: %s\n",
+        result->get_friendly_name().c_str(), result->get_input_element_type(0).get_type_name().c_str());
+}
                 const auto convert = std::make_shared<ov::op::v0::Convert>(result_input, orig_result_types[i]);
                 if (result_input.get_node()->get_output_size() > 1) {
                     convert->set_friendly_name(result_input.get_node()->get_friendly_name() + "." +
@@ -337,6 +346,15 @@ bool convert_function_precision(const std::shared_ptr<Model>& f,
                     convert->set_friendly_name(result_input.get_node()->get_friendly_name());
                     result_input.get_node()->set_friendly_name("");
                 }
+// if (result_input.get_node()->get_friendly_name() == "RaggedToDense_105") {
+//     printf("[PASS][ConvertPrecision] %s in prc before: %s\n",
+//         convert->get_friendly_name().c_str(), convert->get_output_element_type(0).get_type_name().c_str());
+// }
+//                 convert->revalidate_and_infer_types();
+// if (result_input.get_node()->get_friendly_name() == "RaggedToDense_105") {
+//     printf("[PASS][ConvertPrecision] %s in prc after: %s\n",
+//         convert->get_friendly_name().c_str(), convert->get_output_element_type(0).get_type_name().c_str());
+// }
 
                 auto& convert_output_tensor = convert->get_output_tensor(0);
                 convert_output_tensor.set_names(result_input.get_names());
@@ -350,6 +368,11 @@ bool convert_function_precision(const std::shared_ptr<Model>& f,
                 result_input.set_names({});
                 result->input(0).replace_source_output(convert->output(0));
                 result->revalidate_and_infer_types();
+// if (result_input.get_node()->get_friendly_name() == "RaggedToDense_105" ||
+//         result_input.get_node()->get_friendly_name() == "RaggedToDense_105.0") {
+    printf("[PASS][ConvertPrecision] Result: %s in prc: %s; in name: %s\n",
+        result->get_friendly_name().c_str(), result->get_input_element_type(0).get_type_name().c_str(), result_input.get_node()->get_friendly_name().c_str());
+// }
             }
         }
     }
@@ -408,6 +431,7 @@ precisions_set_t find_all_used_precisions(const std::shared_ptr<ov::Model>& fn) 
 }  // namespace
 
 bool ov::pass::ConvertPrecision::run_on_model(const std::shared_ptr<ov::Model>& f) {
+printf("[PASS][ConvertPrecision] run_on_model\n");
     const auto used_precisions_set = find_all_used_precisions(f);
     precisions_map used_precisions;
     for (const auto& p : used_precisions_set) {

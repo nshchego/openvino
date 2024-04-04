@@ -296,6 +296,12 @@ const std::string& ov::Node::get_name() const {
 }
 
 void ov::Node::set_friendly_name(const string& name) {
+if (name == "RaggedToDense_105.0") {
+    printf("[CORE][OP] set_friendly_name old: %s new: %s\n", m_friendly_name.c_str(), name.c_str());
+}
+if (name == "Convert_22749") {
+    printf("[CORE][OP] set_friendly_name old: %s new: %s\n", m_friendly_name.c_str(), name.c_str());
+}
     m_friendly_name = name;
 }
 

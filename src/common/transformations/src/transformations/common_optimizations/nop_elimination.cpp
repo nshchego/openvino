@@ -382,7 +382,9 @@ pass::EliminateConvert::EliminateConvert() {
         if (!convert) {
             return false;
         }
+// printf("[PASS][EliminateConvert] %s parent: %s\n", convert->get_friendly_name().c_str(), convert->get_input_node_ptr(0)->get_friendly_name().c_str());
         if (convert->get_input_element_type(0) == convert->get_element_type()) {
+printf("[PASS][EliminateConvert] %s parent: %s\n", convert->get_friendly_name().c_str(), convert->get_input_node_ptr(0)->get_friendly_name().c_str());
             return replace_output_update_name(convert->output(0), convert->input_value(0));
         }
         return false;
