@@ -1269,6 +1269,14 @@ bool pass::StreamSerialize::run_on_model(const std::shared_ptr<ov::Model>& model
     DataHeader hdr = {};
 
     auto writeHeader = [this](const DataHeader& hdr) {
+        printf("[pass][StreamSerialize][run_on_model]\n    custom_data_offset == %zu\n    custom_data_size == %zu\n    consts_offset == %zu\n"
+               "    consts_size == %zu\n    model_offset == %zu\n    model_size == %zu\n",
+               hdr.custom_data_offset,
+               hdr.custom_data_size,
+               hdr.consts_offset,
+               hdr.consts_size,
+               hdr.model_offset,
+               hdr.model_size);
         m_stream.write((const char*)&hdr, sizeof hdr);
     };
     auto version = static_cast<int64_t>(m_version);

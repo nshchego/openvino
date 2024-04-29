@@ -1415,6 +1415,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
 
     try {
         if (enable_mmap && plugin.supports_model_caching_with_mmap()) {
+            printf("[CPU][CoreImpl][load_model_from_cache][0]\n");
             cacheContent.cacheManager->read_cache_entry(
                 cacheContent.blobId,
                 [&](std::shared_ptr<ov::MappedMemory>& shared_buffer) {
@@ -1423,7 +1424,13 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                                  "Core::load_model_from_cache::ReadStreamAndImport");
                     try {
                         ov::CompiledBlobHeader header;
+                        printf("[CPU][CoreImpl][load_model_from_cache] header: %s\n", shared_buffer->data());
                         shared_buffer->data() >> header;
+                        printf("[CPU][CoreImpl][load_model_from_cache]\n    IeVersion: %s\n    FileInfo: %s\n    "
+                               "RuntimeInfo: %s\n",
+                               header.getIeVersion().c_str(),
+                               header.getFileInfo().c_str(),
+                               header.getRuntimeInfo().c_str());
                         if (header.getFileInfo() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                             // Original file is changed, don't use cache
                             OPENVINO_THROW("Original model file is changed");
@@ -1452,10 +1459,12 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                         throw HeaderException();
                     }
 
+                    printf("[CPU][CoreImpl][load_model_from_cache][1]\n");
                     ov::AnyMap update_config = config;
                     update_config[ov::loaded_from_cache.name()] = true;
                     compiled_model = context ? plugin.import_model(shared_buffer, context, update_config)
                                              : plugin.import_model(shared_buffer, update_config);
+                    printf("[CPU][CoreImpl][load_model_from_cache][2]\n");
                 });
         } else {
             cacheContent.cacheManager->read_cache_entry(cacheContent.blobId, [&](std::istream& networkStream) {
@@ -1465,6 +1474,11 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                 try {
                     ov::CompiledBlobHeader header;
                     networkStream >> header;
+                    printf("[CPU][CoreImpl][load_model_from_cache]\n    IeVersion: %s\n    FileInfo: %s\n    "
+                           "RuntimeInfo: %s\n",
+                           header.getIeVersion().c_str(),
+                           header.getFileInfo().c_str(),
+                           header.getRuntimeInfo().c_str());
                     if (header.getFileInfo() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                         // Original file is changed, don't use cache
                         OPENVINO_THROW("Original model file is changed");
@@ -1497,9 +1511,11 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
             });
         }
     } catch (const HeaderException&) {
+        printf("[CPU][CoreImpl][load_model_from_cache][3]\n");
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+        printf("[CPU][CoreImpl][load_model_from_cache][4]\n");
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
