@@ -22,6 +22,7 @@ class JitKernelBase;
 #define getReg64() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
 #define getReg32() RegistersPool::Reg<Xbyak::Reg32>(registersPool)
 #define getVmm()   RegistersPool::Reg<Vmm>(registersPool)
+#define getXmm()   RegistersPool::Reg<Xbyak::Xmm>(registersPool)
 #define getMask()  RegistersPool::Reg<Vmask>(registersPool)
 
 class JitKernelBase: public dnnl::impl::cpu::x64::jit_generator {
@@ -120,15 +121,16 @@ public:
                   const bool zeroFill = false);
 
     void fillRestWorkMask(const Xbyak::Opmask& kDstMask,
-                          const Xbyak::Reg64& rWorkRest);
+                          const Xbyak::Reg64& rWorkRest,
+                          const uint64_t typeSize = 4lu);
 
     void fillRestWorkMask(const Xbyak::Xmm& ymmDstMask,
                           const Xbyak::Reg64& rWorkRest,
-                          const uint64_t typeSize = 4);
+                          const uint64_t typeSize = 4lu);
 
     void fillRestWorkMask(const Xbyak::Ymm& ymmDstMask,
                           const Xbyak::Reg64& rWorkRest,
-                          const uint64_t typeSize = 4);
+                          const uint64_t typeSize = 4lu);
 
     void load(const Xbyak::Xmm&     vDst,
               const Xbyak::Address& srcAddr,
@@ -233,7 +235,7 @@ public:
 
             IF_ISA_CASE(dnnl::impl::cpu::x64::avx512_core)
             IF_ISA_CASE(dnnl::impl::cpu::x64::avx2)
-            IF_ISA_CASE(dnnl::impl::cpu::x64::sse41);
+            // IF_ISA_CASE(dnnl::impl::cpu::x64::sse41);
 
 #undef IF_ISA_CASE
 

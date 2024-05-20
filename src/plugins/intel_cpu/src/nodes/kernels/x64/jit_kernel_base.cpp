@@ -417,7 +417,8 @@ void JitKernelBase::uni_vshufpd(const Xbyak::Xmm& v_dst,
 }
 
 void JitKernelBase::fillRestWorkMask(const Xbyak::Opmask& dstMask,
-                                     const Xbyak::Reg64& rWorkRest) {
+                                     const Xbyak::Reg64& rWorkRest,
+                                     const uint64_t typeSize) {
     auto rOnes = getReg64();
 
     mov(rOnes, 0xFFFFFFFFFFFFFFFF);

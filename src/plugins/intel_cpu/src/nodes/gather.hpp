@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include <node.h>
-#include "kernels/x64/gather_uni_kernel.hpp"
+#include "node.h"
+#include "kernels/x64/gather.hpp"
 
-#include <memory>
-#include <string>
-#include <vector>
+// #include <memory>
+// #include <string>
+// #include <vector>
 
 namespace ov {
 namespace intel_cpu {
@@ -17,7 +17,7 @@ namespace node {
 
 class Gather : public Node {
 public:
-    Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context);
+    Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
@@ -43,8 +43,8 @@ public:
         int betweenBatchAndAxisIter = 0;
         int specIdxAndAfterAxIterB = 0;
 
-        uint64_t workAmount = 0;
-        uint64_t dstStart = 0;
+        uint64_t work_amount = 0lu;
+        uint64_t dst_start = 0lu;
     };
 
     template <typename OUT_TYPE, typename IN_TYPE>
@@ -66,21 +66,21 @@ private:
     bool canOptimize1DCase = false;
     void exec1DCase();
 
-    bool compressed = false;
+    bool m_compressed = false;
     void execCompressed();
 
-    bool isDataShapeStat = false;
-    bool isIdxShapeStat = false;
-    bool isAxisInputConst = false;
+    bool m_data_shape_static = false;
+    bool m_idx_shape_static = false;
+    bool m_axis_input_const = false;
 
-    bool reverseIndexing = false;
+    bool m_reverse_indexing = false;
 
-    uint64_t dataTypeSize = 1lu;
-    static constexpr uint64_t idxTypeSize = sizeof(int);
+    uint64_t m_data_et_size = 1lu;
+    uint64_t m_idx_et_size = 1lu;
 
-    int axis = 0;
+    int m_axis = 0;
     int axisDim = 0;
-    int batchDims = 0;
+    int m_batch_dims = 0;
     int dataSrcRank = 1;
     uint64_t specIndicesSize = 0lu;
     uint64_t beforeBatchSize = 0lu;
@@ -108,10 +108,10 @@ private:
     bool have_zp = false;
     bool have_scalar_zp = false;
     bool have_scalar_scale = false;
-    size_t zp_group_size = 1u;
-    size_t scale_group_size = 1u;
+    size_t zp_group_size = 1lu;
+    size_t scale_group_size = 1lu;
 
-    std::shared_ptr<jitGatherKernelBase> jitKernel;
+    std::shared_ptr<kernel::JitKernelBase> m_jit_kernel;
 };
 
 }   // namespace node

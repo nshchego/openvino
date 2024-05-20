@@ -33,7 +33,7 @@
 #include "nodes/eye.h"
 #include "nodes/fake_quantize.h"
 #include "nodes/fullyconnected.h"
-#include "nodes/gather.h"
+#include "nodes/gather.hpp"
 #include "nodes/gather_elements.h"
 #include "nodes/gather_nd.h"
 #include "nodes/gather_tree.h"
