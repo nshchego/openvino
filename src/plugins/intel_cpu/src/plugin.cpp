@@ -619,29 +619,10 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
                                                          const ov::AnyMap& properties) const {
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "import_model");
 
-    ModelStreamDeserializer deserializer(model_stream,
-        [this](const std::string& model, const ov::Tensor& weights) {
-            return get_core()->read_model(model, weights, true);
-        });
-
-    return handle_imported_model(deserializer, properties);
-}
-
-std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Any& model_variant,
-                                                         const ov::AnyMap& properties) const {
-    OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "import_model");
-
-    if (model_variant.is<std::istream*>()) {
-        auto model_stream = model_variant.as<std::istream *>();
-
-        return import_model(model_stream, properties);
-    } else if (model_variant.is<std::shared_ptr<ov::MappedMemory>>()) {
-        auto& mapped_model = model_variant.as<std::shared_ptr<ov::MappedMemory>>();
-        if (mapped_model == nullptr || mapped_model->size() == 0lu) {
-            OPENVINO_THROW("Invalid Mapped Memory object.");
-        }
-
-        ModelMmapDeserializer deserializer(mapped_model,
+    try {
+        auto mb = dynamic_cast<mmap_stream&>(model_stream);
+    } catch (bad_cast) {
+        ModelStreamDeserializer deserializer(model_stream,
             [this](const std::string& model, const ov::Tensor& weights) {
                 return get_core()->read_model(model, weights, true);
             });
@@ -651,6 +632,31 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Any& model_va
 
     return nullptr;
 }
+
+// std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Any& model_variant,
+//                                                          const ov::AnyMap& properties) const {
+//     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "import_model");
+
+//     if (model_variant.is<std::istream*>()) {
+//         auto model_stream = model_variant.as<std::istream *>();
+
+//         return import_model(model_stream, properties);
+//     } else if (model_variant.is<std::shared_ptr<ov::MappedMemory>>()) {
+//         auto& mapped_model = model_variant.as<std::shared_ptr<ov::MappedMemory>>();
+//         if (mapped_model == nullptr || mapped_model->size() == 0lu) {
+//             OPENVINO_THROW("Invalid Mapped Memory object.");
+//         }
+
+//         ModelMmapDeserializer deserializer(mapped_model,
+//             [this](const std::string& model, const ov::Tensor& weights) {
+//                 return get_core()->read_model(model, weights, true);
+//             });
+
+//         return handle_imported_model(deserializer, properties);
+//     }
+
+//     return nullptr;
+// }
 
 }  // namespace intel_cpu
 }  // namespace ov

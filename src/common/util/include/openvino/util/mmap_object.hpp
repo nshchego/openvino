@@ -10,6 +10,9 @@
 #pragma once
 
 #include <memory>
+#include <fstream>
+#include <iostream>
+#include <streambuf>
 #include <string>
 
 namespace ov {
@@ -52,5 +55,34 @@ std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::string& path);
 std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::wstring& path);
 
 #endif  // OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
+
+class mmap_stream: public std::istream {
+public:
+    // mmap_stream(const std::shared_ptr<ov::MappedMemory>& mm) {
+    mmap_stream(const std::shared_ptr<ov::MappedMemory>& mm, std::filebuf* str = nullptr) : std::istream(str) {
+        m_mapped_memory = mm;
+    }
+    mmap_stream() = default;
+    // explicit mmap_stream(FILE* cstream) {
+
+    // };
+
+private:
+    std::shared_ptr<ov::MappedMemory> m_mapped_memory;
+};
+
+// class mmap_stream: public std::ios_base {
+// public:
+//     mmap_stream(const std::shared_ptr<ov::MappedMemory>& mm) {
+//         m_mapped_memory = mm;
+//     }
+//     // mmap_stream() = default;
+//     // explicit mmap_stream(FILE* cstream) {
+
+//     // };
+
+// private:
+//     std::shared_ptr<ov::MappedMemory> m_mapped_memory;
+// };
 
 }  // namespace ov
