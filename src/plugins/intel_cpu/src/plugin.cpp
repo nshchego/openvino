@@ -619,16 +619,16 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
                                                          const ov::AnyMap& properties) const {
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "import_model");
 
-    try {
-        auto mb = dynamic_cast<mmap_stream&>(model_stream);
-    } catch (bad_cast) {
+    // try {
+    //     auto mb = dynamic_cast<mmap_stream&>(model_stream);
+    // } catch (bad_cast) {
         ModelStreamDeserializer deserializer(model_stream,
             [this](const std::string& model, const ov::Tensor& weights) {
                 return get_core()->read_model(model, weights, true);
             });
 
         return handle_imported_model(deserializer, properties);
-    }
+    // }
 
     return nullptr;
 }

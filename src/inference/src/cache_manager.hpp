@@ -10,6 +10,7 @@
 #pragma once
 
 #include <fstream>
+#include <streambuf>
 #include <functional>
 #include <memory>
 #include <string>
@@ -79,23 +80,7 @@ public:
      * @param id Id of cache (hash of the model)
      * @param reader Lambda function to be called when input stream is created
      */
-    virtual void read_cache_entry(const std::string& id, StreamReader reader) = 0;
-
-    /**
-     * @brief Function passing created input buffer
-     *
-     */
-    using BufferReader = std::function<void(std::shared_ptr<ov::MappedMemory>&)>;
-    /**
-     * @brief Callback when Inference Engine intends to read network from cache
-     *
-     * Client needs to call create ov::MappedMemory object and call reader(MappedMemory)
-     * Otherwise, network will not be read from cache and will be loaded as usual
-     *
-     * @param id Id of cache (hash of the network)
-     * @param reader Lambda function to be called when input MappedMemory is created
-     */
-    virtual void read_cache_entry(const std::string& id, BufferReader reader) = 0;
+    virtual void read_cache_entry(const std::string& id, StreamReader reader, bool mmap = false) = 0;
 
     /**
      * @brief Callback when OpenVINO intends to remove cache entry
@@ -142,23 +127,33 @@ private:
         writer(stream);
     }
 
-    void read_cache_entry(const std::string& id, StreamReader reader) override {
+    void read_cache_entry(const std::string& id, StreamReader reader, bool mmap = false) override {
         // Fix the bug caused by pugixml, which may return unexpected results if the locale is different from "C".
         ScopedLocale plocal_C(LC_ALL, "C");
         auto blobFileName = getBlobFile(id);
         if (ov::util::file_exists(blobFileName)) {
-            std::ifstream stream(blobFileName, std::ios_base::binary);
-            reader(stream);
+            if (mmap) {
+                auto buffer = ov::load_mmap_object(blobFileName);
+                std::stringstream stream;
+                // std::ifstream stream;
+                // std::filebuf fb;
+                stream.rdbuf()->pubsetbuf(buffer->data(), buffer->size());
+                // auto buf = std::streambuf(buffer.data());
+                reader(stream);
+            } else {
+                std::ifstream stream(blobFileName, std::ios_base::binary);
+                reader(stream);
+            }
         }
     }
 
-    void read_cache_entry(const std::string& id, BufferReader reader) override {
-        auto blob_file_name = getBlobFile(id);
-        if (ov::util::file_exists(blob_file_name)) {
-            auto buffer = ov::load_mmap_object(blob_file_name);
-            reader(buffer);
-        }
-    }
+    // void read_cache_entry(const std::string& id, BufferReader reader) override {
+    //     auto blob_file_name = getBlobFile(id);
+    //     if (ov::util::file_exists(blob_file_name)) {
+    //         auto buffer = ov::load_mmap_object(blob_file_name);
+    //         reader(buffer);
+    //     }
+    // }
 
     void remove_cache_entry(const std::string& id) override {
         auto blobFileName = getBlobFile(id);

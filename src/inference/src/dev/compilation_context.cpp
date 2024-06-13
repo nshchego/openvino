@@ -168,6 +168,7 @@ CompiledBlobHeader::CompiledBlobHeader(const std::string& ieVersion,
 std::istream& operator>>(std::istream& stream, CompiledBlobHeader& header) {
     std::string xmlStr;
     std::getline(stream, xmlStr);
+std::cout << "CompiledBlobHeader xmlStr: " << xmlStr << std::endl;
 
     pugi::xml_document document;
     pugi::xml_parse_result res = document.load_string(xmlStr.c_str());

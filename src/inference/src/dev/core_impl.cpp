@@ -1412,59 +1412,17 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
     OPENVINO_ASSERT(cacheContent.cacheManager != nullptr);
 
     try {
-        if (enable_mmap && plugin.supports_model_caching_with_mmap()) {
-            cacheContent.cacheManager->read_cache_entry(
-                cacheContent.blobId,
-                [&](std::shared_ptr<ov::MappedMemory>& shared_buffer) {
-                    OV_ITT_SCOPE(FIRST_INFERENCE,
-                                 ov::itt::domains::LoadTime,
-                                 "Core::load_model_from_cache::ReadStreamAndImport");
-                    try {
-                        ov::CompiledBlobHeader header;
-                        shared_buffer->data() >> header;
-                        if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
-                            // Original file is changed, don't use cache
-                            OPENVINO_THROW("Original model file is changed");
-                        }
-                        if (util::contains(plugin.get_property(ov::internal::supported_properties),
-                                           ov::internal::compiled_model_runtime_properties_supported.name())) {
-                            ov::AnyMap compiled_model_runtime_properties = {
-                                {ov::internal::compiled_model_runtime_properties.name(),
-                                 std::string(header.get_runtime_info())}};
-                            auto res = plugin.get_property(ov::internal::compiled_model_runtime_properties_supported.name(),
-                                                           compiled_model_runtime_properties);
-                            if (!res.as<bool>()) {
-                                OPENVINO_THROW(
-                                    "Original model runtime properties have been changed, not supported anymore!");
-                            }
-                        } else {
-                            if (header.get_openvino_version() != ov::get_openvino_version().buildNumber) {
-                                // Build number mismatch, don't use this cache
-                                OPENVINO_THROW("Version does not match");
-                            }
-                        }
-
-                        shared_buffer->set_offset((strchr(shared_buffer->data(), '\n') - shared_buffer->data()) + 1);
-                    } catch (...) {
-                        throw HeaderException();
-                    }
-
-                    ov::AnyMap update_config = config;
-                    update_config[ov::loaded_from_cache.name()] = true;
-                    mmap_stream buf_stream(shared_buffer);
-                    compiled_model = context ? plugin.import_model(buf_stream, context, update_config)
-                                             : plugin.import_model(buf_stream, update_config);
-                });
-        } else {
-            cacheContent.cacheManager->read_cache_entry(cacheContent.blobId, [&](std::istream& networkStream) {
+        cacheContent.cacheManager->read_cache_entry(cacheContent.blobId, [&](std::istream& networkStream) {
                 OV_ITT_SCOPE(FIRST_INFERENCE,
                              ov::itt::domains::LoadTime,
                              "Core::load_model_from_cache::ReadStreamAndImport");
                 try {
+printf("[CORE] load_model_from_cache reader callback\n");
                     ov::CompiledBlobHeader header;
                     networkStream >> header;
                     if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                         // Original file is changed, don't use cache
+printf("[CORE] load_model_from_cache Original model file is changed\n");
                         OPENVINO_THROW("Original model file is changed");
                     }
                     if (util::contains(plugin.get_property(ov::internal::supported_properties),
@@ -1475,12 +1433,14 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                         auto res = plugin.get_property(ov::internal::compiled_model_runtime_properties_supported.name(),
                                                        compiled_model_runtime_properties);
                         if (!res.as<bool>()) {
+printf("[CORE] load_model_from_cache Original model runtime properties have been changed, not supported anymore!\n");
                             OPENVINO_THROW(
                                 "Original model runtime properties have been changed, not supported anymore!");
                         }
                     } else {
                         if (header.get_openvino_version() != ov::get_openvino_version().buildNumber) {
                             // Build number mismatch, don't use this cache
+printf("[CORE] load_model_from_cache Version does not match\n");
                             OPENVINO_THROW("Version does not match");
                         }
                     }
@@ -1492,12 +1452,97 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                 update_config[ov::loaded_from_cache.name()] = true;
                 compiled_model = context ? plugin.import_model(networkStream, context, update_config)
                                          : plugin.import_model(networkStream, update_config);
-            });
-        }
+            }, enable_mmap && plugin.supports_model_caching_with_mmap());
+printf("[CORE] load_model_from_cache import_model succeed\n");
+
+        // if (enable_mmap && plugin.supports_model_caching_with_mmap()) {
+        //     cacheContent.cacheManager->read_cache_entry(
+        //         cacheContent.blobId,
+        //         [&](std::shared_ptr<ov::MappedMemory>& shared_buffer) {
+        //             OV_ITT_SCOPE(FIRST_INFERENCE,
+        //                          ov::itt::domains::LoadTime,
+        //                          "Core::load_model_from_cache::ReadStreamAndImport");
+        //             try {
+        //                 ov::CompiledBlobHeader header;
+        //                 shared_buffer->data() >> header;
+        //                 if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
+        //                     // Original file is changed, don't use cache
+        //                     OPENVINO_THROW("Original model file is changed");
+        //                 }
+        //                 if (util::contains(plugin.get_property(ov::internal::supported_properties),
+        //                                    ov::internal::compiled_model_runtime_properties_supported.name())) {
+        //                     ov::AnyMap compiled_model_runtime_properties = {
+        //                         {ov::internal::compiled_model_runtime_properties.name(),
+        //                          std::string(header.get_runtime_info())}};
+        //                     auto res = plugin.get_property(ov::internal::compiled_model_runtime_properties_supported.name(),
+        //                                                    compiled_model_runtime_properties);
+        //                     if (!res.as<bool>()) {
+        //                         OPENVINO_THROW(
+        //                             "Original model runtime properties have been changed, not supported anymore!");
+        //                     }
+        //                 } else {
+        //                     if (header.get_openvino_version() != ov::get_openvino_version().buildNumber) {
+        //                         // Build number mismatch, don't use this cache
+        //                         OPENVINO_THROW("Version does not match");
+        //                     }
+        //                 }
+
+        //                 shared_buffer->set_offset((strchr(shared_buffer->data(), '\n') - shared_buffer->data()) + 1);
+        //             } catch (...) {
+        //                 throw HeaderException();
+        //             }
+
+        //             ov::AnyMap update_config = config;
+        //             update_config[ov::loaded_from_cache.name()] = true;
+        //             mmap_stream buf_stream(shared_buffer);
+        //             compiled_model = context ? plugin.import_model(buf_stream, context, update_config)
+        //                                      : plugin.import_model(buf_stream, update_config);
+        //         });
+        // } else {
+        //     cacheContent.cacheManager->read_cache_entry(cacheContent.blobId, [&](std::istream& networkStream) {
+        //         OV_ITT_SCOPE(FIRST_INFERENCE,
+        //                      ov::itt::domains::LoadTime,
+        //                      "Core::load_model_from_cache::ReadStreamAndImport");
+        //         try {
+        //             ov::CompiledBlobHeader header;
+        //             networkStream >> header;
+        //             if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
+        //                 // Original file is changed, don't use cache
+        //                 OPENVINO_THROW("Original model file is changed");
+        //             }
+        //             if (util::contains(plugin.get_property(ov::internal::supported_properties),
+        //                                ov::internal::compiled_model_runtime_properties_supported.name())) {
+        //                 ov::AnyMap compiled_model_runtime_properties = {
+        //                     {ov::internal::compiled_model_runtime_properties.name(),
+        //                      std::string(header.get_runtime_info())}};
+        //                 auto res = plugin.get_property(ov::internal::compiled_model_runtime_properties_supported.name(),
+        //                                                compiled_model_runtime_properties);
+        //                 if (!res.as<bool>()) {
+        //                     OPENVINO_THROW(
+        //                         "Original model runtime properties have been changed, not supported anymore!");
+        //                 }
+        //             } else {
+        //                 if (header.get_openvino_version() != ov::get_openvino_version().buildNumber) {
+        //                     // Build number mismatch, don't use this cache
+        //                     OPENVINO_THROW("Version does not match");
+        //                 }
+        //             }
+        //         } catch (...) {
+        //             throw HeaderException();
+        //         }
+
+        //         ov::AnyMap update_config = config;
+        //         update_config[ov::loaded_from_cache.name()] = true;
+        //         compiled_model = context ? plugin.import_model(networkStream, context, update_config)
+        //                                  : plugin.import_model(networkStream, update_config);
+        //     });
+        // }
     } catch (const HeaderException&) {
+printf("[CORE] load_model_from_cache HeaderException\n");
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+printf("[CORE] load_model_from_cache Exception\n");
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
