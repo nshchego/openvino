@@ -1,0 +1,268 @@
+// Copyright (C) 2018-2024 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+//
+
+// The CRC computation is used for x86
+// The calculations were taken from the article "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction - Intel (December, 2009)"
+
+#include "openvino/core/visibility.hpp"
+#include "openvino/reference/utils/combine_hash.hpp"
+
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+#    include "openvino/reference/utils/registers_pool.hpp"
+#endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
+
+#include <cstring>
+#include <iterator>
+#include <iostream>
+#include <type_traits>
+#include <typeinfo>
+
+namespace ov {
+namespace runtime {
+
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+namespace jit {
+
+#define GET_OFF(field) offsetof(CombineHashCallArgs, field)
+#define getReg64() RegistersPool::Reg<Xbyak::Reg64>(registersPool)
+#define getVmm()   RegistersPool::Reg<Vmm>(registersPool)
+
+struct CombineHashCompileParams {
+};
+
+struct CombineHashCallArgs {
+    const void* src_ptr;
+    void* dst_ptr;
+    uint64_t work_amount = 0lu;
+};
+
+typedef void (*fn_t)(const CombineHashCallArgs*);
+
+template <cpu_isa_t isa>
+class CombineHash : public Generator {
+public:
+    explicit CombineHash(const CombineHashCompileParams& jcp) :
+            m_jcp(jcp) {
+        if (isa == avx512_core) {
+            vlen = zmm_len;
+        } else if (isa == avx2) {
+            vlen = ymm_len;
+        } else {
+            OPENVINO_THROW("Unsupported isa.");
+        }
+
+        generate();
+    }
+
+    void generate() {
+        this->preamble();
+        registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
+
+        r64_src = getReg64();
+        r64_dst = getReg64();
+        r64_work_amount = getReg64();
+
+        mov(r64_src, ptr[r64_params + GET_OFF(dst_ptr)]);
+        mov(r64_dst, ptr[r64_params + GET_OFF(dst_ptr)]);
+        mov(r64_work_amount, ptr[r64_params + GET_OFF(work_amount)]);
+
+        initVectors();
+
+        bulkFold();
+        restFold();
+        tailFold();
+
+        vpextrq(ptr[r64_dst], v_dst, 0x0);
+
+        registersPool.reset();
+        this->postamble();
+    }
+
+    static fn_t get() {
+        static const CombineHashCompileParams params;
+        static CombineHash<isa> kernel(params);
+
+        return (fn_t)kernel.getCode();
+    }
+
+private:
+    static constexpr uint64_t CHUNK_SIZE = 32;
+    // static constexpr uint64_t P64 = 0x42F0E1EBA9EA3693;
+    static const uint64_t K12 = 0x7B4BC8789D65B2A5;
+
+    using Vmm = typename std::conditional<isa == avx512_core, Xbyak::Zmm, typename std::conditional<isa == sse41, Xbyak::Xmm, Xbyak::Ymm>::type>::type;
+    size_t vlen = xmm_len;
+
+    RegistersPool::Reg<Xbyak::Reg64> r64_src;
+    RegistersPool::Reg<Xbyak::Reg64> r64_dst;
+    RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
+
+    const Xbyak::Reg64 r64_params = abi_param1;
+
+    // Vector registers
+    RegistersPool::Reg<Vmm> v_dst;
+    RegistersPool::Reg<Vmm> v_k_12;
+    RegistersPool::Reg<Vmm> v_k_34;
+    RegistersPool::Reg<Vmm> v_k_56;
+    RegistersPool::Reg<Vmm> v_shuf_mask;
+
+    void initVectors();
+
+    void bulkFold() {
+        Xbyak::Label l_fold_loop, l_fold_128, l_end;
+        cmp(r64_work_amount, vlen);
+        jl(l_end, T_NEAR);
+
+        auto v_src = getVmm();
+        auto v_aux = getVmm();
+        // auto v_x_1 = getVmm();
+        // auto v_x_2 = getVmm();
+
+        vmovups(v_src, ptr[r64_src]);
+        vpshufb(v_src, v_src, v_shuf_mask); // Endianness swap
+        vpxor(v_dst, v_dst, v_src);
+
+        // Bulk fold
+        L(l_fold_loop); {
+            add(r64_src, vlen);
+            sub(r64_work_amount, vlen);
+            cmp(r64_work_amount, vlen);
+            jl(l_fold_128, T_NEAR);
+
+            vmovups(v_src, ptr[r64_src]);
+            vpshufb(v_src, v_src, v_shuf_mask); // Endianness swap
+
+            vpclmulqdq(v_aux, v_dst, v_k_12, 0b00000000);
+            vpclmulqdq(v_dst, v_dst, v_k_12, 0b00010001);
+            vpxor(v_src, v_src, v_dst);
+            vpxor(v_dst, v_src, v_aux);
+
+            jmp(l_fold_loop, T_NEAR);
+        }
+
+        // Fold Vmm to 128
+        L(l_fold_128); {
+            auto ymm_dst = Xbyak::Ymm(v_dst.getIdx());
+            if (isa == avx512_core) {
+                // 4 chunks, 4*128 -> 2*128
+                auto zmm_dst = Xbyak::Zmm(v_dst.getIdx());
+                auto ymm_src = Xbyak::Ymm(v_src.getIdx());
+                auto ymm_aux = Xbyak::Ymm(v_aux.getIdx());
+                auto ymm_k_12 = Xbyak::Ymm(v_k_12.getIdx());
+                vextractf64x4(ymm_src, zmm_dst, 0x1);
+
+                vpclmulqdq(ymm_aux, ymm_dst, ymm_k_12, 0b00000000);
+                vpclmulqdq(ymm_dst, ymm_dst, ymm_k_12, 0b00010001);
+                vpxor(ymm_src, ymm_src, ymm_dst);
+                vpxor(ymm_dst, ymm_src, ymm_aux);
+            }
+
+            // 2 chunks, 2*128 -> 128
+            auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+            auto xmm_src = Xbyak::Xmm(v_src.getIdx());
+            auto xmm_aux = Xbyak::Xmm(v_aux.getIdx());
+            auto xmm_k_12 = Xbyak::Xmm(v_k_12.getIdx());
+            vextractf128(xmm_src, ymm_dst, 0x1);
+
+            vpclmulqdq(xmm_aux, xmm_dst, xmm_k_12, 0b00000000);
+            vpclmulqdq(xmm_dst, xmm_dst, xmm_k_12, 0b00010001);
+            vpxor(xmm_src, xmm_src, xmm_dst);
+            vpxor(xmm_dst, xmm_src, xmm_aux);
+        }
+
+        L(l_end);
+    }
+
+    // CHUNK_SIZE <= Fold < VMM
+    void restFold() {
+        Xbyak::Label l_end;
+        cmp(r64_work_amount, CHUNK_SIZE);
+        jl(l_end, T_NEAR);
+
+        L(l_end);
+    }
+
+    // Fold < CHUNK_SIZE
+    void tailFold() {
+        Xbyak::Label l_end;
+        cmp(r64_work_amount, 0);
+        jle(l_end, T_NEAR);
+
+        L(l_end);
+    }
+
+    CombineHashCompileParams m_jcp;
+    RegistersPool::Ptr registersPool;
+};
+
+template <cpu_isa_t isa>
+void CombineHash<isa>::initVectors() {
+    v_dst = getVmm();
+    v_k_12 = getVmm();
+    v_k_34 = getVmm();
+    v_shuf_mask = getVmm();
+    auto r64_aux = getReg64();
+
+    static const uint64_t ff_const = 0xffffffffffffffff;
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&ff_const));
+    vpbroadcastq(v_dst, ptr[r64_aux]);
+
+    mov(r64_aux, reinterpret_cast<uintptr_t>(&K12));
+    vpbroadcastq(v_k_12, ptr[r64_aux]);
+
+    if (isa == avx512_core) {
+        static const uint8_t shuf_mask[] = {0b00000000, 0b00000001, 0b00000010, 0b00000011, 0b00000100, 0b00000101, 0b00000110, 0b00000111,
+                                            0b00001000, 0b00001001, 0b00001010, 0b00001011, 0b00001100, 0b00001101, 0b00001110, 0b00001111,
+                                            0b00000000, 0b00000001, 0b00000010, 0b00000011, 0b00000100, 0b00000101, 0b00000110, 0b00000111,
+                                            0b00001000, 0b00001001, 0b00001010, 0b00001011, 0b00001100, 0b00001101, 0b00001110, 0b00001111 };
+        mov(r64_aux, reinterpret_cast<uintptr_t>(shuf_mask));
+    } else if (isa == avx2) {
+        static const uint8_t shuf_mask[] = {0b00000000, 0b00000001, 0b00000010, 0b00000011, 0b00000100, 0b00000101, 0b00000110, 0b00000111,
+                                            0b00001000, 0b00001001, 0b00001010, 0b00001011, 0b00001100, 0b00001101, 0b00001110, 0b00001111 };
+        mov(r64_aux, reinterpret_cast<uintptr_t>(shuf_mask));
+    }
+    vmovups(v_shuf_mask, ptr[r64_aux]);
+}
+
+}   // namespace jit
+#endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
+
+size_t hash_combine(const void* src, size_t size) {
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+    jit::fn_t kernel;
+    if (jit::Generator::mayiuse(jit::avx512_core)) {
+        kernel = jit::CombineHash<jit::avx512_core>::get();
+    } else if (jit::Generator::mayiuse(jit::avx2)) {
+        kernel = jit::CombineHash<jit::avx2>::get();
+    }
+
+    if (kernel) {
+        size_t res = 0lu;
+        jit::CombineHashCallArgs args;
+        args.src_ptr = src;
+        args.dst_ptr = &res;
+        args.work_amount = size;
+        kernel(&args);
+        return res;
+    }
+#endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
+
+    constexpr auto cel_size = sizeof(size_t);
+    auto seed = static_cast<size_t>(size);
+    const auto data = static_cast<const size_t*>(src);
+    const auto d_end = std::next(data, size / cel_size);
+    // The constant value used as a magic number has been
+    // traditionally used e.g. in boost library's hash_combine.
+    // It happens to be derived from the golden ratio.
+    for (auto d = data; d != d_end; ++d) {
+        seed ^= *d + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    size_t last_bytes{0};
+    std::memcpy(&last_bytes, d_end, size % cel_size);
+    seed ^= last_bytes + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    return seed;
+}
+
+}   // namespace runtime
+}   // namespace ov
