@@ -37,20 +37,37 @@ namespace jit {
 
     typedef enum {
         isa_any,
-        sse41,
+        sse42,
         avx,
         avx2,
-        avx2_vnni,
-        avx2_vnni_2,
         avx512_common,
         avx512_core,
-        avx512_core_fp16,
-        avx512_core_bf16,
         avx512_core_vnni,
         avx512_mic,
         avx512_mic_4ops,
+        avx512_core_bf16,
         avx512_vpopcnt,
-        fp16
+        fp16,
+        pclmulqdq,
+        vpclmulqdq
+
+        // isa_any,
+        // sse41,
+        // avx,
+        // avx2,
+        // avx2_vnni,
+        // avx2_vnni_2,
+        // avx512_common,
+        // avx512_core,
+        // avx512_core_fp16,
+        // avx512_core_bf16,
+        // avx512_core_vnni,
+        // avx512_mic,
+        // avx512_mic_4ops,
+        // avx512_vpopcnt,
+        // fp16,
+        // pclmulqdq,
+        // vpclmulqdq
     } cpu_isa_t;
 
     class Generator : public Xbyak::CodeGenerator

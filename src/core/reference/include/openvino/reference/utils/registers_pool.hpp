@@ -325,14 +325,14 @@ inline
 RegistersPool::Ptr RegistersPool::create(cpu_isa_t isa, std::initializer_list<Xbyak::Reg> regsToExclude) {
 #define ISA_SWITCH_CASE(isa) case isa: return std::make_shared<IsaRegistersPool<isa>>(regsToExclude);
     switch (isa) {
-        ISA_SWITCH_CASE(sse41)
+        ISA_SWITCH_CASE(sse42)
         ISA_SWITCH_CASE(avx)
         ISA_SWITCH_CASE(avx2)
-        ISA_SWITCH_CASE(avx2_vnni)
+        // ISA_SWITCH_CASE(avx2_vnni)
         ISA_SWITCH_CASE(avx512_core)
         ISA_SWITCH_CASE(avx512_core_vnni)
         ISA_SWITCH_CASE(avx512_core_bf16)
-        ISA_SWITCH_CASE(avx512_core_fp16)
+        // ISA_SWITCH_CASE(avx512_core_fp16)
         // case avx512_core_bf16_ymm:
         //     return std::make_shared<IsaRegistersPool<avx512_core>>(regsToExclude);
         // case avx512_core_amx: return std::make_shared<IsaRegistersPool<avx512_core>>(regsToExclude);
@@ -346,7 +346,7 @@ RegistersPool::Ptr RegistersPool::create(cpu_isa_t isa, std::initializer_list<Xb
         // case avx512_core_amx_fp16:
         // case isa_all:
         default:
-            OPENVINO_THROW("Invalid isa argument in RegistersPool::create()");
+            OPENVINO_THROW("Invalid isa argument in RegistersPool::create(): ", isa);
         }
     OPENVINO_THROW("Invalid isa argument in RegistersPool::create()");
 #undef ISA_SWITCH_CASE

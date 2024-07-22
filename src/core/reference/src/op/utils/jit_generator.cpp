@@ -28,7 +28,7 @@ bool Generator::mayiuse(const cpu_isa_t cpu_isa) {
     using namespace Xbyak::util;
 
     switch (cpu_isa) {
-    case sse41:
+    case sse42:
         return cpu.has(Cpu::tSSE42);
     case avx:
         return cpu.has(Cpu::tAVX);
@@ -51,6 +51,10 @@ bool Generator::mayiuse(const cpu_isa_t cpu_isa) {
         return true && cpu.has(Cpu::tAVX512_VPOPCNTDQ);
     case fp16:
         return cpu.has(Cpu::tF16C);
+    case cpu_isa_t::pclmulqdq:
+        return cpu.has(Cpu::tPCLMULQDQ);
+    case cpu_isa_t::vpclmulqdq:
+        return cpu.has(Cpu::tVPCLMULQDQ);
     case isa_any:
         return true;
     }
