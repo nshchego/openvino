@@ -274,46 +274,88 @@ void CombineHash<isa>::initVectors() {
 
 template <>
 void CombineHash<avx512_core>::bulkFold_128() {
+    Xbyak::Label l_end;
+    cmp(r64_work_amount, 4 * zmm_len);
+    jl(l_end, T_NEAR);
+
     if (mayiuse(cpu_isa_t::vpclmulqdq)) {
     } else {
-        Xbyak::Label l_fold_loop, l_end;
-        cmp(r64_work_amount, xmm_len);
-        jl(l_end, T_NEAR);
+        Xbyak::Label l_fold_loop;
 
-        auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+        auto r64_aux = getReg64();
+        // auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
         auto xmm_k_16_17 = Xbyak::Xmm(v_k_16_17.getIdx());
         // auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
-        auto v_src = getVmm();
-        auto v_aux = getVmm();
-        auto v_aux_1 = getVmm();
-        auto v_aux_2 = getVmm();
-        auto v_aux_3 = getVmm();
+        auto v_src_0 = getVmm();
+        auto v_src_1 = getVmm();
+        auto v_dst_0 = getVmm();
+        auto v_dst_1 = getVmm();
+        auto v_dst_2 = getVmm();
+        auto v_dst_3 = getVmm();
+        auto v_dst_4 = getVmm();
+        auto v_dst_5 = getVmm();
+        auto v_dst_6 = getVmm();
+        auto v_dst_7 = getVmm();
+        auto v_aux_0 = getVmm();
+        // auto v_aux_1 = getVmm();
+        // auto v_aux_2 = getVmm();
+        // auto v_aux_3 = getVmm();
 
-        auto ymm_src = Xbyak::Ymm(v_src.getIdx());
-        auto ymm_dst = Xbyak::Ymm(v_dst.getIdx());
-        auto ymm_aux = Xbyak::Ymm(v_aux.getIdx());
-        auto xmm_src = Xbyak::Xmm(v_src.getIdx());
-        auto xmm_aux = Xbyak::Xmm(v_aux.getIdx());
-        auto xmm_aux_1 = Xbyak::Xmm(v_aux_1.getIdx());
-        auto xmm_aux_2 = Xbyak::Xmm(v_aux_2.getIdx());
-        auto xmm_aux_3 = Xbyak::Xmm(v_aux_3.getIdx());
+        // auto ymm_src_0 = Xbyak::Ymm(v_src_0.getIdx());
+        // auto ymm_src_1 = Xbyak::Ymm(v_src_1.getIdx());
+        // auto ymm_dst = Xbyak::Ymm(v_dst.getIdx());
+        // auto ymm_aux = Xbyak::Ymm(v_aux.getIdx());
 
-        // prefetchnta(ptr[r64_src]); // TODO compare perf
-        vmovdqu(v_dst, ptr[r64_src]);
-        vpshufb(v_dst, v_dst, v_shuf_mask); // Endianness swap
+        auto xmm_src_0 = Xbyak::Xmm(v_src_0.getIdx());
+        // auto xmm_src_1 = Xbyak::Xmm(v_src_1.getIdx());
+        auto xmm_dst_0 = Xbyak::Xmm(v_dst_0.getIdx());
+        auto xmm_dst_1 = Xbyak::Xmm(v_dst_1.getIdx());
+        auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
+        auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
+        auto xmm_dst_4 = Xbyak::Xmm(v_dst_4.getIdx());
+        auto xmm_dst_5 = Xbyak::Xmm(v_dst_5.getIdx());
+        auto xmm_dst_6 = Xbyak::Xmm(v_dst_6.getIdx());
+        auto xmm_dst_7 = Xbyak::Xmm(v_dst_7.getIdx());
+        auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
+        // auto xmm_aux_1 = Xbyak::Xmm(v_aux_1.getIdx());
+        // auto xmm_aux_2 = Xbyak::Xmm(v_aux_2.getIdx());
+        // auto xmm_aux_3 = Xbyak::Xmm(v_aux_3.getIdx());
+
+        vmovdqu64(v_dst_0, ptr[r64_src]);
+        vpshufb(v_dst_0, v_dst_0, v_shuf_mask); // Swap bytes
+        vextracti64x2(xmm_dst_1, v_dst_0, 0x1);
+        vextracti64x2(xmm_dst_2, v_dst_0, 0x2);
+        vextracti64x2(xmm_dst_3, v_dst_0, 0x3);
+
+        add(r64_src, zmm_len);
+        vmovdqu64(v_dst_4, ptr[r64_src]);
+        vpshufb(v_dst_4, v_dst_4, v_shuf_mask); // Swap bytes
+        vextracti64x2(xmm_dst_5, v_dst_0, 0x1);
+        vextracti64x2(xmm_dst_6, v_dst_0, 0x2);
+        vextracti64x2(xmm_dst_7, v_dst_0, 0x3);
+
+        // prefetchnta(ptr[r64_src + zmm_len]); // TODO compare perf
+        // vmovdqu(xmm_dst_0, ptr[r64_src + 0]);
+        // vmovdqu(xmm_dst_1, ptr[r64_src + 16]);
+        // vmovdqu(xmm_dst_2, ptr[r64_src + 32]);
+        // vmovdqu(xmm_dst_3, ptr[r64_src + 48]);
+        // vmovdqu(xmm_dst_4, ptr[r64_src + 64]);
+        // vmovdqu(xmm_dst_5, ptr[r64_src + 80]);
+        // vmovdqu(xmm_dst_6, ptr[r64_src + 96]);
+        // vmovdqu(xmm_dst_7, ptr[r64_src + 128]);
+
         // vpslldq(xmm_dst, xmm_dst, 0x8); TODO modify INIT_CRC instead
-        auto r64_aux = getReg64();
         mov(r64_aux, reinterpret_cast<uintptr_t>(&INIT_CRC));
-        vpxorq(xmm_dst, xmm_dst, ptr_b[r64_aux]);
+        vpxorq(xmm_dst_0, xmm_dst_0, ptr_b[r64_aux]);
 
         // Bulk fold
         L(l_fold_loop); {
             add(r64_src, zmm_len);
-            sub(r64_work_amount, zmm_len);
-            cmp(r64_work_amount, zmm_len);
+            sub(r64_work_amount, 2 * zmm_len);
+            // cmp(r64_work_amount, 2 * zmm_len); // TODO check
             jl(l_end, T_NEAR);
 
-            // vmovdqu(v_src, ptr[r64_src]);
+            // vmovdqu64(v_src, ptr[r64_src]);
             // vpshufb(v_src, v_src, v_shuf_mask); // Endianness swap
 
             // vpclmulqdq(xmm_aux, xmm_dst, xmm_k_16_17, 0b00000000);
@@ -327,22 +369,105 @@ void CombineHash<avx512_core>::bulkFold_128() {
             // vpxorq(ymm_aux, ymm_aux, ymm_src);
             // vpxorq(ymm_dst, ymm_dst, ymm_aux);
 
-            vmovdqu(v_src, ptr[r64_src]);
-            vpshufb(v_src, v_src, v_shuf_mask); // Endianness swap
-            vextracti64x2(xmm_aux_2, v_src, 0x1);
+            // 0
+            vmovdqu64(v_src_0, ptr[r64_src]);
+            vpshufb(v_src_0, v_src_0, v_shuf_mask); // Swap bytes
 
-            vpclmulqdq(xmm_aux, xmm_dst, xmm_k_16_17, 0b00000000);
-            vpclmulqdq(xmm_dst, xmm_dst, xmm_k_16_17, 0b00010001);
-            vpxorq(xmm_aux, xmm_aux, xmm_src);
-            vpxorq(xmm_dst, xmm_dst, xmm_aux);
+            vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_0, xmm_dst_0, xmm_aux_0);
+            // 1
+            vextracti64x2(xmm_src_0, v_src_0, 0x1);
+            vpclmulqdq(xmm_aux_0, xmm_dst_1, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
+            // 2
+            vextracti64x2(xmm_src_0, v_src_0, 0x2);
+            vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_2, xmm_dst_2, xmm_aux_0);
+            // 3
+            vextracti64x2(xmm_src_0, v_src_0, 0x3);
+            vpclmulqdq(xmm_aux_0, xmm_dst_3, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_3, xmm_dst_3, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
 
-            vpclmulqdq(xmm_aux, xmm_aux_3, xmm_k_16_17, 0b00000000);
-            vpclmulqdq(xmm_aux_3, xmm_aux_3, xmm_k_16_17, 0b00010001);
-            vpxorq(ymm_aux, ymm_aux, ymm_src);
-            vpxorq(ymm_dst, ymm_dst, ymm_aux);
+            // 4
+            add(r64_src, zmm_len);
+            vmovdqu64(v_src_0, ptr[r64_src]);
+            vpshufb(v_src_0, v_src_0, v_shuf_mask); // Swap bytes
+
+            vpclmulqdq(xmm_aux_0, xmm_dst_4, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_4, xmm_dst_4, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_4, xmm_dst_4, xmm_aux_0);
+            // 5
+            vextracti64x2(xmm_src_0, v_src_0, 0x1);
+            vpclmulqdq(xmm_aux_0, xmm_dst_5, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_5, xmm_dst_5, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_5, xmm_dst_5, xmm_aux_0);
+            // 6
+            vextracti64x2(xmm_src_0, v_src_0, 0x2);
+            vpclmulqdq(xmm_aux_0, xmm_dst_6, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_6, xmm_dst_6, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_6, xmm_dst_6, xmm_aux_0);
+            // 7
+            vextracti64x2(xmm_src_0, v_src_0, 0x3);
+            vpclmulqdq(xmm_aux_0, xmm_dst_7, xmm_k_16_17, 0b00000000);
+            vpclmulqdq(xmm_dst_7, xmm_dst_7, xmm_k_16_17, 0b00010001);
+            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
 
             jmp(l_fold_loop, T_NEAR);
         }
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 8));
+        vpclmulqdq(xmm_aux_0, xmm_dst_0, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_0, xmm_dst_0, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_0);
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 10));
+        vpclmulqdq(xmm_aux_0, xmm_dst_1, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_1, xmm_dst_1, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_1);
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 12));
+        vpclmulqdq(xmm_aux_0, xmm_dst_2, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_2, xmm_dst_2, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_2);
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 14));
+        vpclmulqdq(xmm_aux_0, xmm_dst_3, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_3, xmm_dst_3, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_3);
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 16));
+        vpclmulqdq(xmm_aux_0, xmm_dst_4, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_4, xmm_dst_4, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_4);
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 18));
+        vpclmulqdq(xmm_aux_0, xmm_dst_5, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_5, xmm_dst_5, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_5);
+
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
+        vpclmulqdq(xmm_aux_0, xmm_dst_6, ptr[r64_aux], 0b00000000);
+        vpclmulqdq(xmm_dst_6, xmm_dst_6, ptr[r64_aux], 0b00010001);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+        vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_6);
 
         L(l_end);
     }
@@ -392,9 +517,23 @@ void CombineHash<avx2>::bulkFold_128() {
 template <cpu_isa_t isa>
 const uint64_t CombineHash<isa>::INIT_CRC = 0xffffffffffffffff;
 
+// Auxiliary fn to obtain K constant multipliers.
+// uint64_t get_k_value(int t, uint64_t poly = 0x42F0E1EBA9EA3693) {
+//     uint64_t res = poly, mask = 0x8000000000000000;
+//     do {
+//         if (res & mask) {
+//             res = (res << 1) ^ poly;
+//         } else {
+//             res = (res << 1);
+//         }
+//     } while (--t);
+//     std::cout << std::hex << "K64: " << res << std::endl;
+//     return res;
+// }
+
 template <cpu_isa_t isa>
 const uint64_t CombineHash<isa>::CONST_K[20] = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e,
-                                                 0x05cf79dea9ac37d6, 0x01067e571d7d5c2h,
+                                                 0x05cf79dea9ac37d6, 0x001067e571d7d5c2,
                                                  0x05f5c3c7eb52fab6, 0x0000000000000000,
                                                  0x578d29d06cc4f872, 0x42f0e1eba9ea3693,
                                                  0xe464f4df5fb60ac1, 0xb649c5b35a759cf2,
@@ -408,23 +547,6 @@ const uint64_t CombineHash<isa>::CONST_K[20] = { 0x05f5c3c7eb52fab6, 0x4eb938a7d
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t combine_hash(const void* src, size_t size) {
-{
-    const int bits = 64;
-    int t = 960;
-    // const uint64_t poly = 0x04C11DB7; // 32
-    const uint64_t poly = 0x42F0E1EBA9EA3693; // 64
-
-    uint64_t v = poly, MSB = 0x8000000000000000;
-    do {
-        if (v & MSB) { // старший бит проверяем
-            v = (v << 1) ^ poly;
-        } else {
-            v = (v << 1);
-        }
-    } while (--t);
-    std::cout << std::hex << "K64: " << v << std::endl;
-}
-
 // std::cout << "combine_hash size: " << size << std::endl;
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
     jit::fn_t kernel;
