@@ -567,6 +567,7 @@ int main(int argc, char* argv[]) {
             compiledModel = core.compile_model(FLAGS_m, device_name, device_config);
             auto duration_ms = get_duration_ms_till_now(startTime);
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
+return 0;
             slog::info << "Original model I/O parameters:" << slog::endl;
             printInputAndOutputsInfoShort(compiledModel);
 
@@ -746,6 +747,7 @@ int main(int argc, char* argv[]) {
             compiledModel = core.compile_model(model, device_name, device_config);
             duration_ms = get_duration_ms_till_now(startTime);
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
+return 0;
             if (statistics)
                 statistics->add_parameters(
                     StatisticsReport::Category::EXECUTION_RESULTS,
