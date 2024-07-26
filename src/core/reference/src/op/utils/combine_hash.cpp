@@ -195,6 +195,10 @@ void CombineHash<isa>::initVectors() {
         // vmovdqu(v_shuf_mask, ptr[r64_aux]);
         vbroadcasti128(v_shuf_mask, ptr[r64_aux]);
     }
+
+    vmovdqu64(v_dst_0, ptr[r64_src]);
+    vpshufb(v_dst_0, v_dst_0, v_shuf_mask);
+    pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
 }
 
 template <>
@@ -222,13 +226,17 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
 
-    vmovdqu64(v_dst_0, ptr[r64_src]);
-    vpshufb(v_dst_0, v_dst_0, v_shuf_mask);
-    pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
+    // vmovdqu64(v_dst_0, ptr[r64_src]);
+    // vpshufb(v_dst_0, v_dst_0, v_shuf_mask);
+    // pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
     if (!is_vpclmulqdq) {
-        vextracti64x2(xmm_dst_1, v_dst_0, 0x1);
-        vextracti64x2(xmm_dst_2, v_dst_0, 0x2);
-        vextracti64x2(xmm_dst_3, v_dst_0, 0x3);
+        prefetchnta(ptr[r64_src]);
+        vmovdqu64(xmm_dst_1, ptr[r64_src]);
+        vmovdqu64(xmm_dst_2, ptr[r64_src + xmm_len]);
+        vmovdqu64(xmm_dst_3, ptr[r64_src + 2 * xmm_len]);
+        // vextracti64x2(xmm_dst_1, v_dst_0, 0x1);
+        // vextracti64x2(xmm_dst_2, v_dst_0, 0x2);
+        // vextracti64x2(xmm_dst_3, v_dst_0, 0x3);
     }
 
     add(r64_src, zmm_len);
