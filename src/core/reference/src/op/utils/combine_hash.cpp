@@ -81,7 +81,7 @@ public:
         restFold(v_dst);
         tailFold(v_dst);
 
-        vpextrq(ptr[r64_dst], Xbyak::Xmm(v_dst.getIdx()), 0x0); // TODO 0x1?
+        vpextrq(ptr[r64_dst], Xbyak::Xmm(v_dst.getIdx()), 0x0);
 
         registersPool.reset();
         this->postamble();
@@ -92,6 +92,16 @@ public:
         static CombineHash<isa> kernel(params);
 
         return (fn_t)kernel.getCode();
+    }
+
+    void fillRestWorkMask(const Xbyak::Opmask& k_dst_mask,
+                          const Xbyak::Reg64& r64_work_rest) {
+        auto rOnes = getReg64();
+
+        mov(rOnes, 0xFFFFFFFFFFFFFFFF);
+        shlx(rOnes, rOnes, r64_work_rest);
+        not_(rOnes);
+        kmovq(k_dst_mask, rOnes);
     }
 
 private:
@@ -153,7 +163,6 @@ private:
 
             add(r64_src, xmm_len);
             sub(r64_work_amount, xmm_len);
-            // cmp(r64_work_amount, zmm_len); // TODO check
             jge(l_fold_loop, T_NEAR);
         }
 
@@ -163,15 +172,9 @@ private:
     void tailFold(const Vmm& v_dst);
 };
 
-template <cpu_isa_t isa>
-void CombineHash<isa>::initVectors() {
+template <>
+void CombineHash<avx512_core>::initVectors() {
     auto r64_aux = getReg64();
-
-    v_dst = getVmm();
-    auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
-    mov(r64_aux, CRC_VAL);
-    vpxorq(v_dst, v_dst, v_dst);
-    vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
 
     v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
@@ -181,30 +184,67 @@ void CombineHash<isa>::initVectors() {
     vbroadcasti64x2(v_k_8_9, ptr[r64_aux]);
 
     v_shuf_mask = getVmm();
-    static const uint8_t shuf_mask[] = //{ 0b00000000, 0b00000001, 0b00000010, 0b00000011, 0b00000100, 0b00000101, 0b00000110, 0b00000111,
-                                        //  0b00001000, 0b00001001, 0b00001010, 0b00001011, 0b00001100, 0b00001101, 0b00001110, 0b00001111,
-                                        //  0b00000000, 0b00000001, 0b00000010, 0b00000011, 0b00000100, 0b00000101, 0b00000110, 0b00000111,
-                                        //  0b00001000, 0b00001001, 0b00001010, 0b00001011, 0b00001100, 0b00001101, 0b00001110, 0b00001111 };
-                                       { 0b00001111, 0b00001110, 0b00001101, 0b00001100, 0b00001011, 0b00001010, 0b00001001, 0b00001000,
+    static const uint8_t shuf_mask[] = { 0b00001111, 0b00001110, 0b00001101, 0b00001100, 0b00001011, 0b00001010, 0b00001001, 0b00001000,
                                          0b00000111, 0b00000110, 0b00000101, 0b00000100, 0b00000011, 0b00000010, 0b00000001, 0b00000000 };
     mov(r64_aux, reinterpret_cast<uintptr_t>(shuf_mask));
-    if (isa == avx512_core) {
-        // vmovdqu8(v_shuf_mask, ptr[r64_aux]);
-        vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
-    } else {
-        // vmovdqu(v_shuf_mask, ptr[r64_aux]);
-        vbroadcasti128(v_shuf_mask, ptr[r64_aux]);
-    }
+    vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
 
-    vmovdqu64(v_dst_0, ptr[r64_src]);
-    vpshufb(v_dst_0, v_dst_0, v_shuf_mask);
-    pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
+    v_dst = getVmm();
+    auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+    auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
+    auto xmm_aux = getXmm();
+    auto k_rest_mask = RegistersPool::Reg<Xbyak::Opmask>(registersPool);
+    // Initial CRC
+    mov(r64_aux, CRC_VAL);
+    vpxorq(v_dst, v_dst, v_dst);
+    vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
+    // First xor with source
+    fillRestWorkMask(k_rest_mask, r64_work_amount);
+    vmovdqu64(Xbyak::Xmm(xmm_aux.getIdx()) | k_rest_mask, ptr[r64_src]);
+    vpshufb(xmm_aux, xmm_aux, xmm_shuf_mask);
+    vpxorq(xmm_dst, xmm_dst, xmm_aux);
+    sub(r64_work_amount, xmm_len);
+    // pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
+}
+
+template <cpu_isa_t isa>
+void CombineHash<isa>::initVectors() {
+    // auto r64_aux = getReg64();
+
+    // v_dst = getVmm();
+    // auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+    // mov(r64_aux, CRC_VAL);
+    // vpxorq(v_dst, v_dst, v_dst);
+    // vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
+
+    // v_k_1_2 = getVmm();
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
+    // vbroadcasti64x2(v_k_1_2, ptr[r64_aux]);
+    // v_k_8_9 = getVmm();
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 14));
+    // vbroadcasti64x2(v_k_8_9, ptr[r64_aux]);
+
+    // v_shuf_mask = getVmm();
+    // static const uint8_t shuf_mask[] = { 0b00001111, 0b00001110, 0b00001101, 0b00001100, 0b00001011, 0b00001010, 0b00001001, 0b00001000,
+    //                                      0b00000111, 0b00000110, 0b00000101, 0b00000100, 0b00000011, 0b00000010, 0b00000001, 0b00000000 };
+    // mov(r64_aux, reinterpret_cast<uintptr_t>(shuf_mask));
+    // if (isa == avx512_core) {
+    //     vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
+    // } else {
+    //     vbroadcasti128(v_shuf_mask, ptr[r64_aux]);
+    // }
+
+    // auto k_rest_mask = RegistersPool::Reg<Xbyak::Opmask>(registersPool);
+    // fillRestWorkMask(k_rest_mask, r64_work_amount);
+    // vmovdqu64(xmm_dst | k_rest_mask, ptr[r64_src]);
+    // vpshufb(xmm_dst, xmm_dst, v_shuf_mask);
+    // pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
 }
 
 template <>
 void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     Xbyak::Label l_fold_loop, l_end;
-    cmp(r64_work_amount, 2 * zmm_len);
+    cmp(r64_work_amount, zmm_len + 3 * xmm_len);
     jl(l_end, T_NEAR);
 
     auto r64_aux = getReg64();
@@ -231,16 +271,16 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     // pxor(xmm_dst_0, xmm_dst_3); // The SSE version is used to avoid zeroing out the rest of the vector.
     if (!is_vpclmulqdq) {
         prefetchnta(ptr[r64_src]);
-        vmovdqu64(xmm_dst_1, ptr[r64_src]);
-        vmovdqu64(xmm_dst_2, ptr[r64_src + xmm_len]);
-        vmovdqu64(xmm_dst_3, ptr[r64_src + 2 * xmm_len]);
+        vmovdqu64(xmm_dst_1, ptr[r64_src + 1 * xmm_len]);
+        vmovdqu64(xmm_dst_2, ptr[r64_src + 2 * xmm_len]);
+        vmovdqu64(xmm_dst_3, ptr[r64_src + 3 * xmm_len]);
         // vextracti64x2(xmm_dst_1, v_dst_0, 0x1);
         // vextracti64x2(xmm_dst_2, v_dst_0, 0x2);
         // vextracti64x2(xmm_dst_3, v_dst_0, 0x3);
     }
 
     add(r64_src, zmm_len);
-    sub(r64_work_amount, zmm_len);
+    sub(r64_work_amount,  3 * xmm_len);
 
     L(l_fold_loop); {
         vmovdqu64(v_src_0, ptr[r64_src]);
@@ -351,9 +391,9 @@ void CombineHash<avx2>::bulkFold(const Vmm& v_dst) {
 
 template <>
 void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
-    Xbyak::Label l_end;
+    Xbyak::Label l_fold_to_64;
     cmp(r64_work_amount, 0);
-    jle(l_end, T_NEAR);
+    jle(l_fold_to_64, T_NEAR);
 
     auto r64_aux = getReg64();
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
@@ -361,31 +401,37 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     auto xmm_src = getXmm();
     auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
     auto xmm_aux = getXmm();
+    auto xmm_aux_1 = getXmm();
+    auto xmm_aux_2 = getXmm();
     auto k_rest_mask = RegistersPool::Reg<Xbyak::Opmask>(registersPool);
 
-    mov(r64_aux, 0xFFFFFFFFFFFFFFFF);
-    shlx(r64_aux, r64_aux, r64_work_amount);
-    not_(r64_aux);
-    kmovq(k_rest_mask, r64_aux);
+    fillRestWorkMask(k_rest_mask, r64_work_amount);
 
     vpxorq(xmm_src, xmm_src, xmm_src);
     vmovdqu64(Xbyak::Xmm(xmm_src.getIdx()) | k_rest_mask, ptr[r64_src]);
-    vpshufb(xmm_src, xmm_src, xmm_shuf_mask); // Swap bytes
+    vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
 
-    shl(r64_work_amount, sizeof(uint64_t));
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 22));
-    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux + r64_work_amount], 0b00000000);
+    vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000);
     vpclmulqdq(xmm_dst, xmm_dst, xmm_k_1_2, 0b00010001);
     vpxorq(xmm_aux, xmm_aux, xmm_src);
     vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
-    // 128 -> 64
-    vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000); // TODO KBP
-    vpclmulqdq(xmm_dst, xmm_dst, xmm_k_1_2, 0b00010001);
-    vpxorq(xmm_aux, xmm_aux, xmm_src);
+    L(l_fold_to_64);
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 4));
+    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux], 0b00000001);
+    vpslldq(xmm_dst, xmm_dst, 0x8);
     vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
-    L(l_end);
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
+    vmovdqu64(xmm_aux_2, ptr[r64_aux]);
+    vpclmulqdq(xmm_aux, xmm_dst, xmm_aux_2, 0b00000001);
+    mov(r64_aux, 0x0);
+    vpinsrq(xmm_aux_1, xmm_dst, r64_aux, 0x0);
+    vpxorq(xmm_aux, xmm_aux, xmm_aux_1);
+    vpinsrq(xmm_aux_1, xmm_aux, r64_aux, 0x0);
+    vpclmulqdq(xmm_aux, xmm_aux, xmm_aux_2, 0b00010001);
+    vpxorq(xmm_aux, xmm_aux, xmm_aux_1);
+    vpxorq(xmm_dst, xmm_dst, xmm_aux);
 }
 
 template <>
@@ -475,10 +521,24 @@ uint64_t get_k_value_reflect(int t, uint64_t poly = 0xEB31D82E) {
     // return 0;
 }
 
+uint64_t barrett_calc(uint64_t poly = 0x42F0E1EBA9EA3693, int bits = 64) {
+    int n = bits;
+    uint64_t r = poly;
+    uint64_t v = 0lu;
+    while (--n) {
+        if (r & (1ULL << n)) {
+            r ^= poly >> (bits-n);
+            v |= 1ULL << n;
+        }
+    }
+    if (r) v|=1;// для деления с остатком округляем в большую сторону
+    return v;
+}
+
 template <cpu_isa_t isa>
 const uint64_t CombineHash<isa>::CONST_K[54] = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e,  // x^(64*1), x^(64*2) U
                                                  0x05cf79dea9ac37d6, 0x001067e571d7d5c2,  // x^(64*15), x^(64*16)
-                                                 0x05f5c3c7eb52fab6, 0x0000000000000000,  // x^(64*1), x^(64*)
+                                                 0x05f5c3c7eb52fab6, 0x0000000000000000,  // x^(64*1), x^(64*0)
                                                  0x578d29d06cc4f872, 0x42f0e1eba9ea3693,  // x^(64*), x^(64*)
                                                  0xe464f4df5fb60ac1, 0xb649c5b35a759cf2,  // x^(64*13), x^(64*14)
                                                  0X9af04e1eff82d0dd, 0x6e82e609297f8fe8,  // x^(64*11), x^(64*12)
@@ -510,8 +570,15 @@ const uint64_t CombineHash<isa>::CONST_K[54] = { 0x05f5c3c7eb52fab6, 0x4eb938a7d
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t combine_hash(const void* src, size_t size) {
-if (size == 0)
-    std::cout << "combine_hash size: " << size << std::endl;
+// std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
+//           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0xD663B05D, 32)
+//           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0x04C11DB7, 32)
+//           << "; barrett_calc 16: " << std::hex << jit::barrett_calc(0x8408, 16)
+//           << "; barrett_calc 16: " << std::hex << jit::barrett_calc(0xA001, 16)
+//           << "; barrett_calc 16m: " << std::hex << jit::barrett_calc(0x4003, 16)
+//           << "; barrett_calc 16b: " << std::hex << jit::barrett_calc(0x0811, 16) << std::endl;
+// if (size == 0)
+//     std::cout << "combine_hash size: " << size << std::endl;
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
     jit::fn_t kernel;
 // if (jit::Generator::mayiuse(jit::vpclmulqdq)) {
@@ -664,12 +731,20 @@ if (size == 0)
         args.src_ptr = src;
         args.dst_ptr = &res;
         args.work_amount = size;
-if (size > 16 && size < 32)
-    std::cout << "combine_hash size: " << size << std::endl;
+// if (size > 16 && size < 32)
+//     std::cout << "combine_hash size: " << size << std::endl;
         kernel(&args);
 // static uint64_t counter = 0lu;
-// if (counter++ < 200)
+// if (counter++ < 200) {
 //     std::cout << "combine_hash kernel res: " << res << "; size: " << size << std::endl;
+//     if (res == 0 || size == 8) {
+//         auto src_u8 = reinterpret_cast<const uint8_t *>(src);
+//         for (int i = 0; i < size; i++) {
+//             std::cout << int(src_u8[i]) << "; ";
+//         }
+//         std::cout << std::endl;
+//     }
+// }
         return res;
     }
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
