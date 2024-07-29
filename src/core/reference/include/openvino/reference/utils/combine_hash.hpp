@@ -11,5 +11,5 @@ namespace runtime {
 
 size_t combine_hash(const void* src, size_t size);
 
-}   // namespace pass
+}   // namespace runtime
 }   // namespace ov
