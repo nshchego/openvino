@@ -266,6 +266,8 @@ function(ov_set_threading_interface_for TARGET_NAME)
     endif()
 
     get_target_property(target_type ${TARGET_NAME} TYPE)
+    message(TARGET_NAME="${TARGET_NAME}")
+    message(target_type="${target_type}")
 
     if(target_type STREQUAL "INTERFACE_LIBRARY")
         set(LINK_TYPE "INTERFACE")

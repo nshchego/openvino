@@ -277,6 +277,12 @@ cross_compiled_file(${TARGET_NAME}
 # system dependencies must go last
 target_link_libraries(${TARGET_NAME} PRIVATE openvino::pugixml)
 ov_set_threading_interface_for(${TARGET_NAME})
+message(CPU_TAR_TBB_VERSION="${TBB_VERSION}")
+message(CPU_THREADING="${THREADING}")
+message(CPU_TBB_IMPORTED_TARGETS="${TBB_IMPORTED_TARGETS}")
+message(CPU_TBB_IMPORTED_TARGETS="${TBB_IMPORTED_TARGETS}")
+message(CPU_TBB_DIR="${TBB_DIR}")
+message(CPU_ENABLE_SYSTEM_TBB="${ENABLE_SYSTEM_TBB}")
 
 # must be called after all target_link_libraries
 ov_add_api_validator_post_build_step(TARGET ${TARGET_NAME})
@@ -319,6 +325,7 @@ if(BUILD_SHARED_LIBS)
     endif()
 
     ov_set_threading_interface_for(${TARGET_NAME}_obj)
+    message(CPU_OBJ_TBB_VERSION="${TBB_VERSION}")
 
     target_compile_definitions(${TARGET_NAME}_obj PRIVATE USE_STATIC_IE)
 

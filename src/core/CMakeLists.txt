@@ -90,6 +90,12 @@ ov_build_target_faster(openvino_core_obj
 ov_add_version_defines(src/version.cpp openvino_core_obj)
 
 ov_set_threading_interface_for(openvino_core_obj)
+message(CORE_TBB_VERSION="${TBB_VERSION}")
+message(CORE_THREADING="${THREADING}")
+message(CORE_TBB_IMPORTED_TARGETS="${TBB_IMPORTED_TARGETS}")
+message(CORE_TBB_IMPORTED_TARGETS="${TBB_IMPORTED_TARGETS}")
+message(CORE_TBB_DIR="${TBB_DIR}")
+message(CORE_ENABLE_SYSTEM_TBB="${ENABLE_SYSTEM_TBB}")
 
 target_link_libraries(openvino_core_obj PRIVATE openvino::reference openvino::util
                                          openvino::pugixml openvino::shape_inference openvino::core::dev)
