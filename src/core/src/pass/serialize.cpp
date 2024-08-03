@@ -117,15 +117,46 @@ public:
             // But even strong hashing algorithms sometimes give collisions.
             // Therefore we always have to compare values when finding a match in the hash multimap.
             const HashValue hash = ov::runtime::combine_hash(ptr_to_write, *new_size);
+
+// static uint64_t counter = 0lu;
+// counter++;
+// if (*new_size == 2359296) {
+    // std::cout << counter << " Hash: " << hash << "; size: " << size << std::endl; // 582
+// }
+// for (auto it : m_hash_to_file_positions) {
+//     // if (memcmp(ptr_to_write, it.second.second, size) == 0 && hash != it.first) {
+//     //     std::cout << "Hash mismatch ctr: " << counter << "; size: " << *new_size << "; hash_0: " << it.first << "; hash_1: " << hash << std::endl;
+//     // }
+//     auto pos = memcmp(ptr_to_write, it.second.second, size);
+//     if (hash == it.first && pos != 0) {
+//         std::cout << "Mem mismatch ctr: " << counter << "; size: " << *new_size
+//             << "; hash_0: " << it.first << "; hash_1: " << hash << "; pos: " << pos << std::endl;
+//     }
+// }
             auto found = m_hash_to_file_positions.find(hash);
             // iterate over all matches of the key in the multimap
             while (found != m_hash_to_file_positions.end()) {
-                if (memcmp(ptr, found->second.second, size) == 0)
+                if (memcmp(ptr, found->second.second, size) == 0) {
+// static uint64_t counter_1 = 0lu;
+// counter_1++;
+// if (counter_1 >= 486)
+//     std::cout << "memcmp == 0: " << counter_1 << std::endl; // 487
+
+// if (size != 4 && size != 8) {
+//     // auto src_u8 = reinterpret_cast<const uint8_t *>(ptr_to_write);
+    // std::cout << "memcmp == 0 count: " << counter << "; size: " << size << "; ";
+//     // for (int i = 0; i < size; i++) {
+//     //     std::cout << int(src_u8[i]) << "; ";
+//     // }
+//     std::cout << std::endl;
+// }
                     return found->second.first;
+                }
                 found++;
             }
             // Since fp16_compressed data will be disposed at exit point and since we cannot reread it from the ostream,
             // we store pointer to the original uncompressed blob.
+// std::cout << counter << " Hash to WRITE size: " << size << "; new_size: " << *new_size << "; hash: " << hash << std::endl;
             m_hash_to_file_positions.insert({hash, {offset, static_cast<void const*>(ptr)}});
             m_binary_output.write(ptr_to_write, *new_size);
         }
@@ -420,6 +451,8 @@ public:
           m_output_element_type(output_element_type) {}
 
     void on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) override {
+// static uint64_t counter = 0lu;
+// std::cout << "XmlSerializer::on_adapter void: " << ++counter << std::endl; // 586
         using BodyTargetNames = std::tuple<std::string, std::string, std::vector<std::string>>;
 
         const std::vector<BodyTargetNames> body_names = {
@@ -1380,11 +1413,17 @@ public:
     std::streamsize xsputn(const char* s, std::streamsize n) override {
         // Reinterpret data as uint32_t and accumulate in uint64_t to avoid overflow fluctuations in parallel_sum.
         auto* intS = reinterpret_cast<const uint32_t *>(s);
-        const uint64_t n64 = n / sizeof(uint32_t);
+        const uint64_t size = static_cast<uint64_t>(n) / sizeof(uint32_t);
 
-        m_res += parallel_sum(n64, uint64_t(0lu), [&](size_t k)->uint32_t {
+        m_res += parallel_sum(size, uint64_t(0lu), [&](size_t k)->uint32_t {
             return intS[k];
         });
+        // for (uint64_t i = 0lu; i < size; i++) {
+        //     if (std::numeric_limits<uint64_t>::max() - intS[i] <= m_res) {
+        //         std::cout << "xsputn num limit" << std::endl;
+        //     }
+        //     m_res += static_cast<uint64_t>(intS[i]);
+        // }
 
         const uint64_t rest = n % sizeof(uint32_t);
         for (uint64_t i = 0lu; i < rest; i++) {
@@ -1392,6 +1431,24 @@ public:
         }
 
         return n;
+// static uint64_t counter = 0lu;
+// static uint64_t sum = 0lu;
+// sum += n;
+// std::cout << "xsputn num: " << ++counter << "; sum: " << sum << std::endl;
+
+        // auto* intS = (const std::streamsize*)s;
+        // std::streamsize n64 = n / static_cast<std::streamsize>(sizeof(std::streamsize));
+        // std::streamsize i = 0;
+        // // Using 64-bit values executes much faster than char
+        // while (i++ < n64) {
+        //     m_res += *(intS++);
+        // }
+
+        // std::streamsize rest = n % static_cast<std::streamsize>(sizeof(std::streamsize));
+        // for (i = 0; i < rest; i++) {
+        //     m_res += s[n - rest + i];
+        // }
+        // return n;
     }
 };
 }  // namespace
@@ -1407,6 +1464,8 @@ bool pass::Hash::run_on_model(const std::shared_ptr<ov::Model>& model) {
     serializeFunc(xml, bin, model, Serialize::Version::UNSPECIFIED, true);
 
     uint64_t seed = 0;
+// std::cout << "xmlHash: " << xmlHash.getResult() << std::endl;
+// std::cout << "binHash: " << binHash.getResult() << std::endl;
     seed = hash_combine(seed, xmlHash.getResult());
     seed = hash_combine(seed, binHash.getResult());
 

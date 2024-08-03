@@ -573,6 +573,8 @@ bool Constant::visit_attributes(AttributeVisitor& visitor) {
             m_data = string_aligned_buffer;
         }
     } else {
+// static uint64_t counter = 0lu;
+// std::cout << "Constant::visit_attributes: " << get_friendly_name() << ": " << ++counter << std::endl; // 1780
         visitor.on_attribute("value", m_data);
     }
     update_identical_flags(false, false);

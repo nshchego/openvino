@@ -1385,6 +1385,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::compile_model_and_cache(ov::Plugin& 
                 compiled_model_runtime_properties =
                     plugin.get_property(ov::internal::compiled_model_runtime_properties.name(), {}).as<std::string>();
             }
+// std::cout << "CoreImpl::load_model_from_cache WRITE hash: " << cacheContent.blobId << std::endl;
             cacheContent.cacheManager->write_cache_entry(cacheContent.blobId, [&](std::ostream& networkStream) {
                 networkStream << ov::CompiledBlobHeader(ov::get_openvino_version().buildNumber,
                                                         ov::ModelCache::calculate_file_info(cacheContent.modelPath),
@@ -1413,6 +1414,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
 
     try {
         if (enable_mmap && plugin.supports_model_caching_with_mmap()) {
+// std::cout << "CoreImpl::load_model_from_cache READ hash: " << cacheContent.blobId << std::endl;
             cacheContent.cacheManager->read_cache_entry(
                 cacheContent.blobId,
                 [&](std::shared_ptr<ov::MappedMemory>& shared_buffer) {
@@ -1506,8 +1508,10 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
     }
 
     // fallback scenario
-    if (!compiled_model)
+    if (!compiled_model) {
+// std::cout << "CoreImpl::load_model_from_cache() Model was NOT loaded from cache" << std::endl;
         compiled_model = compile_model_lambda();
+    }
 
     return compiled_model;
 }

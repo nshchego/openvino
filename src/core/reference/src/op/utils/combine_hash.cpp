@@ -39,6 +39,7 @@ struct CombineHashCallArgs {
     void* dst_ptr;
     uint64_t work_amount = 0lu;
     uint64_t make_64_fold = 0lu;
+    void* tmp_ptr; // TODO: remomve
 };
 
 typedef void (*fn_t)(const CombineHashCallArgs*);
@@ -73,11 +74,13 @@ public:
         r64_dst = getReg64();
         r64_work_amount  = getReg64();
         r64_make_64_fold = getReg64();
+        r64_tmp = getReg64();
 
         mov(r64_src, ptr[r64_params + GET_OFF(src_ptr)]);
         mov(r64_dst, ptr[r64_params + GET_OFF(dst_ptr)]);
         mov(r64_work_amount, ptr[r64_params + GET_OFF(work_amount)]);
         mov(r64_make_64_fold, ptr[r64_params + GET_OFF(make_64_fold)]);
+        mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
 
         initVectors();
         bulkFold(v_dst);
@@ -97,11 +100,17 @@ public:
 
     void fillRestWorkMask(const Xbyak::Opmask& k_dst_mask,
                           const Xbyak::Reg64& r64_work_rest) {
+        Xbyak::Label l_mv_mask;
         auto rOnes = getReg64();
 
         mov(rOnes, 0xFFFFFFFFFFFFFFFF);
+        cmp(r64_work_rest, 0x3f);
+        jg(l_mv_mask);
+
         shlx(rOnes, rOnes, r64_work_rest);
         not_(rOnes);
+
+        L(l_mv_mask);
         kmovq(k_dst_mask, rOnes);
     }
 
@@ -193,6 +202,7 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> r64_dst;
     RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
     RegistersPool::Reg<Xbyak::Reg64> r64_make_64_fold;
+    RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
 
     const Xbyak::Reg64 r64_params = abi_param1;
 
@@ -275,6 +285,7 @@ void CombineHash<avx512_core>::initVectors() {
     vmovdqu8(Xbyak::Xmm(xmm_aux.getIdx()) | k_rest_mask, ptr[r64_src]);
     vpshufb(xmm_aux, xmm_aux, xmm_shuf_mask);
     vpxorq(xmm_dst, xmm_dst, xmm_aux);
+// vmovdqu64(ptr[r64_tmp], xmm_dst);
     sub(r64_work_amount, xmm_len);
     add(r64_src, xmm_len);
 }
@@ -334,6 +345,8 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
+
+    vmovdqu64(xmm_dst_0, xmm_dst_3);
 
     if (!is_vpclmulqdq) {
         // prefetchnta(ptr[r64_src]);
@@ -509,7 +522,7 @@ void CombineHash<avx2>::bulkFold(const Vmm& v_dst) {
 
 template <>
 void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
-    Xbyak::Label l_fold_to_64, l_end;
+    Xbyak::Label l_fold_to_64, l_save_128, l_end;
     cmp(r64_work_amount, 0);
     jle(l_fold_to_64, T_NEAR);
 
@@ -536,7 +549,7 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
 
     L(l_fold_to_64);
     cmp(r64_make_64_fold, 0);
-    je(l_end, T_NEAR);
+    je(l_save_128, T_NEAR);
 
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 4));
     vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux], 0b00000001);
@@ -557,6 +570,9 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     vpextrq(ptr[r64_dst], xmm_dst, 0x0);
     jmp(l_end, T_NEAR);
 
+
+    L(l_save_128);
+    vmovdqu64(ptr[r64_dst], xmm_dst);
 
     L(l_end);
 }
@@ -701,6 +717,10 @@ const uint8_t CombineHash<isa>::SHUF_MASK[] = { 0b00001111, 0b00001110, 0b000011
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t combine_hash(const void* src, size_t size) {
+// static uint64_t counter = 0;
+// static uint64_t sum = 0;
+// counter++;
+// auto t1 = std::chrono::high_resolution_clock::now();
 // std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0xD663B05D, 32)
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0x04C11DB7, 32)
@@ -860,17 +880,21 @@ size_t combine_hash(const void* src, size_t size) {
         // There is no sense to perform parallel execution if there are less than 2 blocks.
         if (size >= 2lu * block_size) {
             const auto nthr = parallel_get_max_threads() / 2; // TODO: WA for Hyper Threading
-            std::vector<size_t> intermediate(nthr * 2); // xmm_len * nthr
+            std::vector<uint64_t> intermediate(nthr * 2); // xmm_len * nthr
             const uint64_t blocks = size / block_size;
             const uint64_t el_per_thread = block_size * ((blocks + nthr - 1) / nthr);
 
+// std::vector<uint64_t> tmp_vec(nthr * 2);
+// std::vector<uint64_t> tmp_vec_2(nthr * 2);
+
+// if (!(counter == 39)) {
+// if (!(counter == 39 || counter == 84)) {
             parallel_nt(nthr, [&](const int ithr, const int nthr) {
                 uint64_t start = ithr * el_per_thread;
                 if (start >= size) {
                     return;
                 }
                 uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
-// printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
 
                 size_t res = 0lu;
                 jit::CombineHashCallArgs args;
@@ -879,37 +903,91 @@ size_t combine_hash(const void* src, size_t size) {
                 args.dst_ptr = &intermediate[ithr * 2];
                 args.work_amount = work_amount;
                 args.make_64_fold = 0lu;
+// args.tmp_ptr = &(tmp_vec_2[ithr * 2]);
+// if ((counter == 39 || counter == 84) && ithr == 1)
+//     printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
                 kernel(&args);
             });
+// } else {
+//     for (int ithr = 0; ithr < nthr; ithr++) {
+//         uint64_t start = ithr * el_per_thread;
+//         if (start >= size) {
+//             continue;
+//         }
+//         uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
+
+//         size_t res = 0lu;
+//         jit::CombineHashCallArgs args;
+
+//         args.src_ptr = reinterpret_cast<const uint8_t *>(src) + start;
+//         args.dst_ptr = &(intermediate[ithr * 2]);
+//         args.work_amount = work_amount;
+//         args.make_64_fold = 0lu;
+// args.tmp_ptr = &(tmp_vec[ithr * 2]);
+//         kernel(&args);
+//     }
+// }
+
+// if (counter == 39) {
+// // if (counter == 39 || counter == 84) {
+//     std::cout << "Combine hash " << counter << " Hash: " ;
+//     for (int i = 0; i < intermediate.size(); i++) {
+//         std::cout << intermediate[i] << "; ";
+//     }
+//     std::cout << std::endl << "    tmp vals: ";
+//     for (int i = 0; i < tmp_vec.size(); i++) {
+//         std::cout << tmp_vec[i] << "; ";
+//     }
+//     std::cout << std::endl;
+
+//     auto data = reinterpret_cast<const uint8_t *>(src);// + 131072;
+//     for (int i = 0; i < 131072; i++) {
+//         std::cout << static_cast<uint32_t>(data[i]) << std::endl;
+//     }
+// }
 
             jit::CombineHashCallArgs args;
             args.src_ptr = intermediate.data();
             args.dst_ptr = &res;
             args.work_amount = ((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
             args.make_64_fold = 1lu;
+// args.tmp_ptr = tmp_vec_2.data();
+// if (size == 2359296)
+//     printf("    [single] work_amount: %lu\n", args.work_amount);
             kernel(&args);
         } else {
+// std::vector<uint64_t> tmp_vec(2);
+
             jit::CombineHashCallArgs args;
             args.src_ptr = src;
             args.dst_ptr = &res;
             args.work_amount = size;
             args.make_64_fold = 1lu;
+// args.tmp_ptr = tmp_vec.data();
 // if (size > 16 && size < 32)
 //     std::cout << "combine_hash size: " << size << std::endl;
             kernel(&args);
         }
 // static uint64_t counter = 0lu;
-// // if (counter < 200) {
+// counter++;
+// // // if (counter < 200) {
+// if (size == 4) {
 //     std::cout << "combine_hash(" << counter << ") kernel res: " << res << "; size: " << size << std::endl;
-//     if (res == 0 || size == 8) {
+//     // if (res == 0 || size == 8) {
 //         auto src_u8 = reinterpret_cast<const uint8_t *>(src);
 //         for (int i = 0; i < size; i++) {
 //             std::cout << int(src_u8[i]) << "; ";
 //         }
 //         std::cout << std::endl;
-//     }
-//     counter++;
-// // }
+//     // }
+// }
+
+// auto t2 = std::chrono::high_resolution_clock::now();
+// auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
+// sum += ms_int.count();
+// if (counter >= 582)
+// // if (counter == 1173 || counter == 582)
+//     std::cout << "combine_hash sum: " << sum << "; count: " << counter << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
         return res;
     }
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
