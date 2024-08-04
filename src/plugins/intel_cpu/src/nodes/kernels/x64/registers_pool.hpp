@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Intel Corporation
+// Copyright (C) 2018-2024 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -62,6 +62,11 @@ public:
             lhs.ensureValid();
             return lhs.operator Xbyak::RegExp() + rhs;
         }
+        // friend TReg operator|(const TReg& x, const Xbyak::Opmask& k) {
+        //     TReg r(x);
+        //     r.setOpmaskIdx(k.getIdx());
+        //     return r;
+        // }
         void release() {
             if (auto pool = regPool.lock()) {
                 pool->returnToPool(reg);

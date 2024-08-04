@@ -149,12 +149,12 @@ void Gather::initSupportedPrimitiveDescriptors() {
     }
     if (m_idx_shape_static) {
         const auto& idxDims = getInputShapeAtPort(GATHER_INDICES).getDims();
-        specIndicesSize = std::accumulate(idxDims.begin() + m_batch_dims, idxDims.end(), 1lu, std::multiplies<Dim>());
+        spec_idx_size = std::accumulate(idxDims.begin() + m_batch_dims, idxDims.end(), 1lu, std::multiplies<Dim>());
 
         if (m_data_shape_static) {
-            specIdxAndAfterAxSize = specIndicesSize * afterAxisSize;
-            specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
-            totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+            specIdxAndAfterAxSize = spec_idx_size * afterAxisSize;
+            specIdxAndAfterAxSizeB = spec_idx_size * afterAxisSizeInBytes;
+            totalWork = beforeBatchSize * betweenBatchAndAxisSize * spec_idx_size * afterAxisSize;
         }
     }
 
@@ -269,7 +269,7 @@ void Gather::createPrimitive() {
         jcp.batch_dims = m_batch_dims;
         if (!jcp.dynamic_shapes) {
             jcp.before_axis_size = beforeAxisSize;
-            jcp.spec_idx_size = specIndicesSize;
+            jcp.spec_idx_size = spec_idx_size;
             jcp.after_axis_size = afterAxisSize;
         } else {
             if (m_data_shape_static && m_axis_input_const) {
@@ -277,7 +277,7 @@ void Gather::createPrimitive() {
                 jcp.after_axis_size = afterAxisSize;
             }
             if (m_idx_shape_static) {
-                jcp.spec_idx_size = specIndicesSize;
+                jcp.spec_idx_size = spec_idx_size;
             }
         }
 
@@ -312,14 +312,14 @@ void Gather::createPrimitive() {
                     p.specIdxInBytes.resize(dataElPerVec);
                     p.idxBatchSumInBytes.resize(dataElPerVec);
                     p.dataBeforeAxisSumInBytes.resize(dataElPerVec);
-                    p.betweenBatchAndAxisIter = (dst_start / specIndicesSize) % betweenBatchAndAxisSize;
+                    p.betweenBatchAndAxisIter = (dst_start / spec_idx_size) % betweenBatchAndAxisSize;
                     for (uint64_t j = 0lu; j < dataElPerVec; j++) {
-                        p.specIdxInBytes[j] = (((dst_start + j) / afterAxisSize) % specIndicesSize) * m_idx_et_size;
+                        p.specIdxInBytes[j] = (((dst_start + j) / afterAxisSize) % spec_idx_size) * m_idx_et_size;
                         p.idxBatchSumInBytes[j] =
-                            ((dst_start + j) / (betweenBatchAndAxisSize * specIndicesSize * afterAxisSize)) *
-                            specIndicesSize * m_idx_et_size;
+                            ((dst_start + j) / (betweenBatchAndAxisSize * spec_idx_size * afterAxisSize)) *
+                            spec_idx_size * m_idx_et_size;
                         p.dataBeforeAxisSumInBytes[j] =
-                            ((dst_start + j) / (specIndicesSize * afterAxisSize)) * axisAndAfterAxisSizeInBytes;
+                            ((dst_start + j) / (spec_idx_size * afterAxisSize)) * axisAndAfterAxisSizeInBytes;
                     }
                     initShortParams(p, dst_start);
                 });
@@ -352,15 +352,15 @@ void Gather::prepareParams() {
 
     // short 1D vector fast execution impl (typical in shape infer subgraph)
     canOptimize1DCase = false;
-    if (dataSrcRank <= 1 && dataMemPtr->getDesc().getPrecision() == element::i32) {
-        const auto& dataDims = dataMemPtr->getStaticDims();
-        const auto& idxDims = idxMemPtr->getStaticDims();
-        if ((dataDims.size() == 0 || (dataDims.size() == 1 && dataDims[0] <= 64)) &&
-            (idxDims.size() == 0 || (idxDims.size() == 1 && idxDims[0] <= 64))) {
-            canOptimize1DCase = true;
-            return;
-        }
-    }
+    // if (dataSrcRank <= 1 && dataMemPtr->getDesc().getPrecision() == element::i32) {
+    //     const auto& dataDims = dataMemPtr->getStaticDims();
+    //     const auto& idxDims = idxMemPtr->getStaticDims();
+    //     if ((dataDims.size() == 0 || (dataDims.size() == 1 && dataDims[0] <= 64)) &&
+    //         (idxDims.size() == 0 || (idxDims.size() == 1 && idxDims[0] <= 64))) {
+    //         canOptimize1DCase = true;
+    //         return;
+    //     }
+    // }
 
     if (!m_axis_input_const) {
         m_axis = (getSrcDataAtPortAs<const int32_t>(GATHER_AXIS))[0];
@@ -388,19 +388,19 @@ void Gather::prepareParams() {
         srcAfterBatchSizeInBytes = betweenBatchAndAxisSize * axisAndAfterAxisSizeInBytes;
 
         if (m_idx_shape_static) {
-            specIdxAndAfterAxSize = specIndicesSize * afterAxisSize;
-            specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
-            totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+            specIdxAndAfterAxSize = spec_idx_size * afterAxisSize;
+            specIdxAndAfterAxSizeB = spec_idx_size * afterAxisSizeInBytes;
+            totalWork = beforeBatchSize * betweenBatchAndAxisSize * spec_idx_size * afterAxisSize;
         }
     }
 
     if (!m_idx_shape_static) {
         const auto& idxDims = idxMemPtr->getStaticDims();
-        specIndicesSize = std::accumulate(idxDims.begin() + m_batch_dims, idxDims.end(), 1lu, std::multiplies<uint64_t>());
+        spec_idx_size = std::accumulate(idxDims.begin() + m_batch_dims, idxDims.end(), 1lu, std::multiplies<uint64_t>());
 
-        specIdxAndAfterAxSize = specIndicesSize * afterAxisSize;
-        specIdxAndAfterAxSizeB = specIndicesSize * afterAxisSizeInBytes;
-        totalWork = beforeBatchSize * betweenBatchAndAxisSize * specIndicesSize * afterAxisSize;
+        specIdxAndAfterAxSize = spec_idx_size * afterAxisSize;
+        specIdxAndAfterAxSizeB = spec_idx_size * afterAxisSizeInBytes;
+        totalWork = beforeBatchSize * betweenBatchAndAxisSize * spec_idx_size * afterAxisSize;
     }
 
 #if defined(OPENVINO_ARCH_X86_64)
@@ -440,16 +440,16 @@ void Gather::execute(dnnl::stream strm) {
             auto& p = execParamsPerThread[ithr];
             auto arg = kernel::GatherCallArgs();
 
-            arg.src = srcData;
-            arg.dst = dstData + p.dst_start * m_data_et_size;
-            arg.indices = srcIndices;
+            arg.src_ptr = srcData;
+            arg.dst_ptr = dstData + p.dst_start * m_data_et_size;
+            arg.idx_ptr = srcIndices;
             arg.start = &p.dst_start;
             arg.axisDim = &axisDim;
             arg.afterAxSize = afterAxisSize;
             arg.axisAndAfterAxisSizeB = &axisAndAfterAxisSizeInBytes;
             arg.srcAfterBatchSizeB = &srcAfterBatchSizeInBytes;
             arg.betweenBatchAndAxisSize = &betweenBatchAndAxisSize;
-            arg.specIndicesSize = &specIndicesSize;
+            arg.spec_idx_size = &spec_idx_size;
             arg.work_amount = p.work_amount;
             arg.specIdxB = p.specIdxInBytes.data();
             arg.idxBatchSumB = p.idxBatchSumInBytes.data();
@@ -458,7 +458,7 @@ void Gather::execute(dnnl::stream strm) {
 
             const uint64_t idxElPerVec = m_jit_kernel->getVectorLen() / m_idx_et_size;
 
-            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {  // Elementwise short case.
+            if (afterAxisSize == 1 && spec_idx_size < idxElPerVec) {  // Elementwise short case.
                 arg.permIdxMask = p.permIdxMask.data();
                 arg.beforeAxisDiff = p.srcBeforeAxisDiff.data();
             } else if (afterAxisSize > 1 && afterAxisSize <= dataElPerVec) {  // Blocked short case.
@@ -512,32 +512,32 @@ void Gather::executeDynamicImpl(dnnl::stream strm) {
 
             auto arg = kernel::GatherCallArgs();
 
-            arg.src = srcData;
-            arg.dst = dstData + afterAxisSizeInBytes * start;
-            arg.indices = srcIndices;
+            arg.src_ptr = srcData;
+            arg.dst_ptr = dstData + afterAxisSizeInBytes * start;
+            arg.idx_ptr = srcIndices;
             arg.start = &start;
             arg.axisDim = &axisDim;
             arg.afterAxSize = afterAxisSize;
             arg.axisAndAfterAxisSizeB = &axisAndAfterAxisSizeInBytes;
             arg.srcAfterBatchSizeB = &srcAfterBatchSizeInBytes;
             arg.betweenBatchAndAxisSize = &betweenBatchAndAxisSize;
-            arg.specIndicesSize = &specIndicesSize;
+            arg.spec_idx_size = &spec_idx_size;
             arg.work_amount = work_amount;
 
             const uint64_t idxElPerVec = m_jit_kernel->getVectorLen() / m_idx_et_size;
             int permIdxMask[16];
             int beforeAxisDiff[16];
-            if (afterAxisSize == 1 && specIndicesSize < idxElPerVec) {
-                permIdxMask[0] = idxElPerVec - specIndicesSize;
-                int div = idxElPerVec / specIndicesSize;
-                int remainder = idxElPerVec % specIndicesSize;
+            if (afterAxisSize == 1 && spec_idx_size < idxElPerVec) {
+                permIdxMask[0] = idxElPerVec - spec_idx_size;
+                int div = idxElPerVec / spec_idx_size;
+                int remainder = idxElPerVec % spec_idx_size;
                 for (uint64_t i = 1; i < idxElPerVec; i++) {
                     permIdxMask[i] = permIdxMask[i - 1] + 1;
                     if (static_cast<uint64_t>(permIdxMask[i]) == idxElPerVec)
-                        permIdxMask[i] = idxElPerVec - specIndicesSize;
+                        permIdxMask[i] = idxElPerVec - spec_idx_size;
                 }
                 for (uint64_t i = 0; i < idxElPerVec; i++) {
-                    if (((start + i) % specIndicesSize) < (specIndicesSize - remainder))
+                    if (((start + i) % spec_idx_size) < (spec_idx_size - remainder))
                         beforeAxisDiff[i] = axisDim * div;
                     else
                         beforeAxisDiff[i] = axisDim * (div + 1);
@@ -564,23 +564,23 @@ void Gather::initShortParams(threadExecParams& p, const uint64_t start) {
     const uint64_t idxElPerVec = m_jit_kernel->getVectorLen() / m_idx_et_size;
 
     if (afterAxisSize == 1) {  // Elementwise gather.
-        if (specIndicesSize >= idxElPerVec)
+        if (spec_idx_size >= idxElPerVec)
             return;  // Is not a short case.
 
         p.permIdxMask.resize(idxElPerVec);
         p.srcBeforeAxisDiff.resize(idxElPerVec);
 
-        p.permIdxMask[0] = idxElPerVec - specIndicesSize;
+        p.permIdxMask[0] = idxElPerVec - spec_idx_size;
         for (uint64_t i = 1; i < idxElPerVec; i++) {
             p.permIdxMask[i] = p.permIdxMask[i - 1] + 1;
             if (static_cast<uint64_t>(p.permIdxMask[i]) == idxElPerVec)
-                p.permIdxMask[i] = idxElPerVec - specIndicesSize;
+                p.permIdxMask[i] = idxElPerVec - spec_idx_size;
         }
 
-        const int div = idxElPerVec / specIndicesSize;
-        const int remainder = idxElPerVec % specIndicesSize;
+        const int div = idxElPerVec / spec_idx_size;
+        const int remainder = idxElPerVec % spec_idx_size;
         for (uint64_t i = 0; i < idxElPerVec; i++) {
-            if (((start + i) % specIndicesSize) < (specIndicesSize - remainder)) {
+            if (((start + i) % spec_idx_size) < (spec_idx_size - remainder)) {
                 p.srcBeforeAxisDiff[i] = axisDim * div;
             } else {
                 p.srcBeforeAxisDiff[i] = axisDim * (div + 1);
@@ -600,12 +600,12 @@ void Gather::initShortParams(threadExecParams& p, const uint64_t start) {
         for (uint64_t i = 0; i < idxElPerVec; i++) {
             p.afterAxIdxInBytes[i] = (start + i) % afterAxisSize;
             p.specIdxDiff[i] =
-                (((secondStart + i) / afterAxisSize) % specIndicesSize) * m_idx_et_size - p.specIdxInBytes[i];
+                (((secondStart + i) / afterAxisSize) % spec_idx_size) * m_idx_et_size - p.specIdxInBytes[i];
             if (p.specIdxDiff[i] < 0)
-                p.specIdxDiff[i] += specIndicesSize * m_idx_et_size;
+                p.specIdxDiff[i] += spec_idx_size * m_idx_et_size;
             p.srcBeforeAxisDiff[i] =
-                ((start + i + idxElPerVec) / (specIndicesSize * afterAxisSize)) * axisAndAfterAxisSizeInBytes -
-                ((start + i) / (specIndicesSize * afterAxisSize)) * axisAndAfterAxisSizeInBytes;
+                ((start + i + idxElPerVec) / (spec_idx_size * afterAxisSize)) * axisAndAfterAxisSizeInBytes -
+                ((start + i) / (spec_idx_size * afterAxisSize)) * axisAndAfterAxisSizeInBytes;
 
             p.afterAxIdxInBytes[i] *= m_data_et_size;
             p.afterAxPermMask[i] = idxElPerVec - afterAxisSize + i;
@@ -614,12 +614,12 @@ void Gather::initShortParams(threadExecParams& p, const uint64_t start) {
                     p.afterAxPermMask[i] -= afterAxisSize;
             }
         }
-        if (specIndicesSize * afterAxisSize < idxElPerVec) {
-            p.beforeAxPermMask[0] = idxElPerVec - specIndicesSize * afterAxisSize;
+        if (spec_idx_size * afterAxisSize < idxElPerVec) {
+            p.beforeAxPermMask[0] = idxElPerVec - spec_idx_size * afterAxisSize;
             for (uint64_t i = 1; i < idxElPerVec; i++) {
                 p.beforeAxPermMask[i] = p.beforeAxPermMask[i - 1] + 1;
                 if (static_cast<uint64_t>(p.beforeAxPermMask[i]) == idxElPerVec)
-                    p.beforeAxPermMask[i] = idxElPerVec - specIndicesSize * afterAxisSize;
+                    p.beforeAxPermMask[i] = idxElPerVec - spec_idx_size * afterAxisSize;
             }
         }
 
@@ -639,8 +639,8 @@ void Gather::execCompressed4Bit() {
     const auto* scale = getSrcDataAtPortAs<float_t>(GATHER_SCALE);
 
     const size_t dstAfterBatchSize = betweenBatchAndAxisSize * specIdxAndAfterAxSize;
-    parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
-        int ii = srcIndices[b * specIndicesSize + j];
+    parallel_for2d(beforeBatchSize, spec_idx_size, [&](const size_t b, const size_t j) {
+        int ii = srcIndices[b * spec_idx_size + j];
         if (ii < 0) {
             if (m_reverse_indexing)
                 ii += axisDim;
@@ -722,8 +722,8 @@ void Gather::execCompressed8Bit() {
 
     const size_t dstAfterBatchSize = betweenBatchAndAxisSize * specIdxAndAfterAxSize;
 
-    parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
-        int ii = srcIndices[b * specIndicesSize + j];
+    parallel_for2d(beforeBatchSize, spec_idx_size, [&](const size_t b, const size_t j) {
+        int ii = srcIndices[b * spec_idx_size + j];
         if (ii < 0) {
             if (m_reverse_indexing)
                 ii += axisDim;
@@ -877,8 +877,8 @@ void Gather::execReference() {
     uint8_t* dstData = getDstDataAtPortAs<uint8_t>(0);
 
     const size_t dstAfterBatchSize = betweenBatchAndAxisSize * specIdxAndAfterAxSizeB;
-    parallel_for2d(beforeBatchSize, specIndicesSize, [&](const size_t b, const size_t j) {
-        int ii = srcIndices[b * specIndicesSize + j];
+    parallel_for2d(beforeBatchSize, spec_idx_size, [&](const size_t b, const size_t j) {
+        int ii = srcIndices[b * spec_idx_size + j];
         if (ii < 0) {
             if (m_reverse_indexing)
                 ii += axisDim;

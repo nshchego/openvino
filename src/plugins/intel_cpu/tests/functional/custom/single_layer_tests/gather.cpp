@@ -57,7 +57,7 @@ public:
         if (!additionalConfig.empty()) {
             result << "_PluginConf";
             for (auto& item : additionalConfig) {
-                if (item.second == ov::element::bf16)
+                if (item.second == element::bf16)
                     result << "_" << item.first << "=" << item.second.as<std::string>();
             }
         }
@@ -84,7 +84,7 @@ protected:
         init_input_shapes(inputShapes);
         configuration.insert(additionalConfig.begin(), additionalConfig.end());
 
-        if (additionalConfig[ov::hint::inference_precision.name()] == ov::element::bf16) {
+        if (additionalConfig[ov::hint::inference_precision.name()] == element::bf16) {
             selectedType = makeSelectedTypeStr(selectedType, ElementType::bf16);
         } else {
             selectedType = makeSelectedTypeStr(selectedType, netPrecision);
@@ -97,23 +97,23 @@ protected:
             }
         }
 
-        ov::ParameterVector params{std::make_shared<ov::op::v0::Parameter>(netPrecision, inputDynamicShapes[0]),
-                                   std::make_shared<ov::op::v0::Parameter>(intInputsPrecision, inputDynamicShapes[1])};
+        ov::ParameterVector params{std::make_shared<op::v0::Parameter>(netPrecision, inputDynamicShapes[0]),
+                                   std::make_shared<op::v0::Parameter>(intInputsPrecision, inputDynamicShapes[1])};
         params[0]->set_friendly_name("data");
         params[1]->set_friendly_name("indices");
         if (!isAxisConstant) {
-            params.push_back(std::make_shared<ov::op::v0::Parameter>(intInputsPrecision, inputDynamicShapes[2]));
+            params.push_back(std::make_shared<op::v0::Parameter>(intInputsPrecision, inputDynamicShapes[2]));
             params[2]->set_friendly_name("axis");
         }
         std::shared_ptr<ov::Node> gatherNode;
         if (isAxisConstant) {
-            gatherNode = std::make_shared<ov::op::v8::Gather>(
+            gatherNode = std::make_shared<op::v8::Gather>(
                 params[0],
                 params[1],
-                ov::op::v0::Constant::create(intInputsPrecision, ov::Shape({1}), {axis}),
+                op::v0::Constant::create(intInputsPrecision, ov::Shape({1}), {axis}),
                 batchDims);
         } else {
-            gatherNode = std::make_shared<ov::op::v8::Gather>(params[0], params[1], params[2], batchDims);
+            gatherNode = std::make_shared<op::v8::Gather>(params[0], params[1], params[2], batchDims);
         }
 
         function = makeNgraphFunction(netPrecision, params, gatherNode, "GatherCPU");
@@ -209,12 +209,12 @@ protected:
 
         selectedType = makeSelectedTypeStr(selectedType, netPrecision);
 
-        ov::ParameterVector params{std::make_shared<ov::op::v0::Parameter>(netPrecision, inputDynamicShapes[0])};
+        ov::ParameterVector params{std::make_shared<op::v0::Parameter>(netPrecision, inputDynamicShapes[0])};
         params[0]->set_friendly_name("data");
-        std::shared_ptr<ov::Node> gatherNode = std::make_shared<ov::op::v8::Gather>(
+        std::shared_ptr<ov::Node> gatherNode = std::make_shared<op::v8::Gather>(
             params[0],
-            ov::op::v0::Constant::create(intInputsPrecision, ov::Shape({indices.size()}), indices),
-            ov::op::v0::Constant::create(intInputsPrecision, ov::Shape({1}), {axis}),
+            op::v0::Constant::create(intInputsPrecision, ov::Shape({indices.size()}), indices),
+            op::v0::Constant::create(intInputsPrecision, ov::Shape({1}), {axis}),
             batchDims);
 
         function = makeNgraphFunction(netPrecision, params, gatherNode, "GatherCPU");
@@ -234,8 +234,8 @@ TEST_P(GatherInPlaceLayerTestCPU, CompareWithRefs) {
 namespace {
 const std::vector<ElementType> netPrecisions = {ElementType::f32, ElementType::bf16, ElementType::i8};
 
-std::vector<ov::AnyMap> additionalConfig = {{{ov::hint::inference_precision(ov::element::f32)}},
-                                            {{ov::hint::inference_precision(ov::element::bf16)}}};
+std::vector<ov::AnyMap> additionalConfig = {{{ov::hint::inference_precision(element::f32)}},
+                                            {{ov::hint::inference_precision(element::bf16)}}};
 
 std::vector<bool> isAxisConst{true, false};
 const CPUSpecificParams cpuParamsRef{{}, {}, {"ref_any"}, "ref_any"};
@@ -435,7 +435,7 @@ std::vector<std::vector<ov::test::InputShape>> get4DShapesJitStat(int maxBatchDi
     return result;
 }
 
-std::vector<std::tuple<int, int>> get4DAxisBatchJitStat(ov::element::Type type, int maxBatchDims) {
+std::vector<std::tuple<int, int>> get4DAxisBatchJitStat(element::Type type, int maxBatchDims) {
     std::vector<std::tuple<int, int>> result = {};
     if (ov::with_cpu_x86_avx512f()) {
         if (type.size() == 4 || type.size() == 2 || type.size() == 1) {
@@ -621,7 +621,7 @@ std::vector<std::vector<ov::test::InputShape>> get4DShapesJitDyn(int maxBatchDim
     return result;
 }
 
-std::vector<std::tuple<int, int>> get4DAxisBatchJitDyn(ov::element::Type type, int maxBatchDims) {
+std::vector<std::tuple<int, int>> get4DAxisBatchJitDyn(element::Type type, int maxBatchDims) {
     std::vector<std::tuple<int, int>> result = {};
     if (ov::with_cpu_x86_avx512f()) {
         if (type.size() == 4 || type.size() == 2 || type.size() == 1) {
@@ -813,7 +813,7 @@ std::vector<std::vector<ov::test::InputShape>> get4DShapesRefStat(bool maxBatchD
     return result;
 }
 
-std::vector<std::tuple<int, int>> get4DAxisBatchRefStat(ov::element::Type type, bool maxBatchDims) {
+std::vector<std::tuple<int, int>> get4DAxisBatchRefStat(element::Type type, bool maxBatchDims) {
     std::vector<std::tuple<int, int>> result = {};
     if (ov::with_cpu_x86_avx512f()) {
         if (type.size() == 4) {

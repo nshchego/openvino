@@ -42,12 +42,12 @@ struct GatherCompileParams {
 };
 
 struct GatherCallArgs {
-    const void* src;
-    const void* indices;
-    void* dst;
-    const int* axisDim;
+    const void* src_ptr;
+    const void* idx_ptr;
+    void*       dst_ptr;
+    const int*  axis_dim;
     const uint64_t* start;
-    const uint64_t* specIndicesSize;
+    const uint64_t* spec_idx_size;
     const uint64_t* betweenBatchAndAxisSize;
     const uint64_t* axisAndAfterAxisSizeB;
     const uint64_t* srcAfterBatchSizeB;
@@ -182,27 +182,24 @@ protected:
     RegistersPool::Reg<Vmm> v_idx_batch_sum_b;
 
     // XMM
-    Xbyak::Xmm xmmSrcBeforeAxisSum = Xbyak::Xmm(vmmSrcBeforeAxisSumB.getIdx());
-    Xbyak::Xmm xmmSpecIdxSizeB = Xbyak::Xmm(v_spec_idx_size_b.getIdx());
-    Xbyak::Xmm xmmSpecIdxB = Xbyak::Xmm(v_spec_idx_b.getIdx());
-    RegistersPool::Reg<Xbyak::Xmm> x_spec_idx_b;
+    Xbyak::Xmm xmm_spec_idx_b;
 
 
     void calcSrcShiftLong(const Vmm& v_dst_shifts, const Vmask& k_dst_mask, bool shift_first = true);
-    void calcSrcShiftLongBlock(Vmm* vAuxPool, bool shift_first = true);
-    void calcSrcShiftShort(Vmm* vAuxPool, bool shift_first = true);
-    void calcSrcShiftShortBlock(Vmm* vAuxPool, bool shift_first);
+    void calcSrcShiftLongBlock(const Vmm& v_dst_shifts, const Vmask& k_dst_mask, bool shift_first = true);
+    void calcSrcShiftShort(const Vmm& v_dst_shifts, const Vmask& k_dst_mask, bool shift_first = true);
+    void calcSrcShiftShortBlock(const Vmm& v_dst_shifts, const Vmask& k_dst_mask, bool shift_first = true);
     void process(bool isShortIdx, bool blocked);
+    void process64b(bool isShortIdx, bool blocked);
     void process32b(bool isShortIdx, bool blocked);
     void process16b(bool isShortIdx, bool blocked);
     void process8b(bool isShortIdx, bool blocked);
-    void shiftIdxAndGather(Vmm* vAuxPool, bool isShortIdx, bool shift_first, bool blocked);
+    void shiftIdxAndGather(const Vmm& v_dst, bool is_short_idx, bool shift_first, bool blocked);
     void tail(bool isShortIdx, bool shift_first = true, bool blocked = false);
     // Aux functions.
     void normalizeRawIndices(const Vmask& k_dst_mask, const Vmm& v_raw_indices);
     void normWithUpperBound(Vmm& vTarget, Vmm& vMax, Vmask& kAuxMask);
     void storeVectorPart(const Xbyak::Reg64& rDst, const Xbyak::Reg64& r64_el_num, const Vmm& vmmSrc);
-    void uniVpGatherDd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& vMask);
     void fillVlenVector();
 
     // const unsigned* permMask8bitUni;
