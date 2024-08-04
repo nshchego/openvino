@@ -15,11 +15,6 @@
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 #include <cstring>
-#include <iterator>
-#include <iostream>
-#include <type_traits>
-#include <typeinfo>
-#include <inttypes.h>
 
 namespace ov {
 namespace runtime {
@@ -186,9 +181,8 @@ public:
 
 private:
     static constexpr uint64_t CHUNK_SIZE = 32;
-    // static constexpr uint64_t P64 = 0x42F0E1EBA9EA3693;
     static const uint64_t CRC_VAL;
-    static const uint64_t CONST_K[54];
+    static const uint64_t CONST_K[12];
     static const uint8_t SHUF_MASK[16];
 
     using Vmm = typename std::conditional<isa == avx512_core, Xbyak::Zmm, Xbyak::Ymm>::type;
@@ -262,7 +256,7 @@ void CombineHash<avx512_core>::initVectors() {
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti64x2(v_k_1_2, ptr[r64_aux]);
     v_k_8_9 = getVmm();
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 14));
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
     vbroadcasti64x2(v_k_8_9, ptr[r64_aux]);
 
     v_shuf_mask = getVmm();
@@ -297,7 +291,7 @@ void CombineHash<isa>::initVectors() {
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti128(v_k_1_2, ptr[r64_aux]);
     v_k_8_9 = getVmm();
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 14));
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
     vbroadcasti128(v_k_8_9, ptr[r64_aux]);
 
     v_shuf_mask = getVmm();
@@ -404,7 +398,7 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
         auto ymm_aux_0 = Xbyak::Ymm(v_aux_0.getIdx());
 
         vextracti64x4(ymm_dst_1, v_dst_0, 0x1);
-        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 18));
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 2));
         vpclmulqdq(ymm_aux_0, ymm_dst_0, ptr[r64_aux], 0b00000000);
         vpclmulqdq(ymm_dst_0, ymm_dst_0, ptr[r64_aux], 0b00010001);
         vpxorq(ymm_dst_1, ymm_dst_1, ymm_aux_0);
@@ -416,13 +410,13 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
         vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
         vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
     } else {
-        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 16));
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 4));
         vpclmulqdq(xmm_aux_0, xmm_dst_0, ptr[r64_aux], 0b00000000);
         vpclmulqdq(xmm_dst_0, xmm_dst_0, ptr[r64_aux], 0b00010001);
         vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
         vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
 
-        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 18));
+        mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 2));
         vpclmulqdq(xmm_aux_0, xmm_dst_1, ptr[r64_aux], 0b00000000);
         vpclmulqdq(xmm_dst_1, xmm_dst_1, ptr[r64_aux], 0b00010001);
         vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
@@ -550,12 +544,12 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     cmp(r64_make_64_fold, 0);
     je(l_save_128, T_NEAR);
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 4));
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 8));
     vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux], 0b00000001);
     vpslldq(xmm_dst, xmm_dst, 0x8);
     vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 10));
     vmovdqu64(xmm_aux_2, ptr[r64_aux]);
     vpclmulqdq(xmm_aux, xmm_dst, xmm_aux_2, 0b00000001);
     mov(r64_aux, 0x0);
@@ -677,42 +671,21 @@ uint64_t barrett_calc(uint64_t poly = 0x42F0E1EBA9EA3693, int bits = 64) {
     return v;
 }
 
+// P(x) = 0x42F0E1EBA9EA3693
 template <cpu_isa_t isa>
-const uint64_t CombineHash<isa>::CONST_K[54] = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e,  // x^(64*1), x^(64*2) U
-                                                 0x05cf79dea9ac37d6, 0x001067e571d7d5c2,  // x^(64*15), x^(64*16)
-                                                 0x05f5c3c7eb52fab6, 0x0000000000000000,  // x^(64*1), x^(64*0)
-                                                 0x578d29d06cc4f872, 0x42f0e1eba9ea3693,  // x^(64*), x^(64*)
-                                                 0xe464f4df5fb60ac1, 0xb649c5b35a759cf2,  // x^(64*13), x^(64*14)
-                                                 0X9af04e1eff82d0dd, 0x6e82e609297f8fe8,  // x^(64*11), x^(64*12)
-                                                 0x097c516e98bd2e73, 0x0b76477b31e22e7b,  // x^(64*9), x^(64*10)
-                                                 0x5f6843ca540df020, 0xddf4b6981205b83f,  // x^(64*7), x^(64*8) U
-                                                 0x54819d8713758b2c, 0x4a6b90073eb0af5a,  // x^(64*5), x^(64*6) U
-                                                 0x571bee0a227ef92b, 0x44bef2a201b5200c,  // x^(64*3), x^(64*4) U
-                                                 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e,  // TODO the last one repeats the first. Modify?
-
-                                                 0x34e4dc94ed8d963f, 0x00000001, // x^{95}, x^{31} 
-                                                 0xe59c4cf90ce5976b, 0x94e66b9518f59db3, // x^{-25}, x^{-89}
-                                                 0x9B1BE78B, 0xd84c42383503cf94, // x^{-17}, x^{-81}
-                                                 0xC790B954, 0xfe004045f5526c4c, // x^{-9},  x^{-73}
-                                                 0xD663B05D, 0x05f5c3c7eb52fab6, // x^{-1},  x^{-65}
-                                                 0x01000000, 0x6e4d3e593561ee88, // x^{7},   x^{-57}
-                                                 0x00010000, 0xc7cc909df556430c, // x^{15},  x^{-49}
-                                                 0x00000100, 0xf40847980ddd6874, // x^{23},  x^{-41}
-                                                 0x00000001, 0x770a6888f4a2ef70, // x^{31},  x^{-33}
-                                                 0x0b854997ba2f81e7, 0xe59c4cf90ce5976b, // x^{39},  x^{-25}
-                                                 0x1bb7156710bcf7af, 0x9B1BE78B, // x^{47}, x^{-17}
-                                                 0x34b9c2e2a60fcb9f, 0xC790B954, // x^{55}, x^{-9}
-                                                 0x30b9c22b9927dbca, 0xD663B05D, // x^{63}, x^{-1}
-                                                 0x195cbfc1cd2a901a, 0x01000000, // x^{71}, x^{7}
-                                                 0x347c386a3c2863a3, 0x00010000, // x^{79}, x^{15}
-                                                 0x045982c73b0b613c, 0x00000100  // x^{87}, x^{23}
+const uint64_t CombineHash<isa>::CONST_K[12] = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e,  // x^(64*1), x^(64*2)
+                                                 0x571bee0a227ef92b, 0x44bef2a201b5200c,  // x^(64*3), x^(64*4)
+                                                 0x54819d8713758b2c, 0x4a6b90073eb0af5a,  // x^(64*5), x^(64*6)
+                                                 0x5f6843ca540df020, 0xddf4b6981205b83f,  // x^(64*7), x^(64*8)
+                                                 0x05f5c3c7eb52fab6, 0x0000000000000000,  // x^(64*1), x^(64*1) mod P(x)
+                                                 0x578d29d06cc4f872, 0x42f0e1eba9ea3693   // floor(x^128/P(x)) - x^64, P(x) - x^64
                                                 };
 
 template <cpu_isa_t isa>
 const uint8_t CombineHash<isa>::SHUF_MASK[] = { 0b00001111, 0b00001110, 0b00001101, 0b00001100, 0b00001011, 0b00001010, 0b00001001, 0b00001000,
                                                 0b00000111, 0b00000110, 0b00000101, 0b00000100, 0b00000011, 0b00000010, 0b00000001, 0b00000000 };
 
-}   // namespace jit
+} // namespace jit
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t combine_hash(const void* src, size_t size) {
