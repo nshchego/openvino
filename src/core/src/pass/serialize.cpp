@@ -120,7 +120,17 @@ public:
 
 // static uint64_t counter = 0lu;
 // counter++;
-// if (*new_size == 2359296) {
+
+// if (counter == 88 || counter == 92 || counter == 96 || counter == 100 || counter == 104 || counter == 108) {
+// if (*new_size <= 8) {
+//     std::cout << counter << " Hash: " << hash << "; size: " << *new_size << "\n    ";
+//     for (int i = 0; i < *new_size; i++) {
+//         std::cout << int(ptr_to_write[i]) << "; ";
+//     }
+//     std::cout << std::endl;
+// }
+
+// if (counter == 88 || counter == 92 || counter == 96 || counter == 100 || counter == 104 || counter == 108) {
     // std::cout << counter << " Hash: " << hash << "; size: " << size << std::endl; // 582
 // }
 // for (auto it : m_hash_to_file_positions) {
@@ -140,14 +150,13 @@ public:
 // static uint64_t counter_1 = 0lu;
 // counter_1++;
 // if (counter_1 >= 486)
-//     std::cout << "memcmp == 0: " << counter_1 << std::endl; // 487
+    // std::cout << "memcmp == 0: " << counter_1 << "; size: " << size << std::endl;
 
-// if (size != 4 && size != 8) {
-//     // auto src_u8 = reinterpret_cast<const uint8_t *>(ptr_to_write);
-    // std::cout << "memcmp == 0 count: " << counter << "; size: " << size << "; ";
-//     // for (int i = 0; i < size; i++) {
-//     //     std::cout << int(src_u8[i]) << "; ";
-//     // }
+// if (size <= 8) {
+//     std::cout << "memcmp == 0 count: " << counter_1 << "; size: " << size << ": ";
+//     for (int i = 0; i < size; i++) {
+//         std::cout << int(ptr_to_write[i]) << "; ";
+//     }
 //     std::cout << std::endl;
 // }
                     return found->second.first;

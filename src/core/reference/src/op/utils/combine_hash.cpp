@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-// The CRC computation is used for x86
-// The calculations were taken from the article "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction - Intel (December, 2009)"
+// The CRC computation is used for x86.
+// The calculations were taken from the article
+// "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction - Intel (December, 2009)".
 
 #include "openvino/core/visibility.hpp"
 #include "openvino/core/parallel.hpp"
@@ -149,7 +150,7 @@ public:
         jmp(l_end, T_NEAR);
 
         L(l_xmm);
-        // vpxorq(ymm_dst, ymm_dst, ymm_dst);
+        vpxorq(ymm_dst, ymm_dst, ymm_dst);
         cmp(r64_load_num, xmm_len);
         jl(l_partial, T_NEAR);
         vmovdqu(xmm_dst, ptr[src_addr.getRegExp()]);
@@ -186,7 +187,6 @@ public:
 private:
     static constexpr uint64_t CHUNK_SIZE = 32;
     // static constexpr uint64_t P64 = 0x42F0E1EBA9EA3693;
-    // static const uint64_t K12;
     static const uint64_t CRC_VAL;
     static const uint64_t CONST_K[54];
     static const uint8_t SHUF_MASK[16];
@@ -209,7 +209,6 @@ private:
     // Vector registers
     RegistersPool::Reg<Vmm> v_dst;
     RegistersPool::Reg<Vmm> v_k_1_2;
-    // RegistersPool::Reg<Vmm> v_k_56;
     RegistersPool::Reg<Vmm> v_k_4_5;
     RegistersPool::Reg<Vmm> v_k_8_9;
     RegistersPool::Reg<Vmm> v_k_16_17;
@@ -228,7 +227,6 @@ private:
         cmp(r64_work_amount, xmm_len);
         jl(l_end, T_NEAR);
 
-        // auto r64_aux = getReg64();
         auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
         auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
         auto xmm_src = getXmm();
@@ -279,13 +277,14 @@ void CombineHash<avx512_core>::initVectors() {
     // Initial CRC
     mov(r64_aux, CRC_VAL);
     vpxorq(v_dst, v_dst, v_dst);
+    vpinsrq(xmm_dst, xmm_dst, r64_work_amount, 0x0);
     vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
     // First xor with source
     fillRestWorkMask(k_rest_mask, r64_work_amount);
-    vmovdqu8(Xbyak::Xmm(xmm_aux.getIdx()) | k_rest_mask, ptr[r64_src]);
+    vmovdqu8(Xbyak::Xmm(xmm_aux.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
+// vmovdqu64(ptr[r64_tmp], xmm_aux);
     vpshufb(xmm_aux, xmm_aux, xmm_shuf_mask);
     vpxorq(xmm_dst, xmm_dst, xmm_aux);
-// vmovdqu64(ptr[r64_tmp], xmm_dst);
     sub(r64_work_amount, xmm_len);
     add(r64_src, xmm_len);
 }
@@ -346,10 +345,10 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
 
-    vmovdqu64(xmm_dst_0, xmm_dst_3);
+    vmovdqu64(v_dst_0, v_dst_3);
 
     if (!is_vpclmulqdq) {
-        // prefetchnta(ptr[r64_src]);
+        prefetchnta(ptr[r64_src + 3 * xmm_len]);
         vmovdqu64(xmm_dst_1, ptr[r64_src + 0 * xmm_len]);
         vmovdqu64(xmm_dst_2, ptr[r64_src + 1 * xmm_len]);
         vmovdqu64(xmm_dst_3, ptr[r64_src + 2 * xmm_len]);
@@ -539,7 +538,7 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     fillRestWorkMask(k_rest_mask, r64_work_amount);
 
     vpxorq(xmm_src, xmm_src, xmm_src);
-    vmovdqu8(Xbyak::Xmm(xmm_src.getIdx()) | k_rest_mask, ptr[r64_src]);
+    vmovdqu8(Xbyak::Xmm(xmm_src.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
     vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
 
     vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000);
@@ -887,8 +886,8 @@ size_t combine_hash(const void* src, size_t size) {
 // std::vector<uint64_t> tmp_vec(nthr * 2);
 // std::vector<uint64_t> tmp_vec_2(nthr * 2);
 
-// if (!(counter == 39)) {
-// if (!(counter == 39 || counter == 84)) {
+// if (!(counter == 104)) {
+// if (!(counter == 88 || counter == 92 || counter == 96 || counter == 100 || counter == 104 || counter == 108)) {
             parallel_nt(nthr, [&](const int ithr, const int nthr) {
                 uint64_t start = ithr * el_per_thread;
                 if (start >= size) {
@@ -903,8 +902,8 @@ size_t combine_hash(const void* src, size_t size) {
                 args.dst_ptr = &intermediate[ithr * 2];
                 args.work_amount = work_amount;
                 args.make_64_fold = 0lu;
-// args.tmp_ptr = &(tmp_vec_2[ithr * 2]);
-// if ((counter == 39 || counter == 84) && ithr == 1)
+// args.tmp_ptr = &(tmp_vec[ithr * 2]);
+// if ((counter == 104))
 //     printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
                 kernel(&args);
             });
@@ -928,8 +927,7 @@ size_t combine_hash(const void* src, size_t size) {
 //     }
 // }
 
-// if (counter == 39) {
-// // if (counter == 39 || counter == 84) {
+// if (counter == 88 || counter == 92 || counter == 96 || counter == 100 || counter == 104 || counter == 108) {
 //     std::cout << "Combine hash " << counter << " Hash: " ;
 //     for (int i = 0; i < intermediate.size(); i++) {
 //         std::cout << intermediate[i] << "; ";
@@ -940,10 +938,10 @@ size_t combine_hash(const void* src, size_t size) {
 //     }
 //     std::cout << std::endl;
 
-//     auto data = reinterpret_cast<const uint8_t *>(src);// + 131072;
-//     for (int i = 0; i < 131072; i++) {
-//         std::cout << static_cast<uint32_t>(data[i]) << std::endl;
-//     }
+// //     auto data = reinterpret_cast<const uint8_t *>(src);// + 131072;
+// //     for (int i = 0; i < 131072; i++) {
+// //         std::cout << static_cast<uint32_t>(data[i]) << std::endl;
+// //     }
 // }
 
             jit::CombineHashCallArgs args;

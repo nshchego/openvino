@@ -1497,11 +1497,11 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
             });
         }
     } catch (const HeaderException&) {
-// std::cout << "load_model_from_cache HeaderException" << std::endl;
+std::cout << "load_model_from_cache HeaderException" << std::endl;
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
-// std::cout << "load_model_from_cache Other Exception" << std::endl;
+std::cout << "load_model_from_cache Other Exception" << std::endl;
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
@@ -1509,7 +1509,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
 
     // fallback scenario
     if (!compiled_model) {
-// std::cout << "CoreImpl::load_model_from_cache() Model was NOT loaded from cache" << std::endl;
+std::cout << "CoreImpl::load_model_from_cache() Model was NOT loaded from cache" << std::endl;
         compiled_model = compile_model_lambda();
     }
 
