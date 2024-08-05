@@ -12,7 +12,7 @@
 #include <vector>
 
 namespace ov {
-namespace runtime {
+namespace reference {
 namespace jit {
 
 class RegistersPool {
@@ -74,7 +74,7 @@ public:
         checkUniqueAndUpdate(false);
     }
 
-    template <ov::runtime::jit::cpu_isa_t isa>
+    template <ov::reference::jit::cpu_isa_t isa>
     static Ptr create(std::initializer_list<Xbyak::Reg> regsToExclude);
 
     static Ptr create(cpu_isa_t isa, std::initializer_list<Xbyak::Reg> regsToExclude);
@@ -303,10 +303,9 @@ RegistersPool::Ptr RegistersPool::create(cpu_isa_t isa, std::initializer_list<Xb
         default:
             OPENVINO_THROW("Invalid isa argument in RegistersPool::create(): ", isa);
         }
-    OPENVINO_THROW("Invalid isa argument in RegistersPool::create()");
 #undef ISA_SWITCH_CASE
 }
 
 } // namespace jit
-} // namespace runtime
+} // namespace reference
 } // namespace ov
