@@ -70,13 +70,13 @@ public:
         r64_dst = getReg64();
         r64_work_amount  = getReg64();
         r64_make_64_fold = getReg64();
-        r64_tmp = getReg64();
+        // r64_tmp = getReg64();
 
         mov(r64_src, ptr[r64_params + GET_OFF(src_ptr)]);
         mov(r64_dst, ptr[r64_params + GET_OFF(dst_ptr)]);
         mov(r64_work_amount, ptr[r64_params + GET_OFF(work_amount)]);
         mov(r64_make_64_fold, ptr[r64_params + GET_OFF(make_64_fold)]);
-        mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
+        // mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
 
         initVectors();
         bulkFold(v_dst);
@@ -203,9 +203,6 @@ private:
     // Vector registers
     RegistersPool::Reg<Vmm> v_dst;
     RegistersPool::Reg<Vmm> v_k_1_2;
-    RegistersPool::Reg<Vmm> v_k_4_5;
-    RegistersPool::Reg<Vmm> v_k_8_9;
-    RegistersPool::Reg<Vmm> v_k_16_17;
     RegistersPool::Reg<Vmm> v_shuf_mask;
 
     size_t getVlen() {
@@ -255,9 +252,6 @@ void CombineHash<avx512_core>::initVectors() {
     v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti64x2(v_k_1_2, ptr[r64_aux]);
-    v_k_8_9 = getVmm();
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
-    vbroadcasti64x2(v_k_8_9, ptr[r64_aux]);
 
     v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
@@ -290,9 +284,6 @@ void CombineHash<isa>::initVectors() {
     v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti128(v_k_1_2, ptr[r64_aux]);
-    v_k_8_9 = getVmm();
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
-    vbroadcasti128(v_k_8_9, ptr[r64_aux]);
 
     v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
@@ -328,6 +319,7 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     auto v_dst_2 = getVmm();
     auto& v_dst_3 = v_dst;
     auto v_aux_0 = getVmm();
+    auto v_k_8_9 = getVmm();
 
     auto xmm_k_8_9 = Xbyak::Xmm(v_k_8_9.getIdx());
     auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
@@ -338,6 +330,9 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
+
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
+    vbroadcasti64x2(v_k_8_9, ptr[r64_aux]);
 
     vmovdqu64(v_dst_0, v_dst_3);
 
@@ -445,6 +440,7 @@ void CombineHash<avx2>::bulkFold(const Vmm& v_dst) {
     auto v_dst_2 = getVmm();
     auto& v_dst_3 = v_dst;
     auto v_aux_0 = getVmm();
+    auto v_k_4_5 = getVmm();
 
     auto xmm_k_4_5 = Xbyak::Xmm(v_k_4_5.getIdx());
     auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
@@ -455,6 +451,9 @@ void CombineHash<avx2>::bulkFold(const Vmm& v_dst) {
     auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
+
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6)); // TODO: check this value
+    vbroadcasti128(v_k_4_5, ptr[r64_aux]); 
 
     if (!is_vpclmulqdq) {
         vmovdqu64(xmm_dst_1, ptr[r64_src + 0 * xmm_len]);
@@ -521,7 +520,7 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
 
     auto r64_aux = getReg64();
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
-    auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx()); // TODO calc a new table for bytes
+    auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
     auto xmm_src = getXmm();
     auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
     auto xmm_aux = getXmm();
@@ -956,9 +955,9 @@ size_t combine_hash(const void* src, size_t size) {
 // auto t2 = std::chrono::high_resolution_clock::now();
 // auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
 // sum += ms_int.count();
-// if (counter >= 582)
+// if (counter == 147)
 // // if (counter == 1173 || counter == 582)
-//     std::cout << "combine_hash sum: " << sum << "; count: " << counter << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
+    // std::cout << "combine_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; count: " << counter << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
         return res;
     }
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
