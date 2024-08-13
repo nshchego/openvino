@@ -31,11 +31,11 @@ struct CombineHashCompileParams {
 };
 
 struct CombineHashCallArgs {
-    const void* src_ptr;
-    void* dst_ptr;
-    uint64_t work_amount = 0lu;
+    const void* src_ptr   = nullptr;
+    void* dst_ptr         = nullptr;
+    uint64_t work_amount  = 0lu;
     uint64_t make_64_fold = 0lu;
-    void* tmp_ptr; // TODO: remomve
+    // void* tmp_ptr; // TODO: remomve
 };
 
 typedef void (*fn_t)(const CombineHashCallArgs*);
@@ -63,14 +63,19 @@ public:
     }
 
     void generate() {
-        this->preamble();
         registersPool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
         r64_src = getReg64();
         r64_dst = getReg64();
         r64_work_amount  = getReg64();
         r64_make_64_fold = getReg64();
+        r64_aux = getReg64();
         // r64_tmp = getReg64();
+        v_dst       = getVmm();
+        v_k_1_2     = getVmm();
+        v_shuf_mask = getVmm();
+
+        this->preamble();
 
         mov(r64_src, ptr[r64_params + GET_OFF(src_ptr)]);
         mov(r64_dst, ptr[r64_params + GET_OFF(dst_ptr)]);
@@ -83,8 +88,8 @@ public:
         restFold(v_dst);
         tailFold(v_dst);
 
-        registersPool.reset();
         this->postamble();
+        registersPool.reset();
     }
 
     static fn_t get() {
@@ -196,7 +201,8 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> r64_dst;
     RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
     RegistersPool::Reg<Xbyak::Reg64> r64_make_64_fold;
-    RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
+    RegistersPool::Reg<Xbyak::Reg64> r64_aux;
+    // RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
 
     const Xbyak::Reg64 r64_params = abi_param1;
 
@@ -247,17 +253,17 @@ private:
 
 template <>
 void CombineHash<avx512_core>::initVectors() {
-    auto r64_aux = getReg64();
+    // auto r64_aux = getReg64();
 
-    v_k_1_2 = getVmm();
+    // v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti64x2(v_k_1_2, ptr[r64_aux]);
 
-    v_shuf_mask = getVmm();
+    // v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
     vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
 
-    v_dst = getVmm();
+    // v_dst = getVmm();
     auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_aux = getXmm();
@@ -279,17 +285,17 @@ void CombineHash<avx512_core>::initVectors() {
 
 template <cpu_isa_t isa>
 void CombineHash<isa>::initVectors() {
-    auto r64_aux = getReg64();
+    // auto r64_aux = getReg64();
 
-    v_k_1_2 = getVmm();
+    // v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti128(v_k_1_2, ptr[r64_aux]);
 
-    v_shuf_mask = getVmm();
+    // v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
     vbroadcasti128(v_shuf_mask, ptr[r64_aux]);
 
-    v_dst = getVmm();
+    // v_dst = getVmm();
     auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_aux = getXmm();
@@ -311,7 +317,7 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     cmp(r64_work_amount, zmm_len + 3 * xmm_len);
     jl(l_end, T_NEAR);
 
-    auto r64_aux = getReg64();
+    // auto r64_aux = getReg64();
 
     auto v_src_0 = getVmm();
     auto v_dst_0 = getVmm();
@@ -330,6 +336,7 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
+    auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
 
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6));
     vbroadcasti64x2(v_k_8_9, ptr[r64_aux]);
@@ -337,7 +344,7 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     vmovdqu64(v_dst_0, v_dst_3);
 
     if (!is_vpclmulqdq) {
-        prefetchnta(ptr[r64_src + 3 * xmm_len]);
+        // prefetchnta(ptr[r64_src + 3 * xmm_len]);
         vmovdqu64(xmm_dst_1, ptr[r64_src + 0 * xmm_len]);
         vmovdqu64(xmm_dst_2, ptr[r64_src + 1 * xmm_len]);
         vmovdqu64(xmm_dst_3, ptr[r64_src + 2 * xmm_len]);
@@ -356,25 +363,42 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
             vpxorq(v_aux_0, v_aux_0, v_src_0);
             vpxorq(v_dst_0, v_dst_0, v_aux_0);
         } else {
+            // prefetchnta(ptr[r64_src + 3 * xmm_len]);
+            // prefetchnta(ptr[r64_src + 64]);
+
+            // vmovdqu64(xmm_src_0, ptr[r64_src]);
+            // vpshufb(xmm_src_0, xmm_src_0, xmm_shuf_mask);
             // 0
             vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_8_9, 0b00000000);
             vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_8_9, 0b00010001);
             vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
             vpxorq(xmm_dst_0, xmm_dst_0, xmm_aux_0);
+
             // 1
             vextracti64x2(xmm_src_1, v_src_0, 0x1);
+            // vmovdqu64(xmm_src_1, ptr[r64_src + 1 * xmm_len]);
+            // vpshufb(xmm_src_1, xmm_src_1, xmm_shuf_mask);
+
             vpclmulqdq(xmm_aux_0, xmm_dst_1, xmm_k_8_9, 0b00000000);
             vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_8_9, 0b00010001);
             vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
             vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
+
             // 2
             vextracti64x2(xmm_src_1, v_src_0, 0x2);
+            // vmovdqu64(xmm_src_1, ptr[r64_src + 2 * xmm_len]);
+            // vpshufb(xmm_src_1, xmm_src_1, xmm_shuf_mask);
+
             vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_8_9, 0b00000000);
             vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_8_9, 0b00010001);
             vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
             vpxorq(xmm_dst_2, xmm_dst_2, xmm_aux_0);
+
             // 3
             vextracti64x2(xmm_src_1, v_src_0, 0x3);
+            // vmovdqu64(xmm_src_1, ptr[r64_src + 3 * xmm_len]);
+            // vpshufb(xmm_src_1, xmm_src_1, xmm_shuf_mask);
+
             vpclmulqdq(xmm_aux_0, xmm_dst_3, xmm_k_8_9, 0b00000000);
             vpclmulqdq(xmm_dst_3, xmm_dst_3, xmm_k_8_9, 0b00010001);
             vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
@@ -432,7 +456,7 @@ void CombineHash<avx2>::bulkFold(const Vmm& v_dst) {
     cmp(r64_work_amount, 2 * vlen - xmm_len);
     jl(l_end, T_NEAR);
 
-    auto r64_aux = getReg64();
+    // auto r64_aux = getReg64();
 
     auto v_src_0 = getVmm();
     auto v_dst_0 = getVmm();
@@ -518,7 +542,7 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     cmp(r64_work_amount, 0);
     jle(l_fold_to_64, T_NEAR);
 
-    auto r64_aux = getReg64();
+    // auto r64_aux = getReg64();
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
     auto xmm_src = getXmm();
@@ -561,7 +585,6 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
 
     vpextrq(ptr[r64_dst], xmm_dst, 0x0);
     jmp(l_end, T_NEAR);
-
 
     L(l_save_128);
     vmovdqu64(ptr[r64_dst], xmm_dst);
@@ -688,10 +711,10 @@ const uint8_t CombineHash<isa>::SHUF_MASK[] = { 0b00001111, 0b00001110, 0b000011
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t combine_hash(const void* src, size_t size) {
-// static uint64_t counter = 0;
-// static uint64_t sum = 0;
-// counter++;
-// auto t1 = std::chrono::high_resolution_clock::now();
+static uint64_t counter = 0;
+static uint64_t sum = 0;
+counter++;
+auto t1 = std::chrono::high_resolution_clock::now();
 // std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0xD663B05D, 32)
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0x04C11DB7, 32)
@@ -850,8 +873,8 @@ size_t combine_hash(const void* src, size_t size) {
         static const size_t block_size = 2lu * jit::Generator::zmm_len;
         // There is no sense to perform parallel execution if there are less than 2 blocks.
         if (size >= 2lu * block_size) {
-            const auto nthr = parallel_get_max_threads() / 2; // TODO: WA for Hyper Threading
-            std::vector<uint64_t> intermediate(nthr * 2); // xmm_len * nthr
+            static const auto nthr = 2;//parallel_get_max_threads() / 2; // TODO: WA for Hyper Threading
+            static std::vector<uint64_t> intermediate(nthr * 2); // xmm_len * nthr
             const uint64_t blocks = size / block_size;
             const uint64_t el_per_thread = block_size * ((blocks + nthr - 1) / nthr);
 
@@ -867,7 +890,6 @@ size_t combine_hash(const void* src, size_t size) {
                 }
                 uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
 
-                size_t res = 0lu;
                 jit::CombineHashCallArgs args;
 
                 args.src_ptr = reinterpret_cast<const uint8_t *>(src) + start;
@@ -875,7 +897,7 @@ size_t combine_hash(const void* src, size_t size) {
                 args.work_amount = work_amount;
                 args.make_64_fold = 0lu;
 // args.tmp_ptr = &(tmp_vec[ithr * 2]);
-// if ((counter == 104))
+// if (counter == 1 || counter == 8 || counter == 557 || counter == 564)
 //     printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
                 kernel(&args);
             });
@@ -952,12 +974,12 @@ size_t combine_hash(const void* src, size_t size) {
 //     // }
 // }
 
-// auto t2 = std::chrono::high_resolution_clock::now();
-// auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
-// sum += ms_int.count();
-// if (counter == 147)
+auto t2 = std::chrono::high_resolution_clock::now();
+auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
+sum += ms_int.count();
+if (counter == 1 || counter == 8 || counter == 557 || counter == 564)
 // // if (counter == 1173 || counter == 582)
-    // std::cout << "combine_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; count: " << counter << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
+    std::cout << "[" << counter << "] combine_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
         return res;
     }
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
