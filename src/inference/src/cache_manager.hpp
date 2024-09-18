@@ -137,9 +137,7 @@ private:
         if (ov::util::file_exists(blobFileName)) {
             if (mmap) {
                 auto mmap_buffer = ov::load_mmap_object(blobFileName);
-                MmapStreamBuffer stream_buf(mmap_buffer);
-                std::istringstream stream;
-                stream.basic_ios::rdbuf(&stream_buf);
+                MmapStream stream(blobFileName, mmap_buffer);
 
                 reader(stream);
             } else {
