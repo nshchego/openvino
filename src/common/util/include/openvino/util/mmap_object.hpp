@@ -10,10 +10,8 @@
 #pragma once
 
 #include <memory>
+#include <sstream>
 #include <string>
-#ifdef _WIN32
-#    include <sstream>
-#endif
 
 namespace ov {
 
@@ -55,8 +53,7 @@ std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::wstring& path);
 
 class MmapStreamBuffer final : public std::stringbuf {
 public:
-    MmapStreamBuffer(std::shared_ptr<ov::MappedMemory> mem) {
-        m_memory = mem;
+    MmapStreamBuffer(const std::shared_ptr<ov::MappedMemory>& mem) : std::stringbuf(std::ios_base::in), m_memory(mem) {
         this->basic_streambuf::pubsetbuf(mem->data(), mem->size());
     }
 

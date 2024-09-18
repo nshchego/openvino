@@ -18,6 +18,9 @@
 #include "transformations/hash.hpp"
 #include "transformations/rt_info/fused_names_attribute.hpp"
 #include "transformations/rt_info/primitives_priority_attribute.hpp"
+#if defined(_WIN32) || defined(_MAC)
+#    include "openvino/util/mmap_object.hpp"
+#endif
 
 #ifdef _WIN32
 #    define stat _stat
@@ -166,6 +169,12 @@ CompiledBlobHeader::CompiledBlobHeader(const std::string& ieVersion,
       m_runtimeInfo(runtimeInfo) {}
 
 std::istream& operator>>(std::istream& stream, CompiledBlobHeader& header) {
+#if defined(_WIN32) || defined(_MAC)
+    if (auto buf = dynamic_cast<MmapStreamBuffer*>(stream.rdbuf())) {
+        operator>>(buf->m_memory->data(), header);
+        return stream;
+    }
+#endif
     std::string xmlStr;
     std::getline(stream, xmlStr);
 
