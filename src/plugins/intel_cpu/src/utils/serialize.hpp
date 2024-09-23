@@ -28,6 +28,8 @@ private:
 
 class ModelDeserializer {
 public:
+    typedef std::function<std::shared_ptr<ov::Model>(const std::string&, const ov::Tensor&)> old_model_builder;
+    old_model_builder m_old_model_builder;
     typedef std::function<std::shared_ptr<ov::Model>(const std::shared_ptr<ov::AlignedBuffer>&, const std::shared_ptr<ov::AlignedBuffer>&)> ModelBuilder;
     typedef std::function<std::string(const std::string&)> CacheDecrypt;
 

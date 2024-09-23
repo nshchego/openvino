@@ -10,6 +10,7 @@ file (GLOB HDR ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
 ov_add_sample(NAME ${TARGET_NAME}
               SOURCES ${SRC}
               HEADERS ${HDR}
+              INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/inference/dev_api/
               DEPENDENCIES ${GFLAGS_TARGET} format_reader ie_samples_utils)
 
 # Required nlohmann_json dependency

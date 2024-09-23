@@ -18,9 +18,6 @@
 #include "transformations/hash.hpp"
 #include "transformations/rt_info/fused_names_attribute.hpp"
 #include "transformations/rt_info/primitives_priority_attribute.hpp"
-#if defined(_WIN32) || defined(_MAC)
-#    include "openvino/util/mmap_object.hpp"
-#endif
 
 #ifdef _WIN32
 #    define stat _stat
@@ -169,40 +166,45 @@ CompiledBlobHeader::CompiledBlobHeader(const std::string& ieVersion,
       m_runtimeInfo(runtimeInfo) {}
 
 std::istream& operator>>(std::istream& stream, CompiledBlobHeader& header) {
-#if defined(_WIN32) || defined(_MAC)
-    if (auto buf = dynamic_cast<MmapStreamBuffer*>(stream.rdbuf())) {
-        operator>>(buf->m_memory->data(), header);
-        return stream;
-    }
-#endif
+std::cout << "operator>> const istream\n";
     std::string xmlStr;
+    // stream.seekg(0, stream.beg);
     std::getline(stream, xmlStr);
+std::cout << "    step 0\n";
+std::cout << "    xmlStr: " << xmlStr << std::endl;
 
     pugi::xml_document document;
     pugi::xml_parse_result res = document.load_string(xmlStr.c_str());
     OPENVINO_ASSERT(res.status == pugi::status_ok, "Error reading compiled blob header");
+std::cout << "    step 1\n";
 
     pugi::xml_node compiledBlobNode = document.document_element();
     header.m_ieVersion = ov::util::pugixml::get_str_attr(compiledBlobNode, "ie_version");
     header.m_fileInfo = ov::util::pugixml::get_str_attr(compiledBlobNode, "file_info");
     header.m_runtimeInfo = ov::util::pugixml::get_str_attr(compiledBlobNode, "runtime_info");
+std::cout << "    step 2\n";
 
     return stream;
 }
 
-void operator>>(const char* xml_str, CompiledBlobHeader& header) {
-    pugi::xml_document document;
-    auto res = document.load_string(xml_str);
+// void operator>>(const char* xml_str, CompiledBlobHeader& header) {
+// std::cout << "operator>> const char*\n";
+//     pugi::xml_document document;
+//     auto res = document.load_string(xml_str);
+// std::cout << "    step 0\n";
 
-    if (res.status != pugi::status_ok) {
-        OPENVINO_THROW("[COMPILATION CONTEXT] Could not read compiled blob header.");
-    }
+//     if (res.status != pugi::status_ok) {
+//         OPENVINO_THROW("[COMPILATION CONTEXT] Could not read compiled blob header.");
+//     }
 
-    auto compiled_blob_node = document.document_element();
-    header.m_ieVersion = ov::util::pugixml::get_str_attr(compiled_blob_node, "ie_version");
-    header.m_fileInfo = ov::util::pugixml::get_str_attr(compiled_blob_node, "file_info");
-    header.m_runtimeInfo = ov::util::pugixml::get_str_attr(compiled_blob_node, "runtime_info");
-}
+// std::cout << "    step 1\n";
+//     auto compiled_blob_node = document.document_element();
+//     header.m_ieVersion = ov::util::pugixml::get_str_attr(compiled_blob_node, "ie_version");
+//     header.m_fileInfo = ov::util::pugixml::get_str_attr(compiled_blob_node, "file_info");
+//     header.m_runtimeInfo = ov::util::pugixml::get_str_attr(compiled_blob_node, "runtime_info");
+
+// std::cout << "    step 2\n";
+// }
 
 std::ostream& operator<<(std::ostream& stream, const CompiledBlobHeader& header) {
     pugi::xml_document document;

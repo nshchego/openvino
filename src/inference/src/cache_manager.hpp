@@ -135,11 +135,24 @@ private:
         ScopedLocale plocal_C(LC_ALL, "C");
         auto blobFileName = getBlobFile(id);
         if (ov::util::file_exists(blobFileName)) {
+printf("read_cache_entry mmap: %d\n", static_cast<int>(mmap));
             if (mmap) {
                 auto mmap_buffer = ov::load_mmap_object(blobFileName);
-                MmapStreamBuffer stream_buf(mmap_buffer);
-                std::istringstream stream;
-                stream.basic_ios::rdbuf(&stream_buf);
+// printf("    data: %s\n", mmap_buffer->data());
+                // MmapStreamBuffer stream_buf(mmap_buffer);
+                // std::istringstream stream;
+                // stream.basic_ios::rdbuf(&stream_buf);
+// std::cout << "    stream.str(): " << stream.str() << std::endl;
+// std::string xmlStr;
+// std::getline(stream, xmlStr);
+                // MmapStreamBuffer stream_buf(mmap_buffer);
+                // std::ifstream stream;
+                // std::ifstream stream(blobFileName, std::ios_base::binary);
+                // auto buf = stream.basic_ios::rdbuf();
+                // buf->pubsetbuf(mmap_buffer->data(), mmap_buffer->size());
+                // stream.basic_ios::rdbuf(&stream_buf);
+
+                MmapStream stream(blobFileName, mmap_buffer);
 
                 reader(stream);
             } else {

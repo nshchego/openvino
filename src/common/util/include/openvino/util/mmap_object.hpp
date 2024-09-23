@@ -10,7 +10,8 @@
 #pragma once
 
 #include <memory>
-#include <sstream>
+#include <fstream>
+// #include <sstream>
 #include <string>
 
 namespace ov {
@@ -51,13 +52,29 @@ std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::wstring& path);
 
 #endif  // OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
 
-class MmapStreamBuffer final : public std::stringbuf {
+class MmapStream final : public std::ifstream {
 public:
-    MmapStreamBuffer(const std::shared_ptr<ov::MappedMemory>& mem) : std::stringbuf(std::ios_base::in), m_memory(mem) {
-        this->basic_streambuf::pubsetbuf(mem->data(), mem->size());
-    }
+    MmapStream(const std::string& path, const std::shared_ptr<ov::MappedMemory>& mem) : std::ifstream(path), m_memory(mem) {}
 
     std::shared_ptr<ov::MappedMemory> m_memory;
 };
+
+// class MmapStreamBuffer final : public std::filebuf {
+// public:
+//     MmapStreamBuffer(const std::shared_ptr<ov::MappedMemory>& mem) : m_memory(mem) {
+//         setbuf(mem->data(), mem->size());
+//         // this->basic_streambuf::pubsetbuf(mem->data(), mem->size());
+//     }
+
+//     std::shared_ptr<ov::MappedMemory> m_memory;
+// };
+// class MmapStreamBuffer final : public std::stringbuf {
+// public:
+//     MmapStreamBuffer(const std::shared_ptr<ov::MappedMemory>& mem) : std::stringbuf(std::ios_base::in), m_memory(mem) {
+//         this->basic_streambuf::pubsetbuf(mem->data(), mem->size());
+//     }
+
+//     std::shared_ptr<ov::MappedMemory> m_memory;
+// };
 
 }  // namespace ov

@@ -53,11 +53,16 @@ void ModelDeserializer::set_info(pugi::xml_node& root, std::shared_ptr<ov::Model
 }
 
 void ModelDeserializer::operator>>(std::shared_ptr<ov::Model>& model) {
-    if (auto stream_buf = dynamic_cast<MmapStreamBuffer*>(m_istream.rdbuf())) {
-        process_mmap(model, stream_buf->m_memory);
+    if (auto mmap_stream = dynamic_cast<MmapStream*>(&m_istream)) {
+        process_mmap(model, mmap_stream->m_memory);
     } else {
         process_stream(model, m_istream);
     }
+    // if (auto stream_buf = dynamic_cast<MmapStreamBuffer*>(m_istream.rdbuf())) {
+    //     process_mmap(model, stream_buf->m_memory);
+    // } else {
+    //     process_stream(model, m_istream);
+    // }
 }
 
 void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
@@ -67,15 +72,12 @@ void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
     // Blob from cache may have other header, so need to skip this.
     auto buffer_base = mmemory->data();
     const auto file_size = mmemory->size();
-#if defined(_WIN32) || defined(_MAC)
-    auto hdr_ptr = std::strchr(buffer_base, '\n');
-    const size_t hdr_pos = hdr_ptr - buffer_base + 1;
-#else
-     const size_t hdr_pos = m_istream.tellg();
-#endif
+    const size_t hdr_pos = m_istream.tellg();
 
     pass::StreamSerialize::DataHeader hdr = {};
     std::memcpy(reinterpret_cast<char*>(&hdr), buffer_base + hdr_pos, sizeof hdr);
+    std::cout << hdr.custom_data_offset << "; " << hdr.custom_data_size << "; " << hdr.consts_offset << "; "
+              << hdr.consts_size << "; " << hdr.model_offset << "; " << hdr.model_size << "\n";
 
     // Check if model header contains valid data.
     bool is_valid_model = (hdr.custom_data_offset == sizeof(hdr) + hdr_pos) &&

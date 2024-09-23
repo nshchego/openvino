@@ -34,6 +34,8 @@
 #include "remote_tensors_filling.hpp"
 #include "statistics_report.hpp"
 #include "utils.hpp"
+
+#include "../../../src/inference/dev_api/openvino/runtime/internal_properties.hpp"
 // clang-format on
 
 namespace {
@@ -543,6 +545,7 @@ int main(int argc, char* argv[]) {
         if (!FLAGS_cache_dir.empty()) {
             core.set_property(ov::cache_dir(FLAGS_cache_dir));
         }
+        core.set_property(ov::internal::caching_with_mmap("YES"));
 
         // If set batch size, disable the auto batching
         if (FLAGS_b > 0) {
