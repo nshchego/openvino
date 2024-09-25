@@ -65,6 +65,7 @@ Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr con
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
+// printf("Gather combine_hash parallel_get_max_threads: %d\n", parallel_get_max_threads());
 
     if (one_of(op->get_input_size(), 4u, 5u) && op->get_output_size() == 1u) {
         compressed = true;

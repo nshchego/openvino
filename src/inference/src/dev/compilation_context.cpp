@@ -166,17 +166,21 @@ CompiledBlobHeader::CompiledBlobHeader(const std::string& ieVersion,
       m_runtimeInfo(runtimeInfo) {}
 
 std::istream& operator>>(std::istream& stream, CompiledBlobHeader& header) {
+std::cout << "operator>> std::istream&\n";
     std::string xmlStr;
     std::getline(stream, xmlStr);
+std::cout << "    step 0 xmlStr.size: " << xmlStr.size() << "; xmlStr: " << xmlStr << std::endl;
 
     pugi::xml_document document;
     pugi::xml_parse_result res = document.load_string(xmlStr.c_str());
     OPENVINO_ASSERT(res.status == pugi::status_ok, "Error reading compiled blob header");
+std::cout << "    step 1\n";
 
     pugi::xml_node compiledBlobNode = document.document_element();
     header.m_ieVersion = ov::util::pugixml::get_str_attr(compiledBlobNode, "ie_version");
     header.m_fileInfo = ov::util::pugixml::get_str_attr(compiledBlobNode, "file_info");
     header.m_runtimeInfo = ov::util::pugixml::get_str_attr(compiledBlobNode, "runtime_info");
+std::cout << "    step 2\n";
 
     return stream;
 }

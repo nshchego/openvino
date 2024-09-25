@@ -63,6 +63,7 @@ size_t get_ir_version(std::istream& model) {
     model.read(header, HEADER_SIZE_LIM);
     model.clear();
     model.seekg(0, model.beg);
+// std::cout << "get_ir_version : " << header << std::endl;
 
     return get_ir_version(header, HEADER_SIZE_LIM);
 }

@@ -53,12 +53,12 @@ std::shared_ptr<ov::MappedMemory> load_mmap_object(const std::wstring& path);
 
 class MmapStream final : public std::ifstream {
 public:
-    MmapStream(const std::string& path, const std::shared_ptr<ov::MappedMemory>& mem)
-        : std::ifstream(path, std::ios_base::binary),
-          m_memory(mem) {}
+    MmapStream(const std::string& path) : std::ifstream(path, std::ios_base::binary) {
+        m_memory = ov::load_mmap_object(path);
+    }
 
 #ifdef OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
-    MmapStream(const std::wstring& path, const std::shared_ptr<ov::MappedMemory>& mem);
+    MmapStream(const std::wstring& path);
 #endif  // OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
 
     std::shared_ptr<ov::MappedMemory> m_memory;

@@ -223,6 +223,7 @@ public:
         : m_weights(weights),
           m_extensions(extensions) {
         auto res = m_xml_doc.load_buffer(model->get_ptr(), model->size(), pugi::parse_default, pugi::encoding_utf8);
+        // auto res = m_xml_doc.load_buffer(model->get_ptr(), model->size(), pugi::parse_default, pugi::encoding_utf8);
         OPENVINO_ASSERT(res.status == pugi::status_ok, res.description(), " at offset ", res.offset);
         init_opset();
     }

@@ -11,6 +11,7 @@
 #include "ov_ops/multiclass_nms_ie_internal.hpp"
 #include "ov_ops/nms_ie_internal.hpp"
 #include "ov_ops/nms_static_shape_ie.hpp"
+#include "ov_ops/rms.hpp"
 #include "ov_ops/rotary_positional_embeddings.hpp"
 #include "ov_ops/type_relaxed.hpp"
 #include "snippets/op/subgraph.hpp"
@@ -82,6 +83,7 @@ private:
     OP_EXTENSION(ov::op::internal::AUGRUSequence)                           \
     OP_EXTENSION(ov::op::internal::NmsStaticShapeIE<ov::op::v8::MatrixNms>) \
     OP_EXTENSION(ov::op::internal::RoPE)                                    \
+    OP_EXTENSION(ov::op::internal::RMS)                                     \
     OP_EXTENSION_X64(ov::intel_cpu::MHANode)                                \
     OP_EXTENSION_X64(ov::intel_cpu::InteractionNode)                        \
     OP_EXTENSION_X64(ov::intel_cpu::LLMMLPNode)                             \
@@ -137,6 +139,7 @@ private:
     TYPE_RELAXED_OP_EXTENSION(ov::op::v0::Squeeze)                      \
     TYPE_RELAXED_OP_EXTENSION(ov::op::v1::Subtract)                     \
     TYPE_RELAXED_OP_EXTENSION(ov::op::v0::Unsqueeze)                    \
+    TYPE_RELAXED_OP_EXTENSION(ov::op::v0::MVN)                          \
     TYPE_RELAXED_OP_EXTENSION(ov::op::v0::MVN)                          \
     TYPE_RELAXED_OP_EXTENSION(ov::op::v6::MVN)
 

@@ -1456,9 +1456,11 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
             },
             does_plugin_support_model_caching_with_mmap(plugin));
     } catch (const HeaderException&) {
+printf("[CORE] CoreImpl::load_model_from_cache HeaderException\n");
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+printf("[CORE] CoreImpl::load_model_from_cache Exception\n");
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
