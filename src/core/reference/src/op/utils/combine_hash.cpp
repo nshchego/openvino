@@ -35,7 +35,7 @@ struct CombineHashCallArgs {
     void* dst_ptr         = nullptr;
     uint64_t work_amount  = 0lu;
     uint64_t make_64_fold = 0lu;
-    // void* tmp_ptr; // TODO: remomve
+void* tmp_ptr; // TODO: remomve
 };
 
 typedef void (*fn_t)(const CombineHashCallArgs*);
@@ -56,6 +56,7 @@ public:
             OPENVINO_THROW("The current CPU does not support pclmulqdq instruction, which is required for the CRC algorithm.");
         }
         if (mayiuse(cpu_isa_t::vpclmulqdq)) {
+printf("[CPU][CombineHash] supports vpclmulqdq\n");
             is_vpclmulqdq = true;
         }
 
@@ -69,11 +70,11 @@ public:
         r64_dst = getReg64();
         r64_work_amount  = getReg64();
         r64_make_64_fold = getReg64();
-        r64_aux = getReg64();
-        // r64_tmp = getReg64();
-        v_dst       = getVmm();
-        v_k_1_2     = getVmm();
-        v_shuf_mask = getVmm();
+        // r64_aux = getReg64();
+r64_tmp = getReg64();
+        // v_dst       = getVmm();
+        // v_k_1_2     = getVmm();
+        // v_shuf_mask = getVmm();
 
         this->preamble();
 
@@ -81,7 +82,7 @@ public:
         mov(r64_dst, ptr[r64_params + GET_OFF(dst_ptr)]);
         mov(r64_work_amount, ptr[r64_params + GET_OFF(work_amount)]);
         mov(r64_make_64_fold, ptr[r64_params + GET_OFF(make_64_fold)]);
-        // mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
+mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
 
         initVectors();
         bulkFold(v_dst);
@@ -126,63 +127,61 @@ public:
         jmp(l_end, T_NEAR);
 
         L(l_partial); {
-            size_t offset = xmm_len;
-
             for (size_t j = 0lu; j < xmm_len - 1; j++) {
-                pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
-                cmp(r64_load_num, ++offset);
+                cmp(r64_load_num, j);
                 jle(l_end, T_NEAR);
+                pinsrb(xmm_dst, ptr[src_addr.getRegExp() + j], j);
             }
         }
 
         L(l_end);
     }
 
-    void partialLoad(const Xbyak::Ymm&     ymm_dst,
-                     const Xbyak::Address& src_addr,
-                     const Xbyak::Reg64&   r64_load_num) {
-        Xbyak::Label l_xmm, l_partial, l_end;
-        auto xmm_dst = Xbyak::Xmm(ymm_dst.getIdx());
+    // void partialLoad(const Xbyak::Ymm&     ymm_dst,
+    //                  const Xbyak::Address& src_addr,
+    //                  const Xbyak::Reg64&   r64_load_num) {
+    //     Xbyak::Label l_xmm, l_partial, l_end;
+    //     auto xmm_dst = Xbyak::Xmm(ymm_dst.getIdx());
 
-        cmp(r64_load_num, ymm_len);
-        jl(l_xmm, T_NEAR);
-        vmovdqu(ymm_dst, ptr[src_addr.getRegExp()]);
-        jmp(l_end, T_NEAR);
+    //     cmp(r64_load_num, ymm_len);
+    //     jl(l_xmm, T_NEAR);
+    //     vmovdqu(ymm_dst, ptr[src_addr.getRegExp()]);
+    //     jmp(l_end, T_NEAR);
 
-        L(l_xmm);
-        vpxorq(ymm_dst, ymm_dst, ymm_dst);
-        cmp(r64_load_num, xmm_len);
-        jl(l_partial, T_NEAR);
-        vmovdqu(xmm_dst, ptr[src_addr.getRegExp()]);
-        je(l_end, T_NEAR);
+    //     L(l_xmm);
+    //     vpxor(ymm_dst, ymm_dst, ymm_dst);
+    //     cmp(r64_load_num, xmm_len);
+    //     jl(l_partial, T_NEAR);
+    //     vmovdqu(xmm_dst, ptr[src_addr.getRegExp()]);
+    //     je(l_end, T_NEAR);
 
-        {
-            Xbyak::Label l_rest_loop, l_perm;
-            size_t offset = xmm_len;
+    //     {
+    //         Xbyak::Label l_rest_loop, l_perm;
+    //         size_t offset = xmm_len;
 
-            vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0x1);
-            for (size_t j = 0lu; j < xmm_len - 1; j++) {
-                pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
-                cmp(r64_load_num, ++offset);
-                jle(l_perm, T_NEAR);
-            }
-            L(l_perm);
-            vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0x1);
-        }
-        jmp(l_end, T_NEAR);
+    //         vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0x1);
+    //         for (size_t j = 0lu; j < xmm_len - 1; j++) {
+    //             pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
+    //             cmp(r64_load_num, ++offset);
+    //             jle(l_perm, T_NEAR);
+    //         }
+    //         L(l_perm);
+    //         vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0x1);
+    //     }
+    //     jmp(l_end, T_NEAR);
 
-        L(l_partial); {
-            size_t offset = xmm_len;
+    //     L(l_partial); {
+    //         size_t offset = xmm_len;
 
-            for (size_t j = 0lu; j < xmm_len - 1; j++) {
-                pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
-                cmp(r64_load_num, ++offset);
-                jle(l_end, T_NEAR);
-            }
-        }
+    //         for (size_t j = 0lu; j < xmm_len - 1; j++) {
+    //             pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
+    //             cmp(r64_load_num, ++offset);
+    //             jle(l_end, T_NEAR);
+    //         }
+    //     }
 
-        L(l_end);
-    }
+    //     L(l_end);
+    // }
 
 private:
     static constexpr uint64_t CHUNK_SIZE = 32;
@@ -201,8 +200,8 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> r64_dst;
     RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
     RegistersPool::Reg<Xbyak::Reg64> r64_make_64_fold;
-    RegistersPool::Reg<Xbyak::Reg64> r64_aux;
-    // RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
+    // RegistersPool::Reg<Xbyak::Reg64> r64_aux;
+RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
 
     const Xbyak::Reg64 r64_params = abi_param1;
 
@@ -219,51 +218,24 @@ private:
 
     void bulkFold(const Vmm& v_dst);
 
-    void restFold(const Vmm& v_dst) {
-        Xbyak::Label l_fold_loop, l_end;
-        cmp(r64_work_amount, xmm_len);
-        jl(l_end, T_NEAR);
-
-        auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
-        auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
-        auto xmm_src = getXmm();
-        auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
-        auto xmm_aux = getXmm();
-
-        L(l_fold_loop); {
-            vmovdqu64(xmm_src, ptr[r64_src]);
-            vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
-
-            vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000);
-            vpclmulqdq(xmm_dst, xmm_dst, xmm_k_1_2, 0b00010001);
-            vpxorq(xmm_dst, xmm_dst, xmm_aux);
-            vpxorq(xmm_dst, xmm_dst, xmm_src);
-
-            add(r64_src, xmm_len);
-            sub(r64_work_amount, xmm_len);
-            cmp(r64_work_amount, xmm_len);
-            jge(l_fold_loop, T_NEAR);
-        }
-
-        L(l_end);
-    }
+    void restFold(const Vmm& v_dst);
 
     void tailFold(const Vmm& v_dst);
 };
 
 template <>
 void CombineHash<avx512_core>::initVectors() {
-    // auto r64_aux = getReg64();
+    auto r64_aux = getReg64();
 
-    // v_k_1_2 = getVmm();
+    v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti64x2(v_k_1_2, ptr[r64_aux]);
 
-    // v_shuf_mask = getVmm();
+    v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
     vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
 
-    // v_dst = getVmm();
+    v_dst = getVmm();
     auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_aux = getXmm();
@@ -273,51 +245,58 @@ void CombineHash<avx512_core>::initVectors() {
     vpxorq(v_dst, v_dst, v_dst);
     vpinsrq(xmm_dst, xmm_dst, r64_work_amount, 0x0);
     vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
+// vmovdqu64(ptr[r64_tmp], xmm_dst);
     // First xor with source
     fillRestWorkMask(k_rest_mask, r64_work_amount);
     vmovdqu8(Xbyak::Xmm(xmm_aux.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
 // vmovdqu64(ptr[r64_tmp], xmm_aux);
     vpshufb(xmm_aux, xmm_aux, xmm_shuf_mask);
     vpxorq(xmm_dst, xmm_dst, xmm_aux);
+// vmovdqu64(ptr[r64_tmp], xmm_dst);
     sub(r64_work_amount, xmm_len);
     add(r64_src, xmm_len);
 }
 
 template <cpu_isa_t isa>
 void CombineHash<isa>::initVectors() {
-    // auto r64_aux = getReg64();
+    auto r64_aux = getReg64();
 
-    // v_k_1_2 = getVmm();
+    v_k_1_2 = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K));
     vbroadcasti128(v_k_1_2, ptr[r64_aux]);
 
-    // v_shuf_mask = getVmm();
+    v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
     vbroadcasti128(v_shuf_mask, ptr[r64_aux]);
 
-    // v_dst = getVmm();
+    v_dst = getVmm();
     auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_aux = getXmm();
-    auto k_rest_mask = RegistersPool::Reg<Xbyak::Opmask>(registersPool);
     // Initial CRC
     mov(r64_aux, CRC_VAL);
-    vpxorq(v_dst, v_dst, v_dst);
+    vpxor(v_dst, v_dst, v_dst);
+    vpinsrq(xmm_dst, xmm_dst, r64_work_amount, 0x0);
     vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
+// vmovdqu(ptr[r64_tmp], xmm_dst);
     // First xor with source
+    vpxor(xmm_aux, xmm_aux, xmm_aux);
     partialLoad(xmm_aux, ptr[r64_src], r64_work_amount);
+// vmovdqu(ptr[r64_tmp], xmm_aux);
     vpshufb(xmm_aux, xmm_aux, xmm_shuf_mask);
-    vpxorq(xmm_dst, xmm_dst, xmm_aux);
+    vpxor(xmm_dst, xmm_dst, xmm_aux);
+// vmovdqu(ptr[r64_tmp], xmm_dst);
     sub(r64_work_amount, xmm_len);
+    add(r64_src, xmm_len);
 }
 
 template <>
 void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     Xbyak::Label l_fold_loop, l_end;
-    cmp(r64_work_amount, zmm_len + 3 * xmm_len);
+    cmp(r64_work_amount, 2 * vlen - xmm_len);
     jl(l_end, T_NEAR);
 
-    // auto r64_aux = getReg64();
+    auto r64_aux = getReg64();
 
     auto v_src_0 = getVmm();
     auto v_dst_0 = getVmm();
@@ -344,14 +323,16 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
     vmovdqu64(v_dst_0, v_dst_3);
 
     if (!is_vpclmulqdq) {
-        // prefetchnta(ptr[r64_src + 3 * xmm_len]);
         vmovdqu64(xmm_dst_1, ptr[r64_src + 0 * xmm_len]);
+        vpshufb(xmm_dst_1, xmm_dst_1, xmm_shuf_mask);
         vmovdqu64(xmm_dst_2, ptr[r64_src + 1 * xmm_len]);
+        vpshufb(xmm_dst_2, xmm_dst_2, xmm_shuf_mask);
         vmovdqu64(xmm_dst_3, ptr[r64_src + 2 * xmm_len]);
+        vpshufb(xmm_dst_3, xmm_dst_3, xmm_shuf_mask);
     }
 
-    add(r64_src, 3 * xmm_len);
-    sub(r64_work_amount, zmm_len + 3 * xmm_len);
+    add(r64_src, vlen - xmm_len);
+    sub(r64_work_amount, 2 * vlen - xmm_len);
 
     L(l_fold_loop); {
         vmovdqu64(v_src_0, ptr[r64_src]);
@@ -405,11 +386,13 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
             vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
         }
 
-        add(r64_src, zmm_len);
-        sub(r64_work_amount, zmm_len);
+        add(r64_src, vlen);
+        sub(r64_work_amount, vlen);
         jge(l_fold_loop, T_NEAR);
     }
-    add(r64_work_amount, zmm_len);
+    add(r64_work_amount, vlen);
+
+vmovdqu64(ptr[r64_tmp], xmm_dst_3);
 
     if (is_vpclmulqdq) {
         auto ymm_dst_0 = Xbyak::Ymm(v_dst_0.getIdx());
@@ -456,85 +439,173 @@ void CombineHash<avx2>::bulkFold(const Vmm& v_dst) {
     cmp(r64_work_amount, 2 * vlen - xmm_len);
     jl(l_end, T_NEAR);
 
-    // auto r64_aux = getReg64();
+    auto r64_aux = getReg64();
 
     auto v_src_0 = getVmm();
     auto v_dst_0 = getVmm();
-    auto v_dst_1 = getVmm();
-    auto v_dst_2 = getVmm();
-    auto& v_dst_3 = v_dst;
+    // auto v_dst_1 = getVmm();
+    // auto v_dst_2 = getVmm();
+    auto& v_dst_1 = v_dst;
     auto v_aux_0 = getVmm();
-    auto v_k_4_5 = getVmm();
+    auto v_k_loop = getVmm();
 
-    auto xmm_k_4_5 = Xbyak::Xmm(v_k_4_5.getIdx());
+    auto xmm_k_loop = Xbyak::Xmm(v_k_loop.getIdx());
     auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
     auto xmm_src_0 = Xbyak::Xmm(v_src_0.getIdx());
     auto xmm_src_1 = getXmm();
     auto xmm_dst_0 = Xbyak::Xmm(v_dst_0.getIdx());
     auto xmm_dst_1 = Xbyak::Xmm(v_dst_1.getIdx());
-    auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
-    auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
+    // auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
+    // auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 6)); // TODO: check this value
-    vbroadcasti128(v_k_4_5, ptr[r64_aux]); 
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 2));
+    vbroadcasti128(v_k_loop, ptr[r64_aux]);
 
-    if (!is_vpclmulqdq) {
-        vmovdqu64(xmm_dst_1, ptr[r64_src + 0 * xmm_len]);
+    vmovdqu(v_dst_0, v_dst_1);
+
+    if (is_vpclmulqdq) {
+        vmovdqu(xmm_aux_0, ptr[r64_src]);
+        vpshufb(xmm_aux_0, xmm_aux_0, Xbyak::Xmm(v_shuf_mask.getIdx()));
+        vinserti128(v_dst_0, v_dst_0, xmm_aux_0, 0x1);
+        // vmovdqu(v_dst_1, ptr[r64_src + xmm_len]);
+        // vpshufb(v_dst_1, v_dst_1, v_shuf_mask);
+        // add(r64_src, vlen + xmm_len);
+    } else {
+        vmovdqu(xmm_dst_1, ptr[r64_src]);
+        vpshufb(xmm_dst_1, xmm_dst_1, Xbyak::Xmm(v_shuf_mask.getIdx()));
     }
 
-    add(r64_src, vlen - xmm_len);
-    sub(r64_work_amount, 2 * vlen - xmm_len);
+    add(r64_src, xmm_len);
+    sub(r64_work_amount, 2 * vlen - xmm_len);  // Check
 
     L(l_fold_loop); {
-        vmovdqu64(v_src_0, ptr[r64_src]);
+        vmovdqu(v_src_0, ptr[r64_src]);
         vpshufb(v_src_0, v_src_0, v_shuf_mask);
+        add(r64_src, vlen);
 
         if (is_vpclmulqdq) {
-            vpclmulqdq(v_aux_0, v_dst_0, v_k_4_5, 0b00000000);
-            vpclmulqdq(v_dst_0, v_dst_0, v_k_4_5, 0b00010001);
-            vpxorq(v_aux_0, v_aux_0, v_src_0);
-            vpxorq(v_dst_0, v_dst_0, v_aux_0);
+            // vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
+            // vpclmulqdq(v_dst_0, v_dst_0, v_k_loop, 0b00010001);
+            // vpxor(v_aux_0, v_aux_0, v_src_0);
+            // vpxor(v_dst_0, v_dst_0, v_aux_0);
+            // 0
+
+            vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
+            vpclmulqdq(v_dst_0, v_dst_0, v_k_loop, 0b00010001);
+            vpxor(v_aux_0, v_aux_0, v_src_0);
+            vpxor(v_dst_0, v_dst_0, v_aux_0);
+
+            // // 1
+            // vmovdqu(v_src_0, ptr[r64_src]);
+            // vpshufb(v_src_0, v_src_0, v_shuf_mask);
+            // add(r64_src, vlen);
+
+            // vpclmulqdq(v_aux_0, v_dst_1, v_k_loop, 0b00000000);
+            // vpclmulqdq(v_dst_1, v_dst_1, v_k_loop, 0b00010001);
+            // vpxor(v_aux_0, v_aux_0, v_src_1);
+            // vpxor(v_dst_1, v_dst_1, v_aux_0);
+
+            // sub(r64_work_amount, vlen * 2lu);
         } else {
             // 0
-            vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_4_5, 0b00000000);
-            vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_4_5, 0b00010001);
-            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
-            vpxorq(xmm_dst_0, xmm_dst_0, xmm_aux_0);
+            vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_loop, 0b00000000);
+            vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_loop, 0b00010001);
+            vpxor(xmm_aux_0, xmm_aux_0, xmm_src_0);
+            vpxor(xmm_dst_0, xmm_dst_0, xmm_aux_0);
             // 1
             vextracti128(xmm_src_1, v_src_0, 0x1);
-            vpclmulqdq(xmm_aux_0, xmm_dst_1, xmm_k_4_5, 0b00000000);
-            vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_4_5, 0b00010001);
-            vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-            vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
+            vpclmulqdq(xmm_aux_0, xmm_dst_1, xmm_k_loop, 0b00000000);
+            vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_loop, 0b00010001);
+            vpxor(xmm_aux_0, xmm_aux_0, xmm_src_1);
+            vpxor(xmm_dst_1, xmm_dst_1, xmm_aux_0);
+
+            // add(r64_src, vlen);
+            // sub(r64_work_amount, vlen);
         }
 
-        add(r64_src, vlen);
         sub(r64_work_amount, vlen);
         jge(l_fold_loop, T_NEAR);
     }
     add(r64_work_amount, vlen);
 
-    if (is_vpclmulqdq) {
-        auto ymm_dst_0 = Xbyak::Ymm(v_dst_0.getIdx());
-        auto ymm_dst_1 = Xbyak::Ymm(v_dst_1.getIdx());
-        auto ymm_aux_0 = Xbyak::Ymm(v_aux_0.getIdx());
+vmovdqu(ptr[r64_tmp], xmm_dst_0);
 
-        vextracti128(xmm_dst_3, ymm_dst_0, 0x1);
+    if (is_vpclmulqdq) {
+        vextracti128(xmm_dst_1, v_dst_0, 0x1);
         vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_1_2, 0b00000000);
         vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_1_2, 0b00010001);
-        vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-        vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
+        vpxor(xmm_dst_1, xmm_dst_1, xmm_aux_0);
+        vpxor(xmm_dst_1, xmm_dst_1, xmm_dst_0);
     } else {
-        vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_1_2, 0b00000000);
-        vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_1_2, 0b00010001);
-        vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-        vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_2);
+        // vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_1_2, 0b00000000);
+        // vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_1_2, 0b00010001);
+        // vpxor(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+        // vpxor(xmm_dst_3, xmm_dst_3, xmm_dst_2);
     }
 
     L(l_end);
 }
 
+template <>
+void CombineHash<avx512_core>::restFold(const Vmm& v_dst) {
+    Xbyak::Label l_fold_loop, l_end;
+    cmp(r64_work_amount, xmm_len);
+    jl(l_end, T_NEAR);
+
+    auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
+    auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
+    auto xmm_src = getXmm();
+    auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+    auto xmm_aux = getXmm();
+
+    L(l_fold_loop); {
+        vmovdqu64(xmm_src, ptr[r64_src]); // TODO: compare assembled code with vmovdqu
+        vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
+
+        vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000);
+        vpclmulqdq(xmm_dst, xmm_dst, xmm_k_1_2, 0b00010001);
+        vpxorq(xmm_dst, xmm_dst, xmm_aux);
+        vpxorq(xmm_dst, xmm_dst, xmm_src);
+
+        add(r64_src, xmm_len);
+        sub(r64_work_amount, xmm_len);
+        cmp(r64_work_amount, xmm_len);
+        jge(l_fold_loop, T_NEAR);
+    }
+
+    L(l_end);
+}
+
+template <>
+void CombineHash<avx2>::restFold(const Vmm& v_dst) {
+    Xbyak::Label l_fold_loop, l_end;
+    cmp(r64_work_amount, xmm_len);
+    jl(l_end, T_NEAR);
+
+    auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
+    auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
+    auto xmm_src = getXmm();
+    auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+    auto xmm_aux = getXmm();
+
+    L(l_fold_loop); {
+        vmovdqu(xmm_src, ptr[r64_src]);
+        vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
+
+        vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000);
+        vpclmulqdq(xmm_dst, xmm_dst, xmm_k_1_2, 0b00010001);
+        vpxor(xmm_dst, xmm_dst, xmm_aux);
+        vpxor(xmm_dst, xmm_dst, xmm_src);
+
+        add(r64_src, xmm_len);
+        sub(r64_work_amount, xmm_len);
+        cmp(r64_work_amount, xmm_len);
+        jge(l_fold_loop, T_NEAR);
+    }
+
+    L(l_end);
+}
 
 template <>
 void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
@@ -542,7 +613,7 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     cmp(r64_work_amount, 0);
     jle(l_fold_to_64, T_NEAR);
 
-    // auto r64_aux = getReg64();
+    auto r64_aux = getReg64();
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
     auto xmm_src = getXmm();
@@ -554,7 +625,7 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
 
     fillRestWorkMask(k_rest_mask, r64_work_amount);
 
-    vpxorq(xmm_src, xmm_src, xmm_src);
+    vpxorq(xmm_src, xmm_src, xmm_src); // TODO: check excessive?
     vmovdqu8(Xbyak::Xmm(xmm_src.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
     vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
 
@@ -589,11 +660,62 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
     L(l_save_128);
     vmovdqu64(ptr[r64_dst], xmm_dst);
 
+// vmovdqu64(ptr[r64_tmp], xmm_dst);
     L(l_end);
 }
 
-template <>
-void CombineHash<avx2>::tailFold(const Vmm& v_dst) {
+template <cpu_isa_t isa>
+void CombineHash<isa>::tailFold(const Vmm& v_dst) {
+    Xbyak::Label l_fold_to_64, l_save_128, l_end;
+    cmp(r64_work_amount, 0);
+    jle(l_fold_to_64, T_NEAR);
+
+    auto r64_aux = getReg64();
+    auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
+    auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
+    auto xmm_src = getXmm();
+    auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+    auto xmm_aux = getXmm();
+    auto xmm_aux_1 = getXmm();
+    auto xmm_aux_2 = getXmm();
+
+    vpxor(xmm_src, xmm_src, xmm_src);
+    partialLoad(xmm_src, ptr[r64_src], r64_work_amount);
+    vpshufb(xmm_src, xmm_src, xmm_shuf_mask);
+
+    vpclmulqdq(xmm_aux, xmm_dst, xmm_k_1_2, 0b00000000);
+    vpclmulqdq(xmm_dst, xmm_dst, xmm_k_1_2, 0b00010001);
+    vpxor(xmm_aux, xmm_aux, xmm_src);
+    vpxor(xmm_dst, xmm_dst, xmm_aux);
+
+    L(l_fold_to_64);
+    cmp(r64_make_64_fold, 0);
+    je(l_save_128, T_NEAR);
+
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 8));
+    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux], 0b00000001);
+    vpslldq(xmm_dst, xmm_dst, 0x8);
+    vpxor(xmm_dst, xmm_dst, xmm_aux);
+
+    mov(r64_aux, reinterpret_cast<uintptr_t>(CONST_K + 10));
+    vmovdqu(xmm_aux_2, ptr[r64_aux]);
+    vpclmulqdq(xmm_aux, xmm_dst, xmm_aux_2, 0b00000001);
+    mov(r64_aux, 0x0);
+    vpinsrq(xmm_aux_1, xmm_dst, r64_aux, 0x0);
+    vpxor(xmm_aux, xmm_aux, xmm_aux_1);
+    vpinsrq(xmm_aux_1, xmm_aux, r64_aux, 0x0);
+    vpclmulqdq(xmm_aux, xmm_aux, xmm_aux_2, 0b00010001);
+    vpxor(xmm_aux, xmm_aux, xmm_aux_1);
+    vpxor(xmm_dst, xmm_dst, xmm_aux);
+
+    vpextrq(ptr[r64_dst], xmm_dst, 0x0);
+    jmp(l_end, T_NEAR);
+
+    L(l_save_128);
+    vmovdqu(ptr[r64_dst], xmm_dst);
+
+// vmovdqu(ptr[r64_tmp], xmm_dst);
+    L(l_end);
 }
 
 // template <cpu_isa_t isa>
@@ -711,10 +833,10 @@ const uint8_t CombineHash<isa>::SHUF_MASK[] = { 0b00001111, 0b00001110, 0b000011
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t combine_hash(const void* src, size_t size) {
-static uint64_t counter = 0;
-static uint64_t sum = 0;
-counter++;
-auto t1 = std::chrono::high_resolution_clock::now();
+// static uint64_t counter = 0;
+// static uint64_t sum = 0;
+// counter++;
+// auto t1 = std::chrono::high_resolution_clock::now();
 // std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0xD663B05D, 32)
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0x04C11DB7, 32)
@@ -725,10 +847,9 @@ auto t1 = std::chrono::high_resolution_clock::now();
 // if (size == 0)
     // std::cout << "[CORE] combine_hash size: " << size << std::endl;
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
-    jit::fn_t kernel;
-// if (jit::Generator::mayiuse(jit::vpclmulqdq)) {
-//     std::cout << "CPU supports vpclmulqdq\n";
-// }
+    // static const auto nthr = parallel_get_max_threads() / 2; // TODO: WA for Hyper Threading
+    // static std::vector<jit::fn_t> kernels(nthr, nullptr);
+    jit::fn_t kernel = nullptr;
 
 // std::cout << std::hex
 //           << "\nx^7: " << jit::get_k_value_reflect(7)
@@ -863,6 +984,9 @@ auto t1 = std::chrono::high_resolution_clock::now();
 //           << std::endl;
     if (jit::Generator::mayiuse(jit::avx512_core)) {
         kernel = jit::CombineHash<jit::avx512_core>::get();
+        // parallel_nt(nthr, [&](const int ithr, const int nthr) {
+        //     kernels[ithr] = jit::CombineHash<jit::avx512_core>::get();
+        // });
     } else if (jit::Generator::mayiuse(jit::avx2)) {
         kernel = jit::CombineHash<jit::avx2>::get();
     }
@@ -870,16 +994,18 @@ auto t1 = std::chrono::high_resolution_clock::now();
     if (kernel) {
         size_t res = 0lu;
 
-        static const size_t block_size = 2lu * jit::Generator::zmm_len;
+        static const size_t block_size = 2lu * jit::Generator::zmm_len; // TODO: vlen
         // There is no sense to perform parallel execution if there are less than 2 blocks.
-        if (size >= 2lu * block_size) {
-            static const auto nthr = 2;//parallel_get_max_threads() / 2; // TODO: WA for Hyper Threading
+        // if (size >= 2lu * block_size) {
+        if (size >= 200000lu) {
+            // static const auto nthr = parallel_get_max_threads() / 2; // TODO: WA for Hyper Threading
+            static const auto nthr = 1lu;
             static std::vector<uint64_t> intermediate(nthr * 2); // xmm_len * nthr
             const uint64_t blocks = size / block_size;
             const uint64_t el_per_thread = block_size * ((blocks + nthr - 1) / nthr);
 
-// std::vector<uint64_t> tmp_vec(nthr * 2);
-// std::vector<uint64_t> tmp_vec_2(nthr * 2);
+std::vector<uint64_t> tmp_vec(nthr * 2);
+std::vector<uint64_t> tmp_vec_2(nthr * 2);
 
 // if (!(counter == 104)) {
 // if (!(counter == 88 || counter == 92 || counter == 96 || counter == 100 || counter == 104 || counter == 108)) {
@@ -896,9 +1022,10 @@ auto t1 = std::chrono::high_resolution_clock::now();
                 args.dst_ptr = &intermediate[ithr * 2];
                 args.work_amount = work_amount;
                 args.make_64_fold = 0lu;
-// args.tmp_ptr = &(tmp_vec[ithr * 2]);
-// if (counter == 1 || counter == 8 || counter == 557 || counter == 564)
+args.tmp_ptr = &(tmp_vec[ithr * 2]);
+// if (counter == 8)
 //     printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
+printf("size >= 200000: %lu -> parallel_nt tmp_vec {%lu;%lu}\n", size, tmp_vec[0], tmp_vec[1]);
                 kernel(&args);
             });
 // } else {
@@ -943,22 +1070,28 @@ auto t1 = std::chrono::high_resolution_clock::now();
             args.dst_ptr = &res;
             args.work_amount = ((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
             args.make_64_fold = 1lu;
-// args.tmp_ptr = tmp_vec_2.data();
+args.tmp_ptr = tmp_vec_2.data();
 // if (size == 2359296)
 //     printf("    [single] work_amount: %lu\n", args.work_amount);
+printf("size >= 200000: %lu -> fold tmp_vec {%lu;%lu}\n", size, tmp_vec_2[0], tmp_vec_2[1]);
             kernel(&args);
         } else {
-// std::vector<uint64_t> tmp_vec(2);
+std::vector<uint64_t> tmp_vec(2);
 
             jit::CombineHashCallArgs args;
             args.src_ptr = src;
             args.dst_ptr = &res;
             args.work_amount = size;
             args.make_64_fold = 1lu;
-// args.tmp_ptr = tmp_vec.data();
-// if (size > 16 && size < 32)
-//     std::cout << "combine_hash size: " << size << std::endl;
+args.tmp_ptr = &(tmp_vec[0]);
             kernel(&args);
+if (size > 16) {
+    // std::cout << "combine_hash size: " << size << "; tmp_vec: {" << tmp_vec[0] << "; " << tmp_vec[1] << "}" << std::endl;
+    // if (size == 4) {
+        std::cout << "combine_hash size: " << size << "; src: {" << reinterpret_cast<const int*>(src)[0]
+            << "} tmp_vec: {" << tmp_vec[0] << "; " << tmp_vec[1] << "}" << std::endl;
+    // }
+}
         }
 // static uint64_t counter = 0lu;
 // counter++;
@@ -974,12 +1107,14 @@ auto t1 = std::chrono::high_resolution_clock::now();
 //     // }
 // }
 
-auto t2 = std::chrono::high_resolution_clock::now();
-auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
-sum += ms_int.count();
-if (counter == 1 || counter == 8 || counter == 557 || counter == 564)
-// // if (counter == 1173 || counter == 582)
-    std::cout << "[" << counter << "] combine_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
+// auto t2 = std::chrono::high_resolution_clock::now();
+// auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
+// sum += ms_int.count();
+// if (counter == 1 || counter == 8 || counter == 557 || counter == 564)
+// // if (size >= 100000 && size <= 200000)
+// if (size > 4)
+//     std::cout << "[" << counter << "] combine_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanosec" << std::endl;
+    // std::cout << ms_int.count() << std::endl;
         return res;
     }
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64

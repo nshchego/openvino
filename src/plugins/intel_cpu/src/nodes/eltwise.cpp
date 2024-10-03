@@ -2068,6 +2068,34 @@ Eltwise::Eltwise(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr c
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
     getInitializers().at(op->get_type_info())(op, *this);
+
+// static const auto nthr = parallel_get_max_threads();
+// static uint64_t counter = 0;
+// static uint64_t sum = 0;
+// counter++;
+// auto t1 = std::chrono::high_resolution_clock::now();
+
+// static const size_t block_size = 2lu * 64;
+// size_t size = counter * 100;
+
+// static std::vector<uint64_t> intermediate(nthr * 2); // xmm_len * nthr
+// const uint64_t blocks = size / block_size;
+// const uint64_t el_per_thread = block_size * ((blocks + nthr - 1) / nthr);
+
+// parallel_nt(nthr, [&](const int ithr, const int nthr) {
+//     uint64_t start = ithr * el_per_thread;
+//     if (start >= size) {
+//         return;
+//     }
+//     uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
+// });
+
+// auto t2 = std::chrono::high_resolution_clock::now();
+// auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
+// sum += ms_int.count();
+
+// std::cout << "[" << counter << "] Eltwise parallel time: " << ms_int.count() << "; sum: " << sum
+    // << "; size: " << size << "; avg_time: " << sum / counter << " nanoseconds" << std::endl;
 }
 
 size_t Eltwise::getOpInputsNum() const {
