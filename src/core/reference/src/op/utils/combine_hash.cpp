@@ -44,6 +44,7 @@ struct CombineHashCompileParams {
 struct CombineHashCallArgs {
     const void* src_ptr    = nullptr;
     void* dst_ptr          = nullptr;
+    void* crc_ptr          = nullptr;
     void* intermediate_ptr = nullptr;
     uint64_t work_amount   = 0lu;
     uint64_t threads_num   = 1lu;
@@ -205,7 +206,7 @@ mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
 
 private:
     static constexpr uint64_t CHUNK_SIZE = 32;
-    static const uint64_t CRC_VAL;
+    // static const uint64_t CRC_VAL;
     static const uint8_t SHUF_MASK[16];
 
     using Vmm = typename std::conditional<isa == avx512_core, Xbyak::Zmm, Xbyak::Ymm>::type;
@@ -269,6 +270,8 @@ static const uint64_t K_15_16[] = { 0x05cf79dea9ac37d6, 0x001067e571d7d5c2 };  /
 static const uint64_t K_1_0[]   = { 0x05f5c3c7eb52fab6, 0x0000000000000000 };  // x^(64*1),  x^(64*1) mod P(x)
 static const uint64_t K_P_P[]   = { 0x578d29d06cc4f872, 0x42f0e1eba9ea3693 };  // floor(x^128/P(x)) - x^64, P(x) - x^64
 
+constexpr uint64_t CRC_VAL = 0xffffffffffffffff;
+
 template <>
 void CombineHash<avx512_core>::initVectors() {
     v_dst = getVmm();
@@ -288,20 +291,27 @@ void CombineHash<avx512_core>::initVectors() {
         auto k_rest_mask = RegistersPool::Reg<Xbyak::Opmask>(registersPool);
 
         // Initial CRC
-        mov(r64_aux, CRC_VAL);
-        vpinsrq(xmm_aux, xmm_aux, r64_work_amount, 0x0);
-        vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x1);
+        if (m_jcp.type == SINGLE_THREAD) {
+            mov(r64_aux, CRC_VAL);
+            vpinsrq(xmm_aux, xmm_aux, r64_work_amount, 0x0);
+            vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x1);
+        } else {
+            mov(r64_aux, ptr[r64_params + GET_OFF(crc_ptr)]);
+            vmovdqu64(xmm_aux, ptr[r64_aux]);
+        }
         // Initial xor with source
         fillRestWorkMask(k_rest_mask, r64_work_amount);
         vmovdqu8(Vmm(v_dst.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
         vpshufb(v_dst, v_dst, v_shuf_mask);
         pxor(xmm_dst, xmm_aux); // The SSE version is used to avoid zeroing out the rest of the Vmm.
-        add(r64_src, xmm_len);
+        if (m_jcp.type == SINGLE_THREAD) {
+            add(r64_src, xmm_len);
+        }
+vmovdqu64(ptr[r64_tmp], xmm_dst);
     } else if (m_jcp.type == N_THREAD) {
         vmovdqu64(v_dst, ptr[r64_src]);
         vpshufb(v_dst, v_dst, v_shuf_mask);
     }
-// vmovdqu64(ptr[r64_tmp], xmm_dst);
     if (m_jcp.type == SINGLE_THREAD || m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
         sub(r64_work_amount, xmm_len);
     }
@@ -338,6 +348,302 @@ void CombineHash<isa>::initVectors() {
     sub(r64_work_amount, xmm_len);
     add(r64_src, xmm_len);
 }
+
+// template <>
+// void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
+//     Xbyak::Label l_fold_loop, l_end;
+//     cmp(r64_work_amount, 4 * vlen - xmm_len);
+//     jl(l_end, T_NEAR);
+
+//     auto r64_aux = getReg64();
+
+//     auto v_src_0 = getVmm();
+//     auto v_dst_0 = getVmm();
+//     auto v_dst_1 = getVmm();
+//     auto v_dst_2 = getVmm();
+//     auto& v_dst_3 = v_dst;
+
+//     auto v_dst_4 = getVmm();
+//     auto v_dst_5 = getVmm();
+//     auto v_dst_6 = getVmm();
+//     auto v_dst_7 = getVmm();
+
+//     auto v_aux_0 = getVmm();
+//     auto v_k_loop = getVmm();
+
+//     auto xmm_k_loop = Xbyak::Xmm(v_k_loop.getIdx());
+//     auto xmm_k_1_2 = Xbyak::Xmm(v_k_1_2.getIdx());
+//     auto xmm_src_0 = Xbyak::Xmm(v_src_0.getIdx());
+//     auto xmm_src_1 = getXmm();
+//     auto xmm_dst_0 = Xbyak::Xmm(v_dst_0.getIdx());
+//     auto xmm_dst_1 = Xbyak::Xmm(v_dst_1.getIdx());
+//     auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
+//     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
+
+//     auto xmm_dst_4 = Xbyak::Xmm(v_dst_4.getIdx());
+//     auto xmm_dst_5 = Xbyak::Xmm(v_dst_5.getIdx());
+//     auto xmm_dst_6 = Xbyak::Xmm(v_dst_6.getIdx());
+//     auto xmm_dst_7 = Xbyak::Xmm(v_dst_7.getIdx());
+
+//     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
+//     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
+
+//     RegistersPool::Reg<Xbyak::Reg64> r64_bulk_step;
+//     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
+//         r64_bulk_step = getReg64();
+//         mov(r64_bulk_step, ptr[r64_params + GET_OFF(threads_num)]);
+//         // if (is_vpclmulqdq) {
+//             // sal(r64_bulk_step, 6); // *vlen
+//         // }
+//     }
+
+//     // if (m_jcp.type == SINGLE_THREAD) {
+//     //     mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
+//     //     vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
+//     // } else {
+//         mov(r64_aux, reinterpret_cast<uintptr_t>(K_15_16));
+//         vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
+//         // ...
+//     // }
+
+//     vmovdqu64(v_dst_0, v_dst_3);
+
+//     if (!is_vpclmulqdq) {
+//         vextracti64x2(xmm_dst_1, v_dst, 0x1);
+//         vextracti64x2(xmm_dst_2, v_dst, 0x2);
+//         vextracti64x2(xmm_dst_3, v_dst, 0x3);
+//     }
+
+// // auto r64_counter = getReg64();
+// // mov(r64_counter, vlen);
+
+//     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
+//         add(r64_src, r64_bulk_step);
+//     } else {
+//         add(r64_src, vlen - xmm_len);
+//     }
+//     prefetcht0(ptr[r64_src + 1024]);
+//     sub(r64_work_amount, 4 * vlen - xmm_len);
+//     // sub(r64_work_amount, 2 * vlen);
+    
+//     vmovdqu64(xmm_dst_4, ptr[r64_src]);
+//     vpshufb(xmm_dst_4, xmm_dst_4, xmm_shuf_mask);
+//     add(r64_src, xmm_len);
+//     vmovdqu64(xmm_dst_5, ptr[r64_src]);
+//     vpshufb(xmm_dst_5, xmm_dst_5, xmm_shuf_mask);
+//     add(r64_src, xmm_len);
+//     vmovdqu64(xmm_dst_6, ptr[r64_src]);
+//     vpshufb(xmm_dst_6, xmm_dst_6, xmm_shuf_mask);
+//     add(r64_src, xmm_len);
+//     vmovdqu64(xmm_dst_7, ptr[r64_src]);
+//     vpshufb(xmm_dst_7, xmm_dst_7, xmm_shuf_mask);
+//     add(r64_src, xmm_len);
+
+//     L(l_fold_loop); {
+//         vmovdqu64(v_src_0, ptr[r64_src]);
+//         vpshufb(v_src_0, v_src_0, v_shuf_mask);
+
+//         if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
+//             add(r64_src, r64_bulk_step);
+//         } else {
+//             add(r64_src, vlen);
+//         }
+//         prefetcht0(ptr[r64_src + 1024]);
+
+//         if (is_vpclmulqdq) {
+//             vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
+//             vpclmulqdq(v_dst_0, v_dst_0, v_k_loop, 0b00010001);
+//             uni_vpxorq(v_aux_0, v_aux_0, v_src_0);
+//             uni_vpxorq(v_dst_0, v_dst_0, v_aux_0);
+//         } else {
+//             // 0
+//             vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+//             uni_vpxorq(xmm_dst_0, xmm_dst_0, xmm_aux_0);
+
+//             // 1
+//             vextracti64x2(xmm_src_1, v_src_0, 0x1);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_1, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
+//             uni_vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
+
+//             // 2
+//             vextracti64x2(xmm_src_1, v_src_0, 0x2);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
+//             uni_vpxorq(xmm_dst_2, xmm_dst_2, xmm_aux_0);
+
+//             // 3
+//             vextracti64x2(xmm_src_1, v_src_0, 0x3);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_3, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_3, xmm_dst_3, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
+//             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+            
+//             // 4
+//             vmovdqu64(v_src_0, ptr[r64_src]);
+//             vpshufb(v_src_0, v_src_0, v_shuf_mask);
+//             add(r64_src, vlen);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_4, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_4, xmm_dst_4, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
+//             uni_vpxorq(xmm_dst_4, xmm_dst_4, xmm_aux_0);
+
+//             // 5
+//             vextracti64x2(xmm_src_1, v_src_0, 0x1);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_5, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_5, xmm_dst_5, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
+//             uni_vpxorq(xmm_dst_5, xmm_dst_5, xmm_aux_0);
+
+//             // 6
+//             vextracti64x2(xmm_src_1, v_src_0, 0x2);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_6, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_6, xmm_dst_6, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
+//             uni_vpxorq(xmm_dst_6, xmm_dst_6, xmm_aux_0);
+
+//             // 7
+//             vextracti64x2(xmm_src_1, v_src_0, 0x3);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_7, xmm_k_loop, 0b00000000);
+//             vpclmulqdq(xmm_dst_7, xmm_dst_7, xmm_k_loop, 0b00010001);
+//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//         }
+
+// // add(r64_counter, vlen);
+//         sub(r64_work_amount, vlen * 2lu);
+//         jge(l_fold_loop, T_NEAR);
+//     }
+//     add(r64_work_amount, vlen * 2lu);
+// // mov(ptr[r64_tmp], r64_counter);
+// // if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
+// //     mov(ptr[r64_tmp], r64_bulk_step);
+// // }
+
+// // vmovdqu64(ptr[r64_tmp], xmm_dst_3);
+
+//     if (m_jcp.type == SINGLE_THREAD) {
+//         if (is_vpclmulqdq) {
+//             auto ymm_dst_0 = Xbyak::Ymm(v_dst_0.getIdx());
+//             auto ymm_dst_1 = Xbyak::Ymm(v_dst_1.getIdx());
+//             auto ymm_aux_0 = Xbyak::Ymm(v_aux_0.getIdx());
+
+//             vextracti64x4(ymm_dst_1, v_dst_0, 0x1);
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
+//             vpclmulqdq(ymm_aux_0, ymm_dst_0, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(ymm_dst_0, ymm_dst_0, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(ymm_dst_1, ymm_dst_1, ymm_aux_0);
+//             uni_vpxorq(ymm_dst_0, ymm_dst_0, ymm_dst_1);
+
+//             vextracti64x2(xmm_dst_3, ymm_dst_0, 0x1);
+//             vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_1_2, 0b00000000);
+//             vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_1_2, 0b00010001);
+//             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
+//         } else {
+// auto r64_intm = getReg64();
+// mov(r64_intm, ptr[r64_params + GET_OFF(intermediate_ptr)]);
+
+// vmovdqu64(ptr[r64_intm], xmm_dst_0);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_1);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_2);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_3);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_4);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_5);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_6);
+// add(r64_intm, xmm_len);
+// vmovdqu64(ptr[r64_intm], xmm_dst_7);
+
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_13_14));
+//             vpclmulqdq(xmm_aux_0, xmm_dst_0, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(xmm_dst_0, xmm_dst_0, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_0);
+
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_11_12));
+//             vpclmulqdq(xmm_aux_0, xmm_dst_1, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(xmm_dst_1, xmm_dst_1, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_1);
+
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_9_10));
+//             vpclmulqdq(xmm_aux_0, xmm_dst_2, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(xmm_dst_2, xmm_dst_2, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_2);
+
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
+//             vpclmulqdq(xmm_aux_0, xmm_dst_3, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(xmm_dst_3, xmm_dst_3, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_3);
+
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_5_6));
+//             vpclmulqdq(xmm_aux_0, xmm_dst_4, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(xmm_dst_4, xmm_dst_4, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_4);
+
+//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
+//             vpclmulqdq(xmm_aux_0, xmm_dst_5, ptr[r64_aux], 0b00000000);
+//             vpclmulqdq(xmm_dst_5, xmm_dst_5, ptr[r64_aux], 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_5);
+
+//             vpclmulqdq(xmm_aux_0, xmm_dst_6, xmm_k_1_2, 0b00000000);
+//             vpclmulqdq(xmm_dst_6, xmm_dst_6, xmm_k_1_2, 0b00010001);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
+//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_6);
+            
+//             vmovdqu64(xmm_dst_3, xmm_dst_7);
+
+//             // mov(r64_aux, reinterpret_cast<uintptr_t>(K_5_6));
+//             // vpclmulqdq(xmm_aux_0, xmm_dst_0, ptr[r64_aux], 0b00000000);
+//             // vpclmulqdq(xmm_dst_0, xmm_dst_0, ptr[r64_aux], 0b00010001);
+//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
+
+//             // mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
+//             // vpclmulqdq(xmm_aux_0, xmm_dst_1, ptr[r64_aux], 0b00000000);
+//             // vpclmulqdq(xmm_dst_1, xmm_dst_1, ptr[r64_aux], 0b00010001);
+//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_1);
+
+//             // vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_1_2, 0b00000000);
+//             // vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_1_2, 0b00010001);
+//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_2);
+//         }
+//     } else {
+//         if (is_vpclmulqdq) {
+//             vmovdqu64(ptr[r64_dst], v_dst_0);
+//         } else {
+//             vmovdqu64(ptr[r64_dst + xmm_len * 0lu], xmm_dst_0);
+//             vmovdqu64(ptr[r64_dst + xmm_len * 1lu], xmm_dst_1);
+//             vmovdqu64(ptr[r64_dst + xmm_len * 2lu], xmm_dst_2);
+//             vmovdqu64(ptr[r64_dst + xmm_len * 3lu], xmm_dst_3);
+//         }
+//     }
+
+//     L(l_end);
+// }
 
 template <>
 void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
@@ -385,12 +691,13 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
         // ...
     }
 
-    vmovdqu64(v_dst_0, v_dst_3);
+    vmovdqu64(v_dst_0, v_dst);
+// vmovdqu64(ptr[r64_tmp], xmm_dst_0);
 
     if (!is_vpclmulqdq) {
-        vextracti64x2(xmm_dst_1, v_dst, 0x1);
-        vextracti64x2(xmm_dst_2, v_dst, 0x2);
-        vextracti64x2(xmm_dst_3, v_dst, 0x3);
+        vextracti64x2(xmm_dst_1, v_dst_0, 0x1);
+        vextracti64x2(xmm_dst_2, v_dst_0, 0x2);
+        vextracti64x2(xmm_dst_3, v_dst_0, 0x3);
     }
 
 // auto r64_counter = getReg64();
@@ -900,27 +1207,29 @@ void CombineHash<isa>::tailFold(const Vmm& v_dst) {
 // template <cpu_isa_t isa>
 // const uint64_t CombineHash<isa>::K12 = 0x7B4BC8789D65B2A5;
 
-template <cpu_isa_t isa>
-const uint64_t CombineHash<isa>::CRC_VAL = 0xffffffffffffffff;
+// template <cpu_isa_t isa>
+// const uint64_t CombineHash<isa>::CRC_VAL = 0xffffffffffffffff;
 
 // Auxiliary fn to obtain K constant multipliers.
-// uint32_t get_k_value(int t, uint32_t poly = 0x04C11DB7) {
-// uint32_t get_k_value(int t, uint32_t poly = 0xD663B05D) {
-// uint32_t get_k_value(int t, uint32_t poly = 0x741B8CD7) {
+// uint32_t gen_k_value(int t, uint32_t poly = 0x04C11DB7) {
+// uint32_t gen_k_value(int t, uint32_t poly = 0xD663B05D) {
+// uint32_t gen_k_value(int t, uint32_t poly = 0x741B8CD7) {
     // uint32_t res = poly, mask = 0x80000000;
-// uint64_t get_k_value(int t, uint64_t poly = 0xD663B05D) {
-uint64_t get_k_value(int t, uint64_t poly = 0x42F0E1EBA9EA3693) {
-    uint64_t res = poly, mask = 0x8000000000000000;
+// uint64_t gen_k_value(int t, uint64_t poly = 0xD663B05D) {
+
+uint64_t gen_k_value(int64_t degree) {
+    constexpr uint64_t POLYNOM = 0x42F0E1EBA9EA3693;
+    constexpr uint64_t MASK = 0x8000000000000000;
+    uint64_t result = POLYNOM;
     do {
-        // std::cout << std::dec << "t: " << t << std::endl;
-        if (res & mask) {
-            res = (res << 1) ^ poly;
+        if (result & MASK) {
+            result = (result << 1) ^ POLYNOM;
         } else {
-            res = (res << 1);
+            result = (result << 1);
         }
-    } while (--t);
-    // std::cout << std::hex << "K64: " << res << std::endl;
-    return res;
+    } while (degree--);
+
+    return result;
 }
 
 uint64_t xt_mod_P_neg(int t, uint64_t poly = 0x42F0E1EBA9EA3693) {
@@ -1019,138 +1328,32 @@ auto t1 = std::chrono::high_resolution_clock::now();
     // std::cout << "[CORE] combine_hash size: " << size << std::endl;
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
     static jit::fn_t kernels[jit::KERNELS_NUM] = {nullptr, nullptr, nullptr, nullptr};
+    static bool initialized = false;
+    static std::vector<uint64_t> K_ARRAY = {
+// static const uint64_t K_1_2[]   = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e };  // x^(64*1),  x^(64*2)
+// static const uint64_t K_3_4[]   = { 0x571bee0a227ef92b, 0x44bef2a201b5200c };  // x^(64*3),  x^(64*4)
+// static const uint64_t K_5_6[]   = { 0x54819d8713758b2c, 0x4a6b90073eb0af5a };  // x^(64*5),  x^(64*6)
+// static const uint64_t K_7_8[]   = { 0x5f6843ca540df020, 0xddf4b6981205b83f };  // x^(64*7),  x^(64*8)
+// static const uint64_t K_9_10[]  = { 0x097c516e98bd2e73, 0x0b76477b31e22e7b };  // x^(64*9),  x^(64*10)
+// static const uint64_t K_11_12[] = { 0x9af04e1eff82d0dd, 0x6e82e609297f8fe8 };  // x^(64*11), x^(64*12)
+// static const uint64_t K_13_14[] = { 0xe464f4df5fb60ac1, 0xb649c5b35a759cf2 };  // x^(64*13), x^(64*14)
+// static const uint64_t K_15_16[] = { 0x05cf79dea9ac37d6, 0x001067e571d7d5c2 };  // x^(64*15), x^(64*16)
+// static const uint64_t K_1_0[]   = { 0x05f5c3c7eb52fab6, 0x0000000000000000 };  // x^(64*1),  x^(64*1) mod P(x)
+// static const uint64_t K_P_P[]   = { 0x578d29d06cc4f872, 0x42f0e1eba9ea3693 };  // floor(x^128/P(x)) - x^64, P(x) - x^64
+    };
 
-// std::cout << std::hex
-//           << "\nx^7: " << jit::get_k_value_reflect(7)
-//           << "\nx^15: " << jit::get_k_value_reflect(15)
-//           << "\nx^23: " << jit::get_k_value_reflect(23)
-        //   << "\nx^64*3: " << jit::get_k_value_reflect(64*3)
-        //   << "\nx^64*4: " << jit::get_k_value_reflect(64*4)
-        //   << "\nx^64*5: " << jit::get_k_value_reflect(64*5)
-        //   << "\nx^64*6: " << jit::get_k_value_reflect(64*6)
-        //   << "\nx^64*7: " << jit::get_k_value_reflect(64*7)
-        //   << "\nx^64*8: " << jit::get_k_value_reflect(64*8)
-        //   << "\nx^64*9: " << jit::get_k_value_reflect(64*9)
-        //   << "\nx^64*10: " << jit::get_k_value_reflect(64*10)
-        //   << "\nx^64*11: " << jit::get_k_value_reflect(64*11)
-        //   << "\nx^64*12: " << jit::get_k_value_reflect(64*12)
-        //   << "\nx^64*13: " << jit::get_k_value_reflect(64*13)
-        //   << "\nx^64*14: " << jit::get_k_value_reflect(64*14)
-        //   << "\nx^64*15: " << jit::get_k_value_reflect(64*15)
-        //   << "\nx^64*16: " << jit::get_k_value_reflect(64*16)
-        //   << "\nx^64*17: " << jit::get_k_value_reflect(64*17)
-        //   << "\nx^64*18: " << jit::get_k_value_reflect(64*18)
-        //   << "\nx^64*19: " << jit::get_k_value_reflect(64*19)
-        //   << "\nx^64*20: " << jit::get_k_value_reflect(64*20)
-        //   << std::endl;
-// std::cout << std::hex
-//           << "\nx^-128: "  << jit::get_k_value(-128)
-//           << "\nx^-96: "  << jit::get_k_value(-96)
-//           << "\nx^-80: "  << jit::get_k_value(-80)
-//           << "\nx^-64: "  << jit::get_k_value(-64)
-//           << "\nx^-56: "  << jit::get_k_value(-56)
-//           << "\nx^-48: "  << jit::get_k_value(-48)
-//           << "\nx^-40: "  << jit::get_k_value(-40)
-//           << "\nx^-32: "  << jit::get_k_value(-32)
-//           << "\nx^-24: "  << jit::get_k_value(-24)
-//           << "\nx^-16: "  << jit::get_k_value(-16)
-//           << "\nx^-8: "  << jit::get_k_value(-8)
-//           << "\nx^-1: "  << jit::get_k_value(-1)
-//           << "\nx^0: "  << jit::get_k_value(0)
-//           << "\nx^1: "  << jit::get_k_value(1)
-//           << "\nx^2: "  << jit::get_k_value(2)
-//           << "\nx^3: "  << jit::get_k_value(3)
-//           << "\nx^4: "  << jit::get_k_value(4)
-//           << "\nx^5: "  << jit::get_k_value(5)
-//           << "\nx^6: "  << jit::get_k_value(6)
-//           << "\nx^7: "  << jit::get_k_value(7)
-//           << "\nx^8: "  << jit::get_k_value(8)
-//           << "\nx^15: " << jit::get_k_value(15)
-//           << "\nx^16: " << jit::get_k_value(16)
-//           << "\nx^23: " << jit::get_k_value(23)
-//           << "\nx^24: " << jit::get_k_value(24)
-//           << "\nx^32: " << jit::get_k_value(32)
-//           << "\nx^40: " << jit::get_k_value(40)
-//           << "\nx^48: " << jit::get_k_value(48)
-//           << "\nx^56: " << jit::get_k_value(56)
-//           << "\nx^64: " << jit::get_k_value(64)
-//           << "\nx^80: " << jit::get_k_value(80)
-//           << "\nx^88: " << jit::get_k_value(88)
-//           << "\nx^96: "  << jit::get_k_value(96)
-//           << "\nx^104: " << jit::get_k_value(104)
-//           << "\nx^128: " << jit::get_k_value(128)
-//           << "\nx^144: " << jit::get_k_value(144)
-//           << "\nx^159: " << jit::get_k_value(159)
-//           << "\nx^160: " << jit::get_k_value(160)
-//           << "\nx^192: " << jit::get_k_value(192)
-        //   << "\nx^64*0: " << jit::get_k_value(64*0)
-        //   << "\nx^64*1: " << jit::get_k_value(64*1)
-        //   << "\nx^64*2: " << jit::get_k_value(64*2)
-        //   << "\nx^64*3: " << jit::get_k_value(64*3)
-        //   << "\nx^64*4: " << jit::get_k_value(64*4)
-        //   << "\nx^64*5: " << jit::get_k_value(64*5)
-        //   << "\nx^64*6: " << jit::get_k_value(64*6)
-        //   << "\nx^64*7: " << jit::get_k_value(64*7)
-        //   << "\nx^64*8: " << jit::get_k_value(64*8)
-        //   << "\nx^64*9: " << jit::get_k_value(64*9)
-        //   << "\nx^64*10: " << jit::get_k_value(64*10)
-        //   << "\nx^64*11: " << jit::get_k_value(64*11)
-        //   << "\nx^64*12: " << jit::get_k_value(64*12)
-        //   << "\nx^64*13: " << jit::get_k_value(64*13)
-        //   << "\nx^64*14: " << jit::get_k_value(64*14)
-        //   << "\nx^64*15: " << jit::get_k_value(64*15)
-        //   << "\nx^64*16: " << jit::get_k_value(64*16)
-        //   << "\nx^64*17: " << jit::get_k_value(64*17)
-        //   << "\nx^64*18: " << jit::get_k_value(64*18)
-        //   << "\nx^64*19: " << jit::get_k_value(64*19)
-        //   << "\nx^64*20: " << jit::get_k_value(64*20)
-        //   << std::endl;
     // std::cout << std::hex;
-    // for (int i = 8; i < 65; i += 8) {
-    //     // std::cout << std::dec << "\nx^" << i << ": " << std::hex << jit::get_k_value(i);
-    //     std::cout << std::dec << "\nx^" << i << ": " << std::hex << jit::xt_mod_P_neg(i);
+    // static int dump_k = 1;
+    // if (dump_k) {
+    //     dump_k = 0;
+    //     for (int i = 0; i < 2048; i += 64) {
+    //         std::cout << std::dec << "\nx^" << i << ": " << std::hex << jit::gen_k_value(i);
+    //     //     std::cout << std::dec << "\nx^" << i << ": " << std::hex << jit::xt_mod_P_neg(i);
+    //     }
     // }
     // std::cout << std::endl;
     // std::cout << std::dec << "\nx^" << 128 << ": " << std::hex << jit::xt_mod_P_neg(128);
-// std::cout << std::hex
-//           << "\nx^-128: "  << jit::xt_mod_P_neg(-128)
-//           << "\nx^-96: "  << jit::xt_mod_P_neg(-96)
-//           << "\nx^-80: "  << jit::xt_mod_P_neg(-80)
-//           << "\nx^-64: "  << jit::xt_mod_P_neg(-64)
-//           << "\nx^-56: "  << jit::xt_mod_P_neg(-56)
-//           << "\nx^-48: "  << jit::xt_mod_P_neg(-48)
-//           << "\nx^-40: "  << jit::xt_mod_P_neg(-40)
-//           << "\nx^-32: "  << jit::xt_mod_P_neg(-32)
-//           << "\nx^-24: "  << jit::xt_mod_P_neg(-24)
-//           << "\nx^-16: "  << jit::xt_mod_P_neg(-16)
-//           << "\nx^-8: "  << jit::xt_mod_P_neg(-8)
-//           << "\nx^-1: "  << jit::xt_mod_P_neg(-1)
-//           << "\nx^0: "  << jit::xt_mod_P_neg(0)
-//           << "\nx^1: "  << jit::xt_mod_P_neg(1)
-//           << "\nx^2: "  << jit::xt_mod_P_neg(2)
-//           << "\nx^3: "  << jit::xt_mod_P_neg(3)
-//           << "\nx^4: "  << jit::xt_mod_P_neg(4)
-//           << "\nx^5: "  << jit::xt_mod_P_neg(5)
-//           << "\nx^6: "  << jit::xt_mod_P_neg(6)
-//           << "\nx^7: "  << jit::xt_mod_P_neg(7)
-//           << "\nx^8: "  << jit::xt_mod_P_neg(8)
-//           << "\nx^15: " << jit::xt_mod_P_neg(15)
-//           << "\nx^16: " << jit::xt_mod_P_neg(16)
-//           << "\nx^23: " << jit::xt_mod_P_neg(23)
-//           << "\nx^24: " << jit::xt_mod_P_neg(24)
-//           << "\nx^32: " << jit::xt_mod_P_neg(32)
-//           << "\nx^40: " << jit::xt_mod_P_neg(40)
-//           << "\nx^48: " << jit::xt_mod_P_neg(48)
-//           << "\nx^56: " << jit::xt_mod_P_neg(56)
-//           << "\nx^64: " << jit::xt_mod_P_neg(64)
-//           << "\nx^80: " << jit::xt_mod_P_neg(80)
-//           << "\nx^88: " << jit::xt_mod_P_neg(88)
-//           << "\nx^96: " << jit::xt_mod_P_neg(96)
-//           << "\nx^104: " << jit::xt_mod_P_neg(104)
-//           << "\nx^144: " << jit::xt_mod_P_neg(144)
-//           << "\nx^159: " << jit::xt_mod_P_neg(159)
-//           << "\nx^160: " << jit::xt_mod_P_neg(160)
-//           << std::endl;
+    
     if (kernels[0] == nullptr) {
 printf("    init kernels\n");
         if (jit::Generator::mayiuse(jit::avx512_core)) {
@@ -1204,6 +1407,7 @@ printf("    init kernels\n");
             const uint64_t el_per_thread = block_size * ((blocks + thr_num - 1) / thr_num);
 std::vector<uint64_t> tmp_vec(thr_num * 4, 0lu);
 std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
+            uint64_t crc_arr[2] = { size, jit::CRC_VAL };
 
             parallel_nt(thr_num, [&](const int ithr, const int nthr) {
             // parallel_nt(36, [&](int ithr, const int nthr) {
@@ -1225,13 +1429,19 @@ std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
 
                 args.src_ptr = reinterpret_cast<const uint8_t *>(src) + jit::Generator::xmm_len * 4lu * ithr;
                 args.dst_ptr = &(intermediate[ithr * 8lu]);
+                if (ithr == 0) {
+                    args.crc_ptr = crc_arr;
+                }
                 args.work_amount = work_amount;
                 args.threads_num = jit::Generator::xmm_len * 8lu; //thr_num;
 args.tmp_ptr = &(tmp_vec[ithr * 4]);
 
                 kernels[ithr == 0 ? jit::FIRST_THREAD : jit::N_THREAD](&args);
                 // kernels[jit::FIRST_THREAD](&args);
-// printf("    [%d] start: %lu, work_amount: %lu; made: %lu\n", ithr, start, work_amount, tmp_vec[ithr * 4]);
+// printf("    [%d] start: %lu, work_amount: %lu; {%lu; %lu}\n", ithr, start, work_amount, tmp_vec[ithr * 4], tmp_vec[ithr * 4 + 1]);
+// printf("    [%d] {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n", ithr,
+//     intermediate[ithr * 8 + 0], intermediate[ithr * 8 + 1], intermediate[ithr * 8 + 2], intermediate[ithr * 8 + 3],
+//     intermediate[ithr * 8 + 4], intermediate[ithr * 8 + 5], intermediate[ithr * 8 + 6], intermediate[ithr * 8 + 7]);
             });
 
 //             jit::CombineHashCallArgs args;
@@ -1255,14 +1465,25 @@ args.tmp_ptr = tmp_vec_2.data();
             kernels[jit::FINAL_FOLD](&args);
         } else {
 std::vector<uint64_t> tmp_vec(4, 0lu);
+static std::vector<uint64_t> intermediate(2 * 8lu); // zmm_len * thr_num
 
             jit::CombineHashCallArgs args;
             args.src_ptr = src;
             args.dst_ptr = &res;
             args.work_amount = size;
+args.intermediate_ptr = intermediate.data();
 args.tmp_ptr = &(tmp_vec[0]);
 
             kernels[jit::SINGLE_THREAD](&args);
+
+if (size > 200000) {
+printf("    {%lu; %lu; %lu; %lu}\n", tmp_vec[0], tmp_vec[1], tmp_vec[2], tmp_vec[3]);
+// printf("    {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n",
+//     intermediate[0], intermediate[1], intermediate[2], intermediate[3],
+//     intermediate[4], intermediate[5], intermediate[6], intermediate[7],
+//     intermediate[8], intermediate[9], intermediate[10], intermediate[11],
+//     intermediate[12], intermediate[13], intermediate[14], intermediate[15]);
+}
         }
 
 auto t2 = std::chrono::high_resolution_clock::now();
