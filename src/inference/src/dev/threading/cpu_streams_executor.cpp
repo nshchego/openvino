@@ -122,6 +122,7 @@ struct CPUStreamsExecutor::Impl {
             _numaNodeId = std::max(0, numa_node_id);
             _socketId = get_socket_by_numa_node(_numaNodeId);
             if (stream_type == STREAM_WITHOUT_PARAM) {
+printf("create_tbb_task_arena 0 max_threads_per_core: %d\n", max_threads_per_core);
                 _taskArena.reset(new custom::task_arena{custom::task_arena::constraints{}
                                                             .set_max_concurrency(concurrency)
                                                             .set_max_threads_per_core(max_threads_per_core)});
@@ -141,6 +142,7 @@ struct CPUStreamsExecutor::Impl {
                     real_numa_node_id = _numaNodeId;
                 }
 #    endif
+printf("create_tbb_task_arena 1 max_threads_per_core: %d\n", max_threads_per_core);
                 _taskArena.reset(new custom::task_arena{custom::task_arena::constraints{}
                                                             .set_numa_id(real_numa_node_id)
                                                             .set_max_concurrency(concurrency)
@@ -149,11 +151,13 @@ struct CPUStreamsExecutor::Impl {
                 const auto real_core_type = (core_type == MAIN_CORE_PROC || core_type == HYPER_THREADING_PROC)
                                                 ? custom::info::core_types().back()
                                                 : custom::info::core_types().front();
+printf("create_tbb_task_arena 2 max_threads_per_core: %d\n", max_threads_per_core);
                 _taskArena.reset(new custom::task_arena{custom::task_arena::constraints{}
                                                             .set_core_type(real_core_type)
                                                             .set_max_concurrency(concurrency)
                                                             .set_max_threads_per_core(max_threads_per_core)});
             } else {
+printf("create_tbb_task_arena 3 max_threads_per_core: %d\n", max_threads_per_core);
                 _taskArena.reset(new custom::task_arena{concurrency});
                 _cpu_ids =
                     stream_id < static_cast<int>(stream_processors.size()) ? stream_processors[stream_id] : _cpu_ids;

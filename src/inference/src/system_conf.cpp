@@ -350,6 +350,7 @@ int get_number_of_cpu_cores(bool bigCoresOnly) {
 #        if (OV_THREAD == OV_THREAD_TBB || OV_THREAD == OV_THREAD_TBB_AUTO)
     auto core_types = custom::info::core_types();
     if (bigCoresOnly && core_types.size() > 1) /*Hybrid CPU*/ {
+printf("get_number_of_cpu_cores 0 max_threads_per_core: %d\n", 1);
         phys_cores = custom::info::default_concurrency(
             custom::task_arena::constraints{}.set_core_type(core_types.back()).set_max_threads_per_core(1));
     }
@@ -460,6 +461,7 @@ int get_number_of_logical_cpu_cores(bool bigCoresOnly) {
 #    if (OV_THREAD == OV_THREAD_TBB || OV_THREAD == OV_THREAD_TBB_AUTO)
     auto core_types = custom::info::core_types();
     if (bigCoresOnly && core_types.size() > 1) /*Hybrid CPU*/ {
+printf("get_number_of_logical_cpu_cores 0 max_threads_per_core: %d\n", -1);
         logical_cores = custom::info::default_concurrency(
             custom::task_arena::constraints{}.set_core_type(core_types.back()).set_max_threads_per_core(-1));
     }

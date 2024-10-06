@@ -230,7 +230,9 @@ task_arena::task_arena(int max_concurrency_, unsigned reserved_for_masters)
     : my_task_arena{max_concurrency_, reserved_for_masters},
       my_initialization_state{},
       my_constraints{},
-      my_binding_observer{} {}
+      my_binding_observer{} {
+printf("task_arena::task_arena 0\n");
+      }
 
 task_arena::task_arena(const constraints& constraints_, unsigned reserved_for_masters)
 #    if USE_TBBBIND_2_5
@@ -244,13 +246,15 @@ task_arena::task_arena(const constraints& constraints_, unsigned reserved_for_ma
       my_initialization_state{},
       my_constraints{constraints_},
       my_binding_observer{} {
+printf("task_arena::task_arena 1\n");
 }
 
 task_arena::task_arena(const task_arena& s)
     : my_task_arena{s.my_task_arena},
       my_initialization_state{},
       my_constraints{s.my_constraints},
-      my_binding_observer{} {}
+      my_binding_observer{} {
+printf("task_arena::task_arena 1\n");}
 
 void task_arena::initialize() {
     my_task_arena.initialize();
