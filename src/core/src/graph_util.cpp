@@ -105,7 +105,7 @@ void traverse_nodes(const NodeVector& subgraph_results,
         stack.pop();
         if (instances_seen.insert(n).second) {
             f(n->shared_from_this());
-            for (size_t i = 0; i < n->inputs().size(); i++) {
+            for (size_t i = 0lu; i < n->get_input_size(); i++) {
                 stack.push(n->get_input_node_ptr(i));
             }
 
