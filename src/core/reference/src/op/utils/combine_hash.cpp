@@ -44,6 +44,7 @@ struct CombineHashCompileParams {
 struct CombineHashCallArgs {
     const void* src_ptr    = nullptr;
     void* dst_ptr          = nullptr;
+    void* k_ptr            = nullptr;
     void* crc_ptr          = nullptr;
     void* intermediate_ptr = nullptr;
     uint64_t work_amount   = 0lu;
@@ -59,10 +60,10 @@ public:
     explicit CombineHash(const CombineHashCompileParams& jcp) :
             m_jcp(jcp) {
         if (isa == avx512_core) {
-printf("[CPU][CombineHash] avx512_core\n");
+// printf("[CPU][CombineHash] avx512_core\n");
             vlen = zmm_len;
         } else if (isa == avx2) {
-printf("[CPU][CombineHash] avx2\n");
+// printf("[CPU][CombineHash] avx2\n");
             vlen = ymm_len;
         } else {
             OPENVINO_THROW("Unsupported isa: ", isa);
@@ -71,7 +72,7 @@ printf("[CPU][CombineHash] avx2\n");
             OPENVINO_THROW("The current CPU does not support pclmulqdq instruction, which is required for the CRC algorithm.");
         }
         if (mayiuse(cpu_isa_t::vpclmulqdq)) {
-printf("[CPU][CombineHash] supports vpclmulqdq\n");
+// printf("[CPU][CombineHash] supports vpclmulqdq\n");
             is_vpclmulqdq = true;
         }
 
@@ -83,7 +84,8 @@ printf("[CPU][CombineHash] supports vpclmulqdq\n");
 
         r64_src = getReg64();
         r64_dst = getReg64();
-        r64_work_amount  = getReg64();
+        r64_work_amount = getReg64();
+        r64_k_ptr = getReg64();
         // r64_aux = getReg64();
 r64_tmp = getReg64();
         // v_dst       = getVmm();
@@ -95,6 +97,7 @@ r64_tmp = getReg64();
         mov(r64_src, ptr[r64_params + GET_OFF(src_ptr)]);
         mov(r64_dst, ptr[r64_params + GET_OFF(dst_ptr)]);
         mov(r64_work_amount, ptr[r64_params + GET_OFF(work_amount)]);
+        mov(r64_k_ptr, ptr[r64_params + GET_OFF(k_ptr)]);
 mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
 
         initVectors();
@@ -220,6 +223,7 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> r64_dst;
     RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
     RegistersPool::Reg<Xbyak::Reg64> r64_make_64_fold;
+    RegistersPool::Reg<Xbyak::Reg64> r64_k_ptr;
     // RegistersPool::Reg<Xbyak::Reg64> r64_bulk_step;
     // RegistersPool::Reg<Xbyak::Reg64> r64_aux;
 RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
@@ -259,7 +263,7 @@ void CombineHash<isa>::uni_vpxorq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_s
 }
 
 // P(x) = 0x42F0E1EBA9EA3693
-static const uint64_t K_1_2[]   = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e };  // x^(64*1),  x^(64*2)
+// static const uint64_t K_1_2[]   = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e };  // x^(64*1),  x^(64*2)
 static const uint64_t K_3_4[]   = { 0x571bee0a227ef92b, 0x44bef2a201b5200c };  // x^(64*3),  x^(64*4)
 static const uint64_t K_5_6[]   = { 0x54819d8713758b2c, 0x4a6b90073eb0af5a };  // x^(64*5),  x^(64*6)
 static const uint64_t K_7_8[]   = { 0x5f6843ca540df020, 0xddf4b6981205b83f };  // x^(64*7),  x^(64*8)
@@ -267,8 +271,13 @@ static const uint64_t K_9_10[]  = { 0x097c516e98bd2e73, 0x0b76477b31e22e7b };  /
 static const uint64_t K_11_12[] = { 0x9af04e1eff82d0dd, 0x6e82e609297f8fe8 };  // x^(64*11), x^(64*12)
 static const uint64_t K_13_14[] = { 0xe464f4df5fb60ac1, 0xb649c5b35a759cf2 };  // x^(64*13), x^(64*14)
 static const uint64_t K_15_16[] = { 0x05cf79dea9ac37d6, 0x001067e571d7d5c2 };  // x^(64*15), x^(64*16)
-static const uint64_t K_1_0[]   = { 0x05f5c3c7eb52fab6, 0x0000000000000000 };  // x^(64*1),  x^(64*1) mod P(x)
-static const uint64_t K_P_P[]   = { 0x578d29d06cc4f872, 0x42f0e1eba9ea3693 };  // floor(x^128/P(x)) - x^64, P(x) - x^64
+// static const uint64_t K_1_0[]   = { 0x05f5c3c7eb52fab6, 0x0000000000000000 };  // x^(64*1),  x^(64*1) mod P(x)
+// static const uint64_t K_P_P[]   = { 0x578d29d06cc4f872, 0x42f0e1eba9ea3693 };  // floor(x^128/P(x)) - x^64, P(x) - x^64
+
+constexpr uint64_t K_1_0_OFF = 0lu * 2lu * sizeof(uint64_t);
+constexpr uint64_t K_P_P_OFF = 1lu * 2lu * sizeof(uint64_t);
+constexpr uint64_t K_1_2_OFF = 2lu * 2lu * sizeof(uint64_t);
+constexpr uint64_t K_7_8_OFF = 5lu * 2lu * sizeof(uint64_t);
 
 constexpr uint64_t CRC_VAL = 0xffffffffffffffff;
 
@@ -278,8 +287,7 @@ void CombineHash<avx512_core>::initVectors() {
     auto r64_aux = getReg64();
 
     v_k_1_2 = getVmm();
-    mov(r64_aux, reinterpret_cast<uintptr_t>(K_1_2));
-    vbroadcasti64x2(v_k_1_2, ptr[r64_aux]);
+    vbroadcasti64x2(v_k_1_2, ptr[r64_k_ptr + K_1_2_OFF]);
 
     v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
@@ -307,7 +315,7 @@ void CombineHash<avx512_core>::initVectors() {
         if (m_jcp.type == SINGLE_THREAD) {
             add(r64_src, xmm_len);
         }
-vmovdqu64(ptr[r64_tmp], xmm_dst);
+// vmovdqu64(ptr[r64_tmp], xmm_dst);
     } else if (m_jcp.type == N_THREAD) {
         vmovdqu64(v_dst, ptr[r64_src]);
         vpshufb(v_dst, v_dst, v_shuf_mask);
@@ -323,8 +331,7 @@ void CombineHash<isa>::initVectors() {
     auto r64_aux = getReg64();
 
     v_k_1_2 = getVmm();
-    mov(r64_aux, reinterpret_cast<uintptr_t>(K_1_2));
-    vbroadcasti128(v_k_1_2, ptr[r64_aux]);
+    vbroadcasti128(v_k_1_2, ptr[r64_k_ptr + K_1_2_OFF]);
 
     v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
@@ -678,13 +685,13 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
         r64_bulk_step = getReg64();
         mov(r64_bulk_step, ptr[r64_params + GET_OFF(threads_num)]);
         // if (is_vpclmulqdq) {
-            // sal(r64_bulk_step, 6); // *vlen
+            sal(r64_bulk_step, 6); // *vlen
         // }
     }
 
     if (m_jcp.type == SINGLE_THREAD) {
-        mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
-        vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
+        // mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
+        vbroadcasti64x2(v_k_loop, ptr[r64_k_ptr + K_7_8_OFF]);
     } else {
         mov(r64_aux, reinterpret_cast<uintptr_t>(K_15_16));
         vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
@@ -705,10 +712,16 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
 
     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
         add(r64_src, r64_bulk_step);
+        // prefetcht2(ptr[r64_src + 8192]);
+        prefetcht2(ptr[r64_src + 16384]);
     } else {
         add(r64_src, vlen - xmm_len);
+        // prefetcht2(ptr[r64_src + 2048]);
     }
+    prefetcht1(ptr[r64_src + 1024]);
     prefetcht0(ptr[r64_src + 1024]);
+    // prefetcht0(ptr[r64_src + 64]);
+    // prefetcht0(ptr[r64_src]);
     sub(r64_work_amount, 2 * vlen - xmm_len);
     // sub(r64_work_amount, 2 * vlen);
 
@@ -718,10 +731,16 @@ void CombineHash<avx512_core>::bulkFold(const Vmm& v_dst) {
 
         if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
             add(r64_src, r64_bulk_step);
+            // prefetcht2(ptr[r64_src + 8192]);
+            prefetcht2(ptr[r64_src + 16384]);
         } else {
             add(r64_src, vlen);
+            // prefetcht2(ptr[r64_src + 2048]);
         }
-        prefetcht0(ptr[r64_src + 1024]);
+        prefetcht1(ptr[r64_src + 1024]);
+        // prefetcht0(ptr[r64_src + 1024]);
+        prefetcht0(ptr[r64_src + 64]);
+        // prefetcht0(ptr[r64_src]);
 
         if (is_vpclmulqdq) {
             vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
@@ -1127,13 +1146,11 @@ void CombineHash<avx512_core>::tailFold(const Vmm& v_dst) {
 
     L(l_fold_to_64);
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(K_1_0));
-    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux], 0b00000001);
+    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_k_ptr + K_1_0_OFF], 0b00000001);
     vpslldq(xmm_dst, xmm_dst, 0x8);
     uni_vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(K_P_P));
-    vmovdqu64(xmm_aux_2, ptr[r64_aux]);
+    vmovdqu64(xmm_aux_2, ptr[r64_k_ptr + K_P_P_OFF]);
     vpclmulqdq(xmm_aux, xmm_dst, xmm_aux_2, 0b00000001);
     mov(r64_aux, 0x0);
     vpinsrq(xmm_aux_1, xmm_dst, r64_aux, 0x0);
@@ -1177,13 +1194,11 @@ void CombineHash<isa>::tailFold(const Vmm& v_dst) {
     cmp(r64_make_64_fold, 0);
     je(l_save_128, T_NEAR);
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(K_1_0));
-    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_aux], 0b00000001);
+    vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_k_ptr + K_1_0_OFF], 0b00000001);
     vpslldq(xmm_dst, xmm_dst, 0x8);
     uni_vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
-    mov(r64_aux, reinterpret_cast<uintptr_t>(K_P_P));
-    vmovdqu(xmm_aux_2, ptr[r64_aux]);
+    vmovdqu(xmm_aux_2, ptr[r64_k_ptr + K_P_P_OFF]);
     vpclmulqdq(xmm_aux, xmm_dst, xmm_aux_2, 0b00000001);
 // vmovdqu(ptr[r64_tmp], xmm_aux);
     mov(r64_aux, 0x0);
@@ -1312,9 +1327,9 @@ const uint8_t CombineHash<isa>::SHUF_MASK[] = { 0b00001111, 0b00001110, 0b000011
 
 size_t combine_hash(const void* src, size_t size) {
 // if (size > 200000)
-    printf("combine_hash size: %lu\n", size);
-static uint64_t counter = 0;
-static uint64_t sum = 0;
+    // printf("combine_hash size: %lu\n", size);
+static uint64_t counter = 0lu;
+static uint64_t sum = 0lu;
 counter++;
 auto t1 = std::chrono::high_resolution_clock::now();
 // std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
@@ -1329,17 +1344,13 @@ auto t1 = std::chrono::high_resolution_clock::now();
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
     static jit::fn_t kernels[jit::KERNELS_NUM] = {nullptr, nullptr, nullptr, nullptr};
     static bool initialized = false;
-    static std::vector<uint64_t> K_ARRAY = {
-// static const uint64_t K_1_2[]   = { 0x05f5c3c7eb52fab6, 0x4eb938a7d257740e };  // x^(64*1),  x^(64*2)
-// static const uint64_t K_3_4[]   = { 0x571bee0a227ef92b, 0x44bef2a201b5200c };  // x^(64*3),  x^(64*4)
-// static const uint64_t K_5_6[]   = { 0x54819d8713758b2c, 0x4a6b90073eb0af5a };  // x^(64*5),  x^(64*6)
-// static const uint64_t K_7_8[]   = { 0x5f6843ca540df020, 0xddf4b6981205b83f };  // x^(64*7),  x^(64*8)
-// static const uint64_t K_9_10[]  = { 0x097c516e98bd2e73, 0x0b76477b31e22e7b };  // x^(64*9),  x^(64*10)
-// static const uint64_t K_11_12[] = { 0x9af04e1eff82d0dd, 0x6e82e609297f8fe8 };  // x^(64*11), x^(64*12)
-// static const uint64_t K_13_14[] = { 0xe464f4df5fb60ac1, 0xb649c5b35a759cf2 };  // x^(64*13), x^(64*14)
-// static const uint64_t K_15_16[] = { 0x05cf79dea9ac37d6, 0x001067e571d7d5c2 };  // x^(64*15), x^(64*16)
-// static const uint64_t K_1_0[]   = { 0x05f5c3c7eb52fab6, 0x0000000000000000 };  // x^(64*1),  x^(64*1) mod P(x)
-// static const uint64_t K_P_P[]   = { 0x578d29d06cc4f872, 0x42f0e1eba9ea3693 };  // floor(x^128/P(x)) - x^64, P(x) - x^64
+    static std::vector<uint64_t> k_array = {
+        0x05f5c3c7eb52fab6, 0x0000000000000000,  // x^(64*1),  x^(64*1) mod P(x)
+        0x578d29d06cc4f872, 0x42f0e1eba9ea3693,  // floor(x^128/P(x)) - x^64, P(x) - x^64
+        0x05f5c3c7eb52fab6, 0x4eb938a7d257740e,  // x^(64*1),  x^(64*2)
+        0x571bee0a227ef92b, 0x44bef2a201b5200c,  // x^(64*3),  x^(64*4)
+        0x54819d8713758b2c, 0x4a6b90073eb0af5a,  // x^(64*5),  x^(64*6)
+        0x5f6843ca540df020, 0xddf4b6981205b83f   // x^(64*7),  x^(64*8)
     };
 
     // std::cout << std::hex;
@@ -1354,8 +1365,8 @@ auto t1 = std::chrono::high_resolution_clock::now();
     // std::cout << std::endl;
     // std::cout << std::dec << "\nx^" << 128 << ": " << std::hex << jit::xt_mod_P_neg(128);
     
-    if (kernels[0] == nullptr) {
-printf("    init kernels\n");
+    if (!initialized) {
+// printf("    init kernels\n");
         if (jit::Generator::mayiuse(jit::avx512_core)) {
             parallel_nt(jit::KERNELS_NUM, [&](const int ithr, const int nthr) {
                 jit::CombineHashCompileParams params;
@@ -1389,6 +1400,7 @@ printf("    init kernels\n");
                     OPENVINO_THROW("[ CORE ] Combine hash. Kernel #", i, " was not initialized.");
                 }
             }
+            initialized = true;
         } else if (jit::Generator::mayiuse(jit::avx2)) {
             // kernel = jit::CombineHash<jit::avx2>::get();
         }
@@ -1397,52 +1409,73 @@ printf("    init kernels\n");
     if (kernels[0]) {
         size_t res = 0lu;
 
-        static const size_t block_size = 2lu * jit::Generator::zmm_len; //kernels[0]->getVlen(); // TODO: vlen
-        if (size >= 200000lu) {
+        constexpr size_t min_wa_per_thread = 65536lu;
+        // Parallel section
+        // if (size >= min_wa_per_thread * 2lu) {
+        if (size >= 200000000lu) {
 // printf("    parallel_get_max_threads : %d\n", parallel_get_max_threads());
-            // static const size_t thr_num = parallel_get_max_threads() > 1 ? parallel_get_max_threads() / 2 : 1lu; // TODO: WA for Hyper Threading
-            const size_t thr_num = 2lu;
-            static std::vector<uint64_t> intermediate(thr_num * 8lu); // zmm_len * thr_num
-            const uint64_t blocks = size / block_size;
-            const uint64_t el_per_thread = block_size * ((blocks + thr_num - 1) / thr_num);
-std::vector<uint64_t> tmp_vec(thr_num * 4, 0lu);
-std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
-            uint64_t crc_arr[2] = { size, jit::CRC_VAL };
+//             static const size_t max_thr_num = parallel_get_max_threads() > 1 ? parallel_get_max_threads() / 2 : 1lu; // TODO: WA for Hyper Threading
+//             // size_t thr_num = 2lu; // (size + min_wa_per_thread / 2) / min_wa_per_thread;
+//             // size_t thr_num = size / min_wa_per_thread; // (size + min_wa_per_thread / 2) / min_wa_per_thread;
+//             size_t thr_num = std::min(size / min_wa_per_thread, max_thr_num);
+//             const size_t k_size = thr_num * 8lu + 4lu;
+//             // if (k_array.size() < k_size) {
+//             //     auto prev_size = k_array.size();
+//             //     k_array.resize(k_size);
+//             //     for (size_t i = prev_size; i < k_size; i++) {
+//             //         k_array[i] = jit::gen_k_value(i - 3lu);
+//             //     }
+//             // }
+//             // const size_t block_size = thr_num * jit::Generator::zmm_len; //kernels[0]->getVlen(); // TODO: vlen
+//             // const uint64_t blocks = size / block_size;
+//             // const uint64_t el_per_thread = block_size * ((blocks + thr_num - 1) / thr_num);
+//             // const uint64_t el_per_thread = block_size * ( (size / block_size) / thr_num );
+//             const uint64_t el_per_thread = jit::Generator::zmm_len * ( (size / thr_num) / jit::Generator::zmm_len);
+//             uint64_t crc_xmm[2] = { size, jit::CRC_VAL };
+//             std::vector<uint64_t> intermediate(thr_num * 8lu); // zmm_len * thr_num
 
-            parallel_nt(thr_num, [&](const int ithr, const int nthr) {
-            // parallel_nt(36, [&](int ithr, const int nthr) {
-            //     if (ithr != 0 && ithr != 18) {
-            //         return;
-            //     }
-            //     ithr /= 18;
-                // if (ithr > 0)
-                //     return;
+// // std::vector<uint64_t> tmp_vec(thr_num * 4, 0lu);
+// // std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
 
-                uint64_t start = ithr * el_per_thread;
-                if (start >= size) {
-                    return;
-                }
-                uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
-// printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
+//             tbb::parallel_for(static_cast<size_t>(0), thr_num, [&](size_t ithr) {
+//             // parallel_nt(thr_num, [&](const int ithr, const int nthr) {
+//             // parallel_nt(2, [&](int ithr, const int nthr) {
+//             //     if (ithr != 0 && ithr != 18) {
+//             //         return;
+//             //     }
+//             //     ithr /= 18;
+//                 // if (ithr > 0)
+//                 //     return;
 
-                jit::CombineHashCallArgs args;
+//                 uint64_t start = ithr * el_per_thread;
+//                 if (start >= size) {
+//                     return;
+//                 }
+//                 uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
+// // printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
 
-                args.src_ptr = reinterpret_cast<const uint8_t *>(src) + jit::Generator::xmm_len * 4lu * ithr;
-                args.dst_ptr = &(intermediate[ithr * 8lu]);
-                if (ithr == 0) {
-                    args.crc_ptr = crc_arr;
-                }
-                args.work_amount = work_amount;
-                args.threads_num = jit::Generator::xmm_len * 8lu; //thr_num;
-args.tmp_ptr = &(tmp_vec[ithr * 4]);
+//                 jit::CombineHashCallArgs args;
 
-                kernels[ithr == 0 ? jit::FIRST_THREAD : jit::N_THREAD](&args);
-                // kernels[jit::FIRST_THREAD](&args);
-// printf("    [%d] start: %lu, work_amount: %lu; {%lu; %lu}\n", ithr, start, work_amount, tmp_vec[ithr * 4], tmp_vec[ithr * 4 + 1]);
-// printf("    [%d] {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n", ithr,
-//     intermediate[ithr * 8 + 0], intermediate[ithr * 8 + 1], intermediate[ithr * 8 + 2], intermediate[ithr * 8 + 3],
-//     intermediate[ithr * 8 + 4], intermediate[ithr * 8 + 5], intermediate[ithr * 8 + 6], intermediate[ithr * 8 + 7]);
-            });
+//                 args.src_ptr = reinterpret_cast<const uint8_t *>(src) + jit::Generator::zmm_len * ithr; //kernels[0]->getVlen(); // TODO: vlen
+//                 args.dst_ptr = &(intermediate[ithr * 8lu]);
+//                 args.k_ptr = k_array.data();
+//                 args.work_amount = work_amount;
+//                 args.threads_num = thr_num; //jit::Generator::xmm_len * 8lu;
+// // args.tmp_ptr = &(tmp_vec[ithr * 4]);
+
+//                 if (ithr == 0) {
+//                     args.crc_ptr = crc_xmm;
+//                     kernels[jit::FIRST_THREAD](&args);
+//                 } else {
+//                     kernels[jit::N_THREAD](&args);
+//                 }
+// // printf("    [%d] start: %lu, work_amount: %lu; {%lu; %lu}\n", ithr, start, work_amount, tmp_vec[ithr * 4], tmp_vec[ithr * 4 + 1]);
+// // printf("    [%d] {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n", ithr,
+// //     intermediate[ithr * 8 + 0], intermediate[ithr * 8 + 1], intermediate[ithr * 8 + 2], intermediate[ithr * 8 + 3],
+// //     intermediate[ithr * 8 + 4], intermediate[ithr * 8 + 5], intermediate[ithr * 8 + 6], intermediate[ithr * 8 + 7]);
+//             // });
+//             }, tbb::static_partitioner());
+            // }, tbb::auto_partitioner());
 
 //             jit::CombineHashCallArgs args;
 
@@ -1454,44 +1487,49 @@ args.tmp_ptr = &(tmp_vec[ithr * 4]);
 
 //             kernels[jit::FIRST_THREAD](&args);
 
-            jit::CombineHashCallArgs args;
-            args.work_amount = size - el_per_thread * thr_num; //((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
-            args.src_ptr = reinterpret_cast<const uint8_t *>(src) + size - args.work_amount;
-            args.dst_ptr = &res;
-            args.intermediate_ptr = intermediate.data();
-args.tmp_ptr = tmp_vec_2.data();
+//             jit::CombineHashCallArgs args;
+//             args.work_amount = size - el_per_thread * thr_num; //((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
+//             args.src_ptr = reinterpret_cast<const uint8_t *>(src) + size - args.work_amount;
+//             args.dst_ptr = &res;
+//             args.k_ptr = k_array.data();
+//             args.intermediate_ptr = intermediate.data();
+// args.tmp_ptr = tmp_vec_2.data();
 // printf("    FINAL_FOLD work_amount: %lu\n", args.work_amount);
 
-            kernels[jit::FINAL_FOLD](&args);
+            // kernels[jit::FINAL_FOLD](&args);
         } else {
-std::vector<uint64_t> tmp_vec(4, 0lu);
-static std::vector<uint64_t> intermediate(2 * 8lu); // zmm_len * thr_num
+// std::vector<uint64_t> tmp_vec(4, 0lu);
+// static std::vector<uint64_t> intermediate(2 * 8lu); // zmm_len * thr_num
 
             jit::CombineHashCallArgs args;
             args.src_ptr = src;
             args.dst_ptr = &res;
+            args.k_ptr = k_array.data();
             args.work_amount = size;
-args.intermediate_ptr = intermediate.data();
-args.tmp_ptr = &(tmp_vec[0]);
+// args.intermediate_ptr = intermediate.data();
+// args.tmp_ptr = &(tmp_vec[0]);
 
             kernels[jit::SINGLE_THREAD](&args);
 
-if (size > 200000) {
-printf("    {%lu; %lu; %lu; %lu}\n", tmp_vec[0], tmp_vec[1], tmp_vec[2], tmp_vec[3]);
+// if (size > 200000) {
+// printf("    {%lu; %lu; %lu; %lu}\n", tmp_vec[0], tmp_vec[1], tmp_vec[2], tmp_vec[3]);
 // printf("    {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n",
 //     intermediate[0], intermediate[1], intermediate[2], intermediate[3],
 //     intermediate[4], intermediate[5], intermediate[6], intermediate[7],
 //     intermediate[8], intermediate[9], intermediate[10], intermediate[11],
 //     intermediate[12], intermediate[13], intermediate[14], intermediate[15]);
-}
+// }
         }
 
 auto t2 = std::chrono::high_resolution_clock::now();
 auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
-sum += ms_int.count();
-if (size > 200000)
+// sum += ms_int.count();
+// if (size >= min_wa_per_thread * 2lu) {
+if (size == 4lu) {
+    sum += ms_int.count();
     std::cout << "[" << counter << "] combine_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanosec" << std::endl;
-printf("    res: %lu\n", res);
+}
+// printf("    res: %lu\n", res);
         return res;
     }
 //     if (kernel) {
