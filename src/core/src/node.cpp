@@ -622,9 +622,11 @@ vector<ov::Input<ov::Node>> ov::Node::inputs() {
 }
 
 vector<ov::Output<ov::Node>> ov::Node::input_values() const {
+    const size_t inp_size = get_input_size();
     vector<Output<Node>> result;
+    result.reserve(inp_size);
 
-    for (size_t i = 0; i < get_input_size(); i++) {
+    for (size_t i = 0lu; i < inp_size; i++) {
         result.emplace_back(input(i).get_source_output());
     }
 
@@ -759,11 +761,11 @@ bool ov::Node::visit_attributes(AttributeVisitor&) {
 namespace ov {
 void check_new_args_count(const Node* const node, const OutputVector& new_args) {
     NODE_VALIDATION_CHECK(node,
-                          new_args.size() == node->input_values().size(),
+                          new_args.size() == node->get_input_size(),
                           "clone_with_new_inputs() expected ",
-                          node->input_values().size(),
+                          node->get_input_size(),
                           " argument",
-                          (node->input_values().size() == 1 ? "" : "s"),
+                          (node->get_input_size() == 1 ? "" : "s"),
                           " but got ",
                           new_args.size());
 }

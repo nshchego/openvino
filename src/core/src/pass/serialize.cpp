@@ -1059,7 +1059,8 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
 
                 port.append_attribute("precision").set_value(get_precision_name(port_element_type).c_str());
                 for (const auto& d : i.get_partial_shape()) {
-                    pugi::xml_node dim = port.append_child("dim");
+                    auto dim = port.append_child(pugi::node_element);
+		            dim.set_name("dim", 3);
                     if (d.is_dynamic()) {
                         dim.append_child(pugi::xml_node_type::node_pcdata).set_value("-1");
                     } else {

@@ -739,12 +739,15 @@ ov::GenericLayerParams ov::XmlDeserializer::parse_generic_params(const pugi::xml
         port.portId = static_cast<size_t>(pugixml::get_uint64_attr(parentNode, "id"));
 
         FOREACH_CHILD (node, parentNode, "dim") {
+            // int64_t dim = std::atoll(node.child_value());
+            // if (dim < -1) {
             int64_t dim = 0;
             const pugi::char_t* dimVal = node.child_value();
             std::stringstream ss(dimVal);
             if (!(ss >> dim) || dim < -1) {
+printf("[CORE] Invalid dimension\n");
                 OPENVINO_THROW("dimension (",
-                               dimVal,
+                            //    dimVal,
                                ") in node ",
                                node.name(),
                                " must be greater or equal to -1: at offset ",
