@@ -19,11 +19,11 @@
 #include "openvino/core/parallel.hpp"
 #include "openvino/core/type/float16.hpp"
 #include "openvino/op/util/framework_node.hpp"
-#include "openvino/opsets/opset1.hpp" //
+#include "openvino/opsets/opset1.hpp"
 #include "openvino/pass/constant_folding.hpp"
 #include "openvino/reference/convert.hpp"
-#include "openvino/reference/utils/combine_hash.hpp"
 #include "openvino/runtime/aligned_buffer.hpp"
+#include "openvino/runtime/compute_hash.hpp"
 #include "openvino/runtime/string_aligned_buffer.hpp"
 #include "openvino/util/file_util.hpp"
 #include "pugixml.hpp"
@@ -117,7 +117,7 @@ public:
             // the same hash for {2, 2} and {0, 128} arrays.
             // But even strong hashing algorithms sometimes give collisions.
             // Therefore we always have to compare values when finding a match in the hash multimap.
-            const HashValue hash = ov::runtime::combine_hash(ptr_to_write, *new_size);
+            const HashValue hash = ov::runtime::compute_hash(ptr_to_write, *new_size);
 // printf("ConstantWriter hash: %lu ? ", hash);
 
 // static uint64_t counter = 0lu;
@@ -1439,7 +1439,7 @@ public:
     }
 
     std::streamsize xsputn(const char* s, std::streamsize n) override {
-        uint64_t h = ov::runtime::combine_hash(s, n);
+        uint64_t h = ov::runtime::compute_hash(s, n);
         m_res = hash_combine_size_t(m_res, h);
 
         return n;

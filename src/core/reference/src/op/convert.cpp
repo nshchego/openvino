@@ -7,7 +7,7 @@
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include "openvino/reference/utils/jit_generator.hpp"
 
-using namespace ov::runtime;
+using namespace ov::reference;
 #endif
 
 namespace ov {

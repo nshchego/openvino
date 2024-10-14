@@ -12,7 +12,7 @@
 #include <xbyak/xbyak.h>
 
 namespace ov {
-namespace runtime {
+namespace reference {
 namespace jit {
 #ifdef XBYAK64
     static const Xbyak::Operand::Code abi_save_gpr_regs[] = {
@@ -112,5 +112,5 @@ namespace jit {
     };
 
 }  // namespace jit
-}  // namespace runtime
+}  // namespace reference
 }  // namespace ov

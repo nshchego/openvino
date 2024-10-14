@@ -5,17 +5,14 @@
 #pragma once
 
 #include "jit_generator.hpp"
-// #include "utils/cpu_utils.hpp"
-// #include "dnnl_types.h"
 #include "openvino/core/except.hpp"
 
 #include <memory>
-// #include <xbyak/xbyak.h>
 #include <utility>
 #include <vector>
 
 namespace ov {
-namespace runtime {
+namespace reference {
 namespace jit {
 
 /**
@@ -102,7 +99,7 @@ public:
         checkUniqueAndUpdate(false);
     }
 
-    template <ov::runtime::jit::cpu_isa_t isa>
+    template <ov::reference::jit::cpu_isa_t isa>
     static Ptr create(std::initializer_list<Xbyak::Reg> regsToExclude);
 
     static Ptr create(cpu_isa_t isa, std::initializer_list<Xbyak::Reg> regsToExclude);
@@ -353,5 +350,5 @@ RegistersPool::Ptr RegistersPool::create(cpu_isa_t isa, std::initializer_list<Xb
 }
 
 } // namespace jit
-} // namespace runtime
+} // namespace reference
 } // namespace ov
