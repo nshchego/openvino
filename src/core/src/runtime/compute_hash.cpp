@@ -47,6 +47,7 @@ struct ComputeHashCallArgs {
     const void* k_ptr      = nullptr;
     void* intermediate_ptr = nullptr;
     uint64_t work_amount   = 0lu;
+    uint64_t size          = 0lu;
     uint64_t threads_num   = 1lu;
 void* tmp_ptr; // TODO: remomve
 };
@@ -97,16 +98,33 @@ constexpr uint64_t K_16_17_OFF = 9lu * 2lu * sizeof(uint64_t);
 // static const uint64_t K_1_0[]   = { K_2, 0x0000000000000000 };  // x^(64*1),  x^(64*1) mod P(x)
 // static const uint64_t K_P_P[]   = { P_1, P_2 };  // floor(x^128/P(x)) - x^64, P(x) - x^64
 
+class HashBase : public Generator {
+protected:
+    void (*ker_fn)(const ComputeHashCallArgs*);
+public:
+    virtual void generate() = 0;
+
+    void operator()(const ComputeHashCallArgs* args) {
+        ker_fn(args);
+    }
+
+    virtual void create_kernel() {
+        generate();
+        ker_fn = (decltype(ker_fn))getCode();
+        OPENVINO_ASSERT(ker_fn, "[ CORE ] Could not generate kernel code.");
+    }
+};
+
 template <cpu_isa_t isa>
-class ComputeHash : public Generator {
+class ComputeHash : public HashBase {
 public:
     explicit ComputeHash(const ComputeHashCompileParams& jcp) :
             m_jcp(jcp) {
         if (isa == avx512_core) {
-// printf("[CPU][ComputeHash] avx512_core\n");
+printf("[CPU][ComputeHash] avx512_core\n");
             vlen = zmm_len;
         } else if (isa == avx2) {
-// printf("[CPU][ComputeHash] avx2\n");
+printf("[CPU][ComputeHash] avx2\n");
             vlen = ymm_len;
         } else {
             OPENVINO_THROW("Unsupported isa: ", isa);
@@ -115,14 +133,13 @@ public:
             OPENVINO_THROW("The current CPU does not support pclmulqdq instruction, which is required for the CRC algorithm.");
         }
         if (mayiuse(cpu_isa_t::vpclmulqdq)) {
-// printf("[CPU][ComputeHash] supports vpclmulqdq\n");
+printf("[CPU][ComputeHash] supports vpclmulqdq\n");
             is_vpclmulqdq = true;
         }
-
-        generate();
     }
 
-    void generate() {
+    void generate() override {
+// printf("ComputeHash generate %d\n", static_cast<int>(m_jcp.type));
         m_registers_pool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
         r64_src = getReg64();
@@ -159,10 +176,12 @@ mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
         m_registers_pool.reset();
     }
 
-    static hash_kernel get(ComputeHashCompileParams params) {
-        static ComputeHash<isa> kernel(params);
+    static std::shared_ptr<HashBase> create(const ComputeHashCompileParams& params) {
+        auto kernel = std::make_shared<ComputeHash>(params);
+        OPENVINO_ASSERT(kernel, "[ CORE ] Could not create ComputeHash kernel.");
+        kernel->create_kernel();
 
-        return (hash_kernel)kernel.getCode();
+        return kernel;
     }
 
     void fill_rest_work_mask(const Xbyak::Opmask& k_dst_mask,
@@ -247,6 +266,7 @@ mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
 
     //     L(l_end);
     // }
+
 
 private:
     static constexpr uint64_t CHUNK_SIZE = 32;
@@ -400,9 +420,11 @@ void ComputeHash<avx512_core>::initialize() {
         auto k_rest_mask = RegistersPool::Reg<Xbyak::Opmask>(m_registers_pool);
 
         // Initial CRC
+        mov(r64_aux, ptr[r64_params + GET_OFF(size)]);
+        vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x0);
         mov(r64_aux, CRC_VAL);
-        vpinsrq(xmm_aux, xmm_aux, r64_work_amount, 0x0);
         vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x1);
+// vmovdqu64(ptr[r64_tmp], xmm_aux);
         // Initial xor with source
         fill_rest_work_mask(k_rest_mask, r64_work_amount);
         vmovdqu8(Vmm(v_dst.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
@@ -785,13 +807,9 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
     }
 
     if (m_jcp.type == SINGLE_THREAD) {
-        // mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
         vbroadcasti64x2(v_k_loop, ptr[r64_k_ptr + K_8_9_OFF]);
     } else {
         vbroadcasti64x2(v_k_loop, ptr[r64_k_ptr + K_16_17_OFF]);
-        // mov(r64_aux, reinterpret_cast<uintptr_t>(K_16_17));
-        // vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
-        // ...
     }
 
     vmovdqu64(v_dst_0, v_dst);
@@ -812,12 +830,14 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
         prefetcht2(ptr[r64_src + 16384]);
     } else {
         add(r64_src, vlen - xmm_len);
-        // prefetcht2(ptr[r64_src + 2048]);
+        prefetcht2(ptr[r64_src + 4096]);
+        // prefetcht2(ptr[r64_src + 16384]);
     }
     prefetcht1(ptr[r64_src + 1024]);
-    prefetcht0(ptr[r64_src + 1024]);
-    // prefetcht0(ptr[r64_src + 64]);
+    // prefetcht0(ptr[r64_src + 1024]);
+    prefetcht0(ptr[r64_src + 64]);
     // prefetcht0(ptr[r64_src]);
+
     sub(r64_work_amount, 2 * vlen - xmm_len);
     // sub(r64_work_amount, 2 * vlen);
 
@@ -831,12 +851,13 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
             prefetcht2(ptr[r64_src + 16384]);
         } else {
             add(r64_src, vlen);
-            // prefetcht2(ptr[r64_src + 2048]);
+            prefetcht2(ptr[r64_src + 4096]);
+            // prefetcht2(ptr[r64_src + 8192]);
+            // prefetcht2(ptr[r64_src + 16384]);
         }
         prefetcht1(ptr[r64_src + 1024]);
         // prefetcht0(ptr[r64_src + 1024]);
         prefetcht0(ptr[r64_src + 64]);
-        // prefetcht0(ptr[r64_src]);
 
         if (is_vpclmulqdq) {
             vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
@@ -905,7 +926,6 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
             auto ymm_aux_0 = Xbyak::Ymm(v_aux_0.getIdx());
 
             vextracti64x4(ymm_dst_1, v_dst_0, 0x1);
-            // vmovdqu64(ymm_aux_0, ptr[r64_k_ptr + K_4_5_OFF]);
             vpclmulqdq(ymm_aux_0, ymm_dst_0, ptr[r64_k_ptr + K_4_5_OFF], 0b00000000);
             vpclmulqdq(ymm_dst_0, ymm_dst_0, ptr[r64_k_ptr + K_4_5_OFF], 0b00010001);
             uni_vpxorq(ymm_dst_1, ymm_dst_1, ymm_aux_0);
@@ -1207,8 +1227,7 @@ void ComputeHash<isa>::rest_fold(const Vmm& v_dst) {
 
 template <>
 void ComputeHash<avx512_core>::tail_fold(const Vmm& v_dst) {
-// vmovdqu64(ptr[r64_tmp], Xbyak::Xmm(v_dst.getIdx()));
-    Xbyak::Label l_fold_to_64;
+Xbyak::Label l_fold_to_64;
     cmp(r64_work_amount, 0);
     jle(l_fold_to_64, T_NEAR);
 
@@ -1246,7 +1265,7 @@ void ComputeHash<avx512_core>::tail_fold(const Vmm& v_dst) {
     vpinsrq(xmm_aux_1, xmm_dst, r64_aux, 0x0);
     uni_vpxorq(xmm_aux, xmm_aux, xmm_aux_1);
     vpinsrq(xmm_aux_1, xmm_aux, r64_aux, 0x0);
-    
+
     mov(r64_aux, P_2);
     vpinsrq(xmm_aux_2, xmm_aux_2, r64_aux, 0x1);
     vpclmulqdq(xmm_aux, xmm_aux, xmm_aux_2, 0b00010001);
@@ -1254,7 +1273,6 @@ void ComputeHash<avx512_core>::tail_fold(const Vmm& v_dst) {
     uni_vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
     vpextrq(ptr[r64_dst], xmm_dst, 0x0);
-// vmovdqu64(ptr[r64_tmp], xmm_dst);
 }
 
 template <cpu_isa_t isa>
@@ -1561,13 +1579,13 @@ uint64_t barrett_calc(uint64_t poly = 0x42F0E1EBA9EA3693, int bits = 64) {
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t compute_hash(const void* src, size_t size) {
-// if (size > 200000)
-    printf("compute_hash size: %lu\n", size);
+if (size > 131072 * 2)
+    printf("combine_hash size: %lu\n", size);
 static uint64_t counter = 0lu;
 static uint64_t sum = 0lu;
 // counter++;
 std::chrono::high_resolution_clock::time_point t1, t2;
-// t1 = std::chrono::high_resolution_clock::now();
+t1 = std::chrono::high_resolution_clock::now();
 // std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0xD663B05D, 32)
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0x04C11DB7, 32)
@@ -1603,15 +1621,6 @@ std::chrono::high_resolution_clock::time_point t1, t2;
     // }
     // std::cout << std::dec << "\nx^" << 128 << ": " << std::hex << jit::xt_mod_P_neg(128);
     
-// t1 = std::chrono::high_resolution_clock::now();
-// t2 = std::chrono::high_resolution_clock::now();
-// if (counter == 0) {
-//     auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
-//     counter++;
-//     sum += ms_int.count();
-//     std::cout << "[" << counter << "] compute_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanosec" << std::endl;
-// }
-
     if (Generator::mayiuse(avx2)) {
         uint64_t result = 0lu;
 
@@ -1635,13 +1644,22 @@ std::chrono::high_resolution_clock::time_point t1, t2;
         // Parallel section
         if (size >= min_wa_per_thread * 2lu) {
         // if (size >= 2000000000lu) {
-            // parallel_nt_static(3, [&](const int ithr, const int nthr) {
             static auto first_thr_kernel = Generator::mayiuse(avx512_core) ?
-                jit::ComputeHash<avx512_core>::get({jit::FIRST_THREAD}) : jit::ComputeHash<avx2>::get({jit::FIRST_THREAD});
+                jit::ComputeHash<avx512_core>::create({jit::FIRST_THREAD}) : jit::ComputeHash<avx2>::create({jit::FIRST_THREAD});
             static auto n_thr_kernel = Generator::mayiuse(avx512_core) ?
-                jit::ComputeHash<avx512_core>::get({jit::N_THREAD}) : jit::ComputeHash<avx2>::get({jit::N_THREAD});
+                jit::ComputeHash<avx512_core>::create({jit::N_THREAD}) : jit::ComputeHash<avx2>::create({jit::N_THREAD});
             static auto final_fold_kernel = Generator::mayiuse(avx512_core) ?
-                jit::ComputeHash<avx512_core>::get({jit::FINAL_FOLD}) : jit::ComputeHash<avx2>::get({jit::FINAL_FOLD});
+                jit::ComputeHash<avx512_core>::create({jit::FINAL_FOLD}) : jit::ComputeHash<avx2>::create({jit::FINAL_FOLD});
+                
+            
+            // parallel_nt_static(3, [&](const int ithr, const int nthr) {
+            //     if 
+            //     static auto first_thr_kernel = Generator::mayiuse(avx512_core) ?
+            //         jit::ComputeHash<avx512_core>::create({jit::FIRST_THREAD}) : jit::ComputeHash<avx2>::create({jit::FIRST_THREAD});
+            //     static auto n_thr_kernel = Generator::mayiuse(avx512_core) ?
+            //         jit::ComputeHash<avx512_core>::create({jit::N_THREAD}) : jit::ComputeHash<avx2>::create({jit::N_THREAD});
+            //     static auto final_fold_kernel = Generator::mayiuse(avx512_core) ?
+            //         jit::ComputeHash<avx512_core>::create({jit::FINAL_FOLD}) : jit::ComputeHash<avx2>::create({jit::FINAL_FOLD});
             // });
 
 // printf("    parallel_get_max_threads : %d\n", parallel_get_max_threads());
@@ -1667,33 +1685,27 @@ std::chrono::high_resolution_clock::time_point t1, t2;
 // std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
 
             parallel_nt_static(thr_num, [&](const int ithr, const int nthr) {
-            //     if (ithr != 0 && ithr != 18) {
-            //         return;
-            //     }
-            //     ithr /= 18;
-                // if (ithr > 0)
-                //     return;
-
                 uint64_t start = ithr * el_per_thread;
                 if (start >= size) {
                     return;
                 }
                 uint64_t work_amount = (el_per_thread + start > size) ? size - start : el_per_thread;
-printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
+// printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
 
                 jit::ComputeHashCallArgs args;
 
-                args.src_ptr = reinterpret_cast<const uint8_t *>(src) + start;
-                args.dst_ptr = &(intermediate[ithr * 8]);
+                args.src_ptr = reinterpret_cast<const uint8_t *>(src) + Generator::zmm_len * ithr;
+                args.dst_ptr = &(intermediate[8lu * ithr]);
                 args.k_ptr = jit::K_PULL;
                 args.work_amount = work_amount;
-                args.threads_num = thr_num; //jit::Generator::xmm_len * 8lu;
+                args.size = size;
+                args.threads_num = thr_num; // jit::Generator::xmm_len * 8lu;
 // args.tmp_ptr = &(tmp_vec[ithr * 4]);
 
                 if (ithr == 0) {
-                    first_thr_kernel(&args);
+                    (*first_thr_kernel)(&args);
                 } else {
-                    n_thr_kernel(&args);
+                    (*n_thr_kernel)(&args);
                 }
 // printf("    [%d] start: %lu, work_amount: %lu; {%lu; %lu}\n", ithr, start, work_amount, tmp_vec[ithr * 4], tmp_vec[ithr * 4 + 1]);
 // printf("    [%d] {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n", ithr,
@@ -1702,18 +1714,19 @@ printf("    [%d] start: %lu, work_amount: %lu\n", ithr, start, work_amount);
             });
 
             jit::ComputeHashCallArgs args;
-            args.work_amount = size - el_per_thread * thr_num; //((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
             args.src_ptr = reinterpret_cast<const uint8_t *>(src) + size - args.work_amount;
             args.dst_ptr = &result;
             args.k_ptr = jit::K_PULL;
+            args.work_amount = size - el_per_thread * thr_num; //((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
+            args.size = size;
             args.intermediate_ptr = intermediate.data();
 // args.tmp_ptr = tmp_vec_2.data();
-printf("    FINAL_FOLD work_amount: %lu\n", args.work_amount);
+// printf("    FINAL_FOLD work_amount: %lu\n", args.work_amount);
 
-            final_fold_kernel(&args);
+            (*final_fold_kernel)(&args);
         } else {
             static auto single_thr_kernel = Generator::mayiuse(avx512_core) 
-                ? jit::ComputeHash<avx512_core>::get({jit::SINGLE_THREAD}) : jit::ComputeHash<avx2>::get({jit::SINGLE_THREAD});
+                ? jit::ComputeHash<avx512_core>::create({jit::SINGLE_THREAD}) : jit::ComputeHash<avx2>::create({jit::SINGLE_THREAD});
 // std::vector<uint64_t> tmp_vec(4, 0lu);
 // static std::vector<uint64_t> intermediate(2 * 8lu); // zmm_len * thr_num
 
@@ -1722,11 +1735,12 @@ printf("    FINAL_FOLD work_amount: %lu\n", args.work_amount);
             args.dst_ptr = &result;
             args.k_ptr = jit::K_PULL;
             args.work_amount = size;
+            args.size = size;
 // args.intermediate_ptr = intermediate.data();
 // args.tmp_ptr = &(tmp_vec[0]);
 
 // t1 = std::chrono::high_resolution_clock::now();
-            single_thr_kernel(&args);
+            (*single_thr_kernel)(&args);
 // t2 = std::chrono::high_resolution_clock::now();
 
 // if (size > 200000) {
@@ -1740,16 +1754,17 @@ printf("    FINAL_FOLD work_amount: %lu\n", args.work_amount);
         }
 
 // t2 = std::chrono::high_resolution_clock::now();
-// if (size >= min_wa_per_thread * 2lu) {
-// if (size <= 16lu) {
-// if (size == 4lu) {
-    // auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
-    // counter++;
-    // sum += ms_int.count();
-//     // if (ms_int.count() > 100)
-    // std::cout << "[" << counter << "] compute_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanosec" << std::endl;
+// if (size >= 131072 * 2) {
+// // if (size <= 16lu) {
+// // if (size == 4lu) {
+//     auto ms_int = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
+//     counter++;
+//     sum += ms_int.count();
+// //     // if (ms_int.count() > 100)
+//     std::cout << "[" << counter << "] compute_hash time: " << ms_int.count() << "; sum: " << sum << "; size: " << size << "; avg_time: " << sum / counter << " nanosec" << std::endl;
 // }
-printf("    res: %lu\n", result);
+// if (size >= 131072 * 2)
+    printf("    res: %lu\n", result);
         return result;
     }
 //     if (kernel) {

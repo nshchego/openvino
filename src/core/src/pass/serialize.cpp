@@ -1247,10 +1247,10 @@ void serializeFunc(std::ostream& xml_file,
     ConstantWriter constant_write_handler(bin_file, true, true);
     XmlSerializer visitor(net_node, name, constant_write_handler, version, deterministic);
     visitor.on_attribute(name, model);
-printf("serializeFunc after 1\n");
+// printf("serializeFunc after 1\n");
 
     xml_doc.save(xml_file);
-printf("serializeFunc after 2\n");
+// printf("serializeFunc after 2\n");
     xml_file.flush();
     bin_file.flush();
 };
