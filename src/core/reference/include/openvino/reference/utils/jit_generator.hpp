@@ -85,6 +85,7 @@ namespace jit {
 
         const Xbyak::Reg64 reg_EVEX_max_8b_offt;
         static constexpr int EVEX_max_8b_offt = 0x200;
+        size_t m_vlen = ymm_len;
 
     public:
         static constexpr size_t xmm_len = 16;
@@ -96,7 +97,7 @@ namespace jit {
         static bool mayiuse(const cpu_isa_t cpu_isa);
         static bool is_x64();
 
-        Generator(void* code_ptr = nullptr, size_t code_size = 16 * 1024);
+        Generator(cpu_isa_t isa = avx2, void* code_ptr = nullptr, size_t code_size = 16 * 1024);
         void preamble();
         void postamble();
 
@@ -109,6 +110,10 @@ namespace jit {
         void copy(const Xbyak::Reg64& dst,
                     const Xbyak::Reg64& src,
                     const Xbyak::Reg64& size);
+
+        size_t get_vlen() {
+            return m_vlen;
+        }
     };
 
 }  // namespace jit

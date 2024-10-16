@@ -10,6 +10,8 @@
 #include "openvino/core/parallel.hpp"
 #include "openvino/runtime/compute_hash.hpp"
 
+#include <cmath>
+
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include "openvino/reference/utils/registers_pool.hpp"
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
@@ -102,6 +104,8 @@ class HashBase : public Generator {
 protected:
     void (*ker_fn)(const ComputeHashCallArgs*);
 public:
+    HashBase(cpu_isa_t isa) : Generator(isa) {}
+
     virtual void generate() = 0;
 
     void operator()(const ComputeHashCallArgs* args) {
@@ -118,17 +122,16 @@ public:
 template <cpu_isa_t isa>
 class ComputeHash : public HashBase {
 public:
-    explicit ComputeHash(const ComputeHashCompileParams& jcp) :
-            m_jcp(jcp) {
-        if (isa == avx512_core) {
-printf("[CPU][ComputeHash] avx512_core\n");
-            vlen = zmm_len;
-        } else if (isa == avx2) {
-printf("[CPU][ComputeHash] avx2\n");
-            vlen = ymm_len;
-        } else {
-            OPENVINO_THROW("Unsupported isa: ", isa);
-        }
+    explicit ComputeHash(const ComputeHashCompileParams& jcp) : HashBase(isa), m_jcp(jcp) {
+//         if (isa == avx512_core) {
+// printf("[CPU][ComputeHash] avx512_core\n");
+//             vlen = zmm_len;
+//         } else if (isa == avx2) {
+// printf("[CPU][ComputeHash] avx2\n");
+//             vlen = ymm_len;
+//         } else {
+//             OPENVINO_THROW("Unsupported isa: ", isa);
+//         }
         if (!mayiuse(cpu_isa_t::pclmulqdq)) {
             OPENVINO_THROW("The current CPU does not support pclmulqdq instruction, which is required for the CRC algorithm.");
         }
@@ -142,15 +145,15 @@ printf("[CPU][ComputeHash] supports vpclmulqdq\n");
 // printf("ComputeHash generate %d\n", static_cast<int>(m_jcp.type));
         m_registers_pool = RegistersPool::create(isa, {rax, rcx, rsp, rdi, k0});
 
-        r64_src = getReg64();
-        r64_dst = getReg64();
+        r64_src         = getReg64();
+        r64_dst         = getReg64();
         r64_work_amount = getReg64();
-        r64_k_ptr = getReg64();
-        // r64_aux = getReg64();
+        r64_k_ptr       = getReg64();
+        r64_aux         = getReg64();
 r64_tmp = getReg64();
-        // v_dst       = getVmm();
-        // v_k_2_3     = getVmm();
-        // v_shuf_mask = getVmm();
+        v_dst       = getVmm();
+        v_k_2_3     = getVmm();
+        v_shuf_mask = getVmm();
 
         this->preamble();
 
@@ -221,60 +224,54 @@ mov(r64_tmp, ptr[r64_params + GET_OFF(tmp_ptr)]);
         L(l_end);
     }
 
-    // void partial_load(const Xbyak::Ymm&     ymm_dst,
-    //                  const Xbyak::Address& src_addr,
-    //                  const Xbyak::Reg64&   r64_load_num) {
-    //     Xbyak::Label l_xmm, l_partial, l_end;
-    //     auto xmm_dst = Xbyak::Xmm(ymm_dst.getIdx());
+    void partial_load(const Xbyak::Ymm&     ymm_dst,
+                      const Xbyak::Address& src_addr,
+                      const Xbyak::Reg64&   r64_load_num) {
+        Xbyak::Label l_xmm, l_partial, l_end;
+        auto xmm_dst = Xbyak::Xmm(ymm_dst.getIdx());
 
-    //     cmp(r64_load_num, ymm_len);
-    //     jl(l_xmm, T_NEAR);
-    //     vmovdqu(ymm_dst, ptr[src_addr.getRegExp()]);
-    //     jmp(l_end, T_NEAR);
+        cmp(r64_load_num, ymm_len);
+        jl(l_xmm, T_NEAR);
+        vmovdqu(ymm_dst, ptr[src_addr.getRegExp()]);
+        jmp(l_end, T_NEAR);
 
-    //     L(l_xmm);
-    //     uni_vpxorq(ymm_dst, ymm_dst, ymm_dst);
-    //     cmp(r64_load_num, xmm_len);
-    //     jl(l_partial, T_NEAR);
-    //     vmovdqu(xmm_dst, ptr[src_addr.getRegExp()]);
-    //     je(l_end, T_NEAR);
+        L(l_xmm);
+        uni_vpxorq(ymm_dst, ymm_dst, ymm_dst);
+        cmp(r64_load_num, xmm_len);
+        jl(l_partial, T_NEAR);
+        vmovdqu(xmm_dst, ptr[src_addr.getRegExp()]);
+        je(l_end, T_NEAR);
 
-    //     {
-    //         Xbyak::Label l_rest_loop, l_perm;
-    //         size_t offset = xmm_len;
+        {
+            Xbyak::Label l_rest_loop, l_perm;
 
-    //         vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0x1);
-    //         for (size_t j = 0lu; j < xmm_len - 1; j++) {
-    //             pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
-    //             cmp(r64_load_num, ++offset);
-    //             jle(l_perm, T_NEAR);
-    //         }
-    //         L(l_perm);
-    //         vperm2f128(ymm_dst, ymm_dst, ymm_dst, 0x1);
-    //     }
-    //     jmp(l_end, T_NEAR);
+            vperm2i128(ymm_dst, ymm_dst, ymm_dst, 0x1);
+            for (size_t j = 0lu; j < xmm_len - 1; j++) {
+                cmp(r64_load_num, xmm_len + j);
+                jle(l_perm, T_NEAR);
+                pinsrb(xmm_dst, ptr[src_addr.getRegExp() + xmm_len + j], j);
+            }
+            L(l_perm);
+            vperm2i128(ymm_dst, ymm_dst, ymm_dst, 0x1);
+        }
+        jmp(l_end, T_NEAR);
 
-    //     L(l_partial); {
-    //         size_t offset = xmm_len;
+        L(l_partial); {
+            for (size_t j = 0lu; j < xmm_len - 1; j++) {
+                cmp(r64_load_num, j);
+                jle(l_end, T_NEAR);
+                pinsrb(xmm_dst, ptr[src_addr.getRegExp() + j], j);
+            }
+        }
 
-    //         for (size_t j = 0lu; j < xmm_len - 1; j++) {
-    //             pinsrb(xmm_dst, ptr[src_addr.getRegExp() + offset], j);
-    //             cmp(r64_load_num, ++offset);
-    //             jle(l_end, T_NEAR);
-    //         }
-    //     }
-
-    //     L(l_end);
-    // }
+        L(l_end);
+    }
 
 
 private:
     static constexpr uint64_t CHUNK_SIZE = 32;
-    // static const uint64_t CRC_VAL;
-    // static const uint8_t SHUF_MASK[16];
 
     using Vmm = typename std::conditional<isa == avx512_core, Xbyak::Zmm, Xbyak::Ymm>::type;
-    size_t vlen = xmm_len;
     bool is_vpclmulqdq = false;
 
     ComputeHashCompileParams m_jcp;
@@ -283,10 +280,8 @@ private:
     RegistersPool::Reg<Xbyak::Reg64> r64_src;
     RegistersPool::Reg<Xbyak::Reg64> r64_dst;
     RegistersPool::Reg<Xbyak::Reg64> r64_work_amount;
-    RegistersPool::Reg<Xbyak::Reg64> r64_make_64_fold;
     RegistersPool::Reg<Xbyak::Reg64> r64_k_ptr;
-    // RegistersPool::Reg<Xbyak::Reg64> r64_bulk_step;
-    // RegistersPool::Reg<Xbyak::Reg64> r64_aux;
+    RegistersPool::Reg<Xbyak::Reg64> r64_aux;
 RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
 
     const Xbyak::Reg64 r64_params = abi_param1;
@@ -295,10 +290,6 @@ RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
     RegistersPool::Reg<Vmm> v_dst;
     RegistersPool::Reg<Vmm> v_k_2_3;
     RegistersPool::Reg<Vmm> v_shuf_mask;
-
-    size_t get_vlen() {
-        return vlen;
-    }
 
     void initialize();
 
@@ -311,6 +302,12 @@ RegistersPool::Reg<Xbyak::Reg64> r64_tmp;
     void tail_fold(const Vmm& v_dst);
 
     void uni_vpxorq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src_0, const Xbyak::Xmm& v_src_1);
+
+    void uni_vmovdqu64(const Xbyak::Xmm& v_dst, const Xbyak::Operand& v_src_0);
+
+    void uni_vmovdqu64(const Xbyak::Address& v_dst, const Xbyak::Xmm& v_src_0);
+
+    void uni_vbroadcasti64x2(const Xbyak::Ymm& v_dst, const Xbyak::Operand& v_src_0);
 };
 
 class ComputeHash4 : public Generator {
@@ -396,23 +393,41 @@ template <>
 void ComputeHash<avx512_core>::uni_vpxorq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src_0, const Xbyak::Xmm& v_src_1) {
     vpxorq(v_dst, v_src_0, v_src_1);
 }
-
 template <cpu_isa_t isa>
 void ComputeHash<isa>::uni_vpxorq(const Xbyak::Xmm& v_dst, const Xbyak::Xmm& v_src_0, const Xbyak::Xmm& v_src_1) {
     vpxor(v_dst, v_src_0, v_src_1);
 }
+template <>
+void ComputeHash<avx512_core>::uni_vmovdqu64(const Xbyak::Xmm& v_dst, const Xbyak::Operand& v_src_0) {
+    vmovdqu64(v_dst, v_src_0);
+}
+template <cpu_isa_t isa>
+void ComputeHash<isa>::uni_vmovdqu64(const Xbyak::Xmm& v_dst, const Xbyak::Operand& v_src_0) {
+    vmovdqu(v_dst, v_src_0);
+}
+template <>
+void ComputeHash<avx512_core>::uni_vmovdqu64(const Xbyak::Address& v_dst, const Xbyak::Xmm& v_src_0) {
+    vmovdqu64(v_dst, v_src_0);
+}
+template <cpu_isa_t isa>
+void ComputeHash<isa>::uni_vmovdqu64(const Xbyak::Address& v_dst, const Xbyak::Xmm& v_src_0) {
+    vmovdqu(v_dst, v_src_0);
+}
+template <>
+void ComputeHash<avx512_core>::uni_vbroadcasti64x2(const Xbyak::Ymm& v_dst, const Xbyak::Operand& v_src_0) {
+    vbroadcasti64x2(v_dst, v_src_0);
+}
+template <cpu_isa_t isa>
+void ComputeHash<isa>::uni_vbroadcasti64x2(const Xbyak::Ymm& v_dst, const Xbyak::Operand& v_src_0) {
+    vbroadcasti128(v_dst, v_src_0);
+}
 
 template <>
 void ComputeHash<avx512_core>::initialize() {
-    v_dst = getVmm();
-    auto r64_aux = getReg64();
+    uni_vbroadcasti64x2(v_k_2_3, ptr[r64_k_ptr + K_2_3_OFF]);
 
-    v_k_2_3 = getVmm();
-    vbroadcasti64x2(v_k_2_3, ptr[r64_k_ptr + K_2_3_OFF]);
-
-    v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
-    vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
+    uni_vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
 
     if (m_jcp.type == SINGLE_THREAD || m_jcp.type == FIRST_THREAD) {
         auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
@@ -424,7 +439,7 @@ void ComputeHash<avx512_core>::initialize() {
         vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x0);
         mov(r64_aux, CRC_VAL);
         vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x1);
-// vmovdqu64(ptr[r64_tmp], xmm_aux);
+
         // Initial xor with source
         fill_rest_work_mask(k_rest_mask, r64_work_amount);
         vmovdqu8(Vmm(v_dst.getIdx()) | k_rest_mask | T_z, ptr[r64_src]);
@@ -434,349 +449,53 @@ void ComputeHash<avx512_core>::initialize() {
             add(r64_src, xmm_len);
         }
     } else if (m_jcp.type == N_THREAD) {
-        vmovdqu64(v_dst, ptr[r64_src]);
+        uni_vmovdqu64(v_dst, ptr[r64_src]);
         vpshufb(v_dst, v_dst, v_shuf_mask);
     }
     if (m_jcp.type == SINGLE_THREAD || m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
         sub(r64_work_amount, xmm_len);
     }
-    // add(r64_src, vlen);
 }
 
 template <cpu_isa_t isa>
 void ComputeHash<isa>::initialize() {
-    auto r64_aux = getReg64();
+    uni_vbroadcasti64x2(v_k_2_3, ptr[r64_k_ptr + K_2_3_OFF]);
 
-    v_k_2_3 = getVmm();
-    vbroadcasti128(v_k_2_3, ptr[r64_k_ptr + K_2_3_OFF]);
-
-    v_shuf_mask = getVmm();
     mov(r64_aux, reinterpret_cast<uintptr_t>(SHUF_MASK));
-    vbroadcasti128(v_shuf_mask, ptr[r64_aux]);
+    uni_vbroadcasti64x2(v_shuf_mask, ptr[r64_aux]);
 
-    v_dst = getVmm();
-    auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
-    auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
-    auto xmm_aux = getXmm();
-    // Initial CRC
-    mov(r64_aux, CRC_VAL);
-    uni_vpxorq(v_dst, v_dst, v_dst);
-    vpinsrq(xmm_dst, xmm_dst, r64_work_amount, 0x0);
-    vpinsrq(xmm_dst, xmm_dst, r64_aux, 0x1);
-    // First xor with source
-    uni_vpxorq(xmm_aux, xmm_aux, xmm_aux);
-    partial_load(xmm_aux, ptr[r64_src], r64_work_amount);
-    vpshufb(xmm_aux, xmm_aux, xmm_shuf_mask);
-    uni_vpxorq(xmm_dst, xmm_dst, xmm_aux);
-// vmovdqu(ptr[r64_tmp], xmm_dst);
-    sub(r64_work_amount, xmm_len);
-    add(r64_src, xmm_len);
+    if (m_jcp.type == SINGLE_THREAD || m_jcp.type == FIRST_THREAD) {
+        auto xmm_dst = Xbyak::Xmm(v_dst.getIdx());
+        auto xmm_aux = getXmm();
+
+        // Initial CRC
+        mov(r64_aux, ptr[r64_params + GET_OFF(size)]);
+        vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x0);
+        mov(r64_aux, CRC_VAL);
+        vpinsrq(xmm_aux, xmm_aux, r64_aux, 0x1);
+
+        // First xor with source
+        partial_load(v_dst, ptr[r64_src], r64_work_amount);
+        vpshufb(v_dst, v_dst, v_shuf_mask);
+        pxor(xmm_dst, xmm_aux); // The SSE version is used to avoid zeroing out the rest of the Vmm.
+        if (m_jcp.type == SINGLE_THREAD) {
+            add(r64_src, xmm_len);
+        }
+// uni_vmovdqu64(ptr[r64_tmp], xmm_dst);
+    } else if (m_jcp.type == N_THREAD) {
+        uni_vmovdqu64(v_dst, ptr[r64_src]);
+        vpshufb(v_dst, v_dst, v_shuf_mask);
+    }
+    if (m_jcp.type == SINGLE_THREAD || m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
+        sub(r64_work_amount, xmm_len);
+    }
 }
-
-// template <>
-// void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
-//     Xbyak::Label l_fold_loop, l_end;
-//     cmp(r64_work_amount, 4 * vlen - xmm_len);
-//     jl(l_end, T_NEAR);
-
-//     auto r64_aux = getReg64();
-
-//     auto v_src_0 = getVmm();
-//     auto v_dst_0 = getVmm();
-//     auto v_dst_1 = getVmm();
-//     auto v_dst_2 = getVmm();
-//     auto& v_dst_3 = v_dst;
-
-//     auto v_dst_4 = getVmm();
-//     auto v_dst_5 = getVmm();
-//     auto v_dst_6 = getVmm();
-//     auto v_dst_7 = getVmm();
-
-//     auto v_aux_0 = getVmm();
-//     auto v_k_loop = getVmm();
-
-//     auto xmm_k_loop = Xbyak::Xmm(v_k_loop.getIdx());
-//     auto xmm_k_2_3 = Xbyak::Xmm(v_k_2_3.getIdx());
-//     auto xmm_src_0 = Xbyak::Xmm(v_src_0.getIdx());
-//     auto xmm_src_1 = getXmm();
-//     auto xmm_dst_0 = Xbyak::Xmm(v_dst_0.getIdx());
-//     auto xmm_dst_1 = Xbyak::Xmm(v_dst_1.getIdx());
-//     auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
-//     auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
-
-//     auto xmm_dst_4 = Xbyak::Xmm(v_dst_4.getIdx());
-//     auto xmm_dst_5 = Xbyak::Xmm(v_dst_5.getIdx());
-//     auto xmm_dst_6 = Xbyak::Xmm(v_dst_6.getIdx());
-//     auto xmm_dst_7 = Xbyak::Xmm(v_dst_7.getIdx());
-
-//     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
-//     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
-
-//     RegistersPool::Reg<Xbyak::Reg64> r64_bulk_step;
-//     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
-//         r64_bulk_step = getReg64();
-//         mov(r64_bulk_step, ptr[r64_params + GET_OFF(threads_num)]);
-//         // if (is_vpclmulqdq) {
-//             // sal(r64_bulk_step, 6); // *vlen
-//         // }
-//     }
-
-//     // if (m_jcp.type == SINGLE_THREAD) {
-//     //     mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
-//     //     vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
-//     // } else {
-//         mov(r64_aux, reinterpret_cast<uintptr_t>(K_15_16));
-//         vbroadcasti64x2(v_k_loop, ptr[r64_aux]);
-//         // ...
-//     // }
-
-//     vmovdqu64(v_dst_0, v_dst_3);
-
-//     if (!is_vpclmulqdq) {
-//         vextracti64x2(xmm_dst_1, v_dst, 0x1);
-//         vextracti64x2(xmm_dst_2, v_dst, 0x2);
-//         vextracti64x2(xmm_dst_3, v_dst, 0x3);
-//     }
-
-// // auto r64_counter = getReg64();
-// // mov(r64_counter, vlen);
-
-//     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
-//         add(r64_src, r64_bulk_step);
-//     } else {
-//         add(r64_src, vlen - xmm_len);
-//     }
-//     prefetcht0(ptr[r64_src + 1024]);
-//     sub(r64_work_amount, 4 * vlen - xmm_len);
-//     // sub(r64_work_amount, 2 * vlen);
-    
-//     vmovdqu64(xmm_dst_4, ptr[r64_src]);
-//     vpshufb(xmm_dst_4, xmm_dst_4, xmm_shuf_mask);
-//     add(r64_src, xmm_len);
-//     vmovdqu64(xmm_dst_5, ptr[r64_src]);
-//     vpshufb(xmm_dst_5, xmm_dst_5, xmm_shuf_mask);
-//     add(r64_src, xmm_len);
-//     vmovdqu64(xmm_dst_6, ptr[r64_src]);
-//     vpshufb(xmm_dst_6, xmm_dst_6, xmm_shuf_mask);
-//     add(r64_src, xmm_len);
-//     vmovdqu64(xmm_dst_7, ptr[r64_src]);
-//     vpshufb(xmm_dst_7, xmm_dst_7, xmm_shuf_mask);
-//     add(r64_src, xmm_len);
-
-//     L(l_fold_loop); {
-//         vmovdqu64(v_src_0, ptr[r64_src]);
-//         vpshufb(v_src_0, v_src_0, v_shuf_mask);
-
-//         if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
-//             add(r64_src, r64_bulk_step);
-//         } else {
-//             add(r64_src, vlen);
-//         }
-//         prefetcht0(ptr[r64_src + 1024]);
-
-//         if (is_vpclmulqdq) {
-//             vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
-//             vpclmulqdq(v_dst_0, v_dst_0, v_k_loop, 0b00010001);
-//             uni_vpxorq(v_aux_0, v_aux_0, v_src_0);
-//             uni_vpxorq(v_dst_0, v_dst_0, v_aux_0);
-//         } else {
-//             // 0
-//             vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
-//             uni_vpxorq(xmm_dst_0, xmm_dst_0, xmm_aux_0);
-
-//             // 1
-//             vextracti64x2(xmm_src_1, v_src_0, 0x1);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_1, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-//             uni_vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
-
-//             // 2
-//             vextracti64x2(xmm_src_1, v_src_0, 0x2);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-//             uni_vpxorq(xmm_dst_2, xmm_dst_2, xmm_aux_0);
-
-//             // 3
-//             vextracti64x2(xmm_src_1, v_src_0, 0x3);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_3, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_3, xmm_dst_3, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-//             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-            
-//             // 4
-//             vmovdqu64(v_src_0, ptr[r64_src]);
-//             vpshufb(v_src_0, v_src_0, v_shuf_mask);
-//             add(r64_src, vlen);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_4, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_4, xmm_dst_4, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_0);
-//             uni_vpxorq(xmm_dst_4, xmm_dst_4, xmm_aux_0);
-
-//             // 5
-//             vextracti64x2(xmm_src_1, v_src_0, 0x1);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_5, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_5, xmm_dst_5, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-//             uni_vpxorq(xmm_dst_5, xmm_dst_5, xmm_aux_0);
-
-//             // 6
-//             vextracti64x2(xmm_src_1, v_src_0, 0x2);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_6, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_6, xmm_dst_6, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-//             uni_vpxorq(xmm_dst_6, xmm_dst_6, xmm_aux_0);
-
-//             // 7
-//             vextracti64x2(xmm_src_1, v_src_0, 0x3);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_7, xmm_k_loop, 0b00000000);
-//             vpclmulqdq(xmm_dst_7, xmm_dst_7, xmm_k_loop, 0b00010001);
-//             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//         }
-
-// // add(r64_counter, vlen);
-//         sub(r64_work_amount, vlen * 2lu);
-//         jge(l_fold_loop, T_NEAR);
-//     }
-//     add(r64_work_amount, vlen * 2lu);
-// // mov(ptr[r64_tmp], r64_counter);
-// // if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
-// //     mov(ptr[r64_tmp], r64_bulk_step);
-// // }
-
-// // vmovdqu64(ptr[r64_tmp], xmm_dst_3);
-
-//     if (m_jcp.type == SINGLE_THREAD) {
-//         if (is_vpclmulqdq) {
-//             auto ymm_dst_0 = Xbyak::Ymm(v_dst_0.getIdx());
-//             auto ymm_dst_1 = Xbyak::Ymm(v_dst_1.getIdx());
-//             auto ymm_aux_0 = Xbyak::Ymm(v_aux_0.getIdx());
-
-//             vextracti64x4(ymm_dst_1, v_dst_0, 0x1);
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
-//             vpclmulqdq(ymm_aux_0, ymm_dst_0, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(ymm_dst_0, ymm_dst_0, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(ymm_dst_1, ymm_dst_1, ymm_aux_0);
-//             uni_vpxorq(ymm_dst_0, ymm_dst_0, ymm_dst_1);
-
-//             vextracti64x2(xmm_dst_3, ymm_dst_0, 0x1);
-//             vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_2_3, 0b00000000);
-//             vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_2_3, 0b00010001);
-//             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
-//         } else {
-// auto r64_intm = getReg64();
-// mov(r64_intm, ptr[r64_params + GET_OFF(intermediate_ptr)]);
-
-// vmovdqu64(ptr[r64_intm], xmm_dst_0);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_1);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_2);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_3);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_4);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_5);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_6);
-// add(r64_intm, xmm_len);
-// vmovdqu64(ptr[r64_intm], xmm_dst_7);
-
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_13_14));
-//             vpclmulqdq(xmm_aux_0, xmm_dst_0, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(xmm_dst_0, xmm_dst_0, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_0);
-
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_11_12));
-//             vpclmulqdq(xmm_aux_0, xmm_dst_1, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(xmm_dst_1, xmm_dst_1, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_1);
-
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_9_10));
-//             vpclmulqdq(xmm_aux_0, xmm_dst_2, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(xmm_dst_2, xmm_dst_2, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_2);
-
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_7_8));
-//             vpclmulqdq(xmm_aux_0, xmm_dst_3, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(xmm_dst_3, xmm_dst_3, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_3);
-
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_5_6));
-//             vpclmulqdq(xmm_aux_0, xmm_dst_4, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(xmm_dst_4, xmm_dst_4, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_4);
-
-//             mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
-//             vpclmulqdq(xmm_aux_0, xmm_dst_5, ptr[r64_aux], 0b00000000);
-//             vpclmulqdq(xmm_dst_5, xmm_dst_5, ptr[r64_aux], 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_5);
-
-//             vpclmulqdq(xmm_aux_0, xmm_dst_6, xmm_k_2_3, 0b00000000);
-//             vpclmulqdq(xmm_dst_6, xmm_dst_6, xmm_k_2_3, 0b00010001);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_aux_0);
-//             uni_vpxorq(xmm_dst_7, xmm_dst_7, xmm_dst_6);
-            
-//             vmovdqu64(xmm_dst_3, xmm_dst_7);
-
-//             // mov(r64_aux, reinterpret_cast<uintptr_t>(K_5_6));
-//             // vpclmulqdq(xmm_aux_0, xmm_dst_0, ptr[r64_aux], 0b00000000);
-//             // vpclmulqdq(xmm_dst_0, xmm_dst_0, ptr[r64_aux], 0b00010001);
-//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
-
-//             // mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
-//             // vpclmulqdq(xmm_aux_0, xmm_dst_1, ptr[r64_aux], 0b00000000);
-//             // vpclmulqdq(xmm_dst_1, xmm_dst_1, ptr[r64_aux], 0b00010001);
-//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_1);
-
-//             // vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_2_3, 0b00000000);
-//             // vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_2_3, 0b00010001);
-//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-//             // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_2);
-//         }
-//     } else {
-//         if (is_vpclmulqdq) {
-//             vmovdqu64(ptr[r64_dst], v_dst_0);
-//         } else {
-//             vmovdqu64(ptr[r64_dst + xmm_len * 0lu], xmm_dst_0);
-//             vmovdqu64(ptr[r64_dst + xmm_len * 1lu], xmm_dst_1);
-//             vmovdqu64(ptr[r64_dst + xmm_len * 2lu], xmm_dst_2);
-//             vmovdqu64(ptr[r64_dst + xmm_len * 3lu], xmm_dst_3);
-//         }
-//     }
-
-//     L(l_end);
-// }
 
 template <>
 void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
     Xbyak::Label l_fold_loop, l_end;
-    cmp(r64_work_amount, 2 * vlen - xmm_len);
-    // cmp(r64_work_amount, 2 * vlen);
+    cmp(r64_work_amount, 2 * get_vlen() - xmm_len);
     jl(l_end, T_NEAR);
-
-    auto r64_aux = getReg64();
 
     auto v_src_0 = getVmm();
     auto v_dst_0 = getVmm();
@@ -801,9 +520,7 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
         r64_bulk_step = getReg64();
         mov(r64_bulk_step, ptr[r64_params + GET_OFF(threads_num)]);
-        // if (is_vpclmulqdq) {
-            sal(r64_bulk_step, 6); // *vlen
-        // }
+        sal(r64_bulk_step, static_cast<int>(std::log2(get_vlen()))); // * vlen
     }
 
     if (m_jcp.type == SINGLE_THREAD) {
@@ -812,7 +529,7 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
         vbroadcasti64x2(v_k_loop, ptr[r64_k_ptr + K_16_17_OFF]);
     }
 
-    vmovdqu64(v_dst_0, v_dst);
+    uni_vmovdqu64(v_dst_0, v_dst);
 // vmovdqu64(ptr[r64_tmp], xmm_dst_0);
 
     if (!is_vpclmulqdq) {
@@ -822,14 +539,14 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
     }
 
 // auto r64_counter = getReg64();
-// mov(r64_counter, vlen);
+// mov(r64_counter, get_vlen());
 
     if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
         add(r64_src, r64_bulk_step);
         // prefetcht2(ptr[r64_src + 8192]);
         prefetcht2(ptr[r64_src + 16384]);
     } else {
-        add(r64_src, vlen - xmm_len);
+        add(r64_src, get_vlen() - xmm_len);
         prefetcht2(ptr[r64_src + 4096]);
         // prefetcht2(ptr[r64_src + 16384]);
     }
@@ -838,8 +555,8 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
     prefetcht0(ptr[r64_src + 64]);
     // prefetcht0(ptr[r64_src]);
 
-    sub(r64_work_amount, 2 * vlen - xmm_len);
-    // sub(r64_work_amount, 2 * vlen);
+    sub(r64_work_amount, 2 * get_vlen() - xmm_len);
+    // sub(r64_work_amount, 2 * get_vlen());
 
     L(l_fold_loop); {
         vmovdqu64(v_src_0, ptr[r64_src]);
@@ -850,7 +567,7 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
             // prefetcht2(ptr[r64_src + 8192]);
             prefetcht2(ptr[r64_src + 16384]);
         } else {
-            add(r64_src, vlen);
+            add(r64_src, get_vlen());
             prefetcht2(ptr[r64_src + 4096]);
             // prefetcht2(ptr[r64_src + 8192]);
             // prefetcht2(ptr[r64_src + 16384]);
@@ -907,11 +624,11 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
             uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
         }
 
-// add(r64_counter, vlen);
-        sub(r64_work_amount, vlen);
+// add(r64_counter, get_vlen());
+        sub(r64_work_amount, get_vlen());
         jge(l_fold_loop, T_NEAR);
     }
-    add(r64_work_amount, vlen);
+    add(r64_work_amount, get_vlen());
 // mov(ptr[r64_tmp], r64_counter);
 // if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
 //     mov(ptr[r64_tmp], r64_bulk_step);
@@ -969,10 +686,8 @@ void ComputeHash<avx512_core>::bulk_fold(const Vmm& v_dst) {
 template <cpu_isa_t isa>
 void ComputeHash<isa>::bulk_fold(const Vmm& v_dst) {
     Xbyak::Label l_fold_loop, l_end;
-    cmp(r64_work_amount, 2 * vlen - xmm_len);
+    cmp(r64_work_amount, 2 * get_vlen() - xmm_len);
     jl(l_end, T_NEAR);
-
-    auto r64_aux = getReg64();
 
     auto v_src_0 = getVmm();
     auto v_dst_0 = getVmm();
@@ -991,54 +706,55 @@ void ComputeHash<isa>::bulk_fold(const Vmm& v_dst) {
     // auto xmm_dst_2 = Xbyak::Xmm(v_dst_2.getIdx());
     // auto xmm_dst_3 = Xbyak::Xmm(v_dst_3.getIdx());
     auto xmm_aux_0 = Xbyak::Xmm(v_aux_0.getIdx());
-
-    vbroadcasti128(v_k_loop, ptr[r64_k_ptr + K_4_5_OFF]);
-
-    vmovdqu(v_dst_0, v_dst_1);
-
-    if (is_vpclmulqdq) {
-        vmovdqu(xmm_aux_0, ptr[r64_src]);
-        vpshufb(xmm_aux_0, xmm_aux_0, Xbyak::Xmm(v_shuf_mask.getIdx()));
-        vinserti128(v_dst_0, v_dst_0, xmm_aux_0, 0x1);
-        // vmovdqu(v_dst_1, ptr[r64_src + xmm_len]);
-        // vpshufb(v_dst_1, v_dst_1, v_shuf_mask);
-        // add(r64_src, vlen + xmm_len);
-    } else {
-        vmovdqu(xmm_dst_1, ptr[r64_src]);
-        vpshufb(xmm_dst_1, xmm_dst_1, Xbyak::Xmm(v_shuf_mask.getIdx()));
+    
+    RegistersPool::Reg<Xbyak::Reg64> r64_bulk_step;
+    if (m_jcp.type == FIRST_THREAD || m_jcp.type == N_THREAD) {
+        r64_bulk_step = getReg64();
+        mov(r64_bulk_step, ptr[r64_params + GET_OFF(threads_num)]);
+        sal(r64_bulk_step, static_cast<int>(std::log2(get_vlen()))); // * vlen
     }
 
-    add(r64_src, xmm_len);
-    sub(r64_work_amount, 2 * vlen - xmm_len);  // Check
+    if (m_jcp.type == SINGLE_THREAD) {
+        vbroadcasti128(v_k_loop, ptr[r64_k_ptr + K_4_5_OFF]);
+    } else {
+        vbroadcasti128(v_k_loop, ptr[r64_k_ptr + K_8_9_OFF]);
+    }
+
+    vmovdqu(v_dst_0, v_dst);
+
+    if (!is_vpclmulqdq) {
+        vextracti64x2(xmm_dst_1, v_dst_0, 0x1);
+    }
+
+    if (m_jcp.type == SINGLE_THREAD) {
+        add(r64_src, get_vlen() - xmm_len);
+    } else {
+        add(r64_src, r64_bulk_step);
+    }
+    prefetcht2(ptr[r64_src + 4096]);
+    prefetcht1(ptr[r64_src + 1024]);
+    prefetcht0(ptr[r64_src + 64]);
+
+    sub(r64_work_amount, 2 * get_vlen() - xmm_len);
 
     L(l_fold_loop); {
         vmovdqu(v_src_0, ptr[r64_src]);
         vpshufb(v_src_0, v_src_0, v_shuf_mask);
-        add(r64_src, vlen);
+        
+        if (m_jcp.type == SINGLE_THREAD) {
+            add(r64_src, get_vlen());
+        } else {
+            add(r64_src, r64_bulk_step);
+        }
+        prefetcht2(ptr[r64_src + 4096]);
+        prefetcht1(ptr[r64_src + 1024]);
+        prefetcht0(ptr[r64_src + 64]);
 
         if (is_vpclmulqdq) {
-            // vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
-            // vpclmulqdq(v_dst_0, v_dst_0, v_k_loop, 0b00010001);
-            // uni_vpxorq(v_aux_0, v_aux_0, v_src_0);
-            // uni_vpxorq(v_dst_0, v_dst_0, v_aux_0);
-            // 0
-
             vpclmulqdq(v_aux_0, v_dst_0, v_k_loop, 0b00000000);
             vpclmulqdq(v_dst_0, v_dst_0, v_k_loop, 0b00010001);
             uni_vpxorq(v_aux_0, v_aux_0, v_src_0);
             uni_vpxorq(v_dst_0, v_dst_0, v_aux_0);
-
-            // // 1
-            // vmovdqu(v_src_0, ptr[r64_src]);
-            // vpshufb(v_src_0, v_src_0, v_shuf_mask);
-            // add(r64_src, vlen);
-
-            // vpclmulqdq(v_aux_0, v_dst_1, v_k_loop, 0b00000000);
-            // vpclmulqdq(v_dst_1, v_dst_1, v_k_loop, 0b00010001);
-            // uni_vpxorq(v_aux_0, v_aux_0, v_src_1);
-            // uni_vpxorq(v_dst_1, v_dst_1, v_aux_0);
-
-            // sub(r64_work_amount, vlen * 2lu);
         } else {
             // 0
             vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_loop, 0b00000000);
@@ -1051,29 +767,30 @@ void ComputeHash<isa>::bulk_fold(const Vmm& v_dst) {
             vpclmulqdq(xmm_dst_1, xmm_dst_1, xmm_k_loop, 0b00010001);
             uni_vpxorq(xmm_aux_0, xmm_aux_0, xmm_src_1);
             uni_vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
-
-            // add(r64_src, vlen);
-            // sub(r64_work_amount, vlen);
         }
 
-        sub(r64_work_amount, vlen);
+        sub(r64_work_amount, get_vlen());
         jge(l_fold_loop, T_NEAR);
     }
-    add(r64_work_amount, vlen);
+    add(r64_work_amount, get_vlen());
 
 // vmovdqu(ptr[r64_tmp], xmm_dst_0);
 
-    if (is_vpclmulqdq) {
-        vextracti128(xmm_dst_1, v_dst_0, 0x1);
+    if (m_jcp.type == SINGLE_THREAD) {
+        if (is_vpclmulqdq) {
+            vextracti128(xmm_dst_1, v_dst_0, 0x1);
+        }
         vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_2_3, 0b00000000);
         vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_2_3, 0b00010001);
         uni_vpxorq(xmm_dst_1, xmm_dst_1, xmm_aux_0);
         uni_vpxorq(xmm_dst_1, xmm_dst_1, xmm_dst_0);
     } else {
-        // vpclmulqdq(xmm_aux_0, xmm_dst_2, xmm_k_2_3, 0b00000000);
-        // vpclmulqdq(xmm_dst_2, xmm_dst_2, xmm_k_2_3, 0b00010001);
-        // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
-        // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_2);
+        if (is_vpclmulqdq) {
+            vmovdqu(ptr[r64_dst], v_dst_0);
+        } else {
+            vmovdqu(ptr[r64_dst + xmm_len * 0lu], xmm_dst_0);
+            vmovdqu(ptr[r64_dst + xmm_len * 1lu], xmm_dst_1);
+        }
     }
 
     L(l_end);
@@ -1102,55 +819,53 @@ void ComputeHash<avx512_core>::after_bulk_fold(const Vmm& v_dst) {
         // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
         // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
     } else {
-        auto r64_intm = getReg64();
-        auto r64_aux  = getReg64();
-        mov(r64_intm, ptr[r64_params + GET_OFF(intermediate_ptr)]);
-        prefetcht0(ptr[r64_intm + 1024]);
+        mov(r64_aux, ptr[r64_params + GET_OFF(intermediate_ptr)]);
+        prefetcht0(ptr[r64_aux + 1024]);
 
         auto xmm_src_0 = getXmm();
         auto xmm_src_last = Xbyak::Xmm(v_dst.getIdx());
         auto xmm_aux_0 = getXmm();
         auto xmm_k_2_3 = Xbyak::Xmm(v_k_2_3.getIdx());
 
-        vmovdqu64(xmm_src_last, ptr[r64_intm + xmm_len * 7]);
+        vmovdqu64(xmm_src_last, ptr[r64_aux + xmm_len * 7]);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_14_15_OFF], 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_14_15_OFF], 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm + xmm_len]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux + xmm_len]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_12_13_OFF], 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_12_13_OFF], 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm + xmm_len * 2lu]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux + xmm_len * 2lu]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_10_11_OFF], 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_10_11_OFF], 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm + xmm_len * 3lu]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux + xmm_len * 3lu]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_8_9_OFF], 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_8_9_OFF], 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm + xmm_len * 4lu]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux + xmm_len * 4lu]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_6_7_OFF], 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_6_7_OFF], 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm + xmm_len * 5lu]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux + xmm_len * 5lu]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_4_5_OFF], 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_4_5_OFF], 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
 
-        vmovdqu64(xmm_src_0, ptr[r64_intm + xmm_len * 6lu]);
+        vmovdqu64(xmm_src_0, ptr[r64_aux + xmm_len * 6lu]);
         vpclmulqdq(xmm_aux_0, xmm_src_0, xmm_k_2_3, 0b00000000);
         vpclmulqdq(xmm_src_0, xmm_src_0, xmm_k_2_3, 0b00010001);
         uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
@@ -1163,6 +878,52 @@ void ComputeHash<isa>::after_bulk_fold(const Vmm& v_dst) {
     if (m_jcp.type != FINAL_FOLD) {
         return;
     }
+    // if (is_vpclmulqdq) {
+        // auto ymm_dst_0 = Xbyak::Ymm(v_dst_0.getIdx());
+        // auto ymm_dst_1 = Xbyak::Ymm(v_dst_1.getIdx());
+        // auto ymm_aux_0 = Xbyak::Ymm(v_aux_0.getIdx());
+
+        // vextracti64x4(ymm_dst_1, v_dst_0, 0x1);
+        // mov(r64_aux, reinterpret_cast<uintptr_t>(K_3_4));
+        // vpclmulqdq(ymm_aux_0, ymm_dst_0, ptr[r64_aux], 0b00000000);
+        // vpclmulqdq(ymm_dst_0, ymm_dst_0, ptr[r64_aux], 0b00010001);
+        // uni_vpxorq(ymm_dst_1, ymm_dst_1, ymm_aux_0);
+        // uni_vpxorq(ymm_dst_0, ymm_dst_0, ymm_dst_1);
+
+        // vextracti64x2(xmm_dst_3, ymm_dst_0, 0x1);
+        // vpclmulqdq(xmm_aux_0, xmm_dst_0, xmm_k_2_3, 0b00000000);
+        // vpclmulqdq(xmm_dst_0, xmm_dst_0, xmm_k_2_3, 0b00010001);
+        // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_aux_0);
+        // uni_vpxorq(xmm_dst_3, xmm_dst_3, xmm_dst_0);
+    // } else {
+        mov(r64_aux, ptr[r64_params + GET_OFF(intermediate_ptr)]);
+        prefetcht0(ptr[r64_aux + 1024]);
+
+        auto xmm_src_0 = getXmm();
+        auto xmm_src_last = Xbyak::Xmm(v_dst.getIdx());
+        auto xmm_aux_0 = getXmm();
+        auto xmm_k_2_3 = Xbyak::Xmm(v_k_2_3.getIdx());
+
+        vmovdqu(xmm_src_last, ptr[r64_aux + xmm_len * 3]);
+
+        vmovdqu(xmm_src_0, ptr[r64_aux + xmm_len * 0lu]);
+        vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_6_7_OFF], 0b00000000);
+        vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_6_7_OFF], 0b00010001);
+        uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
+        uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
+
+        vmovdqu(xmm_src_0, ptr[r64_aux + xmm_len * 1lu]);
+        vpclmulqdq(xmm_aux_0, xmm_src_0, ptr[r64_k_ptr + K_4_5_OFF], 0b00000000);
+        vpclmulqdq(xmm_src_0, xmm_src_0, ptr[r64_k_ptr + K_4_5_OFF], 0b00010001);
+        uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
+        uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
+
+        vmovdqu(xmm_src_0, ptr[r64_aux + xmm_len * 2lu]);
+        vpclmulqdq(xmm_aux_0, xmm_src_0, xmm_k_2_3, 0b00000000);
+        vpclmulqdq(xmm_src_0, xmm_src_0, xmm_k_2_3, 0b00010001);
+        uni_vpxorq(xmm_src_last, xmm_src_last, xmm_aux_0);
+        uni_vpxorq(xmm_src_last, xmm_src_last, xmm_src_0);
+    // }
 }
 
 template <>
@@ -1227,11 +988,10 @@ void ComputeHash<isa>::rest_fold(const Vmm& v_dst) {
 
 template <>
 void ComputeHash<avx512_core>::tail_fold(const Vmm& v_dst) {
-Xbyak::Label l_fold_to_64;
+    Xbyak::Label l_fold_to_64;
     cmp(r64_work_amount, 0);
     jle(l_fold_to_64, T_NEAR);
 
-    auto r64_aux = getReg64();
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_k_2_3 = Xbyak::Xmm(v_k_2_3.getIdx());
     auto xmm_src = getXmm();
@@ -1277,12 +1037,10 @@ Xbyak::Label l_fold_to_64;
 
 template <cpu_isa_t isa>
 void ComputeHash<isa>::tail_fold(const Vmm& v_dst) {
-// vmovdqu(ptr[r64_tmp], Xbyak::Xmm(v_dst.getIdx()));
-    Xbyak::Label l_fold_to_64, l_save_128, l_end;
+    Xbyak::Label l_fold_to_64;
     cmp(r64_work_amount, 0);
     jle(l_fold_to_64, T_NEAR);
 
-    auto r64_aux = getReg64();
     auto xmm_shuf_mask = Xbyak::Xmm(v_shuf_mask.getIdx());
     auto xmm_k_2_3 = Xbyak::Xmm(v_k_2_3.getIdx());
     auto xmm_src = getXmm();
@@ -1302,8 +1060,6 @@ void ComputeHash<isa>::tail_fold(const Vmm& v_dst) {
     uni_vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
     L(l_fold_to_64);
-    cmp(r64_make_64_fold, 0);
-    je(l_save_128, T_NEAR);
 
     vpclmulqdq(xmm_aux, xmm_dst, ptr[r64_k_ptr + K_1_0_OFF], 0b00000001);
     vpslldq(xmm_dst, xmm_dst, 0x8);
@@ -1321,13 +1077,6 @@ void ComputeHash<isa>::tail_fold(const Vmm& v_dst) {
     uni_vpxorq(xmm_dst, xmm_dst, xmm_aux);
 
     vpextrq(ptr[r64_dst], xmm_dst, 0x0);
-    jmp(l_end, T_NEAR);
-
-    L(l_save_128);
-    vmovdqu(ptr[r64_dst], xmm_dst);
-
-    L(l_end);
-// vmovdqu(ptr[r64_tmp], xmm_dst);
 }
 
 // template <cpu_isa_t isa>
@@ -1579,13 +1328,13 @@ uint64_t barrett_calc(uint64_t poly = 0x42F0E1EBA9EA3693, int bits = 64) {
 #endif // OPENVINO_ARCH_X86 || OPENVINO_ARCH_X86_64
 
 size_t compute_hash(const void* src, size_t size) {
-if (size > 131072 * 2)
+// if (size > 131072 * 2)
     printf("combine_hash size: %lu\n", size);
-static uint64_t counter = 0lu;
-static uint64_t sum = 0lu;
-// counter++;
-std::chrono::high_resolution_clock::time_point t1, t2;
-t1 = std::chrono::high_resolution_clock::now();
+// static uint64_t counter = 0lu;
+// static uint64_t sum = 0lu;
+// // counter++;
+// std::chrono::high_resolution_clock::time_point t1, t2;
+// t1 = std::chrono::high_resolution_clock::now();
 // std::cout << "barrett_calc 64: " << std::hex << jit::barrett_calc()
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0xD663B05D, 32)
 //           << "; barrett_calc 32: " << std::hex << jit::barrett_calc(0x04C11DB7, 32)
@@ -1650,17 +1399,22 @@ t1 = std::chrono::high_resolution_clock::now();
                 jit::ComputeHash<avx512_core>::create({jit::N_THREAD}) : jit::ComputeHash<avx2>::create({jit::N_THREAD});
             static auto final_fold_kernel = Generator::mayiuse(avx512_core) ?
                 jit::ComputeHash<avx512_core>::create({jit::FINAL_FOLD}) : jit::ComputeHash<avx2>::create({jit::FINAL_FOLD});
-                
-            
-            // parallel_nt_static(3, [&](const int ithr, const int nthr) {
-            //     if 
-            //     static auto first_thr_kernel = Generator::mayiuse(avx512_core) ?
-            //         jit::ComputeHash<avx512_core>::create({jit::FIRST_THREAD}) : jit::ComputeHash<avx2>::create({jit::FIRST_THREAD});
-            //     static auto n_thr_kernel = Generator::mayiuse(avx512_core) ?
-            //         jit::ComputeHash<avx512_core>::create({jit::N_THREAD}) : jit::ComputeHash<avx2>::create({jit::N_THREAD});
-            //     static auto final_fold_kernel = Generator::mayiuse(avx512_core) ?
-            //         jit::ComputeHash<avx512_core>::create({jit::FINAL_FOLD}) : jit::ComputeHash<avx2>::create({jit::FINAL_FOLD});
-            // });
+
+            // static bool initialized = false;
+            // static std::shared_ptr<jit::HashBase> krnels[3];
+            // if (!initialized) {
+            //     initialized = true;
+            //     parallel_nt_static(3, [&](const int ithr, const int nthr) {
+            //         switch(ithr) {
+            //             case 0: krnels[0] = Generator::mayiuse(avx512_core) ?
+            //                 jit::ComputeHash<avx512_core>::create({jit::FIRST_THREAD}) : jit::ComputeHash<avx2>::create({jit::FIRST_THREAD});
+            //             case 1: krnels[1] = Generator::mayiuse(avx512_core) ?
+            //                 jit::ComputeHash<avx512_core>::create({jit::N_THREAD}) : jit::ComputeHash<avx2>::create({jit::N_THREAD});
+            //             case 2: krnels[2] = Generator::mayiuse(avx512_core) ?
+            //                 jit::ComputeHash<avx512_core>::create({jit::FINAL_FOLD}) : jit::ComputeHash<avx2>::create({jit::FINAL_FOLD});
+            //         }
+            //     });
+            // }
 
 // printf("    parallel_get_max_threads : %d\n", parallel_get_max_threads());
             // static const size_t max_thr_num = parallel_get_max_threads() > 1 ? parallel_get_max_threads() / 2 : 1lu; // TODO: WA for Hyper Threading
@@ -1678,11 +1432,11 @@ t1 = std::chrono::high_resolution_clock::now();
             // const uint64_t blocks = size / block_size;
             // const uint64_t el_per_thread = block_size * ((blocks + thr_num - 1) / thr_num);
             // const uint64_t el_per_thread = block_size * ( (size / block_size) / thr_num );
-            const uint64_t el_per_thread = Generator::zmm_len * ( (size / thr_num) / Generator::zmm_len);
-            std::vector<uint64_t> intermediate(thr_num * 8lu); // zmm_len * thr_num
+            const uint64_t el_per_thread = first_thr_kernel->get_vlen() * ( (size / thr_num) / first_thr_kernel->get_vlen());
+            std::vector<uint8_t> intermediate(thr_num * first_thr_kernel->get_vlen());
 
-// std::vector<uint64_t> tmp_vec(thr_num * 4, 0lu);
-// std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
+std::vector<uint64_t> tmp_vec(thr_num * 4, 0lu);
+std::vector<uint64_t> tmp_vec_2(thr_num * 4, 0lu);
 
             parallel_nt_static(thr_num, [&](const int ithr, const int nthr) {
                 uint64_t start = ithr * el_per_thread;
@@ -1694,18 +1448,20 @@ t1 = std::chrono::high_resolution_clock::now();
 
                 jit::ComputeHashCallArgs args;
 
-                args.src_ptr = reinterpret_cast<const uint8_t *>(src) + Generator::zmm_len * ithr;
-                args.dst_ptr = &(intermediate[8lu * ithr]);
+                args.src_ptr = reinterpret_cast<const uint8_t *>(src) + first_thr_kernel->get_vlen() * ithr;
+                args.dst_ptr = &(intermediate[ithr * first_thr_kernel->get_vlen()]);
                 args.k_ptr = jit::K_PULL;
                 args.work_amount = work_amount;
                 args.size = size;
-                args.threads_num = thr_num; // jit::Generator::xmm_len * 8lu;
-// args.tmp_ptr = &(tmp_vec[ithr * 4]);
+                args.threads_num = thr_num;
+args.tmp_ptr = &(tmp_vec[ithr * 4]);
 
                 if (ithr == 0) {
                     (*first_thr_kernel)(&args);
+                    // (*krnels[0])(&args);
                 } else {
                     (*n_thr_kernel)(&args);
+                    // (*krnels[1])(&args);
                 }
 // printf("    [%d] start: %lu, work_amount: %lu; {%lu; %lu}\n", ithr, start, work_amount, tmp_vec[ithr * 4], tmp_vec[ithr * 4 + 1]);
 // printf("    [%d] {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n", ithr,
@@ -1720,15 +1476,16 @@ t1 = std::chrono::high_resolution_clock::now();
             args.work_amount = size - el_per_thread * thr_num; //((size + el_per_thread - 1) / el_per_thread) * jit::Generator::xmm_len;
             args.size = size;
             args.intermediate_ptr = intermediate.data();
-// args.tmp_ptr = tmp_vec_2.data();
+args.tmp_ptr = tmp_vec_2.data();
 // printf("    FINAL_FOLD work_amount: %lu\n", args.work_amount);
 
             (*final_fold_kernel)(&args);
+            // (*krnels[2])(&args);
         } else {
             static auto single_thr_kernel = Generator::mayiuse(avx512_core) 
                 ? jit::ComputeHash<avx512_core>::create({jit::SINGLE_THREAD}) : jit::ComputeHash<avx2>::create({jit::SINGLE_THREAD});
-// std::vector<uint64_t> tmp_vec(4, 0lu);
-// static std::vector<uint64_t> intermediate(2 * 8lu); // zmm_len * thr_num
+std::vector<uint64_t> tmp_vec(4, 0lu);
+// static std::vector<uint8_t> intermediate(2 * single_thr_kernel->get_vlen());
 
             jit::ComputeHashCallArgs args;
             args.src_ptr = src;
@@ -1737,14 +1494,14 @@ t1 = std::chrono::high_resolution_clock::now();
             args.work_amount = size;
             args.size = size;
 // args.intermediate_ptr = intermediate.data();
-// args.tmp_ptr = &(tmp_vec[0]);
+args.tmp_ptr = &(tmp_vec[0]);
 
 // t1 = std::chrono::high_resolution_clock::now();
             (*single_thr_kernel)(&args);
 // t2 = std::chrono::high_resolution_clock::now();
 
 // if (size > 200000) {
-// printf("    {%lu; %lu; %lu; %lu}\n", tmp_vec[0], tmp_vec[1], tmp_vec[2], tmp_vec[3]);
+// printf("    Single: %lu; tmp_vec {%lu; %lu; %lu; %lu}\n", size, tmp_vec[0], tmp_vec[1], tmp_vec[2], tmp_vec[3]);
 // printf("    {%lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu; %lu}\n",
 //     intermediate[0], intermediate[1], intermediate[2], intermediate[3],
 //     intermediate[4], intermediate[5], intermediate[6], intermediate[7],
