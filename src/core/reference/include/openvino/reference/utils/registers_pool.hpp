@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "jit_generator.hpp"
+#include "openvino/reference/utils/jit_generator.hpp"
 #include "openvino/core/except.hpp"
 
 #include <memory>
