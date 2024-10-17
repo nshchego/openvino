@@ -14,6 +14,10 @@ void ov::AttributeVisitor::start_structure(const string& name) {
     m_context.push_back(name);
 }
 
+//void ov::AttributeVisitor::start_structure(const char* name) {
+//    m_context.push_back(name);
+//}
+
 string ov::AttributeVisitor::finish_structure() {
     string result = m_context.back();
     m_context.pop_back();

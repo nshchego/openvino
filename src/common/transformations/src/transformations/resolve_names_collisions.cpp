@@ -18,7 +18,7 @@ void collect_name_collisions_map(const std::shared_ptr<ov::Model>& model,
         // Collect a names collision map for all nodes in the graph
         const auto& friendly_name = node->get_friendly_name();
         name_collisions_map[friendly_name].emplace_back(node.get());
-        if (auto msn = ov::as_type_ptr<ov::op::util::MultiSubGraphOp>(node)) {
+        if (auto msn = ov::as_type<ov::op::util::MultiSubGraphOp>(node.get())) {
             for (const auto& body : msn->get_functions()) {
                 collect_name_collisions_map(body, name_collisions_map);
             }
