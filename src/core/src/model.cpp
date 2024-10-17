@@ -305,6 +305,7 @@ std::vector<shared_ptr<ov::Node>> ov::Model::get_ordered_ops() const {
 
     NodeVector nodes;
     if (m_shared_rt_info->get_use_topological_cache()) {
+        nodes.reserve(m_cached_ordered_ops.size());
         for (const auto& node : m_cached_ordered_ops) {
             if (auto locked_node = node.lock()) {
                 nodes.emplace_back(locked_node);

@@ -442,11 +442,11 @@ public:
 
     void on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) override {
         using BodyTargetNames = std::tuple<std::string, std::string, std::vector<std::string>>;
-
-        const std::vector<BodyTargetNames> body_names = {
+        static const BodyTargetNames body_names[3] = {
             BodyTargetNames{"body", "port_map", {"input_descriptions", "output_descriptions", "special_body_ports"}},
             BodyTargetNames{"then_body", "then_port_map", {"then_inputs", "then_outputs"}},
-            BodyTargetNames{"else_body", "else_port_map", {"else_inputs", "else_outputs"}}};
+            BodyTargetNames{"else_body", "else_port_map", {"else_inputs", "else_outputs"}}
+        };
         BodyTargetNames bnames;
         bool is_body_target = false;
         for (const auto& _body_target : body_names) {
@@ -461,18 +461,21 @@ public:
             }
         }
         if (!is_body_target) {
-            std::string id = "input_descriptions";
-            std::string od = "output_descriptions";
-            const auto& id_pos = name.find("input_descriptions");
-            const auto& od_pos = name.find("output_descriptions");
+            static const char* id = "input_descriptions";
+            static const char* od = "output_descriptions";
+            static const size_t id_len = strlen(id);
+            static const size_t od_len = strlen(id);
+
+            const auto& id_pos = name.find(id);
+            const auto& od_pos = name.find(od);
             auto id_str = name;
             size_t body_id;
             if (id_pos != std::string::npos) {
-                id_str.erase(id_pos, id.length());
+                id_str.erase(id_pos, id_len);
                 (void)std::stoi(id_str, &body_id);
                 is_body_target = true;
             } else if (od_pos != std::string::npos) {
-                id_str.erase(od_pos, od.length());
+                id_str.erase(od_pos, od_len);
                 (void)std::stoi(id_str, &body_id);
                 is_body_target = true;
             }
@@ -480,8 +483,7 @@ public:
                 auto body_name = "body" + id_str;
                 if (m_xml_node.parent().child(body_name.c_str())) {
                     bnames = BodyTargetNames{body_name,
-                                             "port_map" + id_str,
-                                             {"input_descriptions" + id_str, "output_descriptions" + id_str}};
+                                             "port_map" + id_str, {id + id_str, od + id_str}};
                 } else {
                     is_body_target = false;
                 }
