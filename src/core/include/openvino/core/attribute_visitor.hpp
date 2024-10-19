@@ -99,15 +99,19 @@ public:
 
     /// The generic visitor. There must be a definition of AttributeAdapter<T> that can convert
     /// to a ValueAccessor<U> for one of the on_adpater methods.
-    //template <typename AT>
-    //void on_attribute(const char* name, AT& value) {
-    //    AttributeAdapter<AT> adapter(value);
-    //    start_structure(name);
-    //    on_adapter(get_name_with_context(), adapter);
-    //    finish_structure();
-    //}
+    template <typename AT>
+    void on_attribute(const char* name, AT& value) {
+// static uint64_t counter = 1lu;
+// printf("on_attribute char %lu\n", counter++);
+       AttributeAdapter<AT> adapter(value);
+       start_structure(name);
+       on_adapter(get_name_with_context(), adapter);
+       finish_structure();
+    }
     template <typename AT>
     void on_attribute(const std::string& name, AT& value) {
+// static uint64_t counter = 1lu;
+// printf("on_attribute string %lu\n", counter++);
         AttributeAdapter<AT> adapter(value);
         start_structure(name);
         on_adapter(get_name_with_context(), adapter);
@@ -121,7 +125,7 @@ public:
     virtual std::string get_name_with_context();
     /// \brief Start visiting a nested structure
     virtual void start_structure(const std::string& name);
-    //virtual void start_structure(const char* name);
+    virtual void start_structure(const char* name);
     /// \brief Finish visiting a nested structure
     virtual std::string finish_structure();
     using node_id_t = std::string;

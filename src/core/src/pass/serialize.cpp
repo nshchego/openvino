@@ -40,6 +40,7 @@ std::string join(const Container& c, const char* glue = ", ") {
         oss << s << v;
         s = glue;
     }
+// std::cout << "join: \"" << oss.str() << "\"\n";
     return oss.str();
 }
 
@@ -84,12 +85,12 @@ public:
 
     FilePosition write(const char* ptr,
                        size_t size,
-                       size_t* new_size,
+                       size_t& new_size,
                        bool compress_to_fp16 = false,
                        ov::element::Type src_type = ov::element::dynamic) {
         const FilePosition write_pos = m_binary_output.tellp();
         const auto offset = write_pos - m_blob_offset;
-        *new_size = size;
+        new_size = size;
 
         if (!m_enable_compression) {
             if (!compress_to_fp16) {
@@ -97,7 +98,7 @@ public:
             } else {
                 OPENVINO_ASSERT(size % src_type.size() == 0);
                 auto fp16_buffer = compress_data_to_fp16(ptr, size, src_type, new_size);
-                m_binary_output.write(fp16_buffer.get(), *new_size);
+                m_binary_output.write(fp16_buffer.get(), new_size);
             }
             return offset;
         } else {
@@ -117,7 +118,7 @@ public:
             // the same hash for {2, 2} and {0, 128} arrays.
             // But even strong hashing algorithms sometimes give collisions.
             // Therefore we always have to compare values when finding a match in the hash multimap.
-            const HashValue hash = ov::runtime::compute_hash(ptr_to_write, *new_size);
+            const HashValue hash = ov::runtime::compute_hash(ptr_to_write, new_size);
 
             auto found = m_hash_to_file_positions.find(hash);
             // iterate over all matches of the key in the multimap
@@ -133,7 +134,7 @@ public:
             if (m_write_hash_value) {
                 m_binary_output.write(reinterpret_cast<const char*>(&hash), sizeof(uint64_t));
             } else {
-                m_binary_output.write(ptr_to_write, *new_size);
+                m_binary_output.write(ptr_to_write, new_size);
             }
         }
         return offset;
@@ -143,17 +144,17 @@ private:
     static std::unique_ptr<char[]> compress_data_to_fp16(const char* ptr,
                                                          size_t size,
                                                          ov::element::Type src_type,
-                                                         size_t* compressed_size) {
+                                                         size_t& compressed_size) {
         auto num_src_elements = size / src_type.size();
-        *compressed_size = num_src_elements * ov::element::f16.size();
+        compressed_size = num_src_elements * ov::element::f16.size();
         if (src_type == ov::element::f32) {
-            auto new_ptr = std::unique_ptr<char[]>(new char[*compressed_size]);
+            auto new_ptr = std::unique_ptr<char[]>(new char[compressed_size]);
             auto dst_data = reinterpret_cast<ov::float16*>(new_ptr.get());
             auto src_data = reinterpret_cast<const float*>(ptr);
             ov::reference::convert_from_f32_to_f16_with_clamp(src_data, dst_data, num_src_elements);
             return new_ptr;
         } else if (src_type == ov::element::f64) {
-            auto new_ptr = std::unique_ptr<char[]>(new char[*compressed_size]);
+            auto new_ptr = std::unique_ptr<char[]>(new char[compressed_size]);
             auto dst_data = reinterpret_cast<ov::float16*>(new_ptr.get());
             auto src_data = reinterpret_cast<const double*>(ptr);
 
@@ -525,7 +526,7 @@ public:
 
                 int64_t offset = m_constant_write_handler.write(reinterpret_cast<const char*>(header_ptr.get()),
                                                                 header_size,
-                                                                &inter_size,
+                                                                inter_size,
                                                                 m_compress_to_fp16,
                                                                 m_output_element_type);
                 new_size += inter_size;
@@ -548,7 +549,7 @@ public:
 
                     m_constant_write_handler.write(raw_string_ptr,
                                                    raw_string_size,
-                                                   &inter_size,
+                                                   inter_size,
                                                    m_compress_to_fp16,
                                                    m_output_element_type);
                     new_size += inter_size;
@@ -562,7 +563,7 @@ public:
                 size_t new_size;
                 int64_t offset = m_constant_write_handler.write(static_cast<const char*>(a->get()->get_ptr()),
                                                                 size,
-                                                                &new_size,
+                                                                new_size,
                                                                 m_compress_to_fp16,
                                                                 m_output_element_type);
 
