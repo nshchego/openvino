@@ -84,8 +84,8 @@ public:
         std::transform(val.begin(), val.end(), val.begin(), [](char ch) {
             return std::tolower(static_cast<unsigned char>(ch));
         });
-        std::set<std::string> true_names{"true", "1"};
-        std::set<std::string> false_names{"false", "0"};
+        static const std::set<std::string> true_names{"true", "1"};
+        static const std::set<std::string> false_names{"false", "0"};
 
         bool is_true = true_names.find(val) != true_names.end();
         bool is_false = false_names.find(val) != false_names.end();

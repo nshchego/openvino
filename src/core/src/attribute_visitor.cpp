@@ -8,30 +8,71 @@
 #include "openvino/core/model.hpp"
 #include "openvino/core/node.hpp"
 
-using namespace std;
 
-void ov::AttributeVisitor::start_structure(const string& name) {
+void ov::AttributeVisitor::start_structure(const std::string& name) {
     m_context.push_back(name);
 }
 
-//void ov::AttributeVisitor::start_structure(const char* name) {
-//    m_context.push_back(name);
-//}
+void ov::AttributeVisitor::start_structure(const char* name) {
+    m_context.push_back(name);
+}
 
-string ov::AttributeVisitor::finish_structure() {
-    string result = m_context.back();
+std::string ov::AttributeVisitor::finish_structure() {
+    std::string result = m_context.back();
     m_context.pop_back();
     return result;
 }
 
-string ov::AttributeVisitor::get_name_with_context() {
-    ostringstream result;
-    string sep = "";
+std::string ov::AttributeVisitor::get_name_with_context() {
+    //std::stringstream result;
+    //result.iword(512);
+    //static const char sep = '.';
+    //for (const auto& c : m_context) {
+    //    result << c << sep;
+    //}
+    //auto strt = result.str();
+    //strt.pop_back();
+    //return strt;
+
+
+    //std::cout << "get_name_with_context: \"" << strt << "\" tellp: " << result.tellp() <<
+    //    std::endl;
+    //const std::streamsize size = static_cast<std::streamsize>(result.tellp());
+    //std::string res;
+    //res.reserve(size + 5);
+    //char tmp[5];
+    //char* tmp = &(res[0]);
+    //result.get(tmp, size);
+    //result.read(tmp, size);
+    //result.get(&(res[0]), size - 1);
+    //result.get(const_cast<char*>(res.data()), size - 1l);
+    //std::cout << "get_name_with_context: \"" << strt << "\" size: " << strt.size() << std::endl;
+    //printf("get_name_with_context: \"%s\"; tellp: \"%lu\"\n", result.str().data(), result.tellp());
+    //return strt;
+
+
+    //std::ostringstream result;
+    //std::string sep = "";
+    //for (const auto& c : m_context) {
+    //    result << sep << c;
+    //    sep = ".";
+    //}
+    //return result.str();
+
+
+    std::string result;
+    //std::cout << "result capacity: " << result.capacity() << std::endl;
+    //result.reserve(64);
+    static const char sep = '.';
     for (const auto& c : m_context) {
-        result << sep << c;
-        sep = ".";
+        result.append(c).push_back(sep);
     }
-    return result.str();
+    result.pop_back();
+    //if (result.size() >= 128) {
+        //std::cout << "result: \"" << result << "\"; size: " << result.size() << std::endl;
+    //}
+
+    return result;
 }
 
 void ov::AttributeVisitor::on_adapter(const std::string& name, VisitorAdapter& adapter) {
@@ -42,99 +83,99 @@ void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<voi
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<string>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::string>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 };
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<bool>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<bool>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 };
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<int8_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<int8_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<int16_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<int16_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<int32_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<int32_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<int64_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<int64_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<uint8_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<uint8_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<uint16_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<uint16_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<uint32_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<uint32_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<uint64_t>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<uint64_t>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<float>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<float>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<double>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<double>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<int8_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<int8_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<int16_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<int16_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<int32_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<int32_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<int64_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<int64_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<uint8_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<uint8_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<uint16_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<uint16_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<uint32_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<uint32_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<uint64_t>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<uint64_t>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<float>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<float>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<double>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<double>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::vector<string>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::vector<std::string>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
-void ov::AttributeVisitor::on_adapter(const string& name, ValueAccessor<std::shared_ptr<ov::Model>>& adapter) {
+void ov::AttributeVisitor::on_adapter(const std::string& name, ValueAccessor<std::shared_ptr<ov::Model>>& adapter) {
     on_adapter(name, static_cast<ValueAccessor<void>&>(adapter));
 }
 
@@ -150,7 +191,7 @@ void ov::AttributeVisitor::register_node(const std::shared_ptr<ov::Node>& node, 
 
 std::shared_ptr<ov::Node> ov::AttributeVisitor::get_registered_node(node_id_t id) {
     auto it = m_id_node_map.find(id);
-    return it == m_id_node_map.end() ? shared_ptr<ov::Node>() : it->second;
+    return it == m_id_node_map.end() ? std::shared_ptr<ov::Node>() : it->second;
 }
 
 ov::AttributeVisitor::node_id_t ov::AttributeVisitor::get_registered_node_id(const std::shared_ptr<ov::Node>& node) {

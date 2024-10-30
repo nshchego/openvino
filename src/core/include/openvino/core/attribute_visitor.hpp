@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <deque>
 
 #include "openvino/core/type.hpp"
 
@@ -99,13 +100,13 @@ public:
 
     /// The generic visitor. There must be a definition of AttributeAdapter<T> that can convert
     /// to a ValueAccessor<U> for one of the on_adpater methods.
-    //template <typename AT>
-    //void on_attribute(const char* name, AT& value) {
-    //    AttributeAdapter<AT> adapter(value);
-    //    start_structure(name);
-    //    on_adapter(get_name_with_context(), adapter);
-    //    finish_structure();
-    //}
+    template <typename AT>
+    void on_attribute(const char* name, AT& value) {
+        AttributeAdapter<AT> adapter(value);
+        start_structure(name);
+        on_adapter(get_name_with_context(), adapter);
+        finish_structure();
+    }
     template <typename AT>
     void on_attribute(const std::string& name, AT& value) {
         AttributeAdapter<AT> adapter(value);
@@ -114,14 +115,14 @@ public:
         finish_structure();
     }
     /// \returns The nested context of visits
-    const std::vector<std::string>& get_context() const {
+    const std::deque<std::string>& get_context() const {
         return m_context;
     }
     /// \returns context prepended to names
     virtual std::string get_name_with_context();
     /// \brief Start visiting a nested structure
     virtual void start_structure(const std::string& name);
-    //virtual void start_structure(const char* name);
+    virtual void start_structure(const char* name);
     /// \brief Finish visiting a nested structure
     virtual std::string finish_structure();
     using node_id_t = std::string;
@@ -137,7 +138,7 @@ public:
     virtual node_id_t get_registered_node_id(const std::shared_ptr<Node>& node);
 
 protected:
-    std::vector<std::string> m_context;
+    std::deque<std::string> m_context;
     std::unordered_map<std::shared_ptr<Node>, node_id_t> m_node_id_map;
     std::unordered_map<node_id_t, std::shared_ptr<Node>> m_id_node_map;
 };

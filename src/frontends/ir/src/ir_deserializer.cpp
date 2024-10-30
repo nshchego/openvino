@@ -260,18 +260,79 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
 
     if (skip_names.count(name) && !getStrAttribute(m_node.child("data"), name, val))
         return;
-    if (auto a = ov::as_type<ov::AttributeAdapter<ov::element::Type>>(&adapter)) {
-        static_cast<ov::element::Type&>(*a) = ov::element::Type(val);
+
+    if (auto a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>>(&adapter)) {
+        std::string value;
+        pugi::xml_node dn = m_node.child("data");
+        auto type = pugixml::get_str_attr(m_node, "type");
+
+        if (dn.empty())
+            OPENVINO_THROW("No attrtibutes defined for ", type, " op!");
+
+        if (getStrAttribute(dn, name, value)) {
+            auto buffer = std::make_shared<ov::AlignedBuffer>(value.size());
+            auto data = static_cast<char*>(buffer->get_ptr());
+            value.copy(data, value.size());
+            a->set(buffer);
+        } else if (name == "value" && type == "Const") {
+            std::vector<int64_t> shape;
+            std::string el_type_str;
+
+            size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
+            size_t size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
+            if (!getStrAttribute(dn, "element_type", el_type_str))
+                return;
+            if (!getParameters<int64_t>(dn, "shape", shape))
+                return;
+
+            // ov::element::Type el_type = ov::element::Type(el_type_str);
+            ov::element::Type el_type(el_type_str);
+
+            if (!m_weights)
+                OPENVINO_THROW("Empty weights data in bin file or bin file cannot be found!");
+            if (m_weights->size() < offset + size)
+                OPENVINO_THROW("Incorrect weights in bin file!");
+            char* data = m_weights->get_ptr<char>() + offset;
+
+            if (el_type == element::string) {
+                auto buffer =
+                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data, size);
+                a->set(buffer);
+            } else {
+                if (size < ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3))
+                    OPENVINO_THROW("Attribute and shape size are inconsistent for ", type, " op!");
+
+                auto buffer =
+                    std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, size, m_weights);
+                a->set(buffer);
+            }
+        }
+    } else if (const auto& a = ov::as_type<ov::AttributeAdapter<ov::element::TypeVector>>(&adapter)) {
+        ov::element::TypeVector types;
+        if (!getParameters<ov::element::Type>(m_node.child("data"), name, types))
+            return;
+        a->set(types);
     } else if (auto a = ov::as_type<ov::AttributeAdapter<PartialShape>>(&adapter)) {
         PartialShape shape;
         if (!get_partial_shape_from_attribute(m_node.child("data"), name, shape))
             return;
         a->set(shape);
+    } else if (auto a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::op::util::Variable>>>(&adapter)) {
+        std::string variable_id;
+        if (!getStrAttribute(m_node.child("data"), name, variable_id))
+            return;
+        if (!m_variables.count(variable_id)) {
+            m_variables[variable_id] = std::make_shared<ov::op::util::Variable>(
+                ov::op::util::VariableInfo{ov::PartialShape::dynamic(), ov::element::dynamic, variable_id});
+        }
+        a->set(m_variables[variable_id]);
     } else if (auto a = ov::as_type<ov::AttributeAdapter<Dimension>>(&adapter)) {
         Dimension dim;
         if (!get_dimension_from_attribute(m_node.child("data"), name, dim))
             return;
         a->set(dim);
+    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::element::Type>>(&adapter)) {
+        static_cast<ov::element::Type&>(*a) = ov::element::Type(val);
     } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::Shape>>(&adapter)) {
         std::vector<size_t> shape;
         if (!getParameters<size_t>(m_node.child("data"), name, shape))
@@ -300,74 +361,6 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
         if (!getParameters<size_t>(m_node.child("data"), name, axes))
             return;
         static_cast<ov::AxisSet&>(*a) = ov::AxisSet(axes);
-    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::op::TopKSortType>>(&adapter)) {
-        if (!getStrAttribute(m_node.child("data"), name, val))
-            return;
-        static_cast<ov::op::TopKSortType&>(*a) = ov::as_enum<ov::op::TopKSortType>(val);
-    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::op::TopKMode>>(&adapter)) {
-        if (!getStrAttribute(m_node.child("data"), name, val))
-            return;
-        static_cast<ov::op::TopKMode&>(*a) = ov::as_enum<ov::op::TopKMode>(val);
-    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::CoordinateDiff>>(&adapter)) {
-        std::vector<size_t> shape;
-        if (!getParameters<size_t>(m_node.child("data"), name, shape))
-            return;
-        std::vector<std::ptrdiff_t> coord_diff(shape.begin(), shape.end());
-        static_cast<ov::CoordinateDiff&>(*a) = ov::CoordinateDiff(coord_diff);
-    } else if (auto a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::op::util::Variable>>>(&adapter)) {
-        std::string variable_id;
-        if (!getStrAttribute(m_node.child("data"), name, variable_id))
-            return;
-        if (!m_variables.count(variable_id)) {
-            m_variables[variable_id] = std::make_shared<ov::op::util::Variable>(
-                ov::op::util::VariableInfo{ov::PartialShape::dynamic(), ov::element::dynamic, variable_id});
-        }
-        a->set(m_variables[variable_id]);
-    } else if (auto a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>>(&adapter)) {
-        std::string value;
-        pugi::xml_node dn = m_node.child("data");
-        auto type = pugixml::get_str_attr(m_node, "type");
-
-        if (dn.empty())
-            OPENVINO_THROW("No attrtibutes defined for ", type, " op!");
-
-        if (getStrAttribute(dn, name, value)) {
-            auto buffer = std::make_shared<ov::AlignedBuffer>(value.size());
-            auto data = static_cast<char*>(buffer->get_ptr());
-            value.copy(data, value.size());
-            a->set(buffer);
-        } else if (name == "value" && type == "Const") {
-            std::vector<int64_t> shape;
-            std::string el_type_str;
-
-            size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
-            size_t size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
-            if (!getStrAttribute(dn, "element_type", el_type_str))
-                return;
-            if (!getParameters<int64_t>(dn, "shape", shape))
-                return;
-
-            ov::element::Type el_type = ov::element::Type(el_type_str);
-
-            if (!m_weights)
-                OPENVINO_THROW("Empty weights data in bin file or bin file cannot be found!");
-            if (m_weights->size() < offset + size)
-                OPENVINO_THROW("Incorrect weights in bin file!");
-            char* data = m_weights->get_ptr<char>() + offset;
-
-            if (el_type == element::string) {
-                auto buffer =
-                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data, size);
-                a->set(buffer);
-            } else {
-                if (size < ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3))
-                    OPENVINO_THROW("Attribute and shape size are inconsistent for ", type, " op!");
-
-                auto buffer =
-                    std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, size, m_weights);
-                a->set(buffer);
-            }
-        }
     } else if (auto a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>>(&adapter)) {
         pugi::xml_node dn = m_node.child("data");
         const auto& type = pugixml::get_str_attr(m_node, "type");
@@ -408,11 +401,20 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
         }
 
         a->set(node_attrs);
-    } else if (const auto& a = ov::as_type<ov::AttributeAdapter<ov::element::TypeVector>>(&adapter)) {
-        ov::element::TypeVector types;
-        if (!getParameters<ov::element::Type>(m_node.child("data"), name, types))
+    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::op::TopKSortType>>(&adapter)) {
+        if (!getStrAttribute(m_node.child("data"), name, val))
             return;
-        a->set(types);
+        static_cast<ov::op::TopKSortType&>(*a) = ov::as_enum<ov::op::TopKSortType>(val);
+    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::op::TopKMode>>(&adapter)) {
+        if (!getStrAttribute(m_node.child("data"), name, val))
+            return;
+        static_cast<ov::op::TopKMode&>(*a) = ov::as_enum<ov::op::TopKMode>(val);
+    } else if (auto a = ov::as_type<ov::AttributeAdapter<ov::CoordinateDiff>>(&adapter)) {
+        std::vector<size_t> shape;
+        if (!getParameters<size_t>(m_node.child("data"), name, shape))
+            return;
+        std::vector<std::ptrdiff_t> coord_diff(shape.begin(), shape.end());
+        static_cast<ov::CoordinateDiff&>(*a) = ov::CoordinateDiff(coord_diff);
     } else {
         OPENVINO_THROW("Error IR reading. Attribute adapter can not be found for ", name, " parameter");
     }
@@ -530,19 +532,18 @@ std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_n
         auto node = create_node(inputs, p.xml, weights, p.params);
         id_to_node[layer_id] = node;
 
-        if (const auto& parameter_node = std::dynamic_pointer_cast<ov::op::v0::Parameter>(node)) {
+        if (auto parameter_node = as_type_ptr<op::v0::Parameter>(node)) {
             io_map.inputs.insert({layer_id, func_nodes.parameters.size()});
             func_nodes.parameters.emplace_back(parameter_node);
         }
 
-        if (const auto& result_node = std::dynamic_pointer_cast<ov::op::v0::Result>(node)) {
+        if (auto result_node = as_type_ptr<ov::op::v0::Result>(node)) {
             io_map.outputs.insert({layer_id, func_nodes.results.size()});
             func_nodes.results.emplace_back(result_node);
         }
 
-        if (const auto& sink = std::dynamic_pointer_cast<ov::op::Sink>(node)) {
-            auto subgraph_op = std::dynamic_pointer_cast<ov::op::util::MultiSubGraphOp>(node);
-            if (subgraph_op) {
+        if (auto sink = as_type_ptr<ov::op::Sink>(node)) {
+            if (auto subgraph_op = as_type<ov::op::util::MultiSubGraphOp>(node.get())) {
                 for (const auto& body_model : subgraph_op->get_functions()) {
                     if (body_model->get_sinks().size()) {
                         func_nodes.sinks.emplace_back(sink);
@@ -554,7 +555,7 @@ std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_n
             }
         }
 
-        if (const auto& read_value = std::dynamic_pointer_cast<ov::op::util::ReadValueBase>(node)) {
+        if (auto read_value = as_type_ptr<ov::op::util::ReadValueBase>(node)) {
             variable_id_to_read_value[read_value->get_variable_id()] = read_value;
         }
 
@@ -566,7 +567,7 @@ std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_n
                                                 func_nodes.parameters,
                                                 pugixml::get_str_attr(root, "name", ""));
     for (const auto& sink : func_nodes.sinks) {
-        if (const auto& assign = std::dynamic_pointer_cast<ov::op::util::AssignBase>(sink)) {
+        if (auto assign = as_type<ov::op::util::AssignBase>(sink.get())) {
             assign->add_control_dependency(variable_id_to_read_value.at(assign->get_variable_id()));
         }
     }
@@ -739,12 +740,13 @@ ov::GenericLayerParams ov::XmlDeserializer::parse_generic_params(const pugi::xml
         port.portId = static_cast<size_t>(pugixml::get_uint64_attr(parentNode, "id"));
 
         FOREACH_CHILD (node, parentNode, "dim") {
-            // int64_t dim = std::atoll(node.child_value());
-            // if (dim < -1) {
-            int64_t dim = 0;
+            auto dim_val = node.child_value();
+            int64_t dim = std::atoll(dim_val);
+            if (dim == 0 && dim_val[0] != '0') {
+            /*int64_t dim = 0;
             const pugi::char_t* dimVal = node.child_value();
             std::stringstream ss(dimVal);
-            if (!(ss >> dim) || dim < -1) {
+            if (!(ss >> dim) || dim < -1) {*/
 printf("[CORE] Invalid dimension\n");
                 OPENVINO_THROW("dimension (",
                             //    dimVal,
@@ -900,7 +902,7 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
             OPENVINO_THROW("Opset ", params.version, " doesn't contain the operation with type: ", type_name);
         }
         // Share Weights form constant blob
-        if (auto constant = std::dynamic_pointer_cast<ov::op::v0::Constant>(ovNode)) {
+        if (auto constant = ov::as_type<ov::op::v0::Constant>(ovNode.get())) {
             constant->alloc_buffer_on_visit_attributes(false);
         }
         ovNode->set_arguments(inputs);

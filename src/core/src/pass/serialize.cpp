@@ -47,12 +47,80 @@ namespace {  // helpers
 template <typename Container>
 std::string join(const Container& c, const char* glue = ", ") {
     std::stringstream oss;
+    //if (!c.empty()) {
+    //    oss.iword(512);
+    //    // const char* s = "";
+    //    auto iter = c.begin();
+    //    oss << *iter;
+    //    iter++;
+    //    while (iter != c.end()) {
+    //        oss << glue << *iter;
+    //        iter++;
+    //    }
+    //    //std::cout << "join: " << oss.str() << std::endl;
+    //}
+
     const char* s = "";
     for (const auto& v : c) {
         oss << s << v;
         s = glue;
     }
+    //auto res = oss.str();
+    //if (res.size() >= 15) {
+        //std::cout << "join: " << res << "; size: " << res.size() << std::endl;
+    //}
+
     return oss.str();
+
+    //std::string res;
+    //res.reserve(512);
+    //for (const auto& v : c) {
+    //    res.insert(res.size(), glue).insert(res.size(), v);
+    //}
+    //res.resize(res.size() - strlen(glue));
+    //return res;
+}
+
+template <>
+std::string join(const std::vector<int64_t>& c, const char* glue) {
+    std::string result;
+    if (!c.empty()) {
+        for (const auto& v : c) {
+            result.append(std::to_string(v)).append(glue);
+        }
+        const auto glue_len = strlen(glue);
+        result.erase(result.size() - glue_len, glue_len);
+    }
+
+    return result;
+}
+
+template <>
+std::string join(const std::vector<float>& c, const char* glue) {
+    std::string result;
+    if (!c.empty()) {
+        for (const auto& v : c) {
+            result.append(std::to_string(v)).append(glue);
+        }
+        const auto glue_len = strlen(glue);
+        result.erase(result.size() - glue_len, glue_len);
+    }
+
+    return result;
+}
+
+template <>
+std::string join(const std::vector<std::string>& c, const char* glue) {
+    std::string result;
+    if (!c.empty()) {
+        for (const auto& v : c) {
+            result.append(v).append(glue);
+        }
+        const auto glue_len = strlen(glue);
+        result.erase(result.size() - glue_len, glue_len);
+    }
+
+    return result;
 }
 
 struct Edge {
@@ -265,30 +333,40 @@ public:
 
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int>>& adapter) override {
         check_attribute_name(name);
+        static size_t counter = 1lu;
+        std::cout << "on_adapter vector<int>: " << counter++ << std::endl;
         const auto& value = join(adapter.get());
         m_node.append_attribute(name.c_str()).set_value(value.c_str());
     }
 
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int64_t>>& adapter) override {
         check_attribute_name(name);
+        static size_t counter = 1lu;
+        std::cout << "on_adapter vector<int64_t>: " << counter++ << std::endl;
         const auto& value = join(adapter.get());
         m_node.append_attribute(name.c_str()).set_value(value.c_str());
     }
 
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<uint64_t>>& adapter) override {
         check_attribute_name(name);
+        static size_t counter = 1lu;
+        std::cout << "on_adapter vector<uint64_t>: " << counter++ << std::endl;
         const auto& value = join(adapter.get());
         m_node.append_attribute(name.c_str()).set_value(value.c_str());
     }
 
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<float>>& adapter) override {
         check_attribute_name(name);
+        static size_t counter = 1lu;
+        std::cout << "on_adapter vector<float>: " << counter++ << std::endl;
         const auto& value = join(adapter.get());
         m_node.append_attribute(name.c_str()).set_value(value.c_str());
     }
 
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<std::string>>& adapter) override {
         check_attribute_name(name);
+        static size_t counter = 1lu;
+        std::cout << "on_adapter vector<string>: " << counter++ << std::endl;
         const auto& value = join(adapter.get());
         m_node.append_attribute(name.c_str()).set_value(value.c_str());
     }
@@ -605,6 +683,8 @@ public:
             }
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<ov::element::TypeVector>>(&adapter)) {
             const auto& attrs = a->get();
+            static size_t counter = 1lu;
+            std::cout << "XmlSerializer::on_adapter TypeVector: " << counter++ << std::endl;
             m_xml_node.append_attribute(name.c_str()).set_value(join(attrs).c_str());
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<ov::PartialShape>>(&adapter)) {
             const auto& attrs = a->get();
@@ -644,18 +724,28 @@ public:
         m_xml_node.append_attribute(name.c_str()).set_value(adapter.get());
     }
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int>>& adapter) override {
+        static size_t counter = 1lu;
+        std::cout << "XmlSerializer::on_adapter vector<int>: " << counter++ << std::endl;
         m_xml_node.append_attribute(name.c_str()).set_value(create_atribute_list(adapter).c_str());
     }
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int64_t>>& adapter) override {
+        //static size_t counter = 1lu;
+        //std::cout << "XmlSerializer::on_adapter vector<int64_t>: " << counter++ << std::endl;
         m_xml_node.append_attribute(name.c_str()).set_value(create_atribute_list(adapter).c_str());
     }
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<uint64_t>>& adapter) override {
+        static size_t counter = 1lu;
+        std::cout << "XmlSerializer::on_adapter vector<uint64_t>: " << counter++ << std::endl;
         m_xml_node.append_attribute(name.c_str()).set_value(create_atribute_list(adapter).c_str());
     }
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<float>>& adapter) override {
+        //static size_t counter = 1lu;
+        //std::cout << "XmlSerializer::on_adapter vector<float>: " << counter++ << std::endl;
         m_xml_node.append_attribute(name.c_str()).set_value(create_atribute_list(adapter).c_str());
     }
     void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<std::string>>& adapter) override {
+        //static size_t counter = 1lu;
+        //std::cout << "XmlSerializer::on_adapter vector<string>: " << counter++ << std::endl;
         m_xml_node.append_attribute(name.c_str()).set_value(create_atribute_list(adapter).c_str());
     }
     void on_adapter(const std::string& name, ov::ValueAccessor<std::shared_ptr<ov::Model>>& adapter) override {
