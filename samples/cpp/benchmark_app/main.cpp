@@ -51,6 +51,10 @@
 
 // clang-format on
 
+//#define NOMINMAX
+//#include <windows.h>
+//#include <processthreadsapi.h>
+
 namespace {
 
 #if defined(_WIN32)
@@ -334,6 +338,10 @@ void fuse_mean_scale(ov::preprocess::PrePostProcessor& preproc, const benchmark_
  * @brief The entry point of the benchmark application
  */
 int main(int argc, char* argv[]) {
+    //PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamicCodePolicy = {0};
+    //dynamicCodePolicy.ProhibitDynamicCode = TRUE;
+    //SetProcessMitigationPolicy(ProcessDynamicCodePolicy, &dynamicCodePolicy, sizeof(dynamicCodePolicy));
+
     std::shared_ptr<StatisticsReport> statistics;
     try {
         ov::CompiledModel compiledModel;
@@ -629,6 +637,10 @@ int main(int argc, char* argv[]) {
             slog::warn << "Batch size is set. Auto batching will be disabled" << slog::endl;
             device_config.insert(ov::hint::allow_auto_batching(false));
         }
+        device_config[ov::weights_path.name()] =
+           ov::Any::make<std::string>("C:/Users/nshchego/Downloads/vgg19/tf/tf_frozen/FP16/1/ov/vgg19.bin");
+           //ov::Any::make<std::string>("C:\Users\nshchego\Downloads\vgg19\tf\tf_frozen\FP16\1\ov\vgg19.bin");
+        device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SIZE;
 
         bool isDynamicNetwork = false;
         auto areNetworkInputsDynamic = [](const benchmark_app::InputsInfo& input_info) {
@@ -651,6 +663,7 @@ int main(int argc, char* argv[]) {
             auto compile_model_mem_start = get_peak_memory_usage();
             auto startTime = Time::now();
             compiledModel = core.compile_model(FLAGS_m, device_name, device_config);
+return 0;
             auto duration_ms = get_duration_ms_till_now(startTime);
             auto compile_model_mem_end = get_peak_memory_usage();
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
@@ -831,6 +844,7 @@ int main(int argc, char* argv[]) {
             auto compile_model_mem_start = get_peak_memory_usage();
             startTime = Time::now();
             compiledModel = core.compile_model(model, device_name, device_config);
+return 0;
             duration_ms = get_duration_ms_till_now(startTime);
             auto compile_model_mem_end = get_peak_memory_usage();
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;

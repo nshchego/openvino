@@ -97,6 +97,8 @@
 #include <stdexcept>
 #include <unordered_set>
 
+#include "openvino/util/file_util.hpp"
+
 #ifdef __unix__
 #include <sys/resource.h>
 #endif
@@ -1850,6 +1852,9 @@ void program::load(cldnn::BinaryInputBuffer& ib) {
 
     std::shared_ptr<ov::MappedMemory> mapped_memory = nullptr;
     std::string weights_path = _config.get_weights_path();
+if (!ov::util::file_exists(weights_path)) {
+    printf("Not valid path '%s'\n", weights_path.data());
+}
     if (_config.get_cache_mode() == ov::CacheMode::OPTIMIZE_SIZE &&
         ov::util::validate_weights_path(weights_path)) {
         mapped_memory = ov::load_mmap_object(weights_path);

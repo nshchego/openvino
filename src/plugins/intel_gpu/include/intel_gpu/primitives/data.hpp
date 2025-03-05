@@ -75,6 +75,7 @@ struct weightless_cache_manager {
             ob << false;
             return false;
         }
+printf("--GPU-- data save\n");
 
         ob << true;
         ob << bin_offset;
@@ -105,6 +106,7 @@ struct weightless_cache_manager {
         if (!do_weightless_caching) {
             return false;
         }
+printf("--GPU-- dada load\n");
 
         OPENVINO_ASSERT(mapped_weights != nullptr, "mmap object is null");
 
@@ -137,6 +139,28 @@ struct weightless_cache_manager {
                                                                                   original_size,
                                                                                   mapped_weights);
 
+        // if (curr_dtype == ov::element::i32) {
+            auto src = mapped_weights->data() + bin_offset;
+            std::string tmp = "";
+            if (original_dtype == ov::element::i32) {
+                auto sd = reinterpret_cast<int32_t*>(src);  
+                for (int i = 0; i < std::min(original_size/sizeof(int32_t), 10llu); i++) {
+                    tmp += std::to_string(sd[i]) + "; ";
+                }
+            } else if (original_dtype == ov::element::i64) {
+                auto sd = reinterpret_cast<int64_t*>(src);
+                for (int i = 0; i < std::min(original_size/sizeof(int64_t), 10llu); i++) {
+                    tmp += std::to_string(sd[i]) + "; ";
+                }
+            } else if (original_dtype == ov::element::f32) {
+                auto sd = reinterpret_cast<float*>(src);
+                for (int i = 0; i < std::min(original_size/sizeof(float), 10llu); i++) {
+                    tmp += std::to_string(sd[i]) + "; ";
+                }
+            }
+            printf("original_size: %llu; original_dtype: %s; curr_dtype: %s; origin src {%s}\n",
+                original_size, original_dtype.to_string().data(), curr_dtype.to_string().data(), tmp.data());
+        // }
         if (should_run_transformations()) {
             run_transformations(ib.get_engine(), dst_mem, shared_buf);
         } else {
@@ -168,6 +192,7 @@ private:
     void run_transformations(engine& engine,
                              memory::ptr dst_mem,
                              std::shared_ptr<ov::SharedBuffer<std::shared_ptr<ov::MappedMemory>>> shared_buf) {
+printf("[GPU] run_transformations\n");
         std::shared_ptr<ov::op::v0::Constant> transformed_constant = nullptr;
 
         // Note: this works only until the data is copied to dst_mem.

@@ -825,6 +825,7 @@ size_t compute_hash(const void* src, size_t size) {
 #ifdef OV_CORE_USE_XBYAK_JIT
     if (util::may_i_use_dynamic_code()) {
         if (Generator::mayiuse(avx2)) {
+//printf("compute_hash JIT\n");
             uint64_t result = 0lu;
 
             // Parallel section

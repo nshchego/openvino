@@ -493,6 +493,7 @@ bool ov::pass::ConvertPrecision::run_on_model(const std::shared_ptr<ov::Model>& 
         {ov::op::v1::Reverse::get_type_info_static(), extend_reverse_type},
     };
 
+printf("convert_precision\n");
     bool is_changed = convert_precision(*this,
                                         f,
                                         type_to_fuse,

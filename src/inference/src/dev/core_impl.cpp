@@ -1427,6 +1427,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
     const ov::AnyMap& config,
     const ov::SoPtr<ov::IRemoteContext>& context,
     std::function<ov::SoPtr<ov::ICompiledModel>()> compile_model_lambda) const {
+printf("--CORE-- CoreImpl::load_model_from_cache\n");
     ov::SoPtr<ov::ICompiledModel> compiled_model;
     struct HeaderException {};
 
@@ -1486,18 +1487,23 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                 if (model_buffer) {
                     update_config[ov::internal::cached_model_buffer.name()] = model_buffer;
                 }
+printf("--CORE-- CoreImpl::load_model_from_cache before import_model\n");
                 compiled_model = context ? plugin.import_model(networkStream, context, update_config)
                                          : plugin.import_model(networkStream, update_config);
             });
     } catch (const HeaderException&) {
+ printf("--CORE-- CoreImpl::load_model_from_cache HeaderException\n");
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+ printf("--CORE-- CoreImpl::load_model_from_cache Exception\n");
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
     }
 
+if (!compiled_model)
+    printf("--CORE-- CoreImpl::load_model_from_cache !compiled_model\n");
     // fallback scenario
     if (!compiled_model)
         compiled_model = compile_model_lambda();

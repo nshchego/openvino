@@ -483,12 +483,14 @@ void convert_impl(const TI* arg, TO* out, size_t count) {
 #ifdef OV_CORE_USE_XBYAK_JIT
     if (util::may_i_use_dynamic_code()) {
         if (auto converter = jit_convert_array::get<TI, TO, Clamp::enabled>()) {
+printf("convert_impl JIT\n");
             jit_convert_array::args_t args = {arg, out, count};
             converter(&args);
             return;
         }
     }
 #endif  // OV_CORE_USE_XBYAK_JIT
+printf("convert_impl REF\n");
     Converter<TI, TO>::template apply<Clamp>(arg, out, count);
 }
 }  // namespace
@@ -548,6 +550,7 @@ size_t count_out_of_f16_range(const float* arg, size_t count) {
 #ifdef OV_CORE_USE_XBYAK_JIT
     if (util::may_i_use_dynamic_code()) {
         if (auto converter = jit_count_out_of_range::get<float, float16>()) {
+printf("--CORE-- count_out_of_f16_range JIT\n");
             size_t num_out_of_range = 0;
             jit_count_out_of_range::args_t args = {arg, &num_out_of_range, count};
             converter(&args);
@@ -555,6 +558,7 @@ size_t count_out_of_f16_range(const float* arg, size_t count) {
         }
     }
 #endif  // OV_CORE_USE_XBYAK_JIT
+printf("--CORE-- count_out_of_f16_range REF\n");
     const auto is_out_of_f16_range = [](const float v) {
         return (std::abs(v) < float16::from_bits(0x0001) && v != 0.0f) || (v > std::numeric_limits<float16>::max()) ||
                (v < std::numeric_limits<float16>::lowest());
