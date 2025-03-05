@@ -50,6 +50,7 @@ Reorder::Reorder(const MemoryDesc& input,
            {output.getPrecision()},
            name,
            context) {
+printf("--CPU-- Reorder 2 '%s'\n", name.data());
     this->input = input.clone();
     this->output = output.clone();
 }

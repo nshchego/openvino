@@ -1007,6 +1007,7 @@ void cpu_convert(const void* srcPtr,
                  ov::element::Type interimPrc,
                  ov::element::Type dstPrc,
                  const size_t size) {
+printf("[CPU] cpu_convert\n");
     if (size == 0) {
         return;
     }

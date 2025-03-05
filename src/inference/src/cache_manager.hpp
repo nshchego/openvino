@@ -138,6 +138,7 @@ private:
         ScopedLocale plocal_C(LC_ALL, "C");
         const auto blob_file_name = getBlobFile(id);
         if (ov::util::file_exists(blob_file_name)) {
+printf("--INFERENCE-- read_cache_entry '%s' exists\n", blob_file_name.data());
             auto compiled_blob =
                 read_tensor_data(blob_file_name, element::u8, PartialShape::dynamic(1), 0, enable_mmap);
             SharedStreamBuffer buf{reinterpret_cast<char*>(compiled_blob.data()), compiled_blob.get_byte_size()};

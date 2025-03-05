@@ -38,9 +38,9 @@ bool store_original_type_as_attribute(const std::shared_ptr<ov::Node>& node, con
 
 bool fuse_type_to_variable(const std::shared_ptr<op::util::Variable>& variable, const precisions_map& precisions);
 
-bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
-                           const precisions_map& precisions,
-                           const std::vector<ov::Input<ov::Node>>& consumers);
+// bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
+//                            const precisions_map& precisions,
+//                            const std::vector<ov::Input<ov::Node>>& consumers);
 bool fuse_type_to_shapeof(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions);
 bool fuse_type_to_shapeof_v0(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions);
 bool fuse_type_to_random_uniform_v8(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions);
@@ -274,6 +274,9 @@ bool convert_function_precision(ov::pass::PassBase& pass,
         // skip precision sensitive nodes
         if (skip_precision_sensitive && fp16_compression_is_disabled(node) && has_fp16_compression)
             continue;
+if (is_type<ov::op::v0::Constant>(node.get())) {
+    printf("--TR-- convert_function_precision\n");
+}
         // Recursively apply transformation for sub-graph based operations
         if (auto sub_graph_node = ov::as_type_ptr<op::util::MultiSubGraphOp>(node)) {
             size_t sub_graphs_num = sub_graph_node->get_internal_subgraphs_size();
@@ -417,6 +420,7 @@ precisions_set_t find_all_used_precisions(const std::shared_ptr<ov::Model>& fn) 
 }  // namespace
 
 bool ov::pass::ConvertPrecision::run_on_model(const std::shared_ptr<ov::Model>& f) {
+printf("--TR-- ConvertPrecision::run_on_model\n");
     const auto used_precisions_set = find_all_used_precisions(f);
     precisions_map used_precisions;
     for (const auto& p : used_precisions_set) {
@@ -1101,6 +1105,9 @@ std::shared_ptr<ov::Node> change_constant_precision(std::shared_ptr<ov::op::v0::
 
     const auto* src_data = constant->get_data_ptr<src_type>();
     const auto size = shape_size(constant->get_shape());
+if (size > 1) {
+    printf("--TR-- change_constant_precision size: %lu\n", size);
+}
 
     auto new_constant = std::make_shared<ov::op::v0::Constant>(PREC_TO, constant->get_shape());
     new_constant->output(0).set_names(constant->output(0).get_names());
@@ -1359,7 +1366,7 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<ov::op::v0::Con
 
 }  // namespace
 
-bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
+bool ov::fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
                            const precisions_map& precisions,
                            const std::vector<Input<Node>>& consumers) {
     // Consts marked with is_keep_const_precision should be kept in their own precision until they reach the plugin

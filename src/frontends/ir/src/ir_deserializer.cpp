@@ -14,6 +14,7 @@
 #include "openvino/core/rt_info/weightless_caching_attributes.hpp"
 #include "openvino/core/type.hpp"
 #include "openvino/core/type/element_type.hpp"
+#include "openvino/core/type/element_type_traits.hpp"
 #include "openvino/op/constant.hpp"
 #include "openvino/op/loop.hpp"
 #include "openvino/op/parameter.hpp"
@@ -29,6 +30,7 @@
 #include "openvino/runtime/string_aligned_buffer.hpp"
 #include "openvino/util/xml_parse_utils.hpp"
 #include "rt_info_deserializer.hpp"
+// #include "transformations/convert_precision.hpp"
 #include "transformations/rt_info/attributes.hpp"
 #include "utils.hpp"
 
@@ -267,6 +269,48 @@ ov::op::v5::Loop::SpecialBodyPorts ov::XmlDeserializer::parse_purpose_attribute(
     return result;
 }
 
+namespace {
+template <typename src_type, typename dst_type>
+inline dst_type convert_value(src_type val) {
+    if (val > std::numeric_limits<dst_type>::max()) {
+        return std::numeric_limits<dst_type>::max();
+    } else if (val < std::numeric_limits<dst_type>::lowest()) {
+        return std::numeric_limits<dst_type>::lowest();
+    }
+    return static_cast<dst_type>(val);
+}
+
+template <ov::element::Type_t DT_FROM, ov::element::Type_t DT_TO>
+void convert_dt(char* dst, const char* src, size_t el_num) {
+    using src_type = typename ov::element_type_traits<DT_FROM>::value_type;
+    using dst_type = typename ov::element_type_traits<DT_TO>::value_type;
+
+    // const auto* src_data = static_cast<const src_type*>(constant->get_data_ptr());
+    auto src_data = reinterpret_cast<const src_type*>(src);
+    auto dst_data = reinterpret_cast<dst_type*>(dst);
+    // const auto size = shape_size(constant->get_shape());
+if (el_num > 1) {
+    printf("--FE_IR-- convert_dt size: %lu\n", el_num);
+}
+
+    // auto new_constant = std::make_shared<ov::op::v0::Constant>(DT_TO, constant->get_shape());
+    // new_constant->output(0).set_names(constant->output(0).get_names());
+    // auto* dst_data = const_cast<dst_type*>(reinterpret_cast<const dst_type*>(new_constant->get_data_ptr()));
+    // if (dst_data == nullptr)
+    //     OPENVINO_THROW("Can't get destination data pointer");
+
+    for (size_t i = 0lu; i < el_num; i++) {
+        dst_data[i] = convert_value<src_type, dst_type>(src_data[i]);
+    }
+}
+
+void convert_dt(ov::element::Type to_dt, ov::element::Type from_dt, char* dst, const char* src, size_t el_num) {
+    if (from_dt == ov::element::i64 && to_dt == ov::element::i32) {
+        convert_dt<ov::element::Type_t::i64, ov::element::Type_t::i32>(dst, src, el_num);
+    }
+}
+}  // namespace
+
 void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) {
     static const std::unordered_set<std::string> skip_names = {"input_descriptions",
                                                                "output_descriptions",
@@ -379,34 +423,71 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
             value.copy(data, value.size());
             a->set(buffer);
         } else if (name == "value" && type == "Const") {
+            if (!m_weights) {
+                OPENVINO_THROW("Empty weights data in bin file or bin file cannot be found!");
+            }
             std::vector<int64_t> shape;
             std::string el_type_str;
 
             size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
-            size_t size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
-            if (!getStrAttribute(dn, "element_type", el_type_str))
+            const size_t actual_size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
+            size_t origin_size = actual_size; // Original blob size in the m_weights object.
+            if (!getStrAttribute(dn, "element_type", el_type_str) || !getParameters<int64_t>(dn, "shape", shape)) {
                 return;
-            if (!getParameters<int64_t>(dn, "shape", shape))
-                return;
+            }
 
-            ov::element::Type el_type = ov::element::Type(el_type_str);
+            const auto el_num = ov::shape_size(shape);
+            const auto el_type = ov::element::Type(el_type_str);
+            std::shared_ptr<ov::AlignedBuffer> weights_buf = m_weights;
+            char* data = nullptr;
 
-            if (!m_weights)
-                OPENVINO_THROW("Empty weights data in bin file or bin file cannot be found!");
-            if (m_weights->size() < offset + size)
+            // Weightless cache way
+            if (auto rt_info = m_node.child("rt_info")) {
+                // printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
+                bool attr_found = false;
+                for (auto child : rt_info.children()) {
+                    printf("    RT child: '%s'\n", child.name());
+                    for (auto attr : child.attributes()) {
+                        if (strcmp(attr.name(), "name") == 0 && strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+                            printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
+                            ov::element::Type original_dt(child.attribute("original_dtype").value());
+                            offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
+
+                            if (original_dt != el_type) {
+                                std::shared_ptr<char[]> new_buf(new char[actual_size]);
+                                data = new_buf.get();
+                                weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char[]>>>(data, actual_size, new_buf);
+                                convert_dt(el_type, original_dt, data, m_weights->get_ptr<char>() + offset, el_num);
+                                origin_size = el_num * original_dt.size();
+                            }
+
+                            attr_found = true;
+                            break;
+                        }
+                    }
+                    if (attr_found) {
+                        break;
+                    }
+                }
+            }
+            if (m_weights->size() < offset + origin_size) {
                 OPENVINO_THROW("Incorrect weights in bin file!");
-            char* data = m_weights->get_ptr<char>() + offset;
+            }
+            if (data == nullptr) {
+printf("    offset: %lu\n", offset);
+                data = m_weights->get_ptr<char>() + offset;
+            }
 
             if (el_type == element::string) {
                 auto buffer =
-                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data, size);
+                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data, actual_size);
                 a->set(buffer);
             } else {
-                if (size < ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3))
+                if (actual_size < ((el_num * el_type.bitwidth() + 7) >> 3))
                     OPENVINO_THROW("Attribute and shape size are inconsistent for ", type, " op!");
 
                 auto buffer =
-                    std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, size, m_weights);
+                    std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, actual_size, weights_buf);
                 a->set(buffer);
             }
         }
@@ -846,6 +927,44 @@ static const std::string& translate_type_name(const std::string& name) {
     return name;
 }
 
+// template <typename src_type, typename dst_type>
+// inline dst_type convert_value(src_type val) {
+//     if (val > std::numeric_limits<dst_type>::max()) {
+//         return std::numeric_limits<dst_type>::max();
+//     } else if (val < std::numeric_limits<dst_type>::lowest()) {
+//         return std::numeric_limits<dst_type>::lowest();
+//     }
+//     return static_cast<dst_type>(val);
+// }
+
+// namespace {
+// template <ov::element::Type_t DT_FROM, ov::element::Type_t DT_TO>
+// std::shared_ptr<ov::Node> set_weights(std::shared_ptr<ov::op::v0::Constant>& constant,
+//                                       const std::shared_ptr<ov::AlignedBuffer>& weights,
+//                                       size_t offset) {
+//     using src_type = typename ov::element_type_traits<DT_FROM>::value_type;
+//     using dst_type = typename ov::element_type_traits<DT_TO>::value_type;
+
+//     // const auto* src_data = static_cast<const src_type*>(constant->get_data_ptr());
+//     const auto src_data = reinterpret_cast<const src_type*>(weights->get_ptr<uint8_t>() + offset);
+//     const auto size = shape_size(constant->get_shape());
+// if (size > 1) {
+//     printf("--FE_IR-- set_weights size: %lu\n", size);
+// }
+
+//     auto new_constant = std::make_shared<ov::op::v0::Constant>(DT_TO, constant->get_shape());
+//     new_constant->output(0).set_names(constant->output(0).get_names());
+//     auto* dst_data = const_cast<dst_type*>(reinterpret_cast<const dst_type*>(new_constant->get_data_ptr()));
+//     if (dst_data == nullptr)
+//         OPENVINO_THROW("Can't get destination data pointer");
+
+//     for (size_t i = 0lu; i < size; ++i) {
+//         dst_data[i] = convert_value<src_type, dst_type>(src_data[i]);
+//     }
+//     return new_constant;
+// }
+// }  // namespace
+
 std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov::Output<ov::Node>>& inputs,
                                                            const pugi::xml_node& node,
                                                            const std::shared_ptr<ov::AlignedBuffer>& weights,
@@ -920,12 +1039,128 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
         // Share Weights form constant blob
         if (auto constant = ov::as_type_ptr<ov::op::v0::Constant>(ovNode)) {
             constant->alloc_buffer_on_visit_attributes(false);
+// printf("--IR_FE-- Const '%s' RT: %lu\n", ovNode->get_friendly_name().data(), ovNode->get_rt_info().size());
+// pugi::xml_node dn = node.child("data");
+// if (dn) {
+//     for (auto attr : dn.attributes()) {
+//         printf("    data '%s'\n", attr.name());
+//     }
+// }
+// pugi::xml_node rt = node.child("rt_info");
+// if (rt) {
+//     for (auto attr : rt.attributes()) {
+//         printf("    rt '%s'\n", attr.name());
+//     }
+// }
+        // const auto pr_data = dn.attribute("PrimitivesPriority");
         }
         ovNode->set_arguments(inputs);
         XmlDeserializer visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+// if (auto constant = ov::as_type_ptr<ov::op::v0::Constant>(ovNode)) {
+//     // printf("--IR_FE-- XmlDeserializer::create_node Const '%s' : '%s' RT: %lu\n", ovNode->get_friendly_name().data(), params.name.data(), ovNode->get_rt_info().size());
+//     // pugi::xml_node dn = node.child("data");
+//     // if (dn) {
+//     //     for (auto attr : dn.attributes()) {
+//     //         printf("    data '%s'\n", attr.name());
+//     //     }
+//     // }
+//     pugi::xml_node rt = node.child("rt_info");
+//     if (rt) {
+//         printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
+//         auto rt_attr = rt.child("attribute");
+//         if (rt_attr) {
+//             printf("--IR_FE-- XmlDeserializer::create_node RT->Attributes for '%s'\n", ovNode->get_friendly_name().data());
+//             for (auto attr : rt_attr.attributes()) {
+//                 printf("    rt_attr '%s'\n", attr.name());
+//             }
+//         }
+//         for (auto attr : rt.attributes()) {
+//             printf("    rt '%s'\n", attr.name());
+//         }
+//     }
+// }
 
+if (params.name == "Constant_3166") {
+// if (params.name == "vgg_19/fc8/squeezed") {
+    printf("--FE_IR-- constructor_validate_and_infer_types '%s'\n", params.name.data());
+}
         if (ovNode->visit_attributes(visitor)) {
             ovNode->constructor_validate_and_infer_types();
+        }
+        if (auto constant = ov::as_type_ptr<ov::op::v0::Constant>(ovNode)) {
+//             if (auto rt_info = node.child("rt_info")) {
+//                 // printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
+//                 // auto rt_attr = rt_info.child("attribute");
+//                 if (auto rt_attr = rt_info.child("attribute")) {
+//                     // printf("--IR_FE-- XmlDeserializer::create_node RT->Attributes for '%s'\n", ovNode->get_friendly_name().data());
+//                     // for (auto attr : rt_attr.attributes()) {
+//                     //     printf("    rt_attr '%s'\n", attr.name());
+//                     // }
+//                     // printf("    WeightlessCacheAttribute name '%s'\n", ov::WeightlessCacheAttribute::get_type_info_static().name);
+//                     if (auto attr = rt_attr.attribute("name")) {
+//                         if (strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+// // printf("--IR_FE-- XmlDeserializer::create_node RT->Attributes for '%s' original_dtype: '%s'\n", ovNode->get_friendly_name().data(),
+// //                         rt_attr.attribute("original_dtype").value());
+//                             ov::element::Type original_dt(rt_attr.attribute("original_dtype").value());
+//                             size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(rt_attr, "bin_offset"));
+
+//                             if (auto dn = node.child("data")) {
+//                                 if (auto et_attr = dn.attribute("element_type")) {
+//                                     ov::element::Type target_dt(et_attr.value());
+
+// // printf("--IR_FE-- XmlDeserializer::create_node RT->Attributes for '%s':'%s' original_dt: %s; target_dt: %s; ins: %lu; outs: %lu\n", ovNode->get_friendly_name().data(),
+// //     params.name.data(), original_dt.c_type_string().data(), target_dt.c_type_string().data(), ovNode->get_input_size(), ovNode->get_output_size());
+
+//                                     if (original_dt != target_dt) {
+//                                         // ov::fuse_type_to_constant(ovNode, {{original_dt, target_dt}}, {});
+//                                         if (original_dt == ov::element::i64 && target_dt == ov::element::i32) {
+//                                             // for (auto& out : ovNode->outputs()) {
+//                                             //     printf("    out: '%lu'\n", out.get_target_inputs().size());
+//                                             // }
+//                                             ovNode = set_weights<ov::element::Type_t::i64, ov::element::Type_t::i32>(constant, weights, offset);
+//                                             // as_type<ov::op::v0::Constant>(ovNode.get())->alloc_buffer_on_visit_attributes(false);
+//                                             // for (auto& output : constant->outputs()) {
+//                                             //     output.replace_source_output(ovNode);
+//                                             // }
+//                                         }
+//                                     } else if (original_dt == ov::element::f32) {
+//                                         const auto src_data = reinterpret_cast<const float*>(weights->get_ptr<uint8_t>() + offset);
+//                                         const auto size = shape_size(constant->get_shape());
+// // if (size > 1) {
+// //     printf("--FE_IR-- set_weights size: %lu\n", size);
+// // }
+
+//                                         auto* dst_data = const_cast<float*>(reinterpret_cast<const float*>(constant->get_data_ptr()));
+
+//                                         for (size_t i = 0lu; i < size; ++i) {
+//                                             dst_data[i] = src_data[i];
+//                                         }
+//                                     }
+//                                 }
+//                             }
+//                         }
+//                     }
+//                 }
+            // }
+
+            printf("--FE_IR-- '%s' output_element_type: %s\n", params.name.data(), constant->get_output_element_type(0).c_type_string().data());
+            auto src_data = constant->get_data_ptr();
+            std::string tmp = "    src_data {";
+            if (constant->get_output_element_type(0) == ov::element::Type_t::i64) {
+                printf("    src_data: %lu\n", reinterpret_cast<const uint64_t*>(src_data)[0]);
+            } else if (constant->get_output_element_type(0) == ov::element::Type_t::i32) {
+                auto sd = reinterpret_cast<const uint32_t*>(src_data);
+                for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(uint32_t); i++) {
+                    tmp += std::to_string(sd[i]) + "; ";
+                }
+            } else if (constant->get_output_element_type(0) == ov::element::Type_t::f32) {
+                auto sd = reinterpret_cast<const float*>(src_data);
+                for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10lu); i++) {
+                // for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(float); i++) {
+                    tmp += std::to_string(sd[i]) + "; ";
+                }
+            }
+            printf("    %s}\n", tmp.data());
         }
 
         // To be sure that all default values will be initialized:

@@ -32,7 +32,10 @@ class OPENVINO_API Constant : public Op {
 public:
     OPENVINO_OP("Constant", "opset1");
 
-    Constant() = default;
+    // Constant() = default;
+    Constant() {
+printf("--CORE-- Constant 0 %s\n", m_element_type.get_type_name().data());
+    }
 
     /// \brief Initialize a constant from ov::Tensor
     /// \param tensor The ov::Tensor with data

@@ -351,6 +351,7 @@ void Transformations::CpuSpecificOpSet() {
 }
 
 void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecisions) {
+printf("--CPU-- Transformations::PreLpt\n");
     CPU_DEBUG_CAP_TRANSFORMATION_SCOPE(this, PreLpt);
 
     // Decompression handling related transformations must be run separately from common preLPT pipeline

@@ -68,6 +68,7 @@ Graph::~Graph() {
 
 template <typename NET>
 void Graph::CreateGraph(NET& model, const GraphContext::CPtr& context) {
+printf("[CPU] Graph::CreateGraph\n");
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "CreateGraph");
 
     Init(model, context);
@@ -79,6 +80,7 @@ void Graph::Init(const std::vector<NodePtr>& graphNodes,
                  const std::vector<EdgePtr>& graphEdges,
                  const GraphContext::CPtr& context,
                  std::string name) {
+printf("[CPU] Graph::Init\n");
     if (IsReady()) {
         ForgetGraphData();
     }
@@ -120,6 +122,7 @@ template void Graph::CreateGraph(const std::shared_ptr<const ov::Model>&, const 
 void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
                       const std::vector<node::Input::InputConfig>& inputConfigs,
                       const std::vector<node::Input::OutputConfig>& outputConfigs) {
+printf("--CPU-- Graph::Replicate\n");
     OV_ITT_SCOPE_CHAIN(FIRST_INFERENCE, taskChain, itt::domains::intel_cpu_LT, "Graph::Replicate", "ov::Model");
 
     this->_name = model->get_friendly_name();
@@ -145,6 +148,10 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
 
     auto createNode = [&](const std::shared_ptr<ov::Node>& op) -> NodePtr {
         // special handling for Parameters and Results
+// if (ov::is_type<op::v0::Constant>(op)) {
+//     printf("--CPU-- Graph::Replicate Constant op '%s' %s\n",
+//         op->get_friendly_name().data(), ov::as_type<op::v0::Constant>(op.get())->get_element_type().get_type_name().data());
+// }
         if (op->get_type_info() == op::v0::Parameter::get_type_info_static()) {
             auto input_index = model->get_parameter_index(ov::as_type_ptr<op::v0::Parameter>(op));
             OPENVINO_ASSERT(input_index >= 0,

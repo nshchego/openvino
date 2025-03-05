@@ -6,3 +6,5 @@ ov_add_frontend(NAME ir
                 FILEDESCRIPTION "FrontEnd to load OpenVINO IR file format"
                 LINK_LIBRARIES openvino::pugixml
                                openvino::core::dev)
+                            #    openvino::core::dev
+                            #    openvino_transformations)

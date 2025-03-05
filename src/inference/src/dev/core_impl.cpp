@@ -841,6 +841,13 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::compile_model(const std::shared_ptr<
         cacheContent.blobId = ov::ModelCache::compute_hash(model, create_compile_config(plugin, parsed._config));
         cacheContent.model = model;
         std::unique_ptr<CacheGuardEntry> lock = cacheGuard.get_hash_lock(cacheContent.blobId);
+
+        const auto& rt_info = model->get_rt_info();
+        auto weights_path = rt_info.find("__weights_path");
+        if (weights_path != rt_info.end()) {
+            parsed._config[ov::weights_path.name()] = weights_path->second;
+        }
+
         res = load_model_from_cache(cacheContent, plugin, parsed._config, ov::SoPtr<ov::IRemoteContext>{}, [&]() {
             return compile_model_and_cache(plugin,
                                            model,
@@ -1508,6 +1515,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
     const ov::AnyMap& config,
     const ov::SoPtr<ov::IRemoteContext>& context,
     std::function<ov::SoPtr<ov::ICompiledModel>()> compile_model_lambda) const {
+printf("--CORE-- CoreImpl::load_model_from_cache\n");
     ov::SoPtr<ov::ICompiledModel> compiled_model;
     struct HeaderException {};
 
@@ -1525,6 +1533,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                 ov::CompiledBlobHeader header;
                 try {
                     networkStream >> header;
+printf("    cacheContent.modelPath '%s'\n", cacheContent.modelPath.data());
                     if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                         // Original file is changed, don't use cache
                         OPENVINO_THROW("Original model file is changed");
@@ -1585,17 +1594,25 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                                          : plugin.import_model(networkStream, update_config);
             });
     } catch (const HeaderException&) {
+printf("--CORE-- CoreImpl::load_model_from_cache HeaderException\n");
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+printf("--CORE-- CoreImpl::load_model_from_cache Exception\n");
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
     }
 
+if (!compiled_model) {
+    printf("--CORE-- CoreImpl::load_model_from_cache !compiled_model\n");
+}
+
     // fallback scenario
-    if (!compiled_model)
+    if (!compiled_model) {
+        // slog::info << "[ INFO ] Could not read model from cache. Compile from IR." << slog::endl;
         compiled_model = compile_model_lambda();
+    }
 
     return compiled_model;
 }

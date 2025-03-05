@@ -1072,7 +1072,7 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
         // <layers/data> general attributes
         pugi::xml_node data = layer.append_child("data");
 
-        auto append_runtime_info = [](pugi::xml_node& node, ov::RTMap& attributes) {
+        auto append_runtime_info = [&n](pugi::xml_node& node, ov::RTMap& attributes) {
             pugi::xml_node rt_node = node.append_child("rt_info");
             bool has_attrs = false;
             for (auto& item : attributes) {
@@ -1086,11 +1086,17 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
                     if (!rt_attribute.visit_attributes(serializer)) {
                         rt_node.remove_child(attribute_node);
                     } else {
+if (ov::is_type<ov::op::v0::Constant>(n.get())) {
+    printf("--CORE-- ngfunction_2_ir Write RT for '%s'\n", n->get_friendly_name().data());
+}
                         has_attrs = true;
                     }
                 }
             }
             if (!has_attrs) {
+if (ov::is_type<ov::op::v0::Constant>(n.get())) {
+    printf("--CORE-- ngfunction_2_ir Remove RT for '%s':\n", n->get_friendly_name().data());
+}
                 node.remove_child(rt_node);
             }
         };
@@ -1098,6 +1104,22 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
         if (version >= 11) {
             append_runtime_info(layer, node->get_rt_info());
         }
+if (ov::is_type<ov::op::v0::Constant>(n.get())) {
+    auto rt = layer.child("rt_info");
+    if (rt) {
+        // printf("--CORE-- ngfunction_2_ir Result RT for '%s':\n", n->get_friendly_name().data());
+        auto rt_attr = rt.child("attribute");
+        if (rt_attr) {
+            printf("--CORE-- ngfunction_2_ir Result RT->Attributes for '%s'\n", n->get_friendly_name().data());
+            for (auto attr : rt_attr.attributes()) {
+                printf("    rt_attr '%s' : '%s'\n", attr.name(), attr.value());
+            }
+        }
+        for (auto attr : rt.attributes()) {
+            printf("    rt '%s'\n", attr.name());
+        }
+    }
+}
 
         int port_id = 0;
         // <layers/input>
@@ -1184,6 +1206,10 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
                                 .set_value(std::to_string(d.get_length()).c_str());
                         }
                     }
+                    
+if (ov::is_type<ov::op::v0::Constant>(n.get())) {
+    printf("--CORE-- ngfunction_2_ir append_runtime_info for '%s' output\n", n->get_friendly_name().data());
+}
                     if (version >= 11)
                         append_runtime_info(port, o.get_rt_info());
                 }
@@ -1223,6 +1249,30 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
         if (data_attr_size) {
             layer.remove_child(data);
         }
+
+// printf("--CORE-- ngfunction_2_ir Result DATA for '%s':\n", n->get_friendly_name().data());
+// pugi::xml_node dn = layer.child("data");
+// if (dn) {
+//     for (auto attr : dn.attributes()) {
+//         printf("    data '%s'\n", attr.name());
+//     }
+// }
+if (ov::is_type<ov::op::v0::Constant>(n.get())) {
+    auto rt = layer.child("rt_info");
+    if (rt) {
+        // printf("--CORE-- ngfunction_2_ir Result RT for '%s' at the end\n", n->get_friendly_name().data());
+        auto rt_attr = rt.child("attribute");
+        if (rt_attr) {
+            printf("--CORE-- ngfunction_2_ir Result RT->Attributes at the end for '%s'\n", n->get_friendly_name().data());
+            for (auto attr : rt_attr.attributes()) {
+                printf("    rt_attr '%s'\n", attr.name());
+            }
+        }
+        for (auto attr : rt.attributes()) {
+            printf("    rt '%s'\n", attr.name());
+        }
+    }
+}
     }
     // <edges>
     const std::vector<Edge> edge_mapping = create_edge_mapping(layer_ids, model);
@@ -1246,7 +1296,7 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
     // Serialize rt info
     pugi::xml_node rt_info_node = netXml.append_child("rt_info");
     for (const auto& it : model.get_rt_info()) {
-        // Skip IR version
+        // Skip IR version and Weights path.
         if (it.first == "version" || it.first == "__weights_path")
             continue;
         serialize_rt_info(rt_info_node, it.first, it.second);
@@ -1434,13 +1484,16 @@ bool pass::StreamSerialize::run_on_model(const std::shared_ptr<ov::Model>& model
 
     // Blobs
     hdr.consts_offset = m_stream.tellp();
-    std::string name = "net";
+    const std::string name = "net";
     pugi::xml_document xml_doc;
     pugi::xml_node net_node = xml_doc.append_child(name.c_str());
-    ConstantWriter constant_write_handler(m_stream);
-    XmlSerializer visitor(net_node, name, constant_write_handler, version);
-    std::shared_ptr<ov::Model> fun = model;
-    visitor.on_attribute(name, fun);
+//     if (rt_info.count("__weights_path") > 0lu) {
+// printf("--CORE-- StreamSerialize::run_on_model Weights were serialized\n");
+        ConstantWriter constant_write_handler(m_stream);
+        XmlSerializer visitor(net_node, name, constant_write_handler, version);
+        std::shared_ptr<ov::Model> fun = model;
+        visitor.on_attribute(name, fun);
+    // }
 
     // IR
     hdr.model_offset = m_stream.tellp();

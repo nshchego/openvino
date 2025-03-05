@@ -37,6 +37,7 @@ bool Convert::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
 
 Convert::Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, PassThroughShapeInferFactory()) {
+printf("--CPU-- Convert 1\n");
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
@@ -52,6 +53,7 @@ Convert::Convert(const Shape& shape,
                  const std::string& nodeName,
                  const GraphContext::CPtr& context)
     : Node("Convert", {shape}, {shape}, {inPrc}, {outPrc}, nodeName, context) {
+printf("--CPU-- Convert 2\n");
     convertParams.origPrc = outPrc;
 
     isDynamic = shape.isDynamic();

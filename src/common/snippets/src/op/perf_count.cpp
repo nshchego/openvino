@@ -49,16 +49,16 @@ ConsoleDumper::~ConsoleDumper() {
 }
 
 void ConsoleDumper::update(const op::PerfCountEnd* node) {
-    auto accumulation = node->get_accumulation();
-    auto iteration = node->get_iteration();
-    OPENVINO_ASSERT(accumulation.size() == iteration.size(),
-                    "accumulation size should be the same as iteration size in perf_count_end node.");
-    auto iterator_iter = iteration.begin();
-    auto iterator_acc = accumulation.begin();
-    for (; iterator_iter != iteration.end(); ++iterator_iter, ++iterator_acc) {
-        m_accumulation.local() += *iterator_acc;
-        m_iteration.local() += *iterator_iter;
-    }
+    // auto accumulation = node->get_accumulation();
+    // auto iteration = node->get_iteration();
+    // OPENVINO_ASSERT(accumulation.size() == iteration.size(),
+    //                 "accumulation size should be the same as iteration size in perf_count_end node.");
+    // auto iterator_iter = iteration.begin();
+    // auto iterator_acc = accumulation.begin();
+    // for (; iterator_iter != iteration.end(); ++iterator_iter, ++iterator_acc) {
+    //     m_accumulation.local() += *iterator_acc;
+    //     m_iteration.local() += *iterator_iter;
+    // }
 }
 
 //////////////////utils::CSVDumper///////////////
@@ -83,29 +83,29 @@ CSVDumper::~CSVDumper() {
 }
 
 void CSVDumper::update(const op::PerfCountEnd* node) {
-    auto accumulation = node->get_accumulation();
-    auto iteration = node->get_iteration();
-    OPENVINO_ASSERT(accumulation.size() == iteration.size(), "accumulation size should be the same as iteration size in perf_count_end node.");
-    auto iterator_iter = iteration.begin();
-    auto iterator_acc = accumulation.begin();
-    uint64_t avg_max = 0;
-    for (; iterator_iter != iteration.end(); ++iterator_iter, ++iterator_acc) {
-        const auto iter = *iterator_iter;
-        const auto acc = *iterator_acc;
-        uint64_t avg = iter == 0 ? 0 : acc / iter;
-        if (avg > avg_max)
-            avg_max = avg;
-    }
+    // auto accumulation = node->get_accumulation();
+    // auto iteration = node->get_iteration();
+    // OPENVINO_ASSERT(accumulation.size() == iteration.size(), "accumulation size should be the same as iteration size in perf_count_end node.");
+    // auto iterator_iter = iteration.begin();
+    // auto iterator_acc = accumulation.begin();
+    // uint64_t avg_max = 0;
+    // for (; iterator_iter != iteration.end(); ++iterator_iter, ++iterator_acc) {
+    //     const auto iter = *iterator_iter;
+    //     const auto acc = *iterator_acc;
+    //     uint64_t avg = iter == 0 ? 0 : acc / iter;
+    //     if (avg > avg_max)
+    //         avg_max = avg;
+    // }
 
-    // max time of all threads: combine for reduce max
-    auto BinaryFunc = [](const uint64_t& a, const uint64_t& b) {
-        return a >= b ? a : b;
-    };
+    // // max time of all threads: combine for reduce max
+    // auto BinaryFunc = [](const uint64_t& a, const uint64_t& b) {
+    //     return a >= b ? a : b;
+    // };
 
-    // max accumulation
-    uint64_t acc_max = accumulation.combine(BinaryFunc);
+    // // max accumulation
+    // uint64_t acc_max = accumulation.combine(BinaryFunc);
 
-    m_debug_params_map[node->get_friendly_name()] = m_params + std::to_string(acc_max) + ',' + std::to_string(avg_max);
+    // m_debug_params_map[node->get_friendly_name()] = m_params + std::to_string(acc_max) + ',' + std::to_string(avg_max);
 }
 
 }  // namespace utils

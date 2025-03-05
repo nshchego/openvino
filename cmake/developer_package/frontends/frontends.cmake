@@ -34,6 +34,7 @@ function(ov_generate_frontends_hpp)
         return()
     endif()
 
+    message("<DEB> ov_generate_frontends_hpp")
     # add frontends to libraries including ov_frontends.hpp
     ov_target_link_frontends(openvino)
 
@@ -133,6 +134,8 @@ macro(ov_add_frontend)
     endif()
 
     file(GLOB_RECURSE LIBRARY_SRC ${frontend_root_dir}/src/*.cpp)
+    # file(GLOB_RECURSE LIBRARY_SRC ${frontend_root_dir}/src/*.cpp "${frontend_root_dir}/../../common/transformations/src/transformations/convert_precision.cpp")
+    # file(GLOB_RECURSE LIBRARY_SRC ${frontend_root_dir}/src/*.cpp $<TARGET_OBJECTS:openvino_transformations_obj>)
     file(GLOB_RECURSE LIBRARY_HEADERS ${frontend_root_dir}/src/*.hpp)
     file(GLOB_RECURSE LIBRARY_PUBLIC_HEADERS ${frontend_root_dir}/include/*.hpp)
 
@@ -192,13 +195,19 @@ macro(ov_add_frontend)
     set_source_files_properties(${PROTO_SRCS} ${PROTO_HDRS} PROPERTIES COMPILE_OPTIONS -w GENERATED ON)
 
     # Create library
-    add_library(${TARGET_NAME} ${LIBRARY_SRC} ${LIBRARY_HEADERS} ${LIBRARY_PUBLIC_HEADERS}
+    add_library(${TARGET_NAME} #$<TARGET_OBJECTS:openvino_transformations_obj>
+                               ${LIBRARY_SRC} ${LIBRARY_HEADERS} ${LIBRARY_PUBLIC_HEADERS}
                                ${PROTO_SRCS} ${PROTO_HDRS} ${flatbuffers_schema_files} ${proto_files})
+                            #    $<TARGET_OBJECTS:openvino_transformations_obj>)
+    # add_library(${TARGET_NAME} $<TARGET_OBJECTS:openvino_transformations_obj>)
+    message("<DEB> frontends TARGET_NAME: ${TARGET_NAME}; OV_FRONTEND_NAME: ${OV_FRONTEND_NAME}")
 
     if(OV_FRONTEND_LINKABLE_FRONTEND)
         # create beautiful alias
         add_library(openvino::frontend::${OV_FRONTEND_NAME} ALIAS ${TARGET_NAME})
     endif()
+    # target_sources(${TARGET_NAME} PRIVATE $<TARGET_OBJECTS:openvino_transformations_obj>)
+    # target_link_libraries(${TARGET_NAME} PRIVATE $<TARGET_OBJECTS:openvino_transformations_obj>)
 
     # Shutdown protobuf when unloading the frontend dynamic library
     if(OV_FRONTEND_PROTOBUF_REQUIRED AND BUILD_SHARED_LIBS)
@@ -228,6 +237,7 @@ macro(ov_add_frontend)
     ov_add_vs_version_file(NAME ${TARGET_NAME}
                            FILEDESCRIPTION ${OV_FRONTEND_FILEDESCRIPTION})
 
+    message("<DEB> frontends OV_FRONTEND_LINK_LIBRARIES: ${OV_FRONTEND_LINK_LIBRARIES}")
     target_link_libraries(${TARGET_NAME} PRIVATE ${OV_FRONTEND_LINK_LIBRARIES} openvino::frontend::common_translators
                           PUBLIC openvino::runtime)
     ov_add_library_version(${TARGET_NAME})
