@@ -1205,6 +1205,8 @@ if (params.name == "Constant_3166") {
         const auto offset = dn.attribute("offset");
         const auto element_type = dn.attribute("element_type");
         if (size && offset && element_type) {
+printf("--IR_FE-- XmlDeserializer::create_node add RT_info for '%s' original_dtype: '%s'\n", params.name.data(),
+            element_type.value());
             rtInfo[ov::WeightlessCacheAttribute::get_type_info_static()] =
                 ov::WeightlessCacheAttribute(static_cast<size_t>(pugixml::get_uint64_attr(dn, "size")),
                                              static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset")),

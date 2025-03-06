@@ -591,6 +591,7 @@ public:
             }
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>>(&adapter)) {
             if (name == "value" && translate_type_name(m_node_type_name) == "Const") {
+                
                 const int64_t size = a->get()->size();
                 size_t new_size;
                 int64_t offset = m_constant_write_handler.write(static_cast<const char*>(a->get()->get_ptr()),
@@ -1086,8 +1087,27 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
                     if (!rt_attribute.visit_attributes(serializer)) {
                         rt_node.remove_child(attribute_node);
                     } else {
-if (ov::is_type<ov::op::v0::Constant>(n.get())) {
-    printf("--CORE-- ngfunction_2_ir Write RT for '%s'\n", n->get_friendly_name().data());
+if (auto constant = ov::as_type<ov::op::v0::Constant>(n.get())) {
+    printf("--CORE-- ngfunction_2_ir Write RT '%s' for '%s'\n", type_info.name, n->get_friendly_name().data());
+    if (constant->get_friendly_name() == "Constant_3202") {
+        auto src_data = constant->get_data_ptr();
+        std::string tmp = "";
+        if (constant->get_output_element_type(0) == ov::element::Type_t::i64) {
+            printf("    src_data: %lu\n", reinterpret_cast<const uint64_t*>(src_data)[0]);
+        } else if (constant->get_output_element_type(0) == ov::element::Type_t::i32) {
+            auto sd = reinterpret_cast<const uint32_t*>(src_data);
+            for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(uint32_t); i++) {
+                tmp += std::to_string(sd[i]) + "; ";
+            }
+        } else if (constant->get_output_element_type(0) == ov::element::Type_t::f32) {
+            auto sd = reinterpret_cast<const float*>(src_data);
+            for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10lu); i++) {
+            // for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(float); i++) {
+                tmp += std::to_string(sd[i]) + "; ";
+            }
+        }
+        printf("    data {%s}\n", tmp.data());
+    }
 }
                         has_attrs = true;
                     }
@@ -1108,15 +1128,15 @@ if (ov::is_type<ov::op::v0::Constant>(n.get())) {
     auto rt = layer.child("rt_info");
     if (rt) {
         // printf("--CORE-- ngfunction_2_ir Result RT for '%s':\n", n->get_friendly_name().data());
-        auto rt_attr = rt.child("attribute");
-        if (rt_attr) {
+        auto rt_child = rt.child("attribute");
+        if (rt_child) {
             printf("--CORE-- ngfunction_2_ir Result RT->Attributes for '%s'\n", n->get_friendly_name().data());
-            for (auto attr : rt_attr.attributes()) {
-                printf("    rt_attr '%s' : '%s'\n", attr.name(), attr.value());
+            for (auto attr : rt_child.attributes()) {
+                printf("    rt_child.attr '%s' : '%s'\n", attr.name(), attr.value());
             }
         }
         for (auto attr : rt.attributes()) {
-            printf("    rt '%s'\n", attr.name());
+            printf("    rt.attr '%s' : '%s'\n", attr.name(), attr.value());
         }
     }
 }
@@ -1261,15 +1281,15 @@ if (ov::is_type<ov::op::v0::Constant>(n.get())) {
     auto rt = layer.child("rt_info");
     if (rt) {
         // printf("--CORE-- ngfunction_2_ir Result RT for '%s' at the end\n", n->get_friendly_name().data());
-        auto rt_attr = rt.child("attribute");
-        if (rt_attr) {
+        auto rt_child = rt.child("attribute");
+        if (rt_child) {
             printf("--CORE-- ngfunction_2_ir Result RT->Attributes at the end for '%s'\n", n->get_friendly_name().data());
-            for (auto attr : rt_attr.attributes()) {
-                printf("    rt_attr '%s'\n", attr.name());
+            for (auto attr : rt_child.attributes()) {
+                printf("    rt_child.attr '%s' : '%s'\n", attr.name(), attr.value());
             }
         }
         for (auto attr : rt.attributes()) {
-            printf("    rt '%s'\n", attr.name());
+            printf("    rt.attr '%s' : '%s'\n", attr.name(), attr.value());
         }
     }
 }
