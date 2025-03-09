@@ -630,8 +630,8 @@ int main(int argc, char* argv[]) {
             device_config.insert(ov::hint::allow_auto_batching(false));
         }
 
-        device_config[ov::weights_path.name()] =
-           ov::Any::make<std::string>("/usr/local/models/WW35_static_2024.4.0-16527-382ac845923/vgg19/tf/tf_frozen/FP16/1/ov/vgg19.bin");
+        // device_config[ov::weights_path.name()] =
+        //    ov::Any::make<std::string>("/usr/local/models/WW35_static_2024.4.0-16527-382ac845923/vgg19/tf/tf_frozen/FP16/1/ov/vgg19.bin");
         // device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SIZE;
 
         bool isDynamicNetwork = false;

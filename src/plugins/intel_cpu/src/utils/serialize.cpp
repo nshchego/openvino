@@ -75,6 +75,13 @@ void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
                           (hdr.custom_data_size == hdr.consts_offset - hdr.custom_data_offset) &&
                           (hdr.consts_size == hdr.model_offset - hdr.consts_offset) &&
                           ((hdr.model_size = file_size - hdr.model_offset) != 0u);
+    // if (m_weights_path.empty()) {
+    //     is_valid_model &= (hdr.custom_data_size == hdr.consts_offset - hdr.custom_data_offset) &&
+    //                       (hdr.consts_size == hdr.model_offset - hdr.consts_offset);
+    // } else {
+    //     is_valid_model &= (hdr.custom_data_size == hdr.consts_offset - hdr.custom_data_offset) &&
+    //                       (hdr.consts_size == hdr.model_offset - hdr.consts_offset);
+    // }
     if (!is_valid_model) {
         OPENVINO_THROW("[CPU] Could not deserialize by device xml header.");
     }
@@ -94,18 +101,23 @@ void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
     // Map blob content
     std::shared_ptr<ov::AlignedBuffer> weights_buf;
 printf("--CPU-- ModelDeserializer::process_mmap m_weights_path: '%s'\n", m_weights_path.data());
-    if (m_weights_path.empty()) {
-        if (hdr.consts_size) {
-            weights_buf =
-                std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(buffer_base + hdr.consts_offset,
-                                                                                    hdr.consts_size,
-                                                                                    mmemory);
-        }
-    } else {
-        auto mmap = ov::load_mmap_object(m_weights_path);
+    if (hdr.consts_size) {
         weights_buf =
+            std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(buffer_base + hdr.consts_offset,
+                                                                                hdr.consts_size,
+                                                                                mmemory);
+std::string tmp = "";
+auto sd = reinterpret_cast<const uint32_t*>(weights_buf->get_ptr<char>());
+for (size_t i = 0lu; i < std::min(10lu, weights_buf->size() / sizeof(uint32_t)); i++) {
+    tmp += std::to_string(sd[i]) + "; ";
+}
+printf("    data: {%s}\n", tmp.data());
+    }
+    std::shared_ptr<ov::AlignedBuffer> origin_weights_buf;
+    if (!m_weights_path.empty()) {
+        auto mmap = ov::load_mmap_object(m_weights_path);
+        origin_weights_buf =
             std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(mmap->data(), mmap->size(), mmap);
-        // weights_buf = convert_weights(mmap);
     }
 
     // XML content
@@ -124,7 +136,7 @@ printf("--CPU-- ModelDeserializer::process_mmap m_weights_path: '%s'\n", m_weigh
     std::shared_ptr<ov::AlignedBuffer> model_buf =
         std::make_shared<ov::SharedBuffer<std::shared_ptr<std::string>>>(&((*xml_buff)[0]), hdr.model_size, xml_buff);
 
-    model = m_model_builder(model_buf, weights_buf);
+    model = m_model_builder(model_buf, weights_buf, origin_weights_buf);
 
     // Set Info
     pugi::xml_node root = xml_in_out_doc.child("cnndata");
@@ -169,6 +181,12 @@ void ModelDeserializer::process_stream(std::shared_ptr<ov::Model>& model) {
     if (hdr.consts_size) {
         m_istream.read(static_cast<char*>(data_blob->data(ov::element::u8)), hdr.consts_size);
     }
+    std::shared_ptr<ov::AlignedBuffer> origin_weights_buf;
+    if (!m_weights_path.empty()) {
+        // auto mmap = ov::load_mmap_object(m_weights_path);
+        // origin_weights_buf =
+        //     std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(mmap->data(), mmap->size(), mmap);
+    }
 
     // read XML content
     auto xml_string = std::make_shared<std::string>();
@@ -194,7 +212,7 @@ void ModelDeserializer::process_stream(std::shared_ptr<ov::Model>& model) {
         hdr.consts_size,
         data_blob);
 
-    model = m_model_builder(model_buf, weights_buf);
+    model = m_model_builder(model_buf, weights_buf, origin_weights_buf);
 
     // Set Info
     pugi::xml_node root = xmlInOutDoc.child("cnndata");

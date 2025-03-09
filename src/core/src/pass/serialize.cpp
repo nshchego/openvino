@@ -18,6 +18,7 @@
 #include "openvino/core/meta_data.hpp"
 #include "openvino/core/model.hpp"
 #include "openvino/core/parallel.hpp"
+#include "openvino/core/rt_info/weightless_caching_attributes.hpp"
 #include "openvino/core/type/float16.hpp"
 #include "openvino/op/binary_convolution.hpp"
 #include "openvino/op/constant.hpp"
@@ -329,6 +330,7 @@ class XmlSerializer : public ov::AttributeVisitor {
     bool m_compress_to_fp16;
     ov::element::Type m_output_element_type;
     bool m_data_is_temporary;
+    bool m_weightless_const;
 
     template <typename T>
     std::string create_atribute_list(ov::ValueAccessor<std::vector<T>>& adapter) {
@@ -448,7 +450,8 @@ public:
                   bool deterministic = false,
                   bool compress_to_fp16 = false,
                   ov::element::Type output_element_type = ov::element::dynamic,
-                  bool data_is_temporary = false)
+                  bool data_is_temporary = false,
+                  bool weightless_const = false)
         : m_xml_node(data),
           m_node_type_name(node_type_name),
           m_constant_write_handler(constant_write_handler),
@@ -456,7 +459,8 @@ public:
           m_deterministic(deterministic),
           m_compress_to_fp16(compress_to_fp16),
           m_output_element_type(output_element_type),
-          m_data_is_temporary(data_is_temporary) {}
+          m_data_is_temporary(data_is_temporary),
+          m_weightless_const(weightless_const) {}
 
     void on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) override {
         using BodyTargetNames = std::tuple<std::string, std::string, std::vector<std::string>>;
@@ -591,18 +595,48 @@ public:
             }
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>>(&adapter)) {
             if (name == "value" && translate_type_name(m_node_type_name) == "Const") {
-                
-                const int64_t size = a->get()->size();
-                size_t new_size;
+printf("--CORE-- XmlSerializer::on_adapter CONST dt: %s\n", m_output_element_type.c_type_string().data());
+                bool attr_found = false;
+                for (auto child : m_xml_node.children()) {
+                // if (auto rt_info = m_xml_node.child("rt_info")) {
+printf("    m_xml_node child: '%s'\n", child.name());
+                    // for (auto child : rt_info.children()) {
+                    //     printf("    RT child: '%s'\n", child.name());
+                    //     for (auto attr : child.attributes()) {
+                    //         if (strcmp(attr.name(), "name") == 0 && strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+                    //             attr_found = true;
+                    //             break;
+                    //         }
+                    //     }
+                    //     if (attr_found) {
+                    //         break;
+                    //     }
+                    // }
+                }
+     
+                // if (!attr_found) {
+                const size_t size = m_weightless_const ? 0lu : a->get()->size();
+                size_t new_size = 0lu;
+if (!m_weightless_const) {
+// if (m_output_element_type == ov::element::Type_t::i32) {
+    std::string tmp = "";
+    auto sd = reinterpret_cast<const uint32_t*>(a->get()->get_ptr());
+    for (size_t i = 0lu; i < std::min(10lu, size / sizeof(uint32_t)); i++) {
+        tmp += std::to_string(sd[i]) + "; ";
+    }
+    printf("    data: {%s}\n", tmp.data());
+}
                 int64_t offset = m_constant_write_handler.write(static_cast<const char*>(a->get()->get_ptr()),
                                                                 size,
                                                                 new_size,
                                                                 m_compress_to_fp16,
                                                                 m_output_element_type,
                                                                 m_data_is_temporary);
+printf("    new_size: %lu; offset: %ld\n", new_size, offset);
 
                 m_xml_node.append_attribute("offset").set_value(static_cast<unsigned long long>(offset));
                 m_xml_node.append_attribute("size").set_value(static_cast<unsigned long long>(new_size));
+                // }
             }
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<ov::op::util::FrameworkNodeAttrs>>(&adapter)) {
             const auto& attrs = a->get();
@@ -696,7 +730,7 @@ public:
             OPENVINO_THROW("Unsupported Model name.");
         }
     }
-};
+};  // class XmlSerializer
 
 const std::unordered_map<ov::Node*, int> create_layer_ids(const ov::Model& model) {
     std::unordered_map<ov::Node*, int> layer_ids;
@@ -1072,8 +1106,9 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
 
         // <layers/data> general attributes
         pugi::xml_node data = layer.append_child("data");
+        bool weightless_const = false;
 
-        auto append_runtime_info = [&n](pugi::xml_node& node, ov::RTMap& attributes) {
+        auto append_runtime_info = [&n, &weightless_const](pugi::xml_node& node, ov::RTMap& attributes) {
             pugi::xml_node rt_node = node.append_child("rt_info");
             bool has_attrs = false;
             for (auto& item : attributes) {
@@ -1088,12 +1123,17 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
                         rt_node.remove_child(attribute_node);
                     } else {
 if (auto constant = ov::as_type<ov::op::v0::Constant>(n.get())) {
-    printf("--CORE-- ngfunction_2_ir Write RT '%s' for '%s'\n", type_info.name, n->get_friendly_name().data());
-    if (constant->get_friendly_name() == "Constant_3202") {
+    printf("--CORE-- ngfunction_2_ir ADD RT '%s' for '%s'\n", type_info.name, n->get_friendly_name().data());
+    // if (constant->get_friendly_name() == "Constant_3200") {
+    if (constant->get_output_element_type(0) == ov::element::Type_t::i64 ||
+        constant->get_output_element_type(0) == ov::element::Type_t::i32) {
         auto src_data = constant->get_data_ptr();
         std::string tmp = "";
         if (constant->get_output_element_type(0) == ov::element::Type_t::i64) {
-            printf("    src_data: %lu\n", reinterpret_cast<const uint64_t*>(src_data)[0]);
+            auto sd = reinterpret_cast<const uint64_t*>(src_data);
+            for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(uint64_t); i++) {
+                tmp += std::to_string(sd[i]) + "; ";
+            }
         } else if (constant->get_output_element_type(0) == ov::element::Type_t::i32) {
             auto sd = reinterpret_cast<const uint32_t*>(src_data);
             for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(uint32_t); i++) {
@@ -1102,7 +1142,6 @@ if (auto constant = ov::as_type<ov::op::v0::Constant>(n.get())) {
         } else if (constant->get_output_element_type(0) == ov::element::Type_t::f32) {
             auto sd = reinterpret_cast<const float*>(src_data);
             for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10lu); i++) {
-            // for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(float); i++) {
                 tmp += std::to_string(sd[i]) + "; ";
             }
         }
@@ -1110,12 +1149,15 @@ if (auto constant = ov::as_type<ov::op::v0::Constant>(n.get())) {
     }
 }
                         has_attrs = true;
+                        if (strcmp(type_info.name, ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+                            weightless_const = true;
+                        }
                     }
                 }
             }
             if (!has_attrs) {
 if (ov::is_type<ov::op::v0::Constant>(n.get())) {
-    printf("--CORE-- ngfunction_2_ir Remove RT for '%s':\n", n->get_friendly_name().data());
+    printf("--CORE-- ngfunction_2_ir RM RT_INFO for '%s':\n", n->get_friendly_name().data());
 }
                 node.remove_child(rt_node);
             }
@@ -1128,15 +1170,13 @@ if (ov::is_type<ov::op::v0::Constant>(n.get())) {
     auto rt = layer.child("rt_info");
     if (rt) {
         // printf("--CORE-- ngfunction_2_ir Result RT for '%s':\n", n->get_friendly_name().data());
-        auto rt_child = rt.child("attribute");
-        if (rt_child) {
-            printf("--CORE-- ngfunction_2_ir Result RT->Attributes for '%s'\n", n->get_friendly_name().data());
+        // auto rt_child = rt.child("attribute");
+        // if (rt_child) {
+        printf("--CORE-- ngfunction_2_ir ADDED RT for '%s'\n", n->get_friendly_name().data());
+        for (auto rt_child : rt.children()) {
             for (auto attr : rt_child.attributes()) {
                 printf("    rt_child.attr '%s' : '%s'\n", attr.name(), attr.value());
             }
-        }
-        for (auto attr : rt.attributes()) {
-            printf("    rt.attr '%s' : '%s'\n", attr.name(), attr.value());
         }
     }
 }
@@ -1240,6 +1280,7 @@ if (ov::is_type<ov::op::v0::Constant>(n.get())) {
         }
 
         // fill <data> general attributes
+        // if (!weightless_const) {
         {
             bool compress_to_fp16 = false;
             ov::element::Type output_element_type = ov::element::dynamic;
@@ -1256,7 +1297,8 @@ if (ov::is_type<ov::op::v0::Constant>(n.get())) {
                                   deterministic,
                                   compress_to_fp16,
                                   output_element_type,
-                                  modified_node.data_is_temporary());
+                                  modified_node.data_is_temporary(),
+                                  weightless_const);
             OPENVINO_ASSERT(fixed_node.get_node()->visit_attributes(visitor), "Visitor API is not supported in ", node);
         }
         rt_info::XmlSerializer{data}.serialize(node->get_rt_info());

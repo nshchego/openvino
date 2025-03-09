@@ -29,6 +29,7 @@ private:
 class ModelDeserializer {
 public:
     using ModelBuilder = std::function<std::shared_ptr<ov::Model>(const std::shared_ptr<ov::AlignedBuffer>&,
+                                                                  const std::shared_ptr<ov::AlignedBuffer>&,
                                                                   const std::shared_ptr<ov::AlignedBuffer>&)>;
 
     ModelDeserializer(std::istream& model,

@@ -4,35 +4,27 @@
 
 #include "ir_deserializer.hpp"
 
-#include <pugixml.hpp>
 #include <regex>
 #include <string_view>
 
 #include "openvino/core/descriptor_tensor.hpp"
-#include "openvino/core/except.hpp"
 #include "openvino/core/meta_data.hpp"
 #include "openvino/core/rt_info/weightless_caching_attributes.hpp"
 #include "openvino/core/type.hpp"
-#include "openvino/core/type/element_type.hpp"
 #include "openvino/core/type/element_type_traits.hpp"
 #include "openvino/op/constant.hpp"
-#include "openvino/op/loop.hpp"
 #include "openvino/op/parameter.hpp"
 #include "openvino/op/result.hpp"
 #include "openvino/op/util/assign_base.hpp"
 #include "openvino/op/util/framework_node.hpp"
 #include "openvino/op/util/op_types.hpp"
 #include "openvino/op/util/read_value_base.hpp"
-#include "openvino/op/util/sub_graph_base.hpp"
 #include "openvino/op/util/variable.hpp"
-#include "openvino/runtime/aligned_buffer.hpp"
 #include "openvino/runtime/shared_buffer.hpp"
 #include "openvino/runtime/string_aligned_buffer.hpp"
 #include "openvino/util/xml_parse_utils.hpp"
 #include "rt_info_deserializer.hpp"
-// #include "transformations/convert_precision.hpp"
 #include "transformations/rt_info/attributes.hpp"
-#include "utils.hpp"
 
 using namespace ov::util;
 
@@ -423,14 +415,12 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
             value.copy(data, value.size());
             a->set(buffer);
         } else if (name == "value" && type == "Const") {
-            if (!m_weights) {
-                OPENVINO_THROW("Empty weights data in bin file or bin file cannot be found!");
-            }
+            OPENVINO_ASSERT(m_weights, "Empty weights data in bin file or bin file cannot be found!");
             std::vector<int64_t> shape;
             std::string el_type_str;
 
             size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
-            const size_t actual_size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
+            size_t actual_size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
             size_t origin_size = actual_size; // Original blob size in the m_weights object.
             if (!getStrAttribute(dn, "element_type", el_type_str) || !getParameters<int64_t>(dn, "shape", shape)) {
                 return;
@@ -441,41 +431,57 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
             std::shared_ptr<ov::AlignedBuffer> weights_buf = m_weights;
             char* data = nullptr;
 
-            // Weightless cache way
-            if (auto rt_info = m_node.child("rt_info")) {
-                // printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
-                bool attr_found = false;
-                for (auto child : rt_info.children()) {
-                    printf("    RT child: '%s'\n", child.name());
-                    for (auto attr : child.attributes()) {
-                        if (strcmp(attr.name(), "name") == 0 && strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
-                            printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
-                            ov::element::Type original_dt(child.attribute("original_dtype").value());
-                            offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
-
-                            if (original_dt != el_type) {
-                                std::shared_ptr<char[]> new_buf(new char[actual_size]);
-                                data = new_buf.get();
-                                weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char[]>>>(data, actual_size, new_buf);
-                                convert_dt(el_type, original_dt, data, m_weights->get_ptr<char>() + offset, el_num);
+            // Load from the original binary file if possible.
+            if (m_origin_weights) {
+                if (auto rt_info = m_node.child("rt_info")) {
+                    // printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
+                    bool attr_found = false;
+                    for (auto child : rt_info.children()) {
+                        printf("    RT child: '%s'\n", child.name());
+                        for (auto attr : child.attributes()) {
+                            if (strcmp(attr.name(), "name") == 0 && strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+                                printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
+                                ov::element::Type original_dt(child.attribute("original_dtype").value());
+                                offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
+                                actual_size = el_num * el_type.size();
                                 origin_size = el_num * original_dt.size();
-                            }
+                                if (m_origin_weights->size() < offset + origin_size) {
+                                    OPENVINO_THROW("Incorrect weights in bin file!");
+                                }
 
-                            attr_found = true;
+                                if (original_dt == el_type) {
+                                    weights_buf = m_origin_weights;
+                                } else {
+                                    std::shared_ptr<char[]> new_buf(new char[actual_size]);
+                                    data = new_buf.get();
+                                    weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char[]>>>(data, actual_size, new_buf);
+                                    convert_dt(el_type, original_dt, data, m_origin_weights->get_ptr<char>() + offset, el_num);
+                                }
+
+                                attr_found = true;
+                                break;
+                            }
+                        }
+                        if (attr_found) {
                             break;
                         }
                     }
-                    if (attr_found) {
-                        break;
-                    }
                 }
-            }
-            if (m_weights->size() < offset + origin_size) {
-                OPENVINO_THROW("Incorrect weights in bin file!");
             }
             if (data == nullptr) {
 printf("    offset: %lu\n", offset);
-                data = m_weights->get_ptr<char>() + offset;
+                if (weights_buf->size() < offset + actual_size) {
+                    OPENVINO_THROW("Incorrect weights in bin file!");
+                }
+                data = weights_buf->get_ptr<char>() + offset;
+if (el_type == ov::element::i32) {
+    std::string tmp = "";
+    auto sd = reinterpret_cast<const uint32_t*>(data);
+    for (size_t i = 0lu; i < actual_size / sizeof(uint32_t); i++) {
+        tmp += std::to_string(sd[i]) + "; ";
+    }
+    printf("    data: {%s}\n", tmp.data());
+}
             }
 
             if (el_type == element::string) {
@@ -650,7 +656,7 @@ std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_n
             inputs[realInputPortId] = input_node->output(p_output.get_real_output_port_id(e.fromPortId));
         }
 
-        auto node = create_node(inputs, p.xml, weights, p.params);
+        auto node = create_node(inputs, p.xml, weights, m_origin_weights, p.params);
         id_to_node[layer_id] = node;
 
         if (const auto& parameter_node = ov::as_type_ptr<ov::op::v0::Parameter>(node)) {
@@ -968,6 +974,7 @@ static const std::string& translate_type_name(const std::string& name) {
 std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov::Output<ov::Node>>& inputs,
                                                            const pugi::xml_node& node,
                                                            const std::shared_ptr<ov::AlignedBuffer>& weights,
+                                                           const std::shared_ptr<ov::AlignedBuffer>& origin_weights,
                                                            const GenericLayerParams& params) {
     // Check that inputs are correctly defined
     for (size_t i = 0; i < inputs.size(); i++) {
@@ -989,7 +996,7 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
     auto extensionIt = m_extensions.find(type);
 
     if (extensionIt != m_extensions.end()) {
-        XmlDeserializer visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        XmlDeserializer visitor(node, weights, origin_weights, m_opsets, m_extensions, m_variables, m_version);
         ovNode = (*extensionIt->second).create(inputs, visitor).at(0).get_node_shared_ptr();
     }
 
@@ -1055,7 +1062,7 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
         // const auto pr_data = dn.attribute("PrimitivesPriority");
         }
         ovNode->set_arguments(inputs);
-        XmlDeserializer visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        XmlDeserializer visitor(node, weights, origin_weights, m_opsets, m_extensions, m_variables, m_version);
 // if (auto constant = ov::as_type_ptr<ov::op::v0::Constant>(ovNode)) {
 //     // printf("--IR_FE-- XmlDeserializer::create_node Const '%s' : '%s' RT: %lu\n", ovNode->get_friendly_name().data(), params.name.data(), ovNode->get_rt_info().size());
 //     // pugi::xml_node dn = node.child("data");
@@ -1080,7 +1087,7 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
 //     }
 // }
 
-if (params.name == "Constant_3166") {
+if (params.name == "Constant_3202") {
 // if (params.name == "vgg_19/fc8/squeezed") {
     printf("--FE_IR-- constructor_validate_and_infer_types '%s'\n", params.name.data());
 }
@@ -1147,7 +1154,10 @@ if (params.name == "Constant_3166") {
             auto src_data = constant->get_data_ptr();
             std::string tmp = "    src_data {";
             if (constant->get_output_element_type(0) == ov::element::Type_t::i64) {
-                printf("    src_data: %lu\n", reinterpret_cast<const uint64_t*>(src_data)[0]);
+                auto sd = reinterpret_cast<const uint64_t*>(src_data);
+                for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(uint64_t); i++) {
+                    tmp += std::to_string(sd[i]) + "; ";
+                }
             } else if (constant->get_output_element_type(0) == ov::element::Type_t::i32) {
                 auto sd = reinterpret_cast<const uint32_t*>(src_data);
                 for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(uint32_t); i++) {
@@ -1168,7 +1178,7 @@ if (params.name == "Constant_3166") {
     }
     if (!ovNode && m_extensions.count(ov::op::util::FrameworkNode::get_type_info_static())) {
         ovNode = std::make_shared<ov::op::util::FrameworkNode>(inputs);
-        XmlDeserializer visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        XmlDeserializer visitor(node, weights, origin_weights, m_opsets, m_extensions, m_variables, m_version);
         ovNode->visit_attributes(visitor);
 
         size_t index{0};

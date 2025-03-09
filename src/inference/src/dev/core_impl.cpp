@@ -29,6 +29,7 @@
 #include "openvino/runtime/threading/executor_manager.hpp"
 #include "openvino/util/common_util.hpp"
 #include "openvino/util/file_util.hpp"
+#include "openvino/util/log.hpp"
 #include "openvino/util/shared_object.hpp"
 #include "openvino/util/variant_visitor.hpp"
 #include "openvino/util/xml_parse_utils.hpp"
@@ -1604,12 +1605,10 @@ printf("--CORE-- CoreImpl::load_model_from_cache Exception\n");
         // throw;
     }
 
-if (!compiled_model) {
-    printf("--CORE-- CoreImpl::load_model_from_cache !compiled_model\n");
-}
-
     // fallback scenario
     if (!compiled_model) {
+printf("--CORE-- CoreImpl::load_model_from_cache Could not load model from cache.\n");
+        OPENVINO_ERR("Could not load model from cache.");
         // slog::info << "[ INFO ] Could not read model from cache. Compile from IR." << slog::endl;
         compiled_model = compile_model_lambda();
     }
@@ -1788,9 +1787,10 @@ std::shared_ptr<ov::Model> ov::CoreImpl::read_model(const std::string& model,
 }
 
 std::shared_ptr<ov::Model> ov::CoreImpl::read_model(const std::shared_ptr<AlignedBuffer>& model,
-                                                    const std::shared_ptr<AlignedBuffer>& weights) const {
+                                                    const std::shared_ptr<AlignedBuffer>& weights,
+                                                    const std::shared_ptr<AlignedBuffer>& origin_weights) const {
     OV_ITT_SCOPE(FIRST_INFERENCE, ov::itt::domains::ReadTime, "CoreImpl::read_model from memory");
-    return ov::util::read_model(model, weights, get_extensions_copy());
+    return ov::util::read_model(model, weights, origin_weights, get_extensions_copy());
 }
 
 std::map<std::string, ov::Version> ov::CoreImpl::get_versions(const std::string& deviceName) const {
