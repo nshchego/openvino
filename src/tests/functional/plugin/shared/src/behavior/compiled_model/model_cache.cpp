@@ -4,29 +4,13 @@
 
 #include "behavior/compiled_model/model_cache.hpp"
 
-//#include <sys/stat.h>
-//#include <sys/types.h>
-//
-//#include <cstdio>
-
-#include "base/ov_behavior_test_utils.hpp"
-//#include "common_test_utils/common_utils.hpp"
-#include "common_test_utils/file_utils.hpp"
-#include "common_test_utils/ov_tensor_utils.hpp"
 #include "common_test_utils/subgraph_builders/read_concat_split_assign.hpp"
 #include "common_test_utils/subgraph_builders/single_concat_with_constant.hpp"
 #include "common_test_utils/subgraph_builders/ti_with_lstm_cell.hpp"
-#include "common_test_utils/test_common.hpp"
-#include "openvino/pass/serialize.hpp"
+#include "common_test_utils/test_assertions.hpp"
+#include "common_test_utils/ov_tensor_utils.hpp"
 #include "openvino/util/codec_xor.hpp"
 #include "shared_test_classes/subgraph/weights_decompression_builders.hpp"
-#ifndef WIN32
-#    include <unistd.h>
-#endif
-
-#ifdef WIN32
-#    define stat _stat
-#endif
 
 namespace ov {
 namespace test {

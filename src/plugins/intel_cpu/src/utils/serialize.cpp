@@ -183,9 +183,9 @@ void ModelDeserializer::process_stream(std::shared_ptr<ov::Model>& model) {
     }
     std::shared_ptr<ov::AlignedBuffer> origin_weights_buf;
     if (!m_weights_path.empty()) {
-        // auto mmap = ov::load_mmap_object(m_weights_path);
-        // origin_weights_buf =
-        //     std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(mmap->data(), mmap->size(), mmap);
+        auto mmap = ov::load_mmap_object(m_weights_path);
+        origin_weights_buf =
+            std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(mmap->data(), mmap->size(), mmap);
     }
 
     // read XML content

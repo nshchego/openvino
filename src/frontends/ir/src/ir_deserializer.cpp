@@ -277,19 +277,11 @@ void convert_dt(char* dst, const char* src, size_t el_num) {
     using src_type = typename ov::element_type_traits<DT_FROM>::value_type;
     using dst_type = typename ov::element_type_traits<DT_TO>::value_type;
 
-    // const auto* src_data = static_cast<const src_type*>(constant->get_data_ptr());
     auto src_data = reinterpret_cast<const src_type*>(src);
     auto dst_data = reinterpret_cast<dst_type*>(dst);
-    // const auto size = shape_size(constant->get_shape());
 if (el_num > 1) {
     printf("--FE_IR-- convert_dt size: %lu\n", el_num);
 }
-
-    // auto new_constant = std::make_shared<ov::op::v0::Constant>(DT_TO, constant->get_shape());
-    // new_constant->output(0).set_names(constant->output(0).get_names());
-    // auto* dst_data = const_cast<dst_type*>(reinterpret_cast<const dst_type*>(new_constant->get_data_ptr()));
-    // if (dst_data == nullptr)
-    //     OPENVINO_THROW("Can't get destination data pointer");
 
     for (size_t i = 0lu; i < el_num; i++) {
         dst_data[i] = convert_value<src_type, dst_type>(src_data[i]);
@@ -299,6 +291,22 @@ if (el_num > 1) {
 void convert_dt(ov::element::Type to_dt, ov::element::Type from_dt, char* dst, const char* src, size_t el_num) {
     if (from_dt == ov::element::i64 && to_dt == ov::element::i32) {
         convert_dt<ov::element::Type_t::i64, ov::element::Type_t::i32>(dst, src, el_num);
+    } else if (from_dt == ov::element::f32 && to_dt == ov::element::f16) {
+        convert_dt<ov::element::Type_t::f32, ov::element::Type_t::f16>(dst, src, el_num);
+    } else if (from_dt == ov::element::f16 && to_dt == ov::element::f32) {
+        convert_dt<ov::element::Type_t::f16, ov::element::Type_t::f32>(dst, src, el_num);
+    } else if (from_dt == ov::element::bf16 && to_dt == ov::element::f32) {
+        convert_dt<ov::element::Type_t::bf16, ov::element::Type_t::f32>(dst, src, el_num);
+    } else if (from_dt == ov::element::f32 && to_dt == ov::element::bf16) {
+        convert_dt<ov::element::Type_t::f32, ov::element::Type_t::bf16>(dst, src, el_num);
+    } else if (from_dt == ov::element::u8 && to_dt == ov::element::i32) {
+        convert_dt<ov::element::Type_t::u8, ov::element::Type_t::i32>(dst, src, el_num);
+    } else if (from_dt == ov::element::i8 && to_dt == ov::element::f32) {
+        convert_dt<ov::element::Type_t::i8, ov::element::Type_t::f32>(dst, src, el_num);
+    } else if (from_dt == ov::element::u8 && to_dt == ov::element::f32) {
+        convert_dt<ov::element::Type_t::u8, ov::element::Type_t::f32>(dst, src, el_num);
+    } else {
+        OPENVINO_THROW("Unsupported element types conversion from ", from_dt, " to ", to_dt);
     }
 }
 }  // namespace
