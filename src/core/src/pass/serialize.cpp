@@ -621,7 +621,7 @@ if (!m_weightless_const) {
 // if (m_output_element_type == ov::element::Type_t::i32) {
     std::string tmp = "";
     auto sd = reinterpret_cast<const uint32_t*>(a->get()->get_ptr());
-    for (size_t i = 0lu; i < std::min(10lu, size / sizeof(uint32_t)); i++) {
+    for (size_t i = 0lu; i < std::min(10llu, size / sizeof(uint32_t)); i++) {
         tmp += std::to_string(sd[i]) + "; ";
     }
     printf("    data: {%s}\n", tmp.data());
@@ -1141,7 +1141,7 @@ if (auto constant = ov::as_type<ov::op::v0::Constant>(n.get())) {
             }
         } else if (constant->get_output_element_type(0) == ov::element::Type_t::f32) {
             auto sd = reinterpret_cast<const float*>(src_data);
-            for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10lu); i++) {
+            for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10llu); i++) {
                 tmp += std::to_string(sd[i]) + "; ";
             }
         }

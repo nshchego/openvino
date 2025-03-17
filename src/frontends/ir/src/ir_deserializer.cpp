@@ -443,8 +443,8 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
                                 printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
                                 ov::element::Type original_dt(child.attribute("original_dtype").value());
                                 offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
-                                actual_size = el_num * el_type.size();
-                                origin_size = el_num * original_dt.size();
+                                origin_size = static_cast<size_t>(pugixml::get_uint64_attr(child, "original_size"));
+                                actual_size = ((el_num * el_type.bitwidth() + 7) >> 3);
                                 if (m_origin_weights->size() < offset + origin_size) {
                                     OPENVINO_THROW("Incorrect weights in bin file!");
                                 }
@@ -1165,7 +1165,7 @@ if (params.name == "Constant_3202") {
                 }
             } else if (constant->get_output_element_type(0) == ov::element::Type_t::f32) {
                 auto sd = reinterpret_cast<const float*>(src_data);
-                for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10lu); i++) {
+                for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10llu); i++) {
                 // for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(float); i++) {
                     tmp += std::to_string(sd[i]) + "; ";
                 }

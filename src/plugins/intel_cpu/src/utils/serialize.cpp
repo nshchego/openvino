@@ -108,7 +108,7 @@ printf("--CPU-- ModelDeserializer::process_mmap m_weights_path: '%s'\n", m_weigh
                                                                                 mmemory);
 std::string tmp = "";
 auto sd = reinterpret_cast<const uint32_t*>(weights_buf->get_ptr<char>());
-for (size_t i = 0lu; i < std::min(10lu, weights_buf->size() / sizeof(uint32_t)); i++) {
+for (size_t i = 0lu; i < std::min(10llu, weights_buf->size() / sizeof(uint32_t)); i++) {
     tmp += std::to_string(sd[i]) + "; ";
 }
 printf("    data: {%s}\n", tmp.data());
