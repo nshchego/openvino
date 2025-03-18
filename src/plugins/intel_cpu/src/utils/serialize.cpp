@@ -104,8 +104,8 @@ printf("--CPU-- ModelDeserializer::process_mmap m_weights_path: '%s'\n", m_weigh
     if (hdr.consts_size) {
         weights_buf =
             std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(buffer_base + hdr.consts_offset,
-                                                                                hdr.consts_size,
-                                                                                mmemory);
+                                                                                   hdr.consts_size,
+                                                                                   mmemory);
 std::string tmp = "";
 auto sd = reinterpret_cast<const uint32_t*>(weights_buf->get_ptr<char>());
 for (size_t i = 0lu; i < std::min(10llu, weights_buf->size() / sizeof(uint32_t)); i++) {

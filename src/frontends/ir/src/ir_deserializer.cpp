@@ -429,7 +429,7 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
 
             size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
             size_t actual_size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
-            size_t origin_size = actual_size; // Original blob size in the m_weights object.
+            size_t origin_size = actual_size;  // Original blob size in the m_weights object.
             if (!getStrAttribute(dn, "element_type", el_type_str) || !getParameters<int64_t>(dn, "shape", shape)) {
                 return;
             }
@@ -447,7 +447,8 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
                     for (auto child : rt_info.children()) {
                         printf("    RT child: '%s'\n", child.name());
                         for (auto attr : child.attributes()) {
-                            if (strcmp(attr.name(), "name") == 0 && strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+                            if (strcmp(attr.name(), "name") == 0 &&
+                                strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
                                 printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
                                 ov::element::Type original_dt(child.attribute("original_dtype").value());
                                 offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
@@ -462,8 +463,15 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
                                 } else {
                                     std::shared_ptr<char[]> new_buf(new char[actual_size]);
                                     data = new_buf.get();
-                                    weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char[]>>>(data, actual_size, new_buf);
-                                    convert_dt(el_type, original_dt, data, m_origin_weights->get_ptr<char>() + offset, el_num);
+                                    weights_buf =
+                                        std::make_shared<ov::SharedBuffer<std::shared_ptr<char[]>>>(data,
+                                                                                                    actual_size,
+                                                                                                    new_buf);
+                                    convert_dt(el_type,
+                                               original_dt,
+                                               data,
+                                               m_origin_weights->get_ptr<char>() + offset,
+                                               el_num);
                                 }
 
                                 attr_found = true;
@@ -494,14 +502,16 @@ if (el_type == ov::element::i32) {
 
             if (el_type == element::string) {
                 auto buffer =
-                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data, actual_size);
+                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data,
+                                                                                                         actual_size);
                 a->set(buffer);
             } else {
                 if (actual_size < ((el_num * el_type.bitwidth() + 7) >> 3))
                     OPENVINO_THROW("Attribute and shape size are inconsistent for ", type, " op!");
 
-                auto buffer =
-                    std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, actual_size, weights_buf);
+                auto buffer = std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data,
+                                                                                                     actual_size,
+                                                                                                     weights_buf);
                 a->set(buffer);
             }
         }
