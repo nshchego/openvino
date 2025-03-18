@@ -211,13 +211,13 @@ Constant::Constant(const Tensor& tensor)
       m_data{std::make_shared<SharedBuffer<Tensor>>(const_cast<char*>(static_cast<const char*>(tensor.data())),
                                                     tensor.get_byte_size(),
                                                     tensor)} {
-printf("--CORE-- Constant 1 %s\n", m_element_type.get_type_name().data());
+// printf("--CORE-- Constant 1 %s\n", m_element_type.get_type_name().data());
     constructor_validate_and_infer_types();
 }
 
 Constant::Constant(const element::Type& type, const Shape& shape, const std::vector<std::string>& values)
     : Constant(false, type, shape) {
-printf("--CORE-- Constant 2 %s\n", m_element_type.get_type_name().data());
+// printf("--CORE-- Constant 2 %s\n", m_element_type.get_type_name().data());
     const auto this_shape_size = shape_size(m_shape);
     const auto values_size = values.size();
     const auto has_single_value = (values_size == 1);
@@ -245,13 +245,14 @@ printf("--CORE-- Constant 2 %s\n", m_element_type.get_type_name().data());
 }
 
 Constant::Constant(const element::Type& type, const Shape& shape) : Constant(true, type, shape) {
-printf("--CORE-- Constant 3 %s\n", m_element_type.get_type_name().data());}
+// printf("--CORE-- Constant 3 %s\n", m_element_type.get_type_name().data());
+ }
 
 Constant::Constant(bool memset_allocation, const element::Type& type, const Shape& shape)
     : m_element_type(type),
       m_shape(shape),
       m_byte_strides{calc_byte_strides(m_shape, m_element_type)} {
-printf("--CORE-- Constant ctr 4 dt %s '%s'\n", m_element_type.get_type_name().data(), get_friendly_name().data());
+// printf("--CORE-- Constant ctr 4 dt %s '%s'\n", m_element_type.get_type_name().data(), get_friendly_name().data());
     allocate_buffer(memset_allocation);
     constructor_validate_and_infer_types();
 }

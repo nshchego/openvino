@@ -486,9 +486,10 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
             }
             if (data == nullptr) {
 printf("    offset: %lu\n", offset);
-                if (weights_buf->size() < offset + actual_size) {
-                    OPENVINO_THROW("Incorrect weights in bin file!");
-                }
+                OPENVINO_ASSERT(weights_buf->size() >= offset + actual_size, "Incorrect weights in bin file!");
+                // if (weights_buf->size() < offset + actual_size) {
+                //     OPENVINO_THROW("Incorrect weights in bin file!");
+                // }
                 data = weights_buf->get_ptr<char>() + offset;
 if (el_type == ov::element::i32) {
     std::string tmp = "";
