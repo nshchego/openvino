@@ -454,8 +454,7 @@ ov::Any Plugin::get_ro_property(const std::string& name, [[maybe_unused]] const 
                                                    RW_property(ov::value_cache_precision.name()),
                                                    RW_property(ov::key_cache_group_size.name()),
                                                    RW_property(ov::value_cache_group_size.name()),
-                                                   WO_property(ov::weights_path.name())
-        };
+                                                   WO_property(ov::weights_path.name())};
 
         std::vector<ov::PropertyName> supportedProperties;
         supportedProperties.reserve(roProperties.size() + rwProperties.size());
@@ -600,6 +599,19 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
         _config.erase(blob_it);
     }
 
+    ov::CacheMode cache_mode = ov::CacheMode::OPTIMIZE_SPEED;
+    std::string origin_weights_path;
+    auto cm_it = _config.find(ov::cache_mode.name());
+    if (cm_it != _config.end()) {
+        cache_mode = cm_it->second.as<ov::CacheMode>();
+    }
+    if (cache_mode == ov::CacheMode::OPTIMIZE_SIZE) {
+        auto wp_it = _config.find(ov::weights_path.name());
+        if (wp_it != _config.end()) {
+            origin_weights_path = wp_it->second.as<std::string>();
+        }
+    }
+
     ModelDeserializer deserializer(
         model_stream,
         model_buffer,
@@ -609,11 +621,8 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
             return get_core()->read_model(model, weights, origin_weights);
         },
         decrypt,
-        decript_from_string);
-    auto wp_it = _config.find(ov::weights_path.name());
-    if (wp_it != _config.end()) {
-        deserializer.set_weights_path(wp_it->second.as<std::string>());
-    }
+        decript_from_string,
+        origin_weights_path);
 
     std::shared_ptr<ov::Model> model;
     deserializer >> model;

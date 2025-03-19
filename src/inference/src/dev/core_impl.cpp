@@ -1609,7 +1609,6 @@ printf("--CORE-- CoreImpl::load_model_from_cache Exception\n");
     if (!compiled_model) {
 printf("--CORE-- CoreImpl::load_model_from_cache Could not load model from cache.\n");
         OPENVINO_ERR("Could not load model from cache.");
-        // slog::info << "[ INFO ] Could not read model from cache. Compile from IR." << slog::endl;
         compiled_model = compile_model_lambda();
     }
 

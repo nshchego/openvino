@@ -36,11 +36,13 @@ ModelDeserializer::ModelDeserializer(std::istream& model_stream,
                                      std::shared_ptr<ov::AlignedBuffer> model_buffer,
                                      ModelBuilder fn,
                                      const CacheDecrypt& decrypt_fn,
-                                     bool decript_from_string)
+                                     bool decript_from_string,
+                                     const std::string& origin_weights_path)
     : m_istream(model_stream),
       m_model_builder(std::move(fn)),
       m_decript_from_string(decript_from_string),
-      m_model_buffer(std::move(model_buffer)) {
+      m_model_buffer(std::move(model_buffer)),
+      m_origin_weights_path(origin_weights_path) {
     if (m_decript_from_string) {
         m_cache_decrypt.m_decrypt_str = decrypt_fn.m_decrypt_str;
     } else {
@@ -75,7 +77,7 @@ void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
                           (hdr.custom_data_size == hdr.consts_offset - hdr.custom_data_offset) &&
                           (hdr.consts_size == hdr.model_offset - hdr.consts_offset) &&
                           ((hdr.model_size = file_size - hdr.model_offset) != 0u);
-    // if (m_weights_path.empty()) {
+    // if (m_origin_weights_path.empty()) {
     //     is_valid_model &= (hdr.custom_data_size == hdr.consts_offset - hdr.custom_data_offset) &&
     //                       (hdr.consts_size == hdr.model_offset - hdr.consts_offset);
     // } else {
@@ -100,7 +102,7 @@ void ModelDeserializer::process_mmap(std::shared_ptr<ov::Model>& model,
 
     // Map blob content
     std::shared_ptr<ov::AlignedBuffer> weights_buf;
-printf("--CPU-- ModelDeserializer::process_mmap m_weights_path: '%s'\n", m_weights_path.data());
+printf("--CPU-- ModelDeserializer::process_mmap m_origin_weights_path: '%s'\n", m_origin_weights_path.data());
     if (hdr.consts_size) {
         weights_buf =
             std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(buffer_base + hdr.consts_offset,
@@ -114,8 +116,8 @@ for (size_t i = 0lu; i < std::min(10llu, weights_buf->size() / sizeof(uint32_t))
 printf("    data: {%s}\n", tmp.data());
     }
     std::shared_ptr<ov::AlignedBuffer> origin_weights_buf;
-    if (!m_weights_path.empty()) {
-        auto mmap = ov::load_mmap_object(m_weights_path);
+    if (!m_origin_weights_path.empty()) {
+        auto mmap = ov::load_mmap_object(m_origin_weights_path);
         origin_weights_buf =
             std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(mmap->data(), mmap->size(), mmap);
     }
@@ -182,8 +184,8 @@ void ModelDeserializer::process_stream(std::shared_ptr<ov::Model>& model) {
         m_istream.read(static_cast<char*>(data_blob->data(ov::element::u8)), hdr.consts_size);
     }
     std::shared_ptr<ov::AlignedBuffer> origin_weights_buf;
-    if (!m_weights_path.empty()) {
-        auto mmap = ov::load_mmap_object(m_weights_path);
+    if (!m_origin_weights_path.empty()) {
+        auto mmap = ov::load_mmap_object(m_origin_weights_path);
         origin_weights_buf =
             std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(mmap->data(), mmap->size(), mmap);
     }

@@ -442,14 +442,14 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
             // Load from the original binary file if possible.
             if (m_origin_weights) {
                 if (auto rt_info = m_node.child("rt_info")) {
-                    // printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
+// printf("--IR_FE-- XmlDeserializer::create_node RT for '%s':\n", ovNode->get_friendly_name().data());
                     bool attr_found = false;
                     for (auto child : rt_info.children()) {
-                        printf("    RT child: '%s'\n", child.name());
+printf("    RT child: '%s'\n", child.name());
                         for (auto attr : child.attributes()) {
                             if (strcmp(attr.name(), "name") == 0 &&
                                 strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
-                                printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
+printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
                                 ov::element::Type original_dt(child.attribute("original_dtype").value());
                                 offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
                                 origin_size = static_cast<size_t>(pugixml::get_uint64_attr(child, "original_size"));

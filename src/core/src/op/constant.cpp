@@ -246,7 +246,7 @@ Constant::Constant(const element::Type& type, const Shape& shape, const std::vec
 
 Constant::Constant(const element::Type& type, const Shape& shape) : Constant(true, type, shape) {
 // printf("--CORE-- Constant 3 %s\n", m_element_type.get_type_name().data());
- }
+}
 
 Constant::Constant(bool memset_allocation, const element::Type& type, const Shape& shape)
     : m_element_type(type),
