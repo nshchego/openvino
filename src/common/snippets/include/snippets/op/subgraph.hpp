@@ -159,12 +159,15 @@ public:
                       const std::shared_ptr<IShapeInferSnippetsFactory>& factory = nullptr,
                       const void* compile_params = nullptr);
 
+    void init_config(bool, bool, bool);
+
 private:
     std::shared_ptr<lowered::LinearIR>
     convert_body_to_linear_ir(size_t min_parallel_work_amount = 8, size_t min_kernel_work_amount = 256,
                               const std::shared_ptr<IShapeInferSnippetsFactory>& shape_infer_factory = std::make_shared<IShapeInferSnippetsFactory>());
 
     void init_config();
+
     // Count of Subgraph virtual ports:
     //  - Potential non-scalar Constants that will be created after some transformations (At the moment it's relevant only for FakeQuantize decomposition)
     // NOTE: To avoid overheads in each calculation of this count (for example, in validate_and_type_infer()),

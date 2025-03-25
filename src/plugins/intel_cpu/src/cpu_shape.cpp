@@ -11,6 +11,8 @@
 
 #include "cpu_types.h"
 #include "openvino/core/except.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -80,6 +82,26 @@ Shape mergeShapes(const Shape& lhs, const Shape& rhs) {
                         "Couldn't merge shapes as the dims intervals are not overlapping.");
     }
     return Shape{resultMinDims, resultMaxDims};
+}
+
+void Shape::save(BinaryOutputBuffer& ob) const {
+    ob << type;
+
+    ob << hasZeroDimensions;
+
+    ob << minDims;
+    ob << maxDims;
+    ob << dims;
+}
+
+void Shape::load(BinaryInputBuffer& ib) {
+    ib >> type;
+
+    ib >> hasZeroDimensions;
+
+    ib >> minDims;
+    ib >> maxDims;
+    ib >> dims;
 }
 
 }  // namespace ov::intel_cpu

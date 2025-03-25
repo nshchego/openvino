@@ -112,6 +112,11 @@ DetectionOutput::DetectionOutput(const std::shared_ptr<ov::Node>& op, const Grap
                     : CodeType::CORNER);
 }
 
+DetectionOutput::DetectionOutput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void DetectionOutput::prepareParams() {
     const auto& idPriorDims = getParentEdgeAt(ID_PRIOR)->getMemory().getShape().getStaticDims();
     const auto& idConfDims = getParentEdgeAt(ID_CONF)->getMemory().getShape().getStaticDims();
@@ -168,8 +173,8 @@ void DetectionOutput::initSupportedPrimitiveDescriptors() {
     }
 
     std::vector<PortConfigurator> inDataConf;
-    inDataConf.reserve(inputShapes.size());
-    for (size_t i = 0; i < inputShapes.size(); ++i) {
+    inDataConf.reserve(m_input_shapes.size());
+    for (size_t i = 0; i < m_input_shapes.size(); ++i) {
         inDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
     }
 
@@ -202,8 +207,8 @@ void DetectionOutput::execute([[maybe_unused]] const dnnl::stream& strm) {
     const auto* locData = getSrcDataAtPortAs<const float>(ID_LOC);
     const auto* confData = getSrcDataAtPortAs<const float>(ID_CONF);
     const auto* priorData = getSrcDataAtPortAs<const float>(ID_PRIOR);
-    const float* ARMConfData = inputShapes.size() > 3 ? getSrcDataAtPortAs<const float>(ID_ARM_CONF) : nullptr;
-    const float* ARMLocData = inputShapes.size() > 4 ? getSrcDataAtPortAs<const float>(ID_ARM_LOC) : nullptr;
+    const float* ARMConfData = m_input_shapes.size() > 3 ? getSrcDataAtPortAs<const float>(ID_ARM_CONF) : nullptr;
+    const float* ARMLocData = m_input_shapes.size() > 4 ? getSrcDataAtPortAs<const float>(ID_ARM_LOC) : nullptr;
 
     float* reorderedConfData = reorderedConf.data();
     auto* reorderedConfDataIndices = reinterpret_cast<int*>(reorderedConf.data());

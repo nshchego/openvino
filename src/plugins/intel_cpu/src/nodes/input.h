@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <node.h>
+#include "node.h"
 
 #include <memory>
 #include <oneapi/dnnl/dnnl_common.hpp>
@@ -20,9 +20,7 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/type/element_type.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Input : public Node {
 public:
@@ -64,6 +62,8 @@ public:
 
     Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, const OutputConfig& config);
 
+    Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void initOptimalPrimitiveDescriptor() override;
@@ -92,20 +92,22 @@ public:
         return false;
     }
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
+
 private:
-    void cloneBlobIfRequired();
+    void cloneBlobIfRequired(const void* src, const intel_cpu::Shape& shape, const ov::element::Type& dt, bool validate_blob = true);
     void initSupportedPdDefault();
     void initSupportedPdFromMemDesc();
 
-private:
-    std::shared_ptr<ov::op::v0::Constant> m_constOp;
-    MemoryCPtr memoryPtr;
-    bool isMeanImage = false;
-    MemoryDescPtr extMemDesc = nullptr;
-    bool m_useParentMemoryDescForOutput = false;
-    bool m_isInPlace = false;
+    MemoryCPtr m_memory_ptr = nullptr;
+    MemoryDescPtr m_ext_mem_desc = nullptr;
+    bool m_use_parent_memory_desc_for_output = false;
+    bool m_is_in_place = false;
+    // Specifies whether to load weights from the original IR during graph deserialization.
+    bool m_use_origin_weights = false;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

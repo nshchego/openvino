@@ -24,6 +24,8 @@ class Broadcast : public Node, public TileBroadcastCommon {
 public:
     Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Broadcast(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
@@ -33,6 +35,10 @@ public:
     bool neverExecute() const override;
     bool isExecutable() const override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     bool needPrepareParams() const override;

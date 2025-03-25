@@ -30,6 +30,7 @@
 #include "memory_desc/cpu_memory_desc_utils.h"
 #include "memory_desc/dnnl_blocked_memory_desc.h"
 #include "memory_desc/dnnl_memory_desc.h"
+#include "nodes_factory.hpp"
 #include "nodes/common/cpu_convert.h"
 #include "nodes/eltwise.h"
 #include "nodes/input.h"
@@ -52,8 +53,12 @@
 #include "utils/cpu_utils.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/rt_info/memory_formats_attribute.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 using namespace openvino;
@@ -61,17 +66,11 @@ using namespace ov::intel_cpu::node;
 
 namespace ov::intel_cpu {
 
-Node::NodesFactory& Node::factory() {
-    static NodesFactory factoryInstance;
-    return factoryInstance;
-}
-
 Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const ShapeInferFactory& shapeInferFactory)
-    : context(std::move(ctx)),
-
-      fusingPort(-1),
-      engine(context->getEngine()),
-      name(op->get_friendly_name()),
+    : m_context(std::move(ctx)),
+      m_fusing_port(-1),
+      engine(m_context->getEngine()),
+      m_name(op->get_friendly_name()),
       typeStr(op->get_type_name()),
       type(TypeFromName(op->get_type_name())),
       profiling(op->get_friendly_name()) {
@@ -85,16 +84,14 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
         }
 
         bool isScalar = shape.rank().get_length() == 0;
-        inputShapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
+        m_input_shapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
         originalInputPrecisions.emplace_back(op->get_input_element_type(i));
     }
 
-    parentEdges.reserve(inputShapes.size());
+    parentEdges.reserve(m_input_shapes.size());
 
     if (typeStr != "Result" && typeStr != "Assign") {
-        if (op->get_output_size() == 0) {
-            OPENVINO_THROW("Node with type '", typeStr, "' and name '", name, "' does not have any outputs.");
-        }
+        CPU_NODE_ASSERT(op->get_output_size(), "does not have any outputs.");
         for (size_t i = 0; i < op->get_output_size(); i++) {
             const auto& shape = op->get_output_partial_shape(i);
             if (shape.rank().is_dynamic()) {
@@ -105,19 +102,19 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
             }
 
             bool isScalar = shape.rank().get_length() == 0;
-            outputShapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
+            m_output_shapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
             originalOutputPrecisions.emplace_back(op->get_output_element_type(i));
         }
 
-        childEdges.reserve(outputShapes.size());
+        childEdges.reserve(m_output_shapes.size());
     }
 
-    isDynamic = std::any_of(inputShapes.begin(),
-                            inputShapes.end(),
+    isDynamic = std::any_of(m_input_shapes.begin(),
+                            m_input_shapes.end(),
                             [](const Shape& shape) {
                                 return shape.isDynamic();
                             }) ||
-                std::any_of(outputShapes.begin(), outputShapes.end(), [](const Shape& shape) {
+                std::any_of(m_output_shapes.begin(), m_output_shapes.end(), [](const Shape& shape) {
                     return shape.isDynamic();
                 });
 
@@ -130,7 +127,7 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
     parallelDomain = getRTInfoValue(rtInfo, "parallelDomain");
 
     if (originalLayers.empty()) {
-        addOriginalLayer(name);
+        addOriginalLayer(m_name);
     }
 
     primitivesPriority = getImplPriorityValue(op);
@@ -192,20 +189,37 @@ Node::Node(const std::string& type,
            std::vector<ov::element::Type> outputPrecisions,
            const std::string& name,
            const GraphContext::CPtr& ctx)
-    : inputShapes(std::move(inShapes)),
-      outputShapes(std::move(outShapes)),
+    : m_input_shapes(std::move(inShapes)),
+      m_output_shapes(std::move(outShapes)),
 
-      context(ctx),
+      m_context(ctx),
       originalInputPrecisions(std::move(inputPrecisions)),
       originalOutputPrecisions(std::move(outputPrecisions)),
-      fusingPort(-1),
+      m_fusing_port(-1),
       engine(ctx->getEngine()),
-      name(name),
+      m_name(name),
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
-    parentEdges.reserve(inputShapes.size());
-    childEdges.reserve(outputShapes.size());
+    parentEdges.reserve(m_input_shapes.size());
+    childEdges.reserve(m_output_shapes.size());
+}
+
+Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
+    : m_context(ctx),
+      engine(m_context->getEngine()),
+      profiling("tmp"),
+      m_model_from_cache(true) {
+    load(ib);
+}
+
+Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx)
+    : m_context(ctx),
+      engine(m_context->getEngine()),
+      profiling("tmp"),
+      m_model_from_cache(true) {
+    load(ib);
+    // profiling.execute->strA;
 }
 
 void Node::addEdge(const EdgePtr& edge) {
@@ -501,7 +515,7 @@ bool Node::canBeInPlace() const {
     }
 
     auto inShape = getInputShapeAtPort(0);
-    for (size_t cIdx = 0; cIdx < outputShapes.size(); cIdx++) {
+    for (size_t cIdx = 0; cIdx < m_output_shapes.size(); cIdx++) {
         if (getOutputShapeAtPort(cIdx) != inShape) {
             return false;
         }
@@ -689,14 +703,11 @@ std::string Node::getPrimitiveDescriptorType() const {
 }
 
 EdgePtr Node::getParentEdgeAt(size_t idx) const {
-    if (idx >= parentEdges.size()) {
-        OPENVINO_THROW("Node ", getName(), " contains less parent edges than ", idx);
-    }
-    auto parentEdgePtr = parentEdges[idx].lock();
-    if (!parentEdgePtr) {
-        OPENVINO_THROW("Node ", getName(), " contains empty parent edge for index ", idx);
-    }
-    return parentEdgePtr;
+    CPU_NODE_ASSERT(idx < parentEdges.size(), "contains less parent edges than ", idx);
+    auto parent_edge_ptr = parentEdges[idx].lock();
+    CPU_NODE_ASSERT(parent_edge_ptr, "contains empty parent edge for index ", idx);
+
+    return parent_edge_ptr;
 }
 
 EdgePtr Node::getChildEdgeAt(size_t idx) const {
@@ -715,7 +726,7 @@ std::vector<EdgePtr> Node::getChildEdgesAtPort(int inputNum) const {
         OPENVINO_THROW("Node ", getName(), ". negative input number is not supported ", inputNum);
     }
 
-    if (static_cast<size_t>(inputNum) >= outputShapes.size()) {
+    if (static_cast<size_t>(inputNum) >= m_output_shapes.size()) {
         OPENVINO_THROW("Node ", getName(), " contains less output ports than ", inputNum);
     }
 
@@ -867,10 +878,10 @@ bool Node::outputShapeDataDependency() const {
 }
 
 void Node::redefineOutputMemory(const std::vector<VectorDims>& newOutputShapes) {
-    if (newOutputShapes.size() != outputShapes.size()) {
+    if (newOutputShapes.size() != m_output_shapes.size()) {
         OPENVINO_THROW("Number shapes mismatch with real outputs number for node with name: ", getName());
     }
-    for (size_t i = 0LU; i < outputShapes.size(); i++) {
+    for (size_t i = 0LU; i < m_output_shapes.size(); i++) {
         redefineOutputMemory(i, newOutputShapes[i]);
     }
 }
@@ -1125,14 +1136,14 @@ void Node::prepareMemory(const DnnlMemoryDescPtr& intDesc, size_t indx) {
         Memory memory{engine, newDesc, internalBlob->getData()};
 
         MemoryPtr _ptr = std::make_shared<Memory>(engine, intDesc);
-        node::Reorder::reorderData(memory, *_ptr, context->getParamsCache());
+        node::Reorder::reorderData(memory, *_ptr, m_context->getParamsCache());
         return _ptr;
     };
 
     MemoryPtr ptr;
-    auto weightCache = context->getWeightsCache();
+    auto weightCache = m_context->getWeightsCache();
     if (weightCache != nullptr && memory::format_kind::blocked == intDesc->getDnnlDesc().get_format_kind()) {
-        const auto string_hash = name + "_" + std::to_string(indx) + "_" +
+        const auto string_hash = m_name + "_" + std::to_string(indx) + "_" +
                                  DnnlExtensionUtils::computeWeightsStringHash(internalBlob, intDesc);
         ptr = *weightCache->findOrCreate(string_hash, create);
     } else {
@@ -1185,7 +1196,7 @@ MemoryPtr Node::prepareWeightMemory(DnnlMemoryDescPtr dstWeightDesc, DnnlMemoryD
     auto create = [&]() {
         Memory srcMemory{getEngine(), srcWeightDesc, edgeMem->getData()};
         MemoryPtr _ptr = std::make_shared<Memory>(getEngine(), dstWeightDesc);
-        node::Reorder::reorderData(srcMemory, *_ptr, context->getParamsCache());
+        node::Reorder::reorderData(srcMemory, *_ptr, m_context->getParamsCache());
 
         return _ptr;
     };
@@ -1200,7 +1211,7 @@ MemoryPtr Node::prepareWeightMemory(DnnlMemoryDescPtr dstWeightDesc, DnnlMemoryD
         return itr->second;
     }
 
-    auto weightCache = context->getWeightsCache();
+    auto weightCache = m_context->getWeightsCache();
     if (weightCache != nullptr) {
         const auto string_hash = DnnlExtensionUtils::computeWeightsStringHash(edgeMem, dstWeightDesc);
         ptr = *weightCache->findOrCreate(string_hash, create);
@@ -1222,13 +1233,13 @@ void Node::toNumaNode(int numaNodeID) {
 }
 
 void Node::toNumaNodeImpl(int numaNodeID) {
-    if (curNumaNode == numaNodeID) {
+    if (m_cur_numa_node == numaNodeID) {
         return;
     }
 
     // create scratch pad from specified numa node
     if (scratchpadMem) {
-        scratchpadMem = context->getScratchPad()->createScratchPadMem(scratchpadMem->getDescPtr());
+        scratchpadMem = m_context->getScratchPad()->createScratchPadMem(scratchpadMem->getDescPtr());
         primArgs[DNNL_ARG_SCRATCHPAD] = scratchpadMem->getPrimitive();
     }
 
@@ -1240,7 +1251,7 @@ void Node::toNumaNodeImpl(int numaNodeID) {
         mbind_move(it->second, numaNodeID);
     }
 
-    curNumaNode = numaNodeID;
+    m_cur_numa_node = numaNodeID;
 }
 
 bool Node::isInPlace() const {
@@ -1454,9 +1465,7 @@ void Node::initOptimalPrimitiveDescriptor() {
     }
 
     auto* selected_pd = getSelectedPrimitiveDescriptor();
-    if (selected_pd == nullptr) {
-        OPENVINO_THROW("Preferable primitive descriptor is not set for ", getName());
-    }
+    CPU_NODE_ASSERT(selected_pd, "doesn't have preferable primitive descriptor.");
 
     auto config = selected_pd->getConfig();
     for (size_t i = 0; i < config.inConfs.size(); i++) {
@@ -1598,57 +1607,6 @@ ov::element::Type Node::getRuntimePrecision() const {
     return runtimePrecision;
 }
 
-Node* Node::NodesFactory::create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) {
-    Node* newNode = nullptr;
-    std::string errorMessage;
-    if (newNode == nullptr) {
-        try {
-            std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
-            if (ol != nullptr && ol->created()) {
-                newNode = ol.release();
-            }
-        } catch (const ov::Exception& ex) {
-            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                errorMessage += ex.what();
-            } else {
-                throw;
-            }
-        }
-    }
-
-    if (newNode == nullptr) {
-        try {
-            std::unique_ptr<Node> ol(new Reference(op, context, errorMessage));
-            if (ol != nullptr && ol->created()) {
-                newNode = ol.release();
-            }
-        } catch (const ov::Exception& ex) {
-            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                const std::string currErrorMess = ex.what();
-                if (!currErrorMess.empty()) {
-                    errorMessage += errorMessage.empty() ? currErrorMess : "\n" + currErrorMess;
-                }
-            } else {
-                throw;
-            }
-        }
-    }
-
-    if (!newNode) {
-        std::string errorDetails;
-        if (!errorMessage.empty()) {
-            errorDetails = "\nDetails:\n" + errorMessage;
-        }
-        OPENVINO_THROW("Unsupported operation of type: ",
-                       op->get_type_name(),
-                       " name: ",
-                       op->get_friendly_name(),
-                       errorDetails);
-    }
-
-    return newNode;
-}
-
 bool Node::canBePerformedAsScaleShift(const Node* parentNode) const {
 #if defined(OPENVINO_ARCH_X86_64)
     OPENVINO_ASSERT(parentNode);
@@ -1784,11 +1742,11 @@ std::pair<std::vector<float>, std::vector<float>> Node::getScalesAndShifts(const
 }
 
 bool Node::isInputTensorAtPortEmpty(size_t port) const {
-    if (inputShapes.size() <= port) {
+    if (m_input_shapes.size() <= port) {
         OPENVINO_THROW("Incorrect input port number for node ", getName());
     }
 
-    if (inputShapes[port].hasZeroDims()) {
+    if (m_input_shapes[port].hasZeroDims()) {
         return true;
     }
     auto edge = getParentEdgeAt(port);
@@ -1802,11 +1760,11 @@ bool Node::isInputTensorAtPortEmpty(size_t port) const {
 }
 
 bool Node::isOutputTensorAtPortEmpty(size_t port) const {
-    if (outputShapes.size() <= port) {
+    if (m_output_shapes.size() <= port) {
         OPENVINO_THROW("Incorrect output port number for node ", getName());
     }
-    if (outputShapes[port].isStatic()) {
-        return outputShapes[port].hasZeroDims();
+    if (m_output_shapes[port].isStatic()) {
+        return m_output_shapes[port].hasZeroDims();
     }
     auto&& mem = getChildEdgeAt(port)->getMemory();
     if (mem.isDefined() && !mem.getDesc().empty()) {
@@ -1825,7 +1783,7 @@ bool Node::hasEmptyInputTensors() const {
 }
 
 bool Node::hasEmptyOutputTensors() const {
-    for (size_t i = 0; i < outputShapes.size(); i++) {
+    for (size_t i = 0; i < m_output_shapes.size(); i++) {
         if (isOutputTensorAtPortEmpty(i)) {
             return true;
         }
@@ -1843,7 +1801,7 @@ bool Node::inputShapesDefined() const {
 }
 
 bool Node::outputShapesDefined() const {
-    for (size_t i = 0; i < outputShapes.size(); i++) {
+    for (size_t i = 0; i < m_output_shapes.size(); i++) {
         if (!getChildEdgeAt(i)->getMemory().getDesc().isDefined()) {
             return false;
         }
@@ -1891,7 +1849,7 @@ std::vector<VectorDims> Node::shapeInferGeneric(const std::vector<Shape>& shapes
 
         std::unordered_map<size_t, MemoryPtr> input_values;
         if (input_value_port_mask) {
-            for (size_t port = 0; port < inputShapes.size(); ++port) {
+            for (size_t port = 0; port < m_input_shapes.size(); ++port) {
                 if (input_value_port_mask & (1 << port)) {
                     input_values[port] = getSrcMemoryAtPort(port);
                 }
@@ -1913,14 +1871,14 @@ IShapeInfer::Result Node::shapeInfer() const {
     std::vector<std::reference_wrapper<const VectorDims>> input_shapes;
     auto input_value_port_mask = shapeInference->get_port_mask();
 
-    input_shapes.reserve(inputShapes.size());
-    for (size_t port = 0; port < inputShapes.size(); ++port) {
+    input_shapes.reserve(m_input_shapes.size());
+    for (size_t port = 0; port < m_input_shapes.size(); ++port) {
         input_shapes.emplace_back(std::ref(getParentEdgeAt(port)->getMemory().getStaticDims()));
     }
 
     std::unordered_map<size_t, MemoryPtr> input_values;
     if (input_value_port_mask) {
-        for (size_t port = 0; port < inputShapes.size(); ++port) {
+        for (size_t port = 0; port < m_input_shapes.size(); ++port) {
             if (input_value_port_mask & (1 << port)) {
                 input_values[port] = getSrcMemoryAtPort(port);
             }
@@ -1960,6 +1918,32 @@ bool Node::canFuseSimpleOperation(const NodePtr& node) const {
 
 void Node::addFusedNode(const NodePtr& fusingNode) {
     fusedWith.push_back(fusingNode);
+}
+
+void Node::fuseInto(NodePtr& parent_node) {
+    // The graph supports fusing only of consecutive nodes and some graph logic requires to know through which input
+    // port a node was fused into parent one.
+    for (size_t i = 0; i < getParentEdges().size(); i++) {
+        if (getParentEdgeAt(i)->getParent().get() == parent_node.get()) {
+            setFusingPort(i);
+            break;
+        }
+    }
+
+    auto parent_fused_nodes = parent_node->getFusedWith();
+    if (getFusingPort() < 0 && !parent_fused_nodes.empty()) {
+        for (size_t i = 0; i < getParentEdges().size(); i++) {
+            if (getParentEdgeAt(i)->getParent().get() == parent_fused_nodes[parent_fused_nodes.size() - 1].get()) {
+                setFusingPort(i);
+                break;
+            }
+        }
+    }
+
+    OPENVINO_ASSERT(getFusingPort() > -1, "Cannot determine fusing port between nodes: ", parent_node->getName(), " and ", getName());
+
+    parent_node->addFusedNode(getParentEdgeAt(getFusingPort())->getChild());
+    parent_node->addOriginalLayer(getOriginalLayers());
 }
 
 void Node::addSupportedPrimDesc(const std::vector<PortConfigurator>& inPortConfigs,
@@ -2039,7 +2023,7 @@ void Node::fuseDQScales(const float* scaleData, const size_t scaleSize) {
 }
 
 int Node::inPlaceInputPort(int portIdx) const {
-    if (inputShapes.empty()) {
+    if (m_input_shapes.empty()) {
         // special case - a dead end node
         return -1;
     }
@@ -2062,7 +2046,7 @@ int Node::inPlaceInputPort(int portIdx) const {
 }
 
 int Node::inPlaceOutPort(int portIdx) const {
-    if (outputShapes.empty()) {
+    if (m_output_shapes.empty()) {
         // special case - a dead end node
         return -1;
     }
@@ -2272,6 +2256,137 @@ void Node::resolveInPlaceDirection() {
             }
         }
     }
+}
+
+void Node::save(BinaryOutputBuffer& ob) const {
+    ob << ob.get_pos();  // Read/Write sync position
+
+    ob << m_name;
+    ob << type;
+    ob << typeStr;
+    ob << isDynamic;
+    ob << algorithm;
+    ob << inplace;
+    ob << constant;
+
+    ob << m_input_shapes;
+    ob << m_output_shapes;
+
+    ob << m_fusing_port;
+
+    ob << m_cur_numa_node;
+
+    ob << supportedPrimitiveDescriptors;
+    ob << selectedPrimitiveDescriptorIndex;
+    ob << primitivesPriority;
+    ob << customImplPriorities;
+
+    ob << originalLayers;
+    ob << parallelDomain;
+
+    // ob << internalBlobDesc;
+    // ob << internalBlobMemory;
+    // ob << internalBlobs;
+    // ob << primArgs;
+    // ob << postOpsArgs;
+    // ob << descs;
+
+    // ob << lastInputDims;  // Skip to call prepareParams()
+
+    // ob << shapeInference;
+
+    ob << originalInputPrecisions;
+    ob << originalOutputPrecisions;
+    ob << keepOriginalPrecision;
+    ob << enforceBF16evenForGraphTail;
+
+    ob << execIndex;
+
+    // ob << perfCounter;
+    // ob << profiling;
+
+    // ob << scratchpadMem;
+
+    ob << DQScales;
+    
+    ob << fusedWith.size();
+    for (const auto& n : fusedWith) {
+        ob << n->getType();
+        ob << *n;
+    }
+    
+    ob << ob.get_pos();
+}
+
+void Node::load(BinaryInputBuffer& ib) {
+    validate_stream_offset(ib);
+
+    ib >> m_name;
+    ib >> type;
+    ib >> typeStr;
+    ib >> isDynamic;
+    ib >> algorithm;
+    ib >> inplace;
+    ib >> constant;
+
+    ib >> m_input_shapes;
+    ib >> m_output_shapes;
+
+    ib >> m_fusing_port;
+
+    ib >> m_cur_numa_node;
+
+    ib >> supportedPrimitiveDescriptors;
+    ib >> selectedPrimitiveDescriptorIndex;
+    ib >> primitivesPriority;
+    ib >> customImplPriorities;
+
+    ib >> originalLayers;
+    ib >> parallelDomain;
+
+    // ib >> internalBlobDesc;
+    // ib >> internalBlobMemory;
+    // ib >> internalBlobs;
+    // ib >> primArgs;
+    // ib >> postOpsArgs;
+    // ib >> descs;
+
+    // ib >> lastInputDims; // Skip to call prepareParams()
+
+    // ib >> shapeInference;
+
+    ib >> originalInputPrecisions;
+    ib >> originalOutputPrecisions;
+    ib >> keepOriginalPrecision;
+    ib >> enforceBF16evenForGraphTail;
+
+    ib >> execIndex;
+
+    // ib >> perfCounter;
+    // ib >> profiling;
+
+    // ib >> scratchpadMem;
+
+    ib >> DQScales;
+
+    size_t nodes_num;
+    ib >> nodes_num;
+    fusedWith.reserve(nodes_num);
+    for (size_t i = 0lu; i < nodes_num; i++) {
+        fusedWith.emplace_back(NodePtr(NodesFactory<BinaryInputBuffer&>::factory().create(ib, m_context)));
+    }
+
+    validate_stream_offset(ib);
+}
+
+void NodeDesc::save(BinaryOutputBuffer& ob) const {
+    ob << m_config;
+    ob << m_implementation_type;
+}
+
+void NodeDesc::load(BinaryInputBuffer& ib) {
+    ib >> m_config;
+    ib >> m_implementation_type;
 }
 
 #ifndef CPU_DEBUG_CAPS

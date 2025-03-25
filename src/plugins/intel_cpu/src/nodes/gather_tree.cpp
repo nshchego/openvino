@@ -53,10 +53,10 @@ GatherTree::GatherTree(const std::shared_ptr<ov::Node>& op, const GraphContext::
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    if (inputShapes.size() != 4) {
+    if (m_input_shapes.size() != 4) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges.");
     }
-    if (outputShapes.size() != 1) {
+    if (m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of output edges.");
     }
 
@@ -72,6 +72,11 @@ GatherTree::GatherTree(const std::shared_ptr<ov::Node>& op, const GraphContext::
     if (!is_scalar(op->get_input_partial_shape(GATHER_TREE_END_TOKEN))) {
         THROW_CPU_NODE_ERR("end_token should be scalar");
     }
+}
+
+GatherTree::GatherTree(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void GatherTree::initSupportedPrimitiveDescriptors() {

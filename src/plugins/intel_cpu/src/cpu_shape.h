@@ -15,6 +15,7 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/interval.hpp"
 #include "openvino/core/partial_shape.hpp"
+#include "utils/serialization/buffer.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -178,6 +179,7 @@ public:
         }
 
         return size;
+        // return std::accumulate(minDims.begin(), minDims.end(), );
     }
 
     ov::PartialShape toPartialShape() const {
@@ -211,6 +213,10 @@ public:
     }
 
     enum : Dim { UNDEFINED_DIM = std::numeric_limits<Dim>::max() };
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 
 private:
     void initDims() {

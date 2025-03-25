@@ -22,6 +22,8 @@ class Col2Im : public Node {
 public:
     Col2Im(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Col2Im(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -29,6 +31,10 @@ public:
     bool created() const override;
     bool needPrepareParams() const override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     template <class OV_DATA_TYPE, class OV_INDEX_TYPE>

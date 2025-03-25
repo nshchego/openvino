@@ -85,6 +85,11 @@ CumSum::CumSum(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     }
 }
 
+CumSum::CumSum(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void CumSum::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -104,7 +109,7 @@ void CumSum::initSupportedPrimitiveDescriptors() {
         THROW_CPU_NODE_ERR("has unsupported 'data' input precision: ", dataPrecision.get_type_name());
     }
 
-    if (inputShapes.size() == numOfInputs) {
+    if (m_input_shapes.size() == numOfInputs) {
         const auto& axisTensorPrec = getOriginalInputPrecisionAtPort(AXIS);
         if (axisTensorPrec != ov::element::i32 && axisTensorPrec != ov::element::i64) {
             THROW_CPU_NODE_ERR("has unsupported 'axis' input precision: ", axisTensorPrec.get_type_name());
@@ -112,9 +117,9 @@ void CumSum::initSupportedPrimitiveDescriptors() {
     }
 
     std::vector<PortConfigurator> inDataConf;
-    inDataConf.reserve(inputShapes.size());
+    inDataConf.reserve(m_input_shapes.size());
     inDataConf.emplace_back(LayoutType::ncsp, dataPrecision);
-    for (size_t i = 1; i < inputShapes.size(); ++i) {
+    for (size_t i = 1; i < m_input_shapes.size(); ++i) {
         inDataConf.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
 
@@ -122,7 +127,7 @@ void CumSum::initSupportedPrimitiveDescriptors() {
 }
 
 void CumSum::execute([[maybe_unused]] const dnnl::stream& strm) {
-    if (inputShapes.size() == numOfInputs) {
+    if (m_input_shapes.size() == numOfInputs) {
         axis = getAxis(getParentEdgeAt(AXIS)->getMemory(), getParentEdgeAt(CUM_SUM_DATA)->getMemory());
     }
 

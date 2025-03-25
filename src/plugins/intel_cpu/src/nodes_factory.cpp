@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "cpu_types.h"
-#include "node.h"
+#include "nodes_factory.hpp"
+
 #include "nodes/adaptive_pooling.h"
 #include "nodes/batch_to_space.h"
 #include "nodes/bin_conv.h"
@@ -80,6 +80,7 @@
 #include "nodes/rdft.h"
 #include "nodes/reduce.h"
 #include "nodes/region_yolo.h"
+#include "nodes/reference.h"
 #include "nodes/reorder.h"
 #include "nodes/reorg_yolo.h"
 #include "nodes/reshape.h"
@@ -115,134 +116,244 @@
 #include "openvino/cc/factory.h"
 #include "selective_build.h"
 
+#include "openvino/cc/factory.h"
+#include "selective_build.h"
+#include "utils/serialization/internal_types.hpp"
+
 namespace ov::intel_cpu {
 
 #define INTEL_CPU_NODE(__prim, __type) registerNodeIfRequired(intel_cpu, __prim, __type, NodeImpl<__prim>)
 
-Node::NodesFactory::NodesFactory() : Factory("NodesFactory") {
+template <typename SrcType>
+NodesFactory<SrcType>::NodesFactory() : Factory("NodesFactory") {
     using namespace node;
-    INTEL_CPU_NODE(CumSum, Type::CumSum);
-    INTEL_CPU_NODE(Convolution, Type::Convolution);
-    INTEL_CPU_NODE(BinaryConvolution, Type::BinaryConvolution);
-    INTEL_CPU_NODE(SpaceToBatch, Type::SpaceToBatch);
-    INTEL_CPU_NODE(Lrn, Type::Lrn);
-    INTEL_CPU_NODE(BatchToSpace, Type::BatchToSpace);
-    INTEL_CPU_NODE(DepthToSpace, Type::DepthToSpace);
-    INTEL_CPU_NODE(SpaceToDepth, Type::SpaceToDepth);
-    INTEL_CPU_NODE(SparseFillEmptyRows, Type::SparseFillEmptyRows);
-    INTEL_CPU_NODE(If, Type::If);
-    INTEL_CPU_NODE(Broadcast, Type::Broadcast);
-    INTEL_CPU_NODE(ExperimentalDetectronTopKROIs, Type::ExperimentalDetectronTopKROIs);
-    INTEL_CPU_NODE(Reorder, Type::Reorder);
-    INTEL_CPU_NODE(MatrixNms, Type::MatrixNms);
     INTEL_CPU_NODE(AdaptivePooling, Type::AdaptivePooling);
-    INTEL_CPU_NODE(Pooling, Type::Pooling);
-    INTEL_CPU_NODE(Eltwise, Type::Eltwise);
-    INTEL_CPU_NODE(SoftMax, Type::Softmax);
-    INTEL_CPU_NODE(EmbeddingBagPacked, Type::EmbeddingBagPackedSum);
-    INTEL_CPU_NODE(EmbeddingBagPacked, Type::EmbeddingBagPacked);
-    INTEL_CPU_NODE(Input, Type::Input);
-    INTEL_CPU_NODE(Input, Type::Output);
-    INTEL_CPU_NODE(MemoryInput, Type::MemoryInput);
-    INTEL_CPU_NODE(MemoryOutput, Type::MemoryOutput);
-    INTEL_CPU_NODE(Tile, Type::Tile);
-    INTEL_CPU_NODE(GatherTree, Type::GatherTree);
-    INTEL_CPU_NODE(FullyConnected, Type::FullyConnected);
-    INTEL_CPU_NODE(CTCGreedyDecoder, Type::CTCGreedyDecoder);
-    INTEL_CPU_NODE(Transpose, Type::Transpose);
-    INTEL_CPU_NODE(ReorgYolo, Type::ReorgYolo);
-    INTEL_CPU_NODE(EmbeddingSegmentsSum, Type::EmbeddingSegmentsSum);
-    INTEL_CPU_NODE(ShapeOf, Type::ShapeOf);
-    INTEL_CPU_NODE(ExperimentalDetectronGenerateProposalsSingleImage,
-                   Type::ExperimentalDetectronGenerateProposalsSingleImage);
-    INTEL_CPU_NODE(GenerateProposals, Type::GenerateProposals);
-    INTEL_CPU_NODE(ReverseSequence, Type::ReverseSequence);
-    INTEL_CPU_NODE(ExperimentalDetectronPriorGridGenerator, Type::ExperimentalDetectronPriorGridGenerator);
-    INTEL_CPU_NODE(GatherND, Type::GatherND);
-    INTEL_CPU_NODE(LogSoftmax, Type::LogSoftmax);
-    INTEL_CPU_NODE(PSROIPooling, Type::PSROIPooling);
-    INTEL_CPU_NODE(RNN, Type::RNNCell);
-    INTEL_CPU_NODE(RNN, Type::RNNSeq);
-    INTEL_CPU_NODE(CTCLoss, Type::CTCLoss);
-    INTEL_CPU_NODE(Split, Type::Split);
-    INTEL_CPU_NODE(DetectionOutput, Type::DetectionOutput);
-    INTEL_CPU_NODE(GatherElements, Type::GatherElements);
-    INTEL_CPU_NODE(CTCGreedyDecoderSeqLen, Type::CTCGreedyDecoderSeqLen);
+    INTEL_CPU_NODE(BatchToSpace, Type::BatchToSpace);
+    INTEL_CPU_NODE(BinaryConvolution, Type::BinaryConvolution);
+    INTEL_CPU_NODE(Broadcast, Type::Broadcast);
     INTEL_CPU_NODE(Bucketize, Type::Bucketize);
-    INTEL_CPU_NODE(ExperimentalDetectronROIFeatureExtractor, Type::ExperimentalDetectronROIFeatureExtractor);
-    INTEL_CPU_NODE(Math, Type::Math);
-    INTEL_CPU_NODE(MultiClassNms, Type::MulticlassNms);
-    INTEL_CPU_NODE(Convert, Type::Convert);
+    INTEL_CPU_NODE(CausalMaskPreprocess, Type::CausalMaskPreprocess);
     INTEL_CPU_NODE(Col2Im, Type::Col2Im);
     INTEL_CPU_NODE(ColorConvert, Type::ColorConvert);
-    INTEL_CPU_NODE(EmbeddingBagOffset, Type::EmbeddingBagOffsetsSum);
-    INTEL_CPU_NODE(EmbeddingBagOffset, Type::EmbeddingBagOffsets);
-    INTEL_CPU_NODE(Roll, Type::Roll);
-    INTEL_CPU_NODE(Pad, Type::Pad);
-    INTEL_CPU_NODE(Reshape, Type::Reshape);
-    INTEL_CPU_NODE(MVN, Type::MVN);
-    INTEL_CPU_NODE(MatMul, Type::MatMul);
-    INTEL_CPU_NODE(Multinomial, Type::Multinomial);
-    INTEL_CPU_NODE(ScatterUpdate, Type::ScatterUpdate);
-    INTEL_CPU_NODE(ScatterUpdate, Type::ScatterElementsUpdate);
-    INTEL_CPU_NODE(ScatterUpdate, Type::ScatterNDUpdate);
-    INTEL_CPU_NODE(StringTensorPack, Type::StringTensorPack);
-    INTEL_CPU_NODE(StringTensorUnpack, Type::StringTensorUnpack);
-    INTEL_CPU_NODE(ShuffleChannels, Type::ShuffleChannels);
-    INTEL_CPU_NODE(TensorIterator, Type::TensorIterator);
+    INTEL_CPU_NODE(Composite, Type::SubModel);
     INTEL_CPU_NODE(Concat, Type::Concatenation);
-    INTEL_CPU_NODE(OneHot, Type::OneHot);
-    INTEL_CPU_NODE(ExperimentalDetectronDetectionOutput, Type::ExperimentalDetectronDetectionOutput);
+    INTEL_CPU_NODE(Convert, Type::Convert);
+    INTEL_CPU_NODE(Convolution, Type::Convolution);
+    INTEL_CPU_NODE(CTCGreedyDecoder, Type::CTCGreedyDecoder);
+    INTEL_CPU_NODE(CTCGreedyDecoderSeqLen, Type::CTCGreedyDecoderSeqLen);
+    INTEL_CPU_NODE(CTCLoss, Type::CTCLoss);
+    INTEL_CPU_NODE(CumSum, Type::CumSum);
     INTEL_CPU_NODE(Deconvolution, Type::Deconvolution);
     INTEL_CPU_NODE(DeformableConvolution, Type::DeformableConvolution);
-    INTEL_CPU_NODE(Range, Type::Range);
-    INTEL_CPU_NODE(StridedSlice, Type::StridedSlice);
-    INTEL_CPU_NODE(GRN, Type::GRN);
-    INTEL_CPU_NODE(NonZero, Type::NonZero);
-    INTEL_CPU_NODE(NormalizeL2, Type::NormalizeL2);
-    INTEL_CPU_NODE(PriorBox, Type::PriorBox);
-    INTEL_CPU_NODE(PriorBoxClustered, Type::PriorBoxClustered);
+    INTEL_CPU_NODE(DepthToSpace, Type::DepthToSpace);
+    INTEL_CPU_NODE(DetectionOutput, Type::DetectionOutput);
+    INTEL_CPU_NODE(DFT, Type::DFT);
+    INTEL_CPU_NODE(Eltwise, Type::Eltwise);
+    INTEL_CPU_NODE(EmbeddingBagOffset, Type::EmbeddingBagOffsets);
+    INTEL_CPU_NODE(EmbeddingBagOffset, Type::EmbeddingBagOffsetsSum);
+    INTEL_CPU_NODE(EmbeddingBagPacked, Type::EmbeddingBagPacked);
+    INTEL_CPU_NODE(EmbeddingBagPacked, Type::EmbeddingBagPackedSum);
+    INTEL_CPU_NODE(EmbeddingSegmentsSum, Type::EmbeddingSegmentsSum);
+    INTEL_CPU_NODE(ExperimentalDetectronDetectionOutput, Type::ExperimentalDetectronDetectionOutput);
+    INTEL_CPU_NODE(ExperimentalDetectronGenerateProposalsSingleImage,
+                   Type::ExperimentalDetectronGenerateProposalsSingleImage);
+    INTEL_CPU_NODE(ExperimentalDetectronPriorGridGenerator, Type::ExperimentalDetectronPriorGridGenerator);
+    INTEL_CPU_NODE(ExperimentalDetectronROIFeatureExtractor, Type::ExperimentalDetectronROIFeatureExtractor);
+    INTEL_CPU_NODE(ExperimentalDetectronTopKROIs, Type::ExperimentalDetectronTopKROIs);
+    INTEL_CPU_NODE(ExtractImagePatches, Type::ExtractImagePatches);
     INTEL_CPU_NODE(Eye, Type::Eye);
-    INTEL_CPU_NODE(Unique, Type::Unique);
-    INTEL_CPU_NODE(Ngram, Type::Ngram);
-    INTEL_CPU_NODE(RoPE, Type::RoPE);
-    INTEL_CPU_NODE(CausalMaskPreprocess, Type::CausalMaskPreprocess);
+    INTEL_CPU_NODE(FullyConnected, Type::FullyConnected);
+    INTEL_CPU_NODE(Input, Type::Input);
+    INTEL_CPU_NODE(Input, Type::Output);
+    INTEL_CPU_NODE(Gather, Type::Gather);
+    INTEL_CPU_NODE(GatherElements, Type::GatherElements);
+    INTEL_CPU_NODE(GatherND, Type::GatherND);
+    INTEL_CPU_NODE(GatherTree, Type::GatherTree);
+    INTEL_CPU_NODE(GenerateProposals, Type::GenerateProposals);
+    INTEL_CPU_NODE(GridSample, Type::GridSample);
+    INTEL_CPU_NODE(GRN, Type::GRN);
+    INTEL_CPU_NODE(If, Type::If);
     INTEL_CPU_NODE(Interpolate, Type::Interpolate);
     INTEL_CPU_NODE(Inverse, Type::Inverse);
-    INTEL_CPU_NODE(RandomUniform, Type::RandomUniform);
-    INTEL_CPU_NODE(Reduce, Type::Reduce);
-    INTEL_CPU_NODE(Gather, Type::Gather);
-    INTEL_CPU_NODE(NonMaxSuppression, Type::NonMaxSuppression);
-    INTEL_CPU_NODE(ROIPooling, Type::ROIPooling);
-    INTEL_CPU_NODE(ROIAlign, Type::ROIAlign);
-    INTEL_CPU_NODE(ROIAlignRotated, Type::ROIAlignRotated);
-    INTEL_CPU_NODE(TopK, Type::TopK);
-    INTEL_CPU_NODE(Proposal, Type::Proposal);
-    INTEL_CPU_NODE(RegionYolo, Type::RegionYolo);
-    INTEL_CPU_NODE(DFT, Type::DFT);
-    INTEL_CPU_NODE(RDFT, Type::RDFT);
-    INTEL_CPU_NODE(STFT, Type::STFT);
     INTEL_CPU_NODE(ISTFT, Type::ISTFT);
-    INTEL_CPU_NODE(ExtractImagePatches, Type::ExtractImagePatches);
+    // INTEL_CPU_NODE(LogSoftmax, Type::LogSoftmax);
+    // INTEL_CPU_NODE(LoRA, Type::LoRA);
+    // INTEL_CPU_NODE(Lrn, Type::Lrn);
+    // INTEL_CPU_NODE(MatMul, Type::MatMul);
+    // INTEL_CPU_NODE(MatrixNms, Type::MatrixNms);
+    // INTEL_CPU_NODE(Multinomial, Type::Multinomial);
+    // INTEL_CPU_NODE(MVN, Type::MVN);
+    // INTEL_CPU_NODE(MemoryInput, Type::MemoryInput);
+    // INTEL_CPU_NODE(MemoryOutput, Type::MemoryOutput);
+    // INTEL_CPU_NODE(Math, Type::Math);
+    // INTEL_CPU_NODE(MultiClassNms, Type::MulticlassNms);
+    // INTEL_CPU_NODE(Tile, Type::Tile);
+    // INTEL_CPU_NODE(ReorgYolo, Type::ReorgYolo);
+    // INTEL_CPU_NODE(ShapeOf, Type::ShapeOf);
+    // INTEL_CPU_NODE(ReverseSequence, Type::ReverseSequence);
+    // INTEL_CPU_NODE(PSROIPooling, Type::PSROIPooling);
+    // INTEL_CPU_NODE(RNN, Type::RNNCell);
+    // INTEL_CPU_NODE(RNN, Type::RNNSeq);
+    // INTEL_CPU_NODE(Split, Type::Split);
+    // INTEL_CPU_NODE(SoftMax, Type::Softmax);
+    // INTEL_CPU_NODE(Roll, Type::Roll);
+    // INTEL_CPU_NODE(Pad, Type::Pad);
+    // INTEL_CPU_NODE(SpaceToDepth, Type::SpaceToDepth);
+    // INTEL_CPU_NODE(SpaceToBatch, Type::SpaceToBatch);
+    INTEL_CPU_NODE(Pooling, Type::Pooling);
+    INTEL_CPU_NODE(Reorder, Type::Reorder);
+    INTEL_CPU_NODE(Reshape, Type::Reshape);
+    INTEL_CPU_NODE(Transpose, Type::Transpose);
+    // INTEL_CPU_NODE(ScatterUpdate, Type::ScatterUpdate);
+    // INTEL_CPU_NODE(ScatterUpdate, Type::ScatterElementsUpdate);
+    // INTEL_CPU_NODE(ScatterUpdate, Type::ScatterNDUpdate);
+    // INTEL_CPU_NODE(StringTensorPack, Type::StringTensorPack);
+    // INTEL_CPU_NODE(StringTensorUnpack, Type::StringTensorUnpack);
+    // INTEL_CPU_NODE(ShuffleChannels, Type::ShuffleChannels);
+    // INTEL_CPU_NODE(SparseFillEmptyRows, Type::SparseFillEmptyRows);
+    // INTEL_CPU_NODE(TensorIterator, Type::TensorIterator);
+    // INTEL_CPU_NODE(OneHot, Type::OneHot);
+    // INTEL_CPU_NODE(Range, Type::Range);
+    // INTEL_CPU_NODE(StridedSlice, Type::StridedSlice);
+    // INTEL_CPU_NODE(NonZero, Type::NonZero);
+    // INTEL_CPU_NODE(NormalizeL2, Type::NormalizeL2);
+    // INTEL_CPU_NODE(PriorBox, Type::PriorBox);
+    // INTEL_CPU_NODE(PriorBoxClustered, Type::PriorBoxClustered);
+    // INTEL_CPU_NODE(Unique, Type::Unique);
+    // INTEL_CPU_NODE(Ngram, Type::Ngram);
+    // INTEL_CPU_NODE(RoPE, Type::RoPE);
+    // INTEL_CPU_NODE(RandomUniform, Type::RandomUniform);
+    // INTEL_CPU_NODE(Reduce, Type::Reduce);
+    // INTEL_CPU_NODE(NonMaxSuppression, Type::NonMaxSuppression);
+    // INTEL_CPU_NODE(ROIPooling, Type::ROIPooling);
+    // INTEL_CPU_NODE(ROIAlign, Type::ROIAlign);
+    // INTEL_CPU_NODE(ROIAlignRotated, Type::ROIAlignRotated);
+    // INTEL_CPU_NODE(TopK, Type::TopK);
+    // INTEL_CPU_NODE(Proposal, Type::Proposal);
+    // INTEL_CPU_NODE(RegionYolo, Type::RegionYolo);
+    // INTEL_CPU_NODE(RDFT, Type::RDFT);
+    // INTEL_CPU_NODE(STFT, Type::STFT);
+    // INTEL_CPU_NODE(ScaledDotProductAttention, Type::ScaledDotProductAttention);
+    // INTEL_CPU_NODE(SearchSorted, Type::SearchSorted);
+    // INTEL_CPU_NODE(SegmentMax, Type::SegmentMax);
     INTEL_CPU_NODE(Subgraph, Type::Subgraph);
-    INTEL_CPU_NODE(Composite, Type::SubModel);
-    INTEL_CPU_NODE(ScaledDotProductAttention, Type::ScaledDotProductAttention);
-    INTEL_CPU_NODE(SearchSorted, Type::SearchSorted);
-    INTEL_CPU_NODE(SegmentMax, Type::SegmentMax);
-    INTEL_CPU_NODE(LoRA, Type::LoRA);
 #if defined(OPENVINO_ARCH_X86_64)
     INTEL_CPU_NODE(FakeQuantize, Type::FakeQuantize);
-    INTEL_CPU_NODE(GridSample, Type::GridSample);
     INTEL_CPU_NODE(Interaction, Type::Interaction);
-    INTEL_CPU_NODE(LLMMLP, Type::LLMMLP);
-    INTEL_CPU_NODE(QKVProjection, Type::QKVProjection);
-    INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
-    INTEL_CPU_NODE(RMSNorm, Type::RMS);
+    // INTEL_CPU_NODE(LLMMLP, Type::LLMMLP);
+    // INTEL_CPU_NODE(QKVProjection, Type::QKVProjection);
+    // INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
+    // INTEL_CPU_NODE(RMSNorm, Type::RMS);
 #elif defined(OPENVINO_ARCH_ARM64)
-    INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
+    // INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
 #endif
 }
 
 #undef INTEL_CPU_NODE
+
+template <>
+Node* NodesFactory<const std::shared_ptr<ov::Node>&>::create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) {
+    Node* new_node = nullptr;
+    std::string error_message;
+
+    try {
+        std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
+        if (ol != nullptr && ol->created()) {
+            new_node = ol.release();
+        }
+    } catch (const ov::Exception& ex) {
+        if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
+            error_message += ex.what();
+        } else {
+            throw;
+        }
+    }
+
+    if (new_node == nullptr) {
+        try {
+            std::unique_ptr<Node> ol(new node::Reference(op, context, error_message));
+            if (ol != nullptr && ol->created()) {
+                new_node = ol.release();
+            }
+        } catch (const ov::Exception& ex) {
+            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
+                const std::string curr_error_mess = ex.what();
+                if (!curr_error_mess.empty()) {
+                    error_message += error_message.empty() ? curr_error_mess : "\n" + curr_error_mess;
+                }
+            } else {
+                throw;
+            }
+        }
+    }
+
+    if (!new_node) {
+        std::string error_details;
+        if (!error_message.empty()) {
+            error_details = "\nDetails:\n" + error_message;
+        }
+        OPENVINO_THROW("Unsupported operation of type: ",
+                       op->get_type_name(),
+                       " name: ",
+                       op->get_friendly_name(),
+                       error_details);
+    }
+
+    return new_node;
+}
+
+template <>
+Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& ib, const GraphContext::CPtr& context) {
+    Node* new_node = nullptr;
+    std::string error_message;
+    intel_cpu::Type node_type;
+    ib >> node_type;
+
+    try {
+        std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, node_type, ib, context));
+        if (ol != nullptr && ol->created()) {
+            new_node = ol.release();
+        }
+    } catch (const ov::Exception& ex) {
+        if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
+            error_message += ex.what();
+        } else {
+            throw;
+        }
+    }
+
+    if (new_node == nullptr && node_type == Type::Reference) {
+        try {
+            std::unique_ptr<Node> ol(new node::Reference(ib, context, error_message));
+            if (ol != nullptr && ol->created()) {
+                new_node = ol.release();
+            }
+        } catch (const ov::Exception& ex) {
+            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
+                const std::string curr_error_mess = ex.what();
+                if (!curr_error_mess.empty()) {
+                    error_message += error_message.empty() ? curr_error_mess : "\n" + curr_error_mess;
+                }
+            } else {
+                throw;
+            }
+        }
+    }
+
+    if (!new_node) {
+        std::string error_details;
+        if (!error_message.empty()) {
+            error_details = "\nDetails:\n" + error_message;
+        }
+        OPENVINO_THROW("Unsupported operation of type: ",
+                       NameFromType(node_type),
+                       error_details);
+    }
+
+    return new_node;
+}
+
+template class NodesFactory<const std::shared_ptr<ov::Node>&>;
+template class NodesFactory<BinaryInputBuffer&>;
 
 }  // namespace ov::intel_cpu

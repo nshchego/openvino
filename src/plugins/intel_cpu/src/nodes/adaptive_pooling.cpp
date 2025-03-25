@@ -77,6 +77,11 @@ AdaptivePooling::AdaptivePooling(const std::shared_ptr<ov::Node>& op, const Grap
     spatialDimsValue.resize(spatialDimsCount);
 }
 
+AdaptivePooling::AdaptivePooling(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void AdaptivePooling::getSupportedDescriptors() {
     if (getParentEdges().size() != 2) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges: ", getParentEdges().size());
@@ -312,6 +317,13 @@ inline void AdaptivePooling::setBinBorders(size_t* startPtr,
                                            size_t outputLength) {
     *(startPtr) = idx * inputLength / outputLength;
     *(endPtr) = std::ceil(static_cast<float>((idx + 1) * inputLength) / outputLength);
+}
+
+void AdaptivePooling::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void AdaptivePooling::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

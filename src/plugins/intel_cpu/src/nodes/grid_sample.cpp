@@ -112,6 +112,11 @@ GridSample::GridSample(const std::shared_ptr<ov::Node>& op, const GraphContext::
     }
 }
 
+GridSample::GridSample(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GridSample::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

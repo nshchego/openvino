@@ -27,6 +27,8 @@ public:
                  size_t perSampleWeightsIdx,
                  size_t defaultIndexIdx);
 
+    EmbeddingBag(BinaryInputBuffer& ib);
+
     void execute(const uint8_t* srcData,
                  const uint8_t* weightsData,
                  const ov::element::Type& srcPrc,

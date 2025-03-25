@@ -395,12 +395,12 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, co
 
     auto extImgPatcher = ov::as_type_ptr<const ov::op::v3::ExtractImagePatches>(op);
 
-    if (inputShapes.size() != 1 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 1 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input or output edges!",
                            " Input: ",
-                           inputShapes.size(),
+                           m_input_shapes.size(),
                            "); Output: ",
-                           outputShapes.size());
+                           m_output_shapes.size());
     }
 
     if (getInputShapeAtPort(0).getRank() != 4) {
@@ -428,6 +428,11 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, co
     if (_ksizes.size() != 2 || _strides.size() != 2 || _rates.size() != 2) {
         THROW_CPU_NODE_ERR("must have the following attributes with shape {2}: sizes, strides, rates.");
     }
+}
+
+ExtractImagePatches::ExtractImagePatches(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void ExtractImagePatches::prepareParams() {
@@ -466,7 +471,7 @@ void ExtractImagePatches::prepareParams() {
                                                                 key.padType,
                                                                 key.prcSize);
     };
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     execPtr = result.first;
 }

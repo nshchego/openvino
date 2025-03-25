@@ -988,6 +988,11 @@ void* ColorConvert::Converter::output(size_t idx) const {
     return _node->getDstDataAtPort(idx);
 }
 
+ColorConvert::ColorConvert(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 const VectorDims& ColorConvert::Converter::inputDims(size_t idx) const {
     return _node->getParentEdgeAt(idx)->getMemory().getStaticDims();
 }

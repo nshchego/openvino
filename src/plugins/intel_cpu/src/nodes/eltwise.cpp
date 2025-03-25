@@ -112,8 +112,10 @@
 #include "transformations/cpu_opset/common/op/power_static.hpp"
 #include "transformations/cpu_opset/common/op/swish_cpu.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_ARM64)
 #    include "cpu/aarch64/cpu_isa_traits.hpp"
@@ -1415,6 +1417,11 @@ Eltwise::Eltwise(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     getInitializers().at(op->get_type_info())(op, *this);
 }
 
+Eltwise::Eltwise(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 size_t Eltwise::getOpInputsNum() const {
     switch (getAlgorithm()) {
     case Algorithm::EltwiseIsFinite:
@@ -1485,7 +1492,7 @@ size_t Eltwise::getOpInputsNum() const {
 
 bool Eltwise::isWithBroadcast() {
     const auto& oDims = getOutputShapeAtPort(0).getDims();
-    for (size_t i = 0; i < inputShapes.size(); i++) {
+    for (size_t i = 0; i < m_input_shapes.size(); i++) {
         const auto& iDims = getInputShapeAtPort(i).getDims();
         if (!dimsEqualWeak(iDims, oDims)) {
             return true;
@@ -1814,7 +1821,7 @@ void Eltwise::initSupportedPrimitiveDescriptors() {
                 std::make_shared<EltwiseExecutorFactory>(eltwiseAttrs,
                                                          srcMemoryDescs,
                                                          dstMemoryDescs,
-                                                         std::make_shared<ExecutorContext>(context, getImplPriority()));
+                                                         std::make_shared<ExecutorContext>(m_context, getImplPriority()));
 
             return {config, impl_type, !factory->isEmpty() ? factory : nullptr};
         }
@@ -1920,7 +1927,7 @@ void Eltwise::initSupportedPrimitiveDescriptors() {
         return;
 #endif
 
-    if (context->getConfig().modelType == Config::ModelType::CNN) {
+    if (m_context->getConfig().modelType == Config::ModelType::CNN) {
         if (isChannelsFirstApplicable) {
             supportedPrimitiveDescriptors.emplace_back(initDesc(ChannelsFirst));
         }
@@ -1955,8 +1962,9 @@ void Eltwise::createPrimitive() {
     const auto desc = getChildEdgeAt(0)->getMemory().getDescWithType<BlockedMemoryDesc>();
     start_offset_out = desc->getOffsetPadding() * desc->getPrecision().size();
 
+    m_input_prc.clear();
     for (size_t i = 0; i < inputNum; ++i) {
-        inpPrc.push_back(getParentEdgeAt(i)->getMemory().getDesc().getPrecision());
+        m_input_prc.push_back(getParentEdgeAt(i)->getMemory().getDesc().getPrecision());
     }
 
     outPrc = getChildEdgeAt(0)->getMemory().getDesc().getPrecision();
@@ -2047,7 +2055,7 @@ void Eltwise::prepareParams() {
     if (!canSkipSearchInCache) {
         EltwiseData thisOp{getAlgorithm(), getOneDnnAlgorithm(), getAlpha(), getBeta(), getGamma()};
         EltwiseKey key =
-            {{thisOp}, {getType()}, currentOutBlkDims, outOrder, dims_in, inpPrc, outPrc, dnnl::post_ops(), implType};
+            {{thisOp}, {getType()}, currentOutBlkDims, outOrder, dims_in, m_input_prc, outPrc, dnnl::post_ops(), implType};
         fqDataPtrs.clear();
         for (const auto& node : fusedWith) {
             key.ops_list.push_back(node->getType());
@@ -2067,7 +2075,7 @@ void Eltwise::prepareParams() {
             }
         }
 
-        auto cache = context->getParamsCache();
+        auto cache = m_context->getParamsCache();
         auto result = cache->getOrCreate(key, buildExecutor);
         execPtr = result.first;
     }
@@ -2113,7 +2121,7 @@ void Eltwise::prepareParams() {
             inOffsets[i].resize(inputSize, 1);
             offset_in_calc(inOffsets[i], dims_in[i], outDims);
             for (size_t j = 0; j < inputSize; j++) {
-                inOffsets[i][j] *= inpPrc[i].size();
+                inOffsets[i][j] *= m_input_prc[i].size();
             }
         }
     }
@@ -2122,7 +2130,7 @@ void Eltwise::prepareParams() {
 bool Eltwise::needPrepareParams() const {
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         if (getParentEdgeAt(i)->getMemory().getDescWithType<BlockedMemoryDesc>()->getBlockDims() !=
-            currentInBlkDims[i]) {
+            currentInBlkDims[i] || (!execPtr && !eltwiseExecPtr)) {
             return true;
         }
     }
@@ -2598,4 +2606,65 @@ ov::element::Type Eltwise::getRuntimePrecision() const {
 
     return getMaxPrecision(inputPrecisions);
 }
+
+void Eltwise::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    ob << broadcastingPolicy;
+    ob << onednnAlgorithm;
+    ob << implType;
+    ob << broadcastPolicy;
+    ob << specialConvolutionAddFusing;
+    ob << inputNum;
+    ob << start_offset_in;
+    ob << start_offset_out;
+    ob << m_input_prc;
+    ob << outPrc;
+    ob << currentInBlkDims;
+    ob << execParams.inOffsets;
+    ob << execParams.outDims;
+    ob << execParams.outOffsets;
+    ob << alpha;
+    ob << beta;
+    ob << gamma;
+    ob << scales;
+    ob << shifts;
+    ob << depthwiseData;
+    // ob << depthwiseMemory;
+    ob << depthwiseDataSize;
+    // ob << memPtrs;
+    // ob << fqDataPtrs;
+    ob << canUseEltwiseExecPtr;
+    ob << eltwiseAttrs;
+}
+
+void Eltwise::load(BinaryInputBuffer& ib) {
+    ib >> broadcastingPolicy;
+    ib >> onednnAlgorithm;
+    ib >> implType;
+    ib >> broadcastPolicy;
+    ib >> specialConvolutionAddFusing;
+    ib >> inputNum;
+    ib >> start_offset_in;
+    ib >> start_offset_out;
+    ib >> m_input_prc;
+    ib >> outPrc;
+    ib >> currentInBlkDims;
+    ib >> execParams.inOffsets;
+    ib >> execParams.outDims;
+    ib >> execParams.outOffsets;
+    ib >> alpha;
+    ib >> beta;
+    ib >> gamma;
+    ib >> scales;
+    ib >> shifts;
+    ib >> depthwiseData;
+    // ib >> depthwiseMemory;
+    ib >> depthwiseDataSize;
+    // ib >> memPtrs;
+    // ib >> fqDataPtrs;
+    ib >> canUseEltwiseExecPtr;
+    ib >> eltwiseAttrs;
+}
+
 }  // namespace ov::intel_cpu::node

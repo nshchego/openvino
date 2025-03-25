@@ -30,6 +30,9 @@ namespace node {
 class ColorConvert : public Node {
 public:
     ColorConvert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    ColorConvert(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     class Converter;
 
 public:

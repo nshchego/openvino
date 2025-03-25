@@ -32,7 +32,7 @@
 #include "selective_build.h"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl;

@@ -20,6 +20,8 @@ class ISTFT : public Node {
 public:
     ISTFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    ISTFT(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     bool created() const override;
@@ -32,6 +34,10 @@ public:
     bool canBeInPlace() const override {
         return false;
     }
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     bool needShapeInfer() const override;

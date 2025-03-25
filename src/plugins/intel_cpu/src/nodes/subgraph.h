@@ -39,6 +39,9 @@ namespace node {
 class Subgraph : public Node {
 public:
     Subgraph(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    Subgraph(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+    
     ~Subgraph() override = default;
 
     void getSupportedDescriptors() override{};
@@ -55,6 +58,10 @@ public:
     // if generator is set, it would execute generated code otherwise it would fallback to nGraph reference
     void execute(const dnnl::stream& strm) override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     IShapeInfer::Result shapeInfer() const override;

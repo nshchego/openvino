@@ -44,7 +44,7 @@
 #include "shape_inference/custom/gather.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl::impl::cpu;
 
@@ -139,6 +139,11 @@ Gather::Gather(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     if (auto* indices = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(GATHER_INDICES))) {
         constIndices = indices->cast_vector<int>();
     }
+}
+
+Gather::Gather(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void Gather::initSupportedPrimitiveDescriptors() {
@@ -254,7 +259,7 @@ void Gather::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    const auto& parentDims = inputShapes[0].getDims();
+    const auto& parentDims = m_input_shapes[0].getDims();
     const auto axisDim = parentDims[axis];
     if (Shape::UNDEFINED_DIM == axisDim) {
         return;
@@ -1009,7 +1014,7 @@ void Gather::resolveInPlaceEdges(Edge::LOOK look) {
 
     const auto& config = selected_pd->getConfig();
     size_t inplaceInpIndx = selected_pd->getConfig().outConfs[outputPort].inPlace();
-    const auto baseDim = inputShapes.front().getDims()[axis];
+    const auto baseDim = m_input_shapes.front().getDims()[axis];
     CPU_NODE_ASSERT(baseDim != Shape::UNDEFINED_DIM, "can not use inPlace memory with splitting on dynamic dimention");
     auto baseMemBlock = getParentEdgeAt(inplaceInpIndx)->getMemory().getMemoryBlock();
     const auto index = constIndices.front();

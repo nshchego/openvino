@@ -24,7 +24,7 @@
 #include "openvino/op/constant.hpp"
 #include "openvino/op/tile.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -85,7 +85,7 @@ void Tile::getSupportedDescriptors() {
         THROW_CPU_NODE_ERR("has no output edges.");
     }
     const auto& dstDims0 = getOutputShapeAtPort(0).getDims();
-    for (size_t i = 1LU; i < outputShapes.size(); i++) {
+    for (size_t i = 1LU; i < m_output_shapes.size(); i++) {
         const auto& dstDims = getOutputShapeAtPort(i).getDims();
         if (dstDims.size() != dstDims0.size()) {
             THROW_CPU_NODE_ERR("has output edges 0 and ",
@@ -125,7 +125,7 @@ void Tile::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    supportedPrimitiveDescriptors = getSupportedConfigs(this, outputShapes.size());
+    supportedPrimitiveDescriptors = getSupportedConfigs(this, m_output_shapes.size());
 }
 
 bool Tile::needPrepareParams() const {

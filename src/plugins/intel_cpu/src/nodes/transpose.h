@@ -18,16 +18,16 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/type/element_type.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Transpose : public Node {
 public:
     Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Transpose(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
-    void getSupportedDescriptors() override;
+    void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
     void execute(const dnnl::stream& strm) override;
@@ -48,6 +48,10 @@ public:
     void setOptimized(bool isOptimized) {
         this->isOptimized = isOptimized;
     }
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;
@@ -70,6 +74,4 @@ private:
     bool isOptimized = false;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

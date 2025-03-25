@@ -333,6 +333,11 @@ ExperimentalDetectronGenerateProposalsSingleImage::ExperimentalDetectronGenerate
     roi_indices_.resize(post_nms_topn_);
 }
 
+ExperimentalDetectronGenerateProposalsSingleImage::ExperimentalDetectronGenerateProposalsSingleImage(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronGenerateProposalsSingleImage::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -348,7 +353,7 @@ void ExperimentalDetectronGenerateProposalsSingleImage::initSupportedPrimitiveDe
 
 void ExperimentalDetectronGenerateProposalsSingleImage::execute([[maybe_unused]] const dnnl::stream& strm) {
     try {
-        if (inputShapes.size() != 4 || outputShapes.size() != 2) {
+        if (m_input_shapes.size() != 4 || m_output_shapes.size() != 2) {
             THROW_CPU_NODE_ERR("Incorrect number of input or output edges!");
         }
 

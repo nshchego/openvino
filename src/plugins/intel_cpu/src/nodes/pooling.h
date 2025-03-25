@@ -26,6 +26,8 @@ class Pooling : public Node {
 public:
     Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Pooling(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     void createDescriptor(const std::vector<MemoryDescPtr>& inputDesc,
                           const std::vector<MemoryDescPtr>& outputDesc) override;
     std::vector<dnnl::memory::format_tag> getAvailableFormatsForDims(const Shape& dims) const override;
@@ -42,6 +44,10 @@ public:
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     AttrPtr initPrimitiveAttr() override;

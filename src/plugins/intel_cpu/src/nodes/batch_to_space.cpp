@@ -51,7 +51,7 @@ BatchToSpace::BatchToSpace(const std::shared_ptr<ov::Node>& op, const GraphConte
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    if (inputShapes.size() != 4 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 4 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input or output edges!");
     }
 
@@ -63,6 +63,11 @@ BatchToSpace::BatchToSpace(const std::shared_ptr<ov::Node>& op, const GraphConte
     if (inDims.size() != outDims.size()) {
         THROW_CPU_NODE_ERR("has incorrect number of input/output dimensions");
     }
+}
+
+BatchToSpace::BatchToSpace(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void BatchToSpace::initSupportedPrimitiveDescriptors() {
@@ -281,6 +286,13 @@ void BatchToSpace::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool BatchToSpace::created() const {
     return getType() == Type::BatchToSpace;
+}
+
+void BatchToSpace::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void BatchToSpace::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

@@ -24,11 +24,14 @@ namespace node {
 class Convert : public Node {
 public:
     Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
     Convert(const Shape& shape,
             const ov::element::Type& inPrc,
             const ov::element::Type& outPrc,
             const std::string& nodeName,
             const GraphContext::CPtr& context);
+
+    Convert(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -64,12 +67,16 @@ public:
 
     static bool isSupportedDesc(const MemoryDesc& desc);
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     MemoryDescPtr input;
     MemoryDescPtr output;
     ConvertParams convertParams;
     std::shared_ptr<ConvertExecutor> execPtr = nullptr;
-    NodeConfig config;
+    // NodeConfig config;
 };
 
 }  // namespace node

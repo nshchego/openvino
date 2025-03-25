@@ -35,7 +35,10 @@
 #include "sub_memory_manager.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/memory_stats_dump.hpp"
-#include "utils/serialize.hpp"
+#include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/layout_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include "nodes/executors/acl/acl_ie_scheduler.hpp"
@@ -53,18 +56,6 @@ struct ImmediateSerialExecutor : public ov::threading::ITaskExecutor {
     std::mutex _mutex;
 };
 
-CompiledModel::~CompiledModel() {
-    if (m_has_sub_compiled_models) {
-        m_sub_compiled_models.clear();
-        m_sub_memory_manager->_memorys_table.clear();
-    }
-    auto streamsExecutor = std::dynamic_pointer_cast<ov::threading::IStreamsExecutor>(m_task_executor);
-    if (streamsExecutor) {
-        streamsExecutor->cpu_reset();
-    }
-    CPU_DEBUG_CAP_ENABLE(dumpMemoryStats(m_cfg.debugCaps, m_name, m_graphs, m_socketWeights));
-}
-
 CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
                              const std::shared_ptr<const ov::IPlugin>& plugin,
                              Config cfg,
@@ -76,12 +67,16 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
       m_cfg{std::move(cfg)},
       m_name{model->get_name()},
       m_loaded_from_cache(loaded_from_cache),
-      m_sub_memory_manager(std::move(sub_memory_manager)) {
+      m_sub_memory_manager(std::move(sub_memory_manager)),
+      m_inputs(ov::ICompiledModel::inputs()),
+      m_outputs(ov::ICompiledModel::outputs()) {
     m_mutex = std::make_shared<std::mutex>();
     const auto& core = m_plugin->get_core();
     if (!core) {
         OPENVINO_THROW("Unable to get API version. Core is unavailable");
     }
+
+    m_is_function_quantized = ov::pass::low_precision::LowPrecision::isFunctionQuantized(m_model);
 
     IStreamsExecutor::Config executor_config;
     if (m_cfg.exclusiveAsyncRequests) {
@@ -169,6 +164,188 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
     }
 }
 
+CompiledModel::CompiledModel(BinaryInputBuffer& ib,
+                             const std::shared_ptr<const ov::IPlugin>& plugin,
+                             const Config& config,
+                             const bool loaded_from_cache)
+    : ov::ICompiledModel::ICompiledModel(nullptr, plugin),
+      m_model_buffer(&ib),
+      m_plugin(plugin),
+      m_cfg(config),
+      m_loaded_from_cache(loaded_from_cache) {
+    OPENVINO_ASSERT(m_plugin->get_core(), "[ CPU ] Core is not initialized in the plugin.");
+
+    m_mutex = std::make_shared<std::mutex>();
+
+    validate_stream_offset(ib);
+    
+    ib >> m_name;
+    ib >> m_cfg.modelPreferThreads;
+    ib >> m_is_function_quantized;
+
+    // m_cfg.applyRtInfo(ib);
+    // m_cfg.readProperties(new_config, model_type);
+
+    size_t counter;
+
+    ib >> counter;
+    validate_stream_offset(ib);
+    for (size_t idx = 0lu; idx < counter; idx++) {
+        std::string param_name;
+        element::Type param_element_type;
+        PartialShape param_shape;
+
+        ib >> param_element_type;
+        ib >> param_shape;
+        ib >> param_name;
+
+        std::unordered_set<std::string> param_names;
+        size_t num_names;
+        ib >> num_names;
+        for (size_t i = 0lu; i < num_names; ++i) {
+            std::string name;
+            ib >> name;
+            param_names.emplace(name);
+        }
+
+        auto new_param = std::make_shared<op::v0::Parameter>(param_element_type, param_shape);
+        new_param->set_friendly_name(param_name);
+        new_param->output(0).get_tensor().set_names(param_names);
+        new_param->validate_and_infer_types();
+
+        m_inputs.push_back(new_param->output(0));
+    }
+
+    ib >> counter;
+    validate_stream_offset(ib);
+    for (size_t idx = 0lu; idx < counter; idx++) {
+        element::Type fake_element_type;
+        PartialShape fake_shape;
+        std::string fake_name;
+        std::string param_name;
+
+        ib >> fake_element_type;
+        ib >> fake_shape;
+        ib >> fake_name;
+        ib >> param_name;
+
+        std::unordered_set<std::string> param_names;
+        size_t num_names;
+        ib >> num_names;
+        for (size_t i = 0; i < num_names; ++i) {
+            std::string name;
+            ib >> name;
+            param_names.emplace(name);
+        }
+
+        auto fake_param = std::make_shared<op::v0::Parameter>(fake_element_type, fake_shape);
+        fake_param->set_friendly_name(fake_name);
+        fake_param->validate_and_infer_types();
+
+        auto new_result = std::make_shared<op::v0::Result>(fake_param);
+        new_result->set_friendly_name(param_name);
+        new_result->output(0).get_tensor().set_names(param_names);
+        new_result->validate_and_infer_types();
+
+        m_outputs.push_back(new_result->output(0));
+    }
+
+    IStreamsExecutor::Config executor_config;
+    if (m_cfg.exclusiveAsyncRequests) {
+        // special case when all InferRequests are muxed into a single queue
+        m_task_executor = m_plugin->get_executor_manager()->get_executor("CPU");
+    } else {
+        executor_config = m_cfg.numSubStreams > 0 ? IStreamsExecutor::Config{"CPUMainStreamExecutor",
+                                                                             1,
+                                                                             1,
+                                                                             hint::SchedulingCoreType::ANY_CORE,
+                                                                             false,
+                                                                             true}
+                                                  : m_cfg.streamExecutorConfig;
+        m_task_executor = m_plugin->get_executor_manager()->get_idle_cpu_streams_executor(executor_config);
+    }
+    if (0 != m_cfg.streamExecutorConfig.get_streams()) {
+        m_callback_executor = m_plugin->get_executor_manager()->get_idle_cpu_streams_executor(
+            IStreamsExecutor::Config{"CPUCallbackExecutor", 1, 0});
+    } else {
+        m_callback_executor = m_task_executor;
+    }
+
+    if (m_task_executor) {
+        set_task_executor(m_task_executor);
+    }
+    if (m_callback_executor) {
+        set_callback_executor(m_callback_executor);
+    }
+
+    int streams = std::max(1, executor_config.get_streams());
+    std::vector<Task> tasks;
+    tasks.resize(streams);
+    m_graphs.resize(streams);
+    if (executor_config.get_streams() != 0) {
+        auto all_graphs_ready = [&] {
+            return std::all_of(m_graphs.begin(), m_graphs.end(), [&](Graph& graph) {
+                return graph.IsReady();
+            });
+        };
+        do {
+            for (auto&& task : tasks) {
+                task = [this] {
+#if defined(OV_CPU_WITH_ACL)
+                    static std::once_flag flag_once;
+                    std::call_once(flag_once, [&]() {
+                        std::shared_ptr<arm_compute::IScheduler> acl_scheduler = std::make_shared<ACLScheduler>();
+                        arm_compute::Scheduler::set(std::static_pointer_cast<arm_compute::IScheduler>(acl_scheduler));
+                    });
+#endif
+                    CompiledModel::get_graph();
+                };
+            }
+            m_task_executor->run_and_wait(tasks);
+        } while (!all_graphs_ready());
+    } else {
+        CompiledModel::get_graph();
+    }
+    if (m_cfg.numSubStreams > 0) {
+        m_has_sub_compiled_models = true;
+        auto sub_cfg = m_cfg;
+        sub_cfg.numSubStreams = 0;
+        sub_cfg.enableNodeSplit = true;
+        auto streams_info_table = m_cfg.streamExecutorConfig.get_streams_info_table();
+        auto message = message_manager();
+        // m_sub_memory_manager = std::make_shared<SubMemoryManager>(m_cfg.numSubStreams);
+        message->set_num_sub_streams(m_cfg.numSubStreams);
+        for (int i = 0; i < m_cfg.numSubStreams; i++) {
+            std::vector<std::vector<int>> sub_streams_table;
+            sub_streams_table.push_back(streams_info_table[i + 1]);
+            sub_streams_table[0][NUMBER_OF_STREAMS] = 1;
+            sub_cfg.streamExecutorConfig = IStreamsExecutor::Config{"CPUStreamsExecutor",
+                                                                    1,
+                                                                    1,
+                                                                    hint::SchedulingCoreType::ANY_CORE,
+                                                                    false,
+                                                                    true,
+                                                                    true,
+                                                                    std::move(sub_streams_table),
+                                                                    sub_cfg.streamsRankTable[i]};
+            m_sub_compiled_models.push_back(
+                std::make_shared<CompiledModel>(ib, plugin, sub_cfg, loaded_from_cache));
+        }
+    }
+}
+
+CompiledModel::~CompiledModel() {
+    if (m_has_sub_compiled_models) {
+        m_sub_compiled_models.clear();
+        m_sub_memory_manager->_memorys_table.clear();
+    }
+    auto streamsExecutor = std::dynamic_pointer_cast<ov::threading::IStreamsExecutor>(m_task_executor);
+    if (streamsExecutor) {
+        streamsExecutor->cpu_reset();
+    }
+    CPU_DEBUG_CAP_ENABLE(dumpMemoryStats(m_cfg.debugCaps, m_name, m_graphs, m_socketWeights));
+}
+
 CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {
     int streamId = 0;
     int socketId = 0;
@@ -193,8 +370,7 @@ CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {
                 GraphContext::Ptr ctx;
                 {
                     std::lock_guard<std::mutex> lock{*m_mutex};
-                    auto isQuantizedFlag = (m_cfg.lpTransformsMode == Config::On) &&
-                                           ov::pass::low_precision::LowPrecision::isFunctionQuantized(m_model);
+                    auto isQuantizedFlag = (m_cfg.lpTransformsMode == Config::On) && m_is_function_quantized;
                     ctx = std::make_shared<GraphContext>(m_cfg,
                                                          m_socketWeights[socketId],
                                                          isQuantizedFlag,
@@ -202,8 +378,12 @@ CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {
                                                          m_sub_memory_manager);
                 }
 
-                const std::shared_ptr<const ov::Model> model = m_model;
-                graphLock._graph.Init(model, ctx);
+                if (m_model) {
+                    // const std::shared_ptr<const ov::Model> model = m_model;
+                    graphLock._graph.Init(m_model, ctx);
+                } else {
+                    graphLock._graph.Init(*m_model_buffer, ctx);
+                }
                 graphLock._graph.Activate();
             } catch (...) {
                 exception = std::current_exception();
@@ -399,9 +579,54 @@ ov::Any CompiledModel::get_property(const std::string& name) const {
     OPENVINO_THROW("Unsupported property: ", name);
 }
 
-void CompiledModel::export_model(std::ostream& modelStream) const {
-    ModelSerializer serializer(modelStream, m_cfg.cacheEncrypt);
-    serializer << m_model;
+void CompiledModel::export_model(std::ostream& model_stream) const {
+    // ModelSerializer serializer(model_stream, m_cfg.cacheEncrypt);
+    // serializer << m_model;
+
+    OPENVINO_ASSERT(!m_graphs.empty(), "[ CPU ] No graph was found.");
+
+    BinaryOutputBuffer model_buff(model_stream);
+
+    model_buff << getModelType(m_model);
+    model_buff << model_buff.get_pos();
+
+    model_buff << m_name;
+    model_buff << m_cfg.modelPreferThreads;
+    model_buff << m_is_function_quantized;
+
+    // Inputs
+    const auto& params = inputs();
+    model_buff << params.size();
+
+    model_buff << model_buff.get_pos();  // TODO:: remove
+
+    for (const auto& param : params) {
+        model_buff << param.get_element_type();
+        model_buff << param.get_partial_shape();
+        model_buff << param.get_node()->get_friendly_name();
+        model_buff << param.get_names().size();
+        for (const auto& name : param.get_names()) {
+            model_buff << name;
+        }
+    }
+
+    // Outputs
+    const auto& results = outputs();
+    model_buff << results.size();
+    model_buff << model_buff.get_pos(); // TODO:: remove
+
+    for (const auto& param : results) {
+        model_buff << param.get_element_type();
+        model_buff << param.get_partial_shape();
+        model_buff << param.get_node()->get_input_node_ptr(0)->get_friendly_name();
+        model_buff << param.get_node()->get_friendly_name();
+        model_buff << param.get_names().size();
+        for (const auto& name : param.get_names()) {
+            model_buff << name;
+        }
+    }
+
+    return get_graph()._graph.export_graph(model_buff);
 }
 
 void CompiledModel::release_memory() {

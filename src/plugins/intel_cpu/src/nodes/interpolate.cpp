@@ -57,7 +57,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
 
 using namespace dnnl;
@@ -1931,11 +1931,11 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
         dataRank = getInputShapeAtPort(DATA_ID).getRank();
         if (const auto interp = ov::as_type_ptr<const ov::op::v4::Interpolate>(op)) {
             is_version11 = false;
-            const auto numInputs = inputShapes.size();
+            const auto numInputs = m_input_shapes.size();
             if (numInputs != 3 && numInputs != 4) {
                 THROW_CPU_NODE_ERR("has incorrect number of input edges");
             }
-            if (outputShapes.size() != 1) {
+            if (m_output_shapes.size() != 1) {
                 THROW_CPU_NODE_ERR("has incorrect number of output edges");
             }
             isAxesSpecified = numInputs != 3;
@@ -2039,11 +2039,11 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
             }
         } else if (const auto interp = ov::as_type_ptr<const ov::op::v11::Interpolate>(op)) {
             is_version11 = true;
-            const auto numInputs = inputShapes.size();
+            const auto numInputs = m_input_shapes.size();
             if (numInputs != 2 && numInputs != 3) {
                 THROW_CPU_NODE_ERR("has incorrect number of input edges");
             }
-            if (outputShapes.size() != 1) {
+            if (m_output_shapes.size() != 1) {
                 THROW_CPU_NODE_ERR("has incorrect number of output edges");
             }
             isAxesSpecified = numInputs != 2;
@@ -2114,6 +2114,11 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
     } else {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
+}
+
+Interpolate::Interpolate(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context) {
+    load(ib);
 }
 
 void Interpolate::getSupportedDescriptors() {
@@ -2272,7 +2277,7 @@ void Interpolate::initSupportedPrimitiveDescriptors() {
                 interpAttrs,
                 srcMemoryDescs,
                 dstMemoryDescs,
-                std::make_shared<ExecutorContext>(context, getImplPriority()));
+                std::make_shared<ExecutorContext>(m_context, getImplPriority()));
             if (!factory->isEmpty()) {
                 supportedPrimitiveDescriptors.emplace_back(config, implDetail, factory);
             }
@@ -2547,7 +2552,7 @@ void Interpolate::prepareParams() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     execPtr = result.first;
 

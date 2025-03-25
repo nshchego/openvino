@@ -829,7 +829,7 @@ NormalizeL2::NormalizeL2(const std::shared_ptr<ov::Node>& op, const GraphContext
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    if (inputShapes.size() != 2 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 2 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input/output edges");
     }
 
@@ -1020,7 +1020,7 @@ void NormalizeL2::prepareParams() {
         return NormalizeL2Executor::getNormalizeL2Executor(key.attrs, key.kernel_attrs, key.dims);
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
 
     if (!result.first) {

@@ -12,6 +12,7 @@
 #include "dnnl_extension_utils.h"
 #include "memory_desc/cpu_memory_desc.h"
 #include "openvino/core/type/element_type.hpp"
+#include "utils/serialization/bind.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -20,6 +21,8 @@ class DnnlBlockedMemoryDesc;
 
 class CpuBlockedMemoryDesc : public BlockedMemoryDesc {
 public:
+    CpuBlockedMemoryDesc() = default;
+
     CpuBlockedMemoryDesc(ov::element::Type prc, const Shape& shape);
 
     CpuBlockedMemoryDesc(ov::element::Type prc,
@@ -62,7 +65,7 @@ public:
      * @return offsets
      */
     const VectorDims& getOffsetPaddingToData() const override {
-        return offsetPaddingToData;
+        return m_offset_padding_to_data;
     }
     /**
      * @brief Returns the offset to the current memory block
@@ -91,6 +94,12 @@ public:
     size_t getPaddedElementsCount() const override;
 
     MemoryDescPtr cloneWithNewPrecision(const ov::element::Type prec) const override;
+
+    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::CpuBlockedMemoryDesc)
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     size_t getElementOffset(size_t elemNumber) const override;

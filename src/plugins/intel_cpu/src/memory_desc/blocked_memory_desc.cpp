@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -77,6 +78,24 @@ std::string BlockedMemoryDesc::serializeFormat() const {
     }
 
     return result.str();
+}
+
+void BlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
+    MemoryDesc::save(ob);
+
+    ob << blockedDims;
+    ob << strides;
+    ob << order;
+    ob << m_offset_padding_to_data;
+}
+
+void BlockedMemoryDesc::load(BinaryInputBuffer& ib) {
+    MemoryDesc::load(ib);
+
+    ib >> blockedDims;
+    ib >> strides;
+    ib >> order;
+    ib >> m_offset_padding_to_data;
 }
 
 }  // namespace ov::intel_cpu

@@ -65,6 +65,11 @@ ISTFT::ISTFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
     m_normalized = istft_op->get_normalized();
 }
 
+ISTFT::ISTFT(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context) {
+    load(ib);
+}
+
 void ISTFT::getSupportedDescriptors() {
     const auto input_size = getParentEdges().size();
     if (input_size < 4 || input_size > 5) {
@@ -281,11 +286,17 @@ void ISTFT::createPrimitive() {
         return RDFTExecutor::build(key.isInverse, getSelectedPrimitiveDescriptor());
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     rdft_executor = result.first;
 
     Node::createPrimitive();
+}
+
+void ISTFT::save(BinaryOutputBuffer& ob) const {
+}
+
+void ISTFT::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

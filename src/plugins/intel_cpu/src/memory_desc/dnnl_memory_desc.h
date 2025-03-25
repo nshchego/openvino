@@ -18,6 +18,7 @@
 #include "dnnl_extension_utils.h"
 #include "memory_desc/cpu_memory_desc.h"
 #include "openvino/core/type/element_type.hpp"
+#include "utils/serialization/bind.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -61,6 +62,12 @@ public:
     bool hasEmptyExtraData() const;
 
     size_t getOffsetPadding() const override;
+
+    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::DnnlMemoryDesc)
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     DnnlMemoryDesc() {}

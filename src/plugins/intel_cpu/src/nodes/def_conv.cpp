@@ -831,6 +831,11 @@ DeformableConvolution::DeformableConvolution(const std::shared_ptr<ov::Node>& op
     }
 }
 
+DeformableConvolution::DeformableConvolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void DeformableConvolution::getSupportedDescriptors() {
     if (getParentEdges().size() != 3 && getParentEdges().size() != 4) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges");
@@ -1311,7 +1316,7 @@ void DeformableConvolution::prepareParams() {
 
     execPtr = nullptr;
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, [](const DefConvKey& key) -> std::shared_ptr<DefConvExecutor> {
         if (key.implType == impl_desc_type::ref) {
             return std::make_shared<DefConvRefExecutor>(key.defConvAttr, key.descVector);

@@ -20,6 +20,8 @@ class CTCLoss : public Node {
 public:
     CTCLoss(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    CTCLoss(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override{};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;

@@ -20,6 +20,8 @@
 #include "nodes/executors/transpose.hpp"
 #include "openvino/core/except.hpp"
 #include "openvino/core/parallel.hpp"
+#include "utils/bfloat16.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl;
@@ -289,6 +291,24 @@ bool PermuteParams::operator==(const PermuteParams& rhs) const {
     return (src_block_dims == rhs.src_block_dims) && (dst_block_dims == rhs.dst_block_dims) &&
            (src_block_order == rhs.src_block_order) && (dst_block_order == rhs.dst_block_order) &&
            (order == rhs.order) && (data_size == rhs.data_size);
+}
+
+void PermuteParams::save(BinaryOutputBuffer& ob) const {
+    ob << src_block_dims;
+    ob << dst_block_dims;
+    ob << src_block_order;
+    ob << dst_block_order;
+    ob << order;
+    ob << data_size;
+}
+
+void PermuteParams::load(BinaryInputBuffer& ib) {
+    ib >> src_block_dims;
+    ib >> dst_block_dims;
+    ib >> src_block_order;
+    ib >> dst_block_order;
+    ib >> order;
+    ib >> data_size;    
 }
 
 }  // namespace ov::intel_cpu

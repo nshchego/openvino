@@ -571,4 +571,13 @@ void Config::applyRtInfo(const std::shared_ptr<const ov::Model>& model) {
     }
 }
 
+void Config::applyRtInfo(BinaryInputBuffer& ib) {
+    // ib >> this->kvCachePrecision;
+    ib >> this->keyCacheGroupSize;
+    // ib >> this->keyCachePrecision;
+    ib >> this->valueCacheGroupSize;
+    // ib >> this->valueCachePrecision;
+    ib >> this->fcDynamicQuantizationGroupSize;
+}
+
 }  // namespace ov::intel_cpu

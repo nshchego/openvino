@@ -1151,11 +1151,11 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
             THROW_CPU_NODE_ERR("supports 'levels' attribute greater than or equal to 2");
         }
 
-        if (inputShapes.size() != 5) {
-            THROW_CPU_NODE_ERR("has incorrect number of input edges: ", inputShapes.size());
+        if (m_input_shapes.size() != 5) {
+            THROW_CPU_NODE_ERR("has incorrect number of input edges: ", m_input_shapes.size());
         }
-        if (outputShapes.size() != 1) {
-            THROW_CPU_NODE_ERR("has incorrect number of output edges: ", outputShapes.size());
+        if (m_output_shapes.size() != 1) {
+            THROW_CPU_NODE_ERR("has incorrect number of output edges: ", m_output_shapes.size());
         }
 
         auto initAxisIdx = [&](const VectorDims& inputDims) {
@@ -1446,6 +1446,11 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
     }
 }
 
+FakeQuantize::FakeQuantize(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 std::vector<LayoutType> FakeQuantize::getDataFormats() const {
     // Special case for first FQ in the network
     const auto& dims = getInputShapeAtPort(0).getDims();
@@ -1709,7 +1714,7 @@ void FakeQuantize::createPrimitive() {
             key.jqp.broadcasted = broadcasted;
         }
 
-        auto cache = context->getParamsCache();
+        auto cache = m_context->getParamsCache();
         auto buildExecutor = [](const FakeQuantKey& key) {
             return std::make_shared<FakeQuantizeJitExecutor>(key.jqp);
         };

@@ -163,18 +163,18 @@ std::shared_ptr<ov::Model> dump_graph_as_ie_ngraph_net(const Graph& graph) {
         bool should_be_hold = false;
         size_t input_index = -1;
         size_t output_index = -1;
-        for (auto&& kvp : graph.inputNodesMap) {
-            if (kvp.second == node) {
+        for (size_t i = 0lu; i < graph.m_input_nodes.size(); i++) {
+            if (graph.m_input_nodes[i] == node) {
                 is_input = true;
-                input_index = kvp.first;
+                input_index = i;
                 break;
             }
         }
 
-        for (auto&& kvp : graph.outputNodesMap) {
-            if (kvp.second == node) {
+        for (size_t i = 0lu; i < graph.m_output_nodes.size(); i++) {
+            if (graph.m_output_nodes[i] == node) {
                 is_output = true;
-                output_index = kvp.first;
+                output_index = i;
                 break;
             }
         }
@@ -238,7 +238,7 @@ std::shared_ptr<ov::Model> dump_graph_as_ie_ngraph_net(const Graph& graph) {
         holder->add_control_dependency(node);
     }
 
-    return std::make_shared<ov::Model>(results, params, graph._name);
+    return std::make_shared<ov::Model>(results, params, graph.m_name);
 }
 
 #ifdef CPU_DEBUG_CAPS

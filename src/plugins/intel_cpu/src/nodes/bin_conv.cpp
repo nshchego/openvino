@@ -44,7 +44,7 @@
 #include "openvino/op/binary_convolution.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 // WA for xbyak.h
 #ifdef _WIN32
@@ -1016,6 +1016,11 @@ BinaryConvolution::BinaryConvolution(const std::shared_ptr<ov::Node>& op, const 
     }
 }
 
+BinaryConvolution::BinaryConvolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void BinaryConvolution::getSupportedDescriptors() {
     withBinarization = isFusedWith(Type::FakeQuantize);
     withSum = false;
@@ -1464,6 +1469,13 @@ void BinaryConvolution::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool BinaryConvolution::created() const {
     return getType() == Type::BinaryConvolution;
+}
+
+void BinaryConvolution::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void BinaryConvolution::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

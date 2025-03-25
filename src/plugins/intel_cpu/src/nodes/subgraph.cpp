@@ -74,7 +74,10 @@
 #include <utility>
 #include <vector>
 
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #ifdef SNIPPETS_LIBXSMM_TPP
 #    include "snippets/lowered/pass/optimize_domain.hpp"
@@ -203,6 +206,24 @@ Subgraph::Subgraph(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr
     is_dynamic = isDynamicNgraphNode(op);
 }
 
+Subgraph::Subgraph(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context),
+      host_isa(getHostIsa()),
+      subgraph_attrs(std::make_shared<SubgraphAttrs>()) {
+    load(in_buf);
+
+#if defined(OPENVINO_ARCH_ARM64)
+    subgraph_attrs->snippet->set_generator(
+        std::make_shared<aarch64::CPUGenerator>(host_isa, context->getParamsCache()));
+#elif defined(OPENVINO_ARCH_X86_64)
+    subgraph_attrs->snippet->set_generator(std::make_shared<CPUGenerator>(host_isa, context->getParamsCache()));
+#else
+    THROW_CPU_NODE_ERR("Subgraphs code-generator is not supported on non-x64 platforms");
+#endif
+
+    // shapeInference = SnippetShapeInferFactory(subgraph_attrs->snippet).makeShapeInfer();
+}
+
 uint64_t Subgraph::getBodyHash(const std::shared_ptr<snippets::op::Subgraph>& snippet) {
     uint64_t seed = 0;
     ov::snippets::pass::Hash hash_function(seed);
@@ -219,15 +240,15 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
         {ov::element::f32, ov::element::i32, ov::element::bf16, ov::element::f16, ov::element::i8, ov::element::u8};
 
     bool dimRanksAreEqual = true;
-    for (size_t i = 0; dimRanksAreEqual && i < inputShapes.size(); i++) {
-        for (size_t j = 0; dimRanksAreEqual && j < outputShapes.size(); j++) {
-            if (inputShapes[i].getRank() != outputShapes[j].getRank()) {
+    for (size_t i = 0; dimRanksAreEqual && i < m_input_shapes.size(); i++) {
+        for (size_t j = 0; dimRanksAreEqual && j < m_output_shapes.size(); j++) {
+            if (m_input_shapes[i].getRank() != m_output_shapes[j].getRank()) {
                 dimRanksAreEqual = false;
             }
         }
     }
 
-    const size_t ndims = outputShapes[0].getRank();
+    const size_t ndims = m_output_shapes[0].getRank();
     // Domain sensitive operations and dynamic Subgraphs support only Planar layout
     const bool isOnlyPlanarApplicable = subgraph_attrs->snippet->has_domain_sensitive_ops();
     const bool isChannelsFirstApplicable = dnnl::impl::utils::one_of(ndims, 1U, 2U, 3U, 4U, 5U) && dimRanksAreEqual &&
@@ -241,7 +262,7 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
     bool isBlockedApplicable =
         dnnl::impl::utils::one_of(ndims, 3U, 4U, 5U) && dimRanksAreEqual && !isOnlyPlanarApplicable && !isDynamic;
 
-    for (const auto& inShape : inputShapes) {
+    for (const auto& inShape : m_input_shapes) {
         if (isDynamic && inShape.getRank() != 1) {
             isBlockedApplicable =
                 isBlockedApplicable && inShape.getMinDims()[1] != Shape::UNDEFINED_DIM && inShape.getMinDims()[1] > 1;
@@ -297,14 +318,14 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
 
         size_t offset = 0;
         NodeConfig config;
-        config.inConfs.resize(inputShapes.size());
-        for (size_t i = 0; i < inputShapes.size(); i++) {
+        config.inConfs.resize(m_input_shapes.size());
+        for (size_t i = 0; i < m_input_shapes.size(); i++) {
             const auto originalInputPrecision = getOriginalInputPrecisionAtPort(i);
             const auto precision =
                 ((originalInputPrecision == ov::element::f32) &&
-                 one_of(context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
+                 one_of(m_context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
                  subgraph_attrs->snippet->has_domain_sensitive_ops())
-                    ? context->getConfig().inferencePrecision
+                    ? m_context->getConfig().inferencePrecision
                     : originalInputPrecision;
             if (supportedPrecisions.count(precision) == 0) {
                 THROW_CPU_NODE_ERR("doesn't support ", precision, " precision.");
@@ -317,14 +338,14 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
             PortConfig portConfig;
             portConfig.inPlace((!i && canBeInPlace() && equalPrecisions) ? 0 : -1);
             portConfig.constant(false);
-            if (inputShapes[i].getDims()[0] == 1) {
+            if (m_input_shapes[i].getDims()[0] == 1) {
                 inputMask.reset(0);  // accepts any stride on batch axis
             }
-            portConfig.setMemDesc(createMemoryDesc(inputShapes[i], precision, offset), inputMask);
+            portConfig.setMemDesc(createMemoryDesc(m_input_shapes[i], precision, offset), inputMask);
             config.inConfs[i] = portConfig;
         }
-        config.outConfs.resize(outputShapes.size());
-        for (size_t i = 0; i < outputShapes.size(); i++) {
+        config.outConfs.resize(m_output_shapes.size());
+        for (size_t i = 0; i < m_output_shapes.size(); i++) {
             auto precision = getOriginalOutputPrecisionAtPort(i);
             if (supportedPrecisions.count(precision) == 0) {
                 THROW_CPU_NODE_ERR("doesn't support ", precision, " precision.");
@@ -334,10 +355,10 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
             PortConfig portConfig;
             portConfig.inPlace(-1);
             portConfig.constant(false);
-            if (outputShapes[i].getDims()[0] == 1) {
+            if (m_output_shapes[i].getDims()[0] == 1) {
                 outputMask.reset(0);  // accepts any stride on batch axis
             }
-            portConfig.setMemDesc(createMemoryDesc(outputShapes[i], precision, offset), outputMask);
+            portConfig.setMemDesc(createMemoryDesc(m_output_shapes[i], precision, offset), outputMask);
             config.outConfs[i] = portConfig;
         }
 
@@ -385,17 +406,22 @@ ov::element::Type Subgraph::getRuntimePrecision() const {
 
 void Subgraph::createPrimitive() {
     if (!hasEmptyInputTensors()) {
-        const auto config = getSelectedPrimitiveDescriptor()->getConfig();
-        input_num = config.inConfs.size();
-        output_num = config.outConfs.size();
+        if (!m_model_from_cache) {
+            const auto config = getSelectedPrimitiveDescriptor()->getConfig();
+            input_num = config.inConfs.size();
+            output_num = config.outConfs.size();
 
-        initMemoryPtrs();
-        initPluginBlockedShapes();
-        initAttributes();
-        optimizeIR();
-        prepareWeights();
-        // Init starts offsets should be after `prepareWeights`
-        initStartOffsets();
+            initMemoryPtrs();
+            initPluginBlockedShapes();
+            initAttributes();
+            optimizeIR();
+            prepareWeights();
+            // Init starts offsets should be after `prepareWeights`
+            initStartOffsets();
+        } else {
+            initMemoryPtrs();
+            prepareWeights();
+        }
     }
 
     Node::createPrimitive();
@@ -518,7 +544,7 @@ Subgraph::DataFlowPasses Subgraph::getDataFlowPasses() {
                                            ov::snippets::pass::AnalyzeBroadcastableInputs,
                                            broadcastable_inputs);
 
-    if (one_of(context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
+    if (one_of(m_context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
         subgraph_attrs->snippet->has_domain_sensitive_ops()) {
         // enforce BF16 precisions to supported operations
         // MatMul has to be decomposed to Brgemm operations before enforcement
@@ -535,7 +561,7 @@ Subgraph::DataFlowPasses Subgraph::getDataFlowPasses() {
                                                ov::snippets::pass::MatMulToBrgemm,
                                                pass::EnforcePrecision,
                                                element::f32,
-                                               context->getConfig().inferencePrecision);
+                                               m_context->getConfig().inferencePrecision);
     }
 
     SNIPPETS_REGISTER_PASS_RELATIVE_X86_64(Place::Before,
@@ -637,7 +663,7 @@ Subgraph::ControlFlowPasses Subgraph::getControlFlowPasses() {
                                            ov::intel_cpu::pass::InsertBrgemmCopyBuffers);
     SNIPPETS_REGISTER_PASS_ABSOLUTE_X86_64(Place::PipelineEnd,
                                            ov::intel_cpu::pass::InitRepackedConstantInputs,
-                                           context->getParamsCache(),
+                                           m_context->getParamsCache(),
                                            repacked_constant_input_config);
 
 #ifdef SNIPPETS_LIBXSMM_TPP
@@ -739,7 +765,7 @@ void Subgraph::prepareWeights() {
     }
 
 #if defined(OPENVINO_ARCH_X86_64)
-    srcMemPtrs = SubgraphExecutor::prepare_weights(srcMemPtrs, repacked_constant_input_config, context);
+    srcMemPtrs = SubgraphExecutor::prepare_weights(srcMemPtrs, repacked_constant_input_config, m_context);
 #else
     OPENVINO_THROW("Weight repacking is unimplemented on this platform");
 #endif
@@ -747,7 +773,7 @@ void Subgraph::prepareWeights() {
 
 void Subgraph::prepareParams() {
 #if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
-    const auto& cache = context->getParamsCache();
+    const auto& cache = m_context->getParamsCache();
 
     auto builder = [this, &cache](const SubgraphKey& key) -> std::shared_ptr<SubgraphBaseExecutor> {
         const auto& snippet = subgraph_attrs->snippet;
@@ -826,7 +852,7 @@ IShapeInfer::Result Subgraph::shapeInfer() const {
         return std::make_shared<SubgraphShapeInferResult>(Node::shapeInfer());
     };
 
-    const auto cache = context->getParamsCache();
+    const auto cache = m_context->getParamsCache();
     const auto result = cache->getOrCreate(SubgraphShapeInferResultKey(in_shapes, subgraph_attrs->bodyHash), builder);
     return result.first->result;
 }
@@ -869,6 +895,59 @@ void Subgraph::execute(const dnnl::stream& strm) {
 
 void Subgraph::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
+}
+
+void Subgraph::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    // ob << host_isa;
+    ob << subgraph_attrs->bodyHash;
+    ob << subgraph_attrs->inMemOrders;
+    ob << subgraph_attrs->outMemOrders;
+    ob << subgraph_attrs->inMemPrecs;
+    ob << subgraph_attrs->outMemPrecs;
+
+    ob << subgraph_attrs->snippet->is_quantized();
+    ob << subgraph_attrs->snippet->has_domain_sensitive_ops();
+    ob << bool(false);
+
+    ob << broadcastable_inputs;
+    ob << input_num;
+    ob << output_num;
+    // ob << srcMemPtrs;
+    // ob << dstMemPtrs;
+    ob << start_offset_in;
+    ob << start_offset_out;
+    // ob << repacked_constant_input_config;
+    ob << is_dynamic;
+    ob << in_shapes;
+}
+
+void Subgraph::load(BinaryInputBuffer& ib) {
+    // ib >> host_isa;
+    ib >> subgraph_attrs->bodyHash;
+    ib >> subgraph_attrs->inMemOrders;
+    ib >> subgraph_attrs->outMemOrders;
+    ib >> subgraph_attrs->inMemPrecs;
+    ib >> subgraph_attrs->outMemPrecs;
+    
+    bool is_quantized, has_domain_sensitive_ops, has_broadcast_sensitive_ops;
+    ib >> is_quantized;
+    ib >> has_domain_sensitive_ops;
+    ib >> has_broadcast_sensitive_ops;
+    subgraph_attrs->snippet = std::make_shared<snippets::op::Subgraph>();
+    subgraph_attrs->snippet->init_config(is_quantized, has_domain_sensitive_ops, has_broadcast_sensitive_ops);
+
+    ib >> broadcastable_inputs;
+    ib >> input_num;
+    ib >> output_num;
+    // ib >> srcMemPtrs;
+    // ib >> dstMemPtrs;
+    ib >> start_offset_in;
+    ib >> start_offset_out;
+    // ib >> repacked_constant_input_config;
+    ib >> is_dynamic;
+    ib >> in_shapes;
 }
 
 }  // namespace ov::intel_cpu::node

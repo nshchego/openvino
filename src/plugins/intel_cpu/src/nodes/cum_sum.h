@@ -24,6 +24,8 @@ class CumSum : public Node {
 public:
     CumSum(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    CumSum(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override{};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;

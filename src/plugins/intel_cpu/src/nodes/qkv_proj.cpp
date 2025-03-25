@@ -335,9 +335,9 @@ void QKVProjection::createPrimitive() {
     auto rtPrecision = getInputPrecisions()[0];
 #ifdef OPENVINO_ARCH_X86_64
     if (rtPrecision == ov::element::bf16) {
-        m_executor = std::make_shared<Executor<ov::bfloat16>>(this, context->getScratchPad());
+        m_executor = std::make_shared<Executor<ov::bfloat16>>(this, m_context->getScratchPad());
     } else if (rtPrecision == ov::element::f16) {
-        m_executor = std::make_shared<Executor<ov::float16>>(this, context->getScratchPad());
+        m_executor = std::make_shared<Executor<ov::float16>>(this, m_context->getScratchPad());
     }
 #endif
     if (!m_executor) {

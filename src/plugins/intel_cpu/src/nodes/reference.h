@@ -22,6 +22,8 @@ class Reference : public Node {
 public:
     Reference(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, std::string errorMessage);
 
+    Reference(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context, std::string error_message);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;
@@ -40,12 +42,16 @@ public:
     }
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     ov::TensorVector prepareInputs() const;
     ov::TensorVector prepareOutputs() const;
 
 private:
-    const std::shared_ptr<ov::Node> ovCoreNode;
+    const std::shared_ptr<ov::Node> m_ov_node;
     const std::string additionalErrorMessage;
     bool hasOutputShapeDataDependency = false;  // flag to cache the output shape data dependency check result
 };

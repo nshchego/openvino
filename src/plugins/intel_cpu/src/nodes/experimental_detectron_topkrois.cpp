@@ -54,7 +54,7 @@ ExperimentalDetectronTopKROIs::ExperimentalDetectronTopKROIs(const std::shared_p
         THROW_CPU_NODE_ERR("is not an instance of ExperimentalDetectronTopKROIs from opset6.");
     }
 
-    if (inputShapes.size() != 2 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 2 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input/output edges!");
     }
 
@@ -63,6 +63,11 @@ ExperimentalDetectronTopKROIs::ExperimentalDetectronTopKROIs(const std::shared_p
     }
 
     max_rois_num_ = topKROI->get_max_rois();
+}
+
+ExperimentalDetectronTopKROIs::ExperimentalDetectronTopKROIs(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void ExperimentalDetectronTopKROIs::initSupportedPrimitiveDescriptors() {

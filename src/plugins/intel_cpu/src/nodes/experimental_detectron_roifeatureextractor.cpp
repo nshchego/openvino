@@ -319,14 +319,19 @@ ExperimentalDetectronROIFeatureExtractor::ExperimentalDetectronROIFeatureExtract
     pooled_width_ = output_dim_;
 }
 
+ExperimentalDetectronROIFeatureExtractor::ExperimentalDetectronROIFeatureExtractor(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronROIFeatureExtractor::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
     }
 
     std::vector<PortConfigurator> inDataConf;
-    inDataConf.reserve(inputShapes.size());
-    for (size_t i = 0; i < inputShapes.size(); ++i) {
+    inDataConf.reserve(m_input_shapes.size());
+    for (size_t i = 0; i < m_input_shapes.size(); ++i) {
         inDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
     }
 
@@ -336,7 +341,7 @@ void ExperimentalDetectronROIFeatureExtractor::initSupportedPrimitiveDescriptors
 }
 
 void ExperimentalDetectronROIFeatureExtractor::execute([[maybe_unused]] const dnnl::stream& strm) {
-    const int levels_num = inputShapes.size() - INPUT_FEATURES_START;
+    const int levels_num = m_input_shapes.size() - INPUT_FEATURES_START;
     const int num_rois = getParentEdgeAt(INPUT_ROIS)->getMemory().getStaticDims()[0];
     const int channels_num = getParentEdgeAt(INPUT_FEATURES_START)->getMemory().getStaticDims()[1];
     const int feaxels_per_roi = pooled_height_ * pooled_width_ * channels_num;
@@ -344,7 +349,7 @@ void ExperimentalDetectronROIFeatureExtractor::execute([[maybe_unused]] const dn
     const auto* input_rois = getSrcDataAtPortAs<const float>(INPUT_ROIS);
     auto* output_rois_features = getDstDataAtPortAs<float>(OUTPUT_ROI_FEATURES);
     float* output_rois = nullptr;
-    if (OUTPUT_ROIS < outputShapes.size()) {
+    if (OUTPUT_ROIS < m_output_shapes.size()) {
         output_rois = getDstDataAtPortAs<float>(OUTPUT_ROIS);
     }
 

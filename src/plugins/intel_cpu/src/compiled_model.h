@@ -48,6 +48,12 @@ public:
                   const bool loaded_from_cache,
                   std::shared_ptr<SubMemoryManager> sub_memory_manager = nullptr);
 
+    CompiledModel(BinaryInputBuffer& ib,
+                  const std::shared_ptr<const ov::IPlugin>& plugin,
+                  //const RemoteContextImpl::Ptr& context,
+                  const Config& config,
+                  const bool loaded_from_cache);
+
     ~CompiledModel();
 
     std::shared_ptr<ov::IAsyncInferRequest> create_infer_request() const override;
@@ -69,14 +75,25 @@ public:
         return m_name;
     }
 
+    const std::vector<ov::Output<const ov::Node>>& inputs() const override {
+        return m_inputs;
+    }
+
+    const std::vector<ov::Output<const ov::Node>>& outputs() const override {
+        return m_outputs;
+    }
+
 private:
     std::shared_ptr<ov::ISyncInferRequest> create_sync_infer_request() const override;
     friend class CompiledModelHolder;
 
     const std::shared_ptr<ov::Model> m_model;
+    BinaryInputBuffer* m_model_buffer;
     const std::shared_ptr<const ov::IPlugin> m_plugin;
     std::shared_ptr<ov::threading::ITaskExecutor> m_task_executor = nullptr;      //!< Holds a task executor
     std::shared_ptr<ov::threading::ITaskExecutor> m_callback_executor = nullptr;  //!< Holds a callback executor
+    std::vector<ov::Output<const ov::Node>> m_inputs;
+    std::vector<ov::Output<const ov::Node>> m_outputs;
 
     // Generic synchronization primitive on CompiledModel level.
     // Usage example: helps to avoid data races during CPU Graph initialization in multi-streams scenario
@@ -103,6 +120,9 @@ private:
     std::vector<std::shared_ptr<CompiledModel>> m_sub_compiled_models;
     std::shared_ptr<SubMemoryManager> m_sub_memory_manager = nullptr;
     bool m_has_sub_compiled_models = false;
+
+    bool m_is_function_quantized = false;
+
     bool m_optimized_single_stream = false;
 };
 

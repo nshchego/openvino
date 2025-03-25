@@ -190,7 +190,7 @@ void PagedAttention::createPrimitive() {
         // Since we are quantize only last dim it's safe to use the last dim of KV.
         auto kCachePrecision = getOriginalInputPrecisionAtPort(PagedAttentionExecutor::ID_KCACHE);
         auto vCachePrecision = getOriginalInputPrecisionAtPort(PagedAttentionExecutor::ID_VCACHE);
-        const auto& cpuConfig = context->getConfig();
+        const auto& cpuConfig = m_context->getConfig();
 
         bool quantKeybyChannel = isQuantByChannel(cpuConfig.keyCacheQuantMode, cpuConfig.keyCachePrecision, true);
         bool quantValuebyChannel =
@@ -207,7 +207,7 @@ void PagedAttention::createPrimitive() {
 #endif
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
     if (!result.first) {
         THROW_CPU_NODE_ERR("AttentionExecutor creation fails with precision " + rtPrecision.to_string());

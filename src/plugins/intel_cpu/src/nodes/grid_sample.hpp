@@ -23,6 +23,9 @@ namespace ov::intel_cpu::node {
 class GridSample : public Node {
 public:
     GridSample(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    GridSample(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void getSupportedDescriptors() override{};

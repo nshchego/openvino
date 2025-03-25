@@ -60,6 +60,12 @@ EmbeddingSegmentsSum::EmbeddingSegmentsSum(const std::shared_ptr<ov::Node>& op, 
     }
 }
 
+EmbeddingSegmentsSum::EmbeddingSegmentsSum(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context),
+      EmbeddingBag(in_buf) {
+    load(in_buf);
+}
+
 void EmbeddingSegmentsSum::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -92,10 +98,10 @@ void EmbeddingSegmentsSum::initSupportedPrimitiveDescriptors() {
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32}});
-    if (inputShapes.size() > DEFAULT_INDEX_IDX) {
+    if (m_input_shapes.size() > DEFAULT_INDEX_IDX) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
-    if (inputShapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
+    if (m_input_shapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, inDataPrecision);
     }
 

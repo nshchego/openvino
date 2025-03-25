@@ -672,6 +672,16 @@ NodePtr Edge::modifiedInPlace() const {
     return nullptr;
 }
 
+void Edge::save(BinaryOutputBuffer& ob) const {
+    // bool useExternalMemory = false;
+    // EdgeWeakPtr memoryFromEdge;
+    // MemoryPtr memoryPtr;
+    // Status status = Status::Uninitialized;
+}
+
+void Edge::load(BinaryInputBuffer& ib) {
+}
+
 std::ostream& operator<<(std::ostream& os, const Edge& edge) {
     return os << "(" << edge.getParent()->getName() << ")"
               << "[" << edge.getInputNum() << "] "

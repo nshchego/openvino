@@ -5,7 +5,7 @@
 #pragma once
 
 #include "cpu_memory.h"
-#include "memory_desc/cpu_memory_desc.h"
+// #include "memory_desc/cpu_memory_desc.h"
 #include "unordered_map"
 
 namespace ov::intel_cpu {

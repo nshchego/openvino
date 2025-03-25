@@ -94,6 +94,11 @@ Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     this->axis = axis;
 }
 
+Concat::Concat(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Concat::getSupportedDescriptors() {
     const auto& firstParentDims = getInputShapeAtPort(0).getDims();
     for (size_t i = 1; i < getParentEdges().size(); i++) {
@@ -116,7 +121,7 @@ void Concat::getSupportedDescriptors() {
     // we need the first dims before axis to be 1 to avoid the reorder in the edge between the first parent and this
     // concat
 
-    const auto& childDims = outputShapes[0].getDims();
+    const auto& childDims = m_output_shapes[0].getDims();
     if (childDims[axis] != Shape::UNDEFINED_DIM &&
         std::all_of(childDims.begin(), childDims.begin() + axis, [](size_t dim) {
             return dim == 1;
@@ -133,7 +138,7 @@ void Concat::initSupportedPrimitiveDescriptors() {
     const auto& originInputPrecisions = getOriginalInputPrecisions();
     inputPrecision = originInputPrecisions[0];
     bool isMixedPrecision = false;
-    for (size_t i = 1; i < inputShapes.size(); i++) {
+    for (size_t i = 1; i < m_input_shapes.size(); i++) {
         if (originInputPrecisions[0] != originInputPrecisions[i]) {
             isMixedPrecision = true;
             break;
@@ -202,7 +207,7 @@ void Concat::initSupportedPrimitiveDescriptors() {
         } else if (canBeInPlace) {
             // canBeInPlace means all dims before axis are 1, so for nspc layout we only need check sp dimensions in
             // axis=1 cases here
-            const auto& childDims = outputShapes[0].getDims();
+            const auto& childDims = m_output_shapes[0].getDims();
             if (axis != 1 || std::all_of(childDims.crbegin(), childDims.crend() - 2, [](const Dim dim) {
                     return 1 == dim;
                 })) {
@@ -218,7 +223,7 @@ void Concat::initSupportedPrimitiveDescriptors() {
         }
     }
 
-    if (!canBeInPlace || std::any_of(inputShapes.begin(), inputShapes.end(), [](const Shape& shape) {
+    if (!canBeInPlace || std::any_of(m_input_shapes.begin(), m_input_shapes.end(), [](const Shape& shape) {
             return shape.hasZeroDims();
         })) {
         return;
@@ -304,7 +309,7 @@ void Concat::selectOptimalPrimitiveDescriptor() {
             maxCount = it.second;
             convertTo = it.first;
         } else if (it.second == maxCount) {
-            if ((context->isGraphQuantized() && it.first == LayoutType::nspc) || it.first == LayoutType::nCsp8c ||
+            if ((m_context->isGraphQuantized() && it.first == LayoutType::nspc) || it.first == LayoutType::nCsp8c ||
                 it.first == LayoutType::nCsp16c) {
                 convertTo = it.first;
             }
@@ -746,7 +751,7 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
     const auto& config = selected_pd->getConfig();
     size_t numberOfInputs = config.inConfs.size();
     size_t inplaceOutIndx = selected_pd->getConfig().inConfs[0].inPlace();
-    auto baseDim = outputShapes.front().getDims()[axis];
+    auto baseDim = m_output_shapes.front().getDims()[axis];
     CPU_NODE_ASSERT(baseDim != Shape::UNDEFINED_DIM,
                     "can't use inPlace memory with concatenation on dynamic dimension");
 
@@ -761,7 +766,7 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
 
     ptrdiff_t offset = 0;
     for (size_t i = 0; i < numberOfInputs; ++i) {
-        auto partDim = inputShapes[i].getDims()[axis];
+        auto partDim = m_input_shapes[i].getDims()[axis];
         CPU_NODE_ASSERT(partDim != Shape::UNDEFINED_DIM,
                         "can't use inPlace memory with concatenation on dynamic dimension");
 

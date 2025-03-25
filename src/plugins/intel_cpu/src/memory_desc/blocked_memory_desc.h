@@ -84,6 +84,10 @@ public:
 
     std::string serializeFormat() const override;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 protected:
     /**
      * @brief Check descs on compatibility
@@ -97,7 +101,7 @@ protected:
     mutable VectorDims blockedDims;
     mutable VectorDims strides;
     mutable VectorDims order;
-    mutable VectorDims offsetPaddingToData;
+    mutable VectorDims m_offset_padding_to_data;
 };
 
 using BlockedMemoryDescPtr = std::shared_ptr<BlockedMemoryDesc>;

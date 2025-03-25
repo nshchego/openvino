@@ -280,14 +280,19 @@ ExperimentalDetectronDetectionOutput::ExperimentalDetectronDetectionOutput(const
     deltas_weights_ = attributes.deltas_weights;
 }
 
+ExperimentalDetectronDetectionOutput::ExperimentalDetectronDetectionOutput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronDetectionOutput::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
     }
 
     std::vector<PortConfigurator> inDataConf;
-    inDataConf.reserve(inputShapes.size());
-    for (size_t i = 0; i < inputShapes.size(); ++i) {
+    inDataConf.reserve(m_input_shapes.size());
+    for (size_t i = 0; i < m_input_shapes.size(); ++i) {
         inDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
     }
 

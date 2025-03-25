@@ -36,18 +36,20 @@
 #include "shape_inference/custom/transpose.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 using namespace dnnl;
 
 namespace ov::intel_cpu::node {
 
 bool Transpose::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(), ov::op::v1::Transpose::get_type_info_static())) {
+        if (!one_of(op->get_type_info(), op::v1::Transpose::get_type_info_static())) {
             errorMessage = "Node is not an instance of the Transpose operation from opset1.";
             return false;
         }
 
-        if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() != ov::op::v0::Constant::get_type_info_static()) {
+        if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() != op::v0::Constant::get_type_info_static()) {
             // TODO: Support parameterized Order input for dynamic shapes.
             errorMessage = "Constant expected as the second input for static shapes.";
             return false;
@@ -65,9 +67,9 @@ Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() == ov::op::v0::Constant::get_type_info_static()) {
+    if (op->get_input_node_ptr(INPUT_ORDER_IDX)->get_type_info() == op::v0::Constant::get_type_info_static()) {
         isInputOrderConst = true;
-        order = ov::as_type<ov::op::v0::Constant>(op->get_input_node_ptr(INPUT_ORDER_IDX))->cast_vector<size_t>();
+        order = ov::as_type<op::v0::Constant>(op->get_input_node_ptr(INPUT_ORDER_IDX))->cast_vector<size_t>();
 
         if (order.empty()) {
             size_t rank = getInputShapeAtPort(INPUT_DATA_IDX).getRank();
@@ -78,7 +80,10 @@ Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     }
 }
 
-void Transpose::getSupportedDescriptors() {}
+Transpose::Transpose(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
 
 void Transpose::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
@@ -99,7 +104,7 @@ void Transpose::initSupportedPrimitiveDescriptors() {
         creatorsMap.at(LayoutType::ncsp)->createSharedDesc(ov::element::i32, getInputShapeAtPort(INPUT_ORDER_IDX)));
     config.outConfs[0].inPlace(isOptimized ? 0 : -1);
     config.outConfs[0].constant(false);
-    transpose_context = std::make_shared<ExecutorContext>(context, getImplPriority());
+    transpose_context = std::make_shared<ExecutorContext>(m_context, getImplPriority());
 
     auto supportedPrimitiveDescriptorsBuilder = [this](const NodeConfig& config,
                                                        const TransposeParams& transposeParams) {
@@ -176,7 +181,7 @@ void Transpose::prepareParams() {
         auto dstMemPtr = getDstMemoryAtPort(0);
         auto dstDesc = dstMemPtr->getDescWithType<DnnlMemoryDesc>()->getDnnlDesc();
         auto srcDesc = dnnl::memory::desc(dstDesc.get_dims(), dstDesc.get_data_type(), memory::format_tag::acdb);
-        auto result = getReorderPrim(context->getParamsCache(), getEngine(), srcDesc, dstDesc);
+        auto result = getReorderPrim(m_context->getParamsCache(), getEngine(), srcDesc, dstDesc);
         if (!result) {
             THROW_CPU_NODE_ERR("reorder primitive descriptor was not found.");
         }
@@ -218,7 +223,7 @@ void Transpose::prepareParams() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(transposeParams.permuteParams, builder);
 
     if (!result.first) {
@@ -299,6 +304,28 @@ void Transpose::executeDynamicImpl(const dnnl::stream& strm) {
 
 bool Transpose::created() const {
     return getType() == Type::Transpose;
+}
+
+void Transpose::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    // ob << prim;
+    ob << order;
+    ob << prec;
+    ob << transposeParams;
+    ob << isInputOrderConst;
+    ob << performAsReorder;
+    ob << isOptimized;
+}
+
+void Transpose::load(BinaryInputBuffer& ib) {
+    // ib >> prim;
+    ib >> order;
+    ib >> prec;
+    ib >> transposeParams;
+    ib >> isInputOrderConst;
+    ib >> performAsReorder;
+    ib >> isOptimized;
 }
 
 }  // namespace ov::intel_cpu::node

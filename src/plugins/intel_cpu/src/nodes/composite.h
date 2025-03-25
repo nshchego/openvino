@@ -27,6 +27,8 @@ public:
 
     Composite(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Composite(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     bool created() const override {
         return getType() == Type::SubModel;
     }

@@ -22,6 +22,7 @@
 #include "graph_context.h"
 #include "itt.h"
 #include "node.h"
+#include "nodes_factory.hpp"
 #include "openvino/core/except.hpp"
 #include "openvino/core/model.hpp"
 #include "openvino/core/node.hpp"
@@ -49,8 +50,9 @@
 #include "utils/codec_xor.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/denormals.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
-#include "utils/serialize.hpp"
+#include "utils/serialization/internal_types.hpp"
 #include "weights_cache.hpp"
 
 using namespace ov::threading;
@@ -158,19 +160,19 @@ void Plugin::calculate_streams(Config& conf, const std::shared_ptr<ov::Model>& m
     }
 }
 
-static Config::ModelType getModelType(const std::shared_ptr<const Model>& model) {
-    if (op::util::has_op_with_type<op::v1::Convolution>(model) ||
-        op::util::has_op_with_type<op::v1::ConvolutionBackpropData>(model)) {
-        return Config::ModelType::CNN;
-    }
+// static Config::ModelType getModelType(const std::shared_ptr<const Model>& model) {
+//     if (op::util::has_op_with_type<op::v1::Convolution>(model) ||
+//         op::util::has_op_with_type<op::v1::ConvolutionBackpropData>(model)) {
+//         return Config::ModelType::CNN;
+//     }
 
-    if ((op::util::has_op_with_type<op::v13::ScaledDotProductAttention>(model) && !model->get_variables().empty()) ||
-        op::util::has_op_with_type<ov::op::PagedAttentionExtension>(model)) {
-        return Config::ModelType::LLM;
-    }
+    // if ((op::util::has_op_with_type<op::v13::ScaledDotProductAttention>(model) && !model->get_variables().empty()) ||
+    //     op::util::has_op_with_type<ov::op::PagedAttentionExtension>(model)) {
+    //     return Config::ModelType::LLM;
+    // }
 
-    return Config::ModelType::Unknown;
-}
+//     return Config::ModelType::Unknown;
+// }
 
 std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<const ov::Model>& model,
                                                           const ov::AnyMap& orig_config) const {
@@ -541,7 +543,7 @@ ov::SupportedOpsMap Plugin::query_model(const std::shared_ptr<const ov::Model>& 
         [&](const std::shared_ptr<ov::Node>& op) {
             std::unique_ptr<Node> ptr;
             try {
-                ptr.reset(Node::factory().create(op, context));
+                ptr.reset(NodesFactory<const std::shared_ptr<ov::Node>&>::factory().create(op, context));
             } catch (const ov::Exception&) {
                 return false;
             }
@@ -560,50 +562,55 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "import_model");
 
     CacheDecrypt decrypt{codec_xor};
-    bool decript_from_string = false;
+    // bool decript_from_string = false;
     if (auto it = config.find(ov::cache_encryption_callbacks.name()); it != config.end()) {
         const auto& encryption_callbacks = it->second.as<EncryptionCallbacks>();
         decrypt.m_decrypt_str = encryption_callbacks.decrypt;
-        decript_from_string = true;
+        // decript_from_string = true;
     }
 
-    auto _config = config;
+    auto new_config = config;
     std::shared_ptr<ov::AlignedBuffer> model_buffer;
-    if (auto blob_it = _config.find(ov::hint::compiled_blob.name()); blob_it != _config.end()) {
+    if (auto blob_it = new_config.find(ov::hint::compiled_blob.name()); blob_it != new_config.end()) {
         auto compiled_blob = blob_it->second.as<ov::Tensor>();
         model_buffer = std::make_shared<ov::SharedBuffer<ov::Tensor>>(reinterpret_cast<char*>(compiled_blob.data()),
                                                                       compiled_blob.get_byte_size(),
                                                                       compiled_blob);
-        _config.erase(blob_it);
+        new_config.erase(blob_it);
     }
 
-    ModelDeserializer deserializer(
-        model_stream,
-        model_buffer,
-        [this](const std::shared_ptr<ov::AlignedBuffer>& model, const std::shared_ptr<ov::AlignedBuffer>& weights) {
-            return get_core()->read_model(model, weights);
-        },
-        decrypt,
-        decript_from_string);
+    // ModelDeserializer deserializer(
+    //     model_stream,
+    //     model_buffer,
+    //     [this](const std::shared_ptr<ov::AlignedBuffer>& model, const std::shared_ptr<ov::AlignedBuffer>& weights) {
+    //         return get_core()->read_model(model, weights);
+    //     },
+    //     decrypt,
+    //     decript_from_string);
 
-    std::shared_ptr<ov::Model> model;
-    deserializer >> model;
+    // std::shared_ptr<ov::Model> model;
+    // deserializer >> model;
+    std::shared_ptr<BinaryInputBuffer> ib_ptr = std::make_shared<BinaryInputBuffer>(model_stream);
+        // encryption_enabled ? std::make_unique<EncryptedBinaryInputBuffer>(model,
+        //                                                                          context_impl->get_engine(),
+        //                                                                          encryption_callbacks.decrypt)
+        //                    : std::make_unique<BinaryInputBuffer>(model, context_impl->get_engine());
+    auto& ib = *ib_ptr;
 
     Config conf = engConfig;
-    Config::ModelType modelType = getModelType(model);
-    conf.applyRtInfo(model);
+    Config::ModelType model_type;
+    ib >> model_type;
+    // conf.applyRtInfo(ib);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
-    const auto& it = _config.find(ov::loaded_from_cache.name());
+    const auto& it = new_config.find(ov::loaded_from_cache.name());
     bool loaded_from_cache = false;
-    if (it != _config.end()) {
+    if (it != new_config.end()) {
         loaded_from_cache = it->second.as<bool>();
-        _config.erase(it);
+        new_config.erase(it);
     }
-    conf.readProperties(_config, modelType);
+    conf.readProperties(new_config, model_type);
 
-    // import config props from caching model
-    calculate_streams(conf, model, true);
-    auto compiled_model = std::make_shared<CompiledModel>(model, shared_from_this(), conf, loaded_from_cache);
+    auto compiled_model = std::make_shared<CompiledModel>(ib, shared_from_this(), conf, loaded_from_cache);
     return compiled_model;
 }
 }  // namespace ov::intel_cpu

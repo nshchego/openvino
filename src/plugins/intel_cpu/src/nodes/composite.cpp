@@ -51,6 +51,11 @@ Composite::Composite(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     m_body = subModel->get_function();
 }
 
+Composite::Composite(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Composite::selectOptimalPrimitiveDescriptor() {
     // for the input configuration, just always use the parent configuration
     std::vector<PortConfig> inConfs;
@@ -64,10 +69,10 @@ void Composite::selectOptimalPrimitiveDescriptor() {
         graphInputConfig.emplace_back(node::Input::InputConfig{std::move(desc), isInPlace});
     }
 
-    std::vector<Input::OutputConfig> graphOutputConfig(outputShapes.size(), node::Input::OutputConfig{true, isInPlace});
+    std::vector<Input::OutputConfig> graphOutputConfig(m_output_shapes.size(), node::Input::OutputConfig{true, isInPlace});
 
     // configure the inner graph to get the information about output memory descriptors
-    m_graph.Init(m_body, context, graphInputConfig, graphOutputConfig);
+    m_graph.Init(m_body, m_context, graphInputConfig, graphOutputConfig);
 
     // for the output descriptors, use the configuration of the graph's output nodes
     auto outputDescriptors = m_graph.getOutputMemoryDescriptors();

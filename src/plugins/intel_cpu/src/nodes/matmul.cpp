@@ -694,7 +694,7 @@ void MatMul::prepareParams() {
         return std::make_shared<DnnlExecutorLegacy>(first_desc);
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
 
     execPtr = result.first;

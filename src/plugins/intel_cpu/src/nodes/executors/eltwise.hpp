@@ -50,6 +50,10 @@ struct EltwiseAttrs {
 
         return retVal;
     }
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 };
 
 enum class EltwisePostOpType { Undefined, Eltwise, Dnnl };

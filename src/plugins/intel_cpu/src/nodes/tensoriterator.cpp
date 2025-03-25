@@ -462,7 +462,7 @@ void TensorIterator::initSupportedPrimitiveDescriptors() {
     auto subgraphOp = ov::as_type_ptr<const ov::op::util::SubGraphOp>(ngraphOp);
     CPU_NODE_ASSERT(subgraphOp, "cannot be cast to ov::op::util::SubGraphOp");
 
-    sub_graph.Init(subgraphOp->get_function(), context);
+    sub_graph.Init(subgraphOp->get_function(), m_context);
 
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -747,10 +747,10 @@ void TensorIterator::prepareInputPorts() {
 
         if (map_rule.axis == -1) {
             first_mappers.emplace(std::make_pair(map_rule.from, map_rule.to),
-                                  std::make_shared<BackEdgePortHelper>(context->getParamsCache(), from_mem, to_mem));
+                                  std::make_shared<BackEdgePortHelper>(m_context->getParamsCache(), from_mem, to_mem));
         } else {
             before_mappers.emplace_back(
-                std::make_shared<PortIteratorHelper>(context->getParamsCache(), from_mem, to_mem, true, map_rule, eng));
+                std::make_shared<PortIteratorHelper>(m_context->getParamsCache(), from_mem, to_mem, true, map_rule, eng));
         }
     }
 }
@@ -763,9 +763,9 @@ void TensorIterator::prepareOutputPorts() {
 
         if (map_rule.axis == -1) {
             last_mappers.emplace_back(
-                std::make_shared<BackEdgePortHelper>(context->getParamsCache(), from_mem, to_mem));
+                std::make_shared<BackEdgePortHelper>(m_context->getParamsCache(), from_mem, to_mem));
         } else {
-            after_mappers.emplace_back(std::make_shared<PortIteratorHelper>(context->getParamsCache(),
+            after_mappers.emplace_back(std::make_shared<PortIteratorHelper>(m_context->getParamsCache(),
                                                                             from_mem,
                                                                             to_mem,
                                                                             false,
@@ -780,7 +780,7 @@ void TensorIterator::prepareBackEdges() {
         auto from_mem = output_mem[map_rule.from];
         auto to_mem = input_mems[map_rule.to].front();
 
-        before_mappers.emplace_back(std::make_shared<BackEdgePortHelper>(context->getParamsCache(), from_mem, to_mem));
+        before_mappers.emplace_back(std::make_shared<BackEdgePortHelper>(m_context->getParamsCache(), from_mem, to_mem));
     }
 }
 
@@ -794,7 +794,7 @@ void TensorIterator::prepareDynamicBackEdges() {
 
         // first memory is enough to get common memory ptr
         back_mappers.emplace_back(
-            std::make_shared<BackEdgePortHelper>(context->getParamsCache(), from_mem, to_mems.front()));
+            std::make_shared<BackEdgePortHelper>(m_context->getParamsCache(), from_mem, to_mems.front()));
     }
 }
 
@@ -889,7 +889,7 @@ void TensorIterator::reshapeAndFillOutput(const dnnl::stream& strm) {
             redefineToMemories(to_mems, desc);
 
             if (!newShape.isDynamic()) {
-                BackEdgePortHelper mapper(context->getParamsCache(), from_mem, to_mems.front());
+                BackEdgePortHelper mapper(m_context->getParamsCache(), from_mem, to_mems.front());
                 mapper.execute(strm, -1);
             }
         }
@@ -926,7 +926,7 @@ void TensorIterator::restoreSubgraphInputByBackEdges() {
             redefineToMemories(to_mems, desc);
 
             // update first_mappers to replace its legacy input memory addr.
-            input_map.second = std::make_shared<BackEdgePortHelper>(context->getParamsCache(), from_mem, to_mem);
+            input_map.second = std::make_shared<BackEdgePortHelper>(m_context->getParamsCache(), from_mem, to_mem);
         }
     }
 }
@@ -985,11 +985,11 @@ int TensorIterator::getNumIteration(const std::vector<PortMap>& inputPortMap,
     int numIterations = 1;
     bool isDefault = true;
     for (const auto& rule : inputPortMap) {
-        if (rule.from < 0 || rule.from >= static_cast<int64_t>(inputShapes.size())) {
+        if (rule.from < 0 || rule.from >= static_cast<int64_t>(m_input_shapes.size())) {
             THROW_CPU_NODE_ERR(": Invalid \"from\" value: \"from\" = ",
                                rule.from,
                                " inputs number = ",
-                               inputShapes.size(),
+                               m_input_shapes.size(),
                                " (out of range)");
         }
 
@@ -1020,11 +1020,11 @@ int TensorIterator::getNumIteration(const std::vector<PortMap>& inputPortMap,
             continue;
         }
 
-        if (rule.from < 0 || rule.from >= static_cast<int64_t>(outputShapes.size())) {
+        if (rule.from < 0 || rule.from >= static_cast<int64_t>(m_output_shapes.size())) {
             THROW_CPU_NODE_ERR(": Invalid \"from\" value: \"from\" = ",
                                rule.from,
                                " inputs number = ",
-                               outputShapes.size(),
+                               m_output_shapes.size(),
                                " (out of range)");
         }
 

@@ -22,6 +22,8 @@ class CausalMaskPreprocess : public Node {
 public:
     CausalMaskPreprocess(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    CausalMaskPreprocess(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override {}
     bool created() const override {
         return getType() == Type::CausalMaskPreprocess;
@@ -35,6 +37,10 @@ public:
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     struct Executor {

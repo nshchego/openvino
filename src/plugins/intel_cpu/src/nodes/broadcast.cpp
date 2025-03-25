@@ -27,7 +27,7 @@
 #include "openvino/op/util/attr_types.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -99,6 +99,11 @@ Broadcast::Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     }
 }
 
+Broadcast::Broadcast(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Broadcast::getSupportedDescriptors() {
     if (!isDynamicNode()) {
         const auto& srcDims = getInputShapeAtPort(INPUT_DATA_IDX).getDims();
@@ -122,7 +127,7 @@ void Broadcast::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
     }
-    supportedPrimitiveDescriptors = getSupportedConfigs(this, outputShapes.size());
+    supportedPrimitiveDescriptors = getSupportedConfigs(this, m_output_shapes.size());
 }
 
 bool Broadcast::needPrepareParams() const {
@@ -286,6 +291,13 @@ void Broadcast::plainExecute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool Broadcast::created() const {
     return getType() == Type::Broadcast;
+}
+
+void Broadcast::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void Broadcast::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

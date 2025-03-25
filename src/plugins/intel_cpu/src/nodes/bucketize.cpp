@@ -63,6 +63,11 @@ Bucketize::Bucketize(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     with_right = bucketsize->get_with_right_bound();
 }
 
+Bucketize::Bucketize(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Bucketize::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -269,6 +274,13 @@ void Bucketize::bucketize() {
 
 bool Bucketize::created() const {
     return getType() == Type::Bucketize;
+}
+
+void Bucketize::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void Bucketize::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

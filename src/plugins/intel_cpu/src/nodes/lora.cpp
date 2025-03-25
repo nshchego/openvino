@@ -78,7 +78,7 @@ void LoRA::selectOptimalPrimitiveDescriptor() {
     graphOutputConfig.emplace_back(inConfs.front().getMemDesc(), isInPlace);
 
     // configure the inner graph to get the information about output memory descriptors
-    m_graph.Init(m_body, context, graphInputConfig, graphOutputConfig);
+    m_graph.Init(m_body, m_context, graphInputConfig, graphOutputConfig);
 
     // for the output descriptors, use the configuration of the graph's output nodes
     auto outputDescriptors = m_graph.getOutputMemoryDescriptors();

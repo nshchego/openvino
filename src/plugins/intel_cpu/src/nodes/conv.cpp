@@ -54,7 +54,9 @@
 #include "post_ops.hpp"
 #include "shape_inference/custom/convolution.hpp"
 #include "utils/debug_capabilities.h"
-#include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -274,6 +276,11 @@ Convolution::Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext
     useJitPlanar = ((IC == 1 && groupOC * groupNum == 1) && isAvx2FP32);
 }
 
+Convolution::Convolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool Convolution::canBeExecutedInInt8() const {
     auto inputDataType = DnnlExtensionUtils::ElementTypeToDataType(getOriginalInputPrecisionAtPort(0));
     auto weightsDataType = DnnlExtensionUtils::ElementTypeToDataType(getOriginalInputPrecisionAtPort(1));
@@ -360,7 +367,7 @@ void Convolution::selectOptimalPrimitiveDescriptor() {
      * - more total memory usage when fallback is not needed (by size of a graph data structure itself)
      */
     if (withSum && isDynamicNode()) {
-        subgraph = std::make_shared<FusedSubgraph>(fusedWith, *this, context);
+        subgraph = std::make_shared<FusedSubgraph>(fusedWith, *this, m_context);
     }
 }
 
@@ -420,7 +427,7 @@ std::tuple<VecMemoryDescs, MemoryDescPtr> Convolution::initMemoryDescriptors(ov:
 }
 
 ExecutorFactoryPtr<ConvAttrs> Convolution::createExecutorFactory(const MemoryDescArgs& descs, const ConvAttrs& attrs) {
-    auto executionContext = std::make_shared<ExecutorContext>(context, getImplPriority(), privateWeightCache);
+    auto executionContext = std::make_shared<ExecutorContext>(m_context, getImplPriority(), privateWeightCache);
     return std::make_shared<ExecutorFactory<ConvAttrs>>(attrs, executionContext, descs, memoryFormatFilter);
 }
 
@@ -484,7 +491,7 @@ void Convolution::initSupportedPrimitiveDescriptors() {
         m_atoi[ARG_BIAS] = BIAS;
     }
 
-    m_attrs.isGraphQuantized = context->isGraphQuantized();
+    m_attrs.isGraphQuantized = m_context->isGraphQuantized();
     m_attrs.fcSemantic = false;
     m_attrs.nonConstantWeights = !getParentEdgeAt(WEIGHTS)->getParent()->isConstant();
     m_attrs.weightsNonTransposed = false;
@@ -612,7 +619,7 @@ void Convolution::createPrimitive() {
     }
 
     if (!m_attrs.withBias) {
-        m_memory[ARG_BIAS] = MemoryDescUtils::makeEmptyMemory(context);
+        m_memory[ARG_BIAS] = MemoryDescUtils::makeEmptyMemory(m_context);
     }
 
     if (withDWConv) {
@@ -779,14 +786,14 @@ void Convolution::addFusedNode(const NodePtr& fusingNode) {
         auto convolutionNode = std::dynamic_pointer_cast<Convolution>(fusingNode);
         CPU_NODE_ASSERT(convolutionNode, "Unexpected dynamic node type");
         withDWConv = true;
-        const auto& inActivationDims = convolutionNode->inputShapes[0].getStaticDims();
-        dw_conv_ih = inActivationDims[convolutionNode->inputShapes[0].getRank() - 2];
-        dw_conv_iw = inActivationDims[convolutionNode->inputShapes[0].getRank() - 1];
+        const auto& inActivationDims = convolutionNode->m_input_shapes[0].getStaticDims();
+        dw_conv_ih = inActivationDims[convolutionNode->m_input_shapes[0].getRank() - 2];
+        dw_conv_iw = inActivationDims[convolutionNode->m_input_shapes[0].getRank() - 1];
 
-        const auto& outDims = convolutionNode->outputShapes[0].getStaticDims();
+        const auto& outDims = convolutionNode->m_output_shapes[0].getStaticDims();
         dw_conv_oc = outDims[1];
 
-        const auto& dwWeightsDims = convolutionNode->inputShapes[1].getStaticDims();
+        const auto& dwWeightsDims = convolutionNode->m_input_shapes[1].getStaticDims();
         dw_conv_kernel.push_back(dwWeightsDims[dwWeightsDims.size() - 1]);
         dw_conv_kernel.push_back(dwWeightsDims[dwWeightsDims.size() - 2]);
         dw_conv_strides = convolutionNode->getStride();
@@ -845,6 +852,110 @@ void Convolution::initializeInputZeroPoints(const uint8_t* inputZpData, const si
     } else {
         m_attrs.inputZeroPointsType = ZeroPointsType::PerChannel;
     }
+}
+
+void Convolution::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    ob << m_atoi;
+
+    ob << m_attrs.stride;
+    ob << m_attrs.dilation;
+    ob << m_attrs.paddingL;
+    ob << m_attrs.paddingR;
+    ob << m_attrs.autoPadding;
+    ob << m_attrs.withBias;
+    ob << m_attrs.weightsNonTransposed;
+    ob << m_attrs.isGrouped;
+    ob << m_attrs.isGraphQuantized;
+    ob << m_attrs.fcSemantic;
+    ob << m_attrs.nonConstantWeights;
+    ob << m_attrs.inputZeroPointsType;
+    ob << m_attrs.dqScales;
+    // ob << m_attrs.postOps;
+
+    // ob << m_memory;
+    // ob << m_factory;
+    // ob << m_executor;
+    // ob << fallbackExecutor;
+
+    ob << withSum;
+    ob << withDWConv;
+    ob << withSumBroadcast;
+
+    ob << dw_conv_oc;
+    ob << dw_conv_ih;
+    ob << dw_conv_iw;
+    ob << dw_conv_kernel;
+    ob << dw_conv_strides;
+    ob << dw_conv_in_dt;
+
+    ob << groupNum;
+    ob << IC;
+    ob << groupIC;
+    ob << groupOC;
+
+    // ob << subgraph;
+    // ob << fusedConstNodes;
+
+    ob << useJitPlanar;
+}
+
+void Convolution::load(BinaryInputBuffer& ib) {
+    ib >> m_atoi;
+
+    ib >> m_attrs.stride;
+    ib >> m_attrs.dilation;
+    ib >> m_attrs.paddingL;
+    ib >> m_attrs.paddingR;
+    ib >> m_attrs.autoPadding;
+    ib >> m_attrs.withBias;
+    ib >> m_attrs.weightsNonTransposed;
+    ib >> m_attrs.isGrouped;
+    ib >> m_attrs.isGraphQuantized;
+    ib >> m_attrs.fcSemantic;
+    ib >> m_attrs.nonConstantWeights;
+    ib >> m_attrs.inputZeroPointsType;
+    ib >> m_attrs.dqScales;
+    // ib >> m_attrs.postOps;
+
+    // ib >> m_memory;
+    // ib >> m_factory;
+    // ib >> m_executor;
+    // ib >> fallbackExecutor;
+
+    ib >> withSum;
+    ib >> withDWConv;
+    ib >> withSumBroadcast;
+
+    ib >> dw_conv_oc;
+    ib >> dw_conv_ih;
+    ib >> dw_conv_iw;
+    ib >> dw_conv_kernel;
+    ib >> dw_conv_strides;
+    ib >> dw_conv_in_dt;
+
+    ib >> groupNum;
+    ib >> IC;
+    ib >> groupIC;
+    ib >> groupOC;
+
+    // ib >> subgraph;
+    // ib >> fusedConstNodes;
+
+    ib >> useJitPlanar;
+
+    const auto [dst_type, sum_type] = getDstAndSumPrecision();
+    m_attrs.postOps = getPostOps(fusedWith, sum_type);
+    auto [src_descs, dst_desc] = initMemoryDescriptors(dst_type);
+    MemoryDescArgs descs{
+        {ARG_SRC, src_descs[DATA]},
+        {ARG_WEI, src_descs[WEIGHTS]},
+        {ARG_BIAS, m_attrs.withBias ? src_descs[BIAS] : MemoryDescUtils::makeEmptyDesc()},
+        {ARG_DST, dst_desc}
+    };
+
+    m_factory = createExecutorFactory(descs, m_attrs);
 }
 
 }  // namespace ov::intel_cpu::node

@@ -18,6 +18,7 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/type/element_type.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
 
@@ -65,9 +66,9 @@ CpuBlockedMemoryDesc::CpuBlockedMemoryDesc(ov::element::Type prc,
     this->offsetPadding = offsetPadding;
 
     if (offsetPaddingToData.empty() && !order.empty()) {
-        this->offsetPaddingToData.resize(order.size(), 0);
+        this->m_offset_padding_to_data.resize(order.size(), 0);
     } else {
-        this->offsetPaddingToData = offsetPaddingToData;
+        this->m_offset_padding_to_data = offsetPaddingToData;
     }
 
     if (strides.empty() && !order.empty()) {
@@ -90,7 +91,7 @@ CpuBlockedMemoryDesc::CpuBlockedMemoryDesc(ov::element::Type prc,
 
     if (!everyone_is(this->order.size(),
                      this->blockedDims.size(),
-                     this->offsetPaddingToData.size(),
+                     this->m_offset_padding_to_data.size(),
                      this->strides.size())) {
         OPENVINO_THROW("Order, blocked dims, offset padding to data and strides must have equals size");
     }
@@ -107,7 +108,7 @@ bool CpuBlockedMemoryDesc::isDefinedImp() const {
     defined = defined && std::none_of(order.cbegin(), order.cend(), [](size_t val) {
                   return val == Shape::UNDEFINED_DIM;
               });
-    defined = defined && std::none_of(offsetPaddingToData.cbegin(), offsetPaddingToData.cend(), [](size_t val) {
+    defined = defined && std::none_of(m_offset_padding_to_data.cbegin(), m_offset_padding_to_data.cend(), [](size_t val) {
                   return val == Shape::UNDEFINED_DIM;
               });
     defined = defined && offsetPadding != Shape::UNDEFINED_DIM;
@@ -323,10 +324,10 @@ MemoryDescPtr CpuBlockedMemoryDesc::cloneWithNewDimsImp(const VectorDims& dims) 
     }
 
     VectorDims newOffsetPaddingToData;
-    if (std::none_of(offsetPaddingToData.begin(), offsetPaddingToData.end(), [](size_t x) {
+    if (std::none_of(m_offset_padding_to_data.begin(), m_offset_padding_to_data.end(), [](size_t x) {
             return x == Shape::UNDEFINED_DIM;
         })) {
-        newOffsetPaddingToData = offsetPaddingToData;
+        newOffsetPaddingToData = m_offset_padding_to_data;
     }
 
     return std::make_shared<CpuBlockedMemoryDesc>(precision,
@@ -377,4 +378,20 @@ MemoryDescPtr CpuBlockedMemoryDesc::cloneWithNewPrecision(const ov::element::Typ
     return newDesc;
 }
 
+void CpuBlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
+    BlockedMemoryDesc::save(ob);
+
+    ob << precision;
+    ob << offsetPadding;
+}
+
+void CpuBlockedMemoryDesc::load(BinaryInputBuffer& ib) {
+    BlockedMemoryDesc::load(ib);
+
+    ib >> precision;
+    ib >> offsetPadding;
+}
+
 }  // namespace ov::intel_cpu
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::CpuBlockedMemoryDesc)

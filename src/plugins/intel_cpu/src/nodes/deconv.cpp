@@ -281,7 +281,7 @@ Deconvolution::Deconvolution(const std::shared_ptr<ov::Node>& op, const GraphCon
     deconvAttrs.aclFastMath = context->getConfig().aclFastMath;
 #endif
 
-    externOutShape = inputShapes.size() == 3;
+    externOutShape = m_input_shapes.size() == 3;
     biasPort = externOutShape ? 3 : 2;
     if (externOutShape) {
         isConstOutShape = ov::is_type<ov::op::v0::Constant>(op->get_input_node_shared_ptr(2));
@@ -317,6 +317,11 @@ Deconvolution::Deconvolution(const std::shared_ptr<ov::Node>& op, const GraphCon
         asymmetricPaddingAnd1x1 = isImplicit1x1PaddingAsymmetric(getInputShapeAtPort(0).getStaticDims());
     }
     attr = std::make_shared<dnnl::primitive_attr>();
+}
+
+Deconvolution::Deconvolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void Deconvolution::createDnnlCompatibleWeights() {
@@ -772,7 +777,7 @@ VectorDims Deconvolution::shapeInferInternal(const VectorDims& inDims, std::vect
 
     auto port_mask = shapeInference->get_port_mask();
     if (port_mask) {
-        for (size_t i = 0; i < inputShapes.size(); ++i) {
+        for (size_t i = 0; i < m_input_shapes.size(); ++i) {
             if (port_mask & 1 << i) {
                 if (outSpDims.size() != getInputShapeAtPort(i).getStaticDims()[0]) {
                     THROW_CPU_NODE_ERR(
@@ -1122,7 +1127,7 @@ void Deconvolution::prepareParams() {
 
     auto prevExecPtr = execPtr;
     execPtr = nullptr;
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
 
     execPtr = result.first;
@@ -1344,7 +1349,7 @@ void Deconvolution::initSupportedPrimitiveDescriptors() {
             std::make_shared<DeconvExecutorFactory>(deconvAttrs,
                                                     srcMemoryDescs,
                                                     dstMemoryDescs,
-                                                    std::make_shared<ExecutorContext>(context, getImplPriority()));
+                                                    std::make_shared<ExecutorContext>(m_context, getImplPriority()));
 
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::gemm_acl, factory);
     };

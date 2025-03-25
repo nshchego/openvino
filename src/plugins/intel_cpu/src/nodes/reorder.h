@@ -33,6 +33,8 @@ public:
             const std::string& name,
             const GraphContext::CPtr& context);
 
+    Reorder(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
@@ -74,6 +76,10 @@ public:
     static std::string getReorderArgs(const MemoryDesc& parentDesc, const MemoryDesc& childDesc);
 
     static void reorderData(const IMemory& input, const IMemory& output, const MultiCachePtr& cache = nullptr);
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     dnnl::reorder::primitive prim;

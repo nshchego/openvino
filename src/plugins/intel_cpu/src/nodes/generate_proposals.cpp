@@ -330,6 +330,11 @@ GenerateProposals::GenerateProposals(const std::shared_ptr<ov::Node>& op, const 
     roi_indices_.resize(post_nms_topn_);
 }
 
+GenerateProposals::GenerateProposals(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GenerateProposals::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -352,7 +357,7 @@ void GenerateProposals::executeDynamicImpl(const dnnl::stream& strm) {
 
 void GenerateProposals::execute([[maybe_unused]] const dnnl::stream& strm) {
     try {
-        if (inputShapes.size() != 4 || outputShapes.size() != 3) {
+        if (m_input_shapes.size() != 4 || m_output_shapes.size() != 3) {
             THROW_CPU_NODE_ERR("Incorrect number of input or output edges!");
         }
 

@@ -14,6 +14,7 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/type/element_type.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/bind.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -68,6 +69,12 @@ public:
                         " is prohibited");
         return clone();
     }
+
+    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::EmptyMemoryDesc)
+
+    void save(BinaryOutputBuffer& ob) const override {}
+
+    void load(BinaryInputBuffer& ib) override {}
 
 private:
     size_t getElementOffset(size_t elemNumber) const override {

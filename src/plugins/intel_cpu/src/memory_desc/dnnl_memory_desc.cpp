@@ -143,4 +143,18 @@ size_t DnnlMemoryDesc::getOffsetPadding() const {
     return DnnlExtensionUtils::convertToDim(wrap.offset0());
 }
 
+void DnnlMemoryDesc::save(BinaryOutputBuffer& ob) const {
+    MemoryDesc::save(ob);
+
+    // ob << desc;
+}
+
+void DnnlMemoryDesc::load(BinaryInputBuffer& ib) {
+    MemoryDesc::load(ib);
+
+    // ib >> desc;
+}
+
 }  // namespace ov::intel_cpu
+
+// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::DnnlMemoryDesc)

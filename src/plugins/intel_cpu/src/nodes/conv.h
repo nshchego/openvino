@@ -1,6 +1,7 @@
 // Copyright (C) 2018-2025 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
+
 #pragma once
 
 #include <cstddef>
@@ -19,8 +20,8 @@
 #include "graph_context.h"
 #include "memory_desc/cpu_memory_desc.h"
 #include "node.h"
+#include "common/dnnl_executor.h"
 #include "nodes/executors/convolution_config.hpp"
-#include "nodes/executors/executor.hpp"
 #include "nodes/executors/executor_factory.hpp"
 #include "nodes/executors/memory_arguments.hpp"
 #include "oneapi/dnnl/dnnl.hpp"
@@ -33,6 +34,8 @@ namespace ov::intel_cpu::node {
 class Convolution : public Node {
 public:
     Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    Convolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
@@ -86,6 +89,10 @@ public:
     bool isDepthWise() const {
         return m_attrs.isGrouped && 1 == groupOC && 1 == groupIC;
     }
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 protected:
     void addFusedNode(const NodePtr& fusingNode) override;
