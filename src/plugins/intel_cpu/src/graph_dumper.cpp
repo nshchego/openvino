@@ -218,7 +218,7 @@ std::shared_ptr<ov::Model> dump_graph_as_ie_ngraph_net(const Graph& graph) {
         holder->add_control_dependency(node);
     }
 
-    return std::make_shared<ov::Model>(results, params, graph._name);
+    return std::make_shared<ov::Model>(results, params, graph.m_name);
 }
 
 #ifdef CPU_DEBUG_CAPS

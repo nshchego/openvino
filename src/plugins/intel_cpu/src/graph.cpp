@@ -51,6 +51,7 @@
 #include "utils/ngraph_utils.hpp"
 #include "utils/node_dumper.h"
 #include "utils/precision_support.h"
+#include "utils/serialization/string_serializer.hpp"
 #include "utils/verbose.h"
 
 #if (OV_THREAD == OV_THREAD_TBB || OV_THREAD == OV_THREAD_TBB_AUTO)
@@ -86,7 +87,7 @@ void Graph::Init(const std::vector<NodePtr>& graphNodes,
     m_context = context;
     m_stream = dnnl::stream(getEngine());
 
-    this->_name = std::move(name);
+    this->m_name = std::move(name);
 
     this->graphNodes = graphNodes;
     this->graphEdges = graphEdges;
@@ -122,7 +123,7 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
                       const std::vector<node::Input::OutputConfig>& outputConfigs) {
     OV_ITT_SCOPE_CHAIN(FIRST_INFERENCE, taskChain, itt::domains::intel_cpu_LT, "Graph::Replicate", "ov::Model");
 
-    this->_name = model->get_friendly_name();
+    this->m_name = model->get_friendly_name();
 
     // Map data object onto producer node
     std::map<std::shared_ptr<ov::Node>, NodePtr> op2node;
@@ -2155,6 +2156,56 @@ void Graph::assignStates(const std::vector<MemStatePtr>& states) {
             itr->second->assignState(state);
         }
     }
+}
+
+void Graph::export_graph(BinaryOutputBuffer& ob) {
+    ob << m_name;
+    // ob << status;
+    // ob << graphHasDynamicInput;
+
+    // ob << graphNodes;
+    // ob << graphEdges;
+
+    // ob << inputNodesMap;
+    // ob << outputNodesMap;
+
+    // ob << m_outputNodesMemBlocks;
+
+    // ob << m_executableGraphNodes;
+    // ob << m_executableSyncNodesInds;
+
+
+
+/// GPU ///
+    // bool need_onednn_engine = false;
+    // try {
+    //     get_engine().get_onednn_engine();
+    //     need_onednn_engine = true;
+    // } catch (ov::AssertFailure &) {
+    //     need_onednn_engine = false;
+    // }
+    // ob << need_onednn_engine;
+
+    // ob << m_input_layouts;
+    // ob << primitiveIDs;
+    // ob << inputPrimitiveIDs;
+    // ob << prevPrimitiveIDs;
+    // ob << profilingIDs;
+    // {
+    //     ob << perfMap.size();
+    //     for (auto& perf_item : perfMap) {
+    //         ob << perf_item.first;
+    //         ob << perf_item.second.second.layerType;
+    //         ob << cldnn::make_data(&perf_item.second.second.status, sizeof(ov::ProfilingInfo::Status));
+    //         ob << perf_item.second.second.isCPU;
+    //         ob << perf_item.second.second.parentPrimitive;
+    //     }
+    // }
+    // OstreamAttributeVisitor<cldnn::BinaryOutputBuffer> visitor(ob);
+    // m_config.visit_attributes(visitor);
+
+    // ob.set_stream(m_network->get_stream_ptr().get());
+    // m_network->get_program()->save(ob);
 }
 
 }  // namespace ov::intel_cpu

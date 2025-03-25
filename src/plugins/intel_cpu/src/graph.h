@@ -21,6 +21,7 @@
 #include "openvino/runtime/profiling_info.hpp"
 #include "openvino/runtime/so_ptr.hpp"
 #include "proxy_mem_blk.h"
+#include "utils/serialization/buffer.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -100,7 +101,7 @@ public:
     }
 
     std::string GetName() const {
-        return _name;
+        return m_name;
     }
 
     NodePtr getInputNodeByIndex(std::size_t index) {
@@ -281,6 +282,8 @@ public:
         return m_outputNodesMemBlocks;
     }
 
+    void export_graph(BinaryOutputBuffer& ob);
+
 protected:
     void ForgetGraphData() {
         status = Status::NotReady;
@@ -300,7 +303,7 @@ protected:
     std::vector<NodePtr> graphNodes;
     std::vector<EdgePtr> graphEdges;
 
-    std::string _name;
+    std::string m_name;
 
     bool graphHasDynamicInput = false;
 

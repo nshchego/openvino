@@ -20,7 +20,7 @@
 #include "utils/codec_xor.hpp"
 #include "utils/denormals.hpp"
 #include "utils/precision_support.h"
-#include "utils/serialize.hpp"
+#include "utils/serialization/serialize.hpp"
 #include "weights_cache.hpp"
 
 #if defined(__linux__)

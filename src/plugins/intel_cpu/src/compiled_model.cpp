@@ -26,7 +26,7 @@
 #include "openvino/util/common_util.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/memory_stats_dump.hpp"
-#include "utils/serialize.hpp"
+#include "utils/serialization/serialize.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include "nodes/executors/acl/acl_ie_scheduler.hpp"
@@ -383,9 +383,16 @@ ov::Any CompiledModel::get_property(const std::string& name) const {
     OPENVINO_THROW("Unsupported property: ", name);
 }
 
-void CompiledModel::export_model(std::ostream& modelStream) const {
-    ModelSerializer serializer(modelStream, m_cfg.cacheEncrypt);
-    serializer << m_model;
+void CompiledModel::export_model(std::ostream& model_stream) const {
+    // ModelSerializer serializer(model_stream, m_cfg.cacheEncrypt);
+    // serializer << m_model;
+
+    if (m_graphs.empty()) {
+        OPENVINO_THROW("[ CPU ] No graph was found.");
+    }
+
+    BinaryOutputBuffer out_buff(model_stream);
+    return get_graph()._graph.export_graph(out_buff);
 }
 
 void CompiledModel::release_memory() {
