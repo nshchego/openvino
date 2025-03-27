@@ -35,6 +35,9 @@
 #include "utils/general_utils.h"
 #include "utils/ngraph_utils.hpp"
 #include "utils/rt_info/memory_formats_attribute.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 using namespace openvino;
@@ -2256,6 +2259,79 @@ void Node::resolveInPlaceDirection() {
             }
         }
     }
+}
+
+void Node::save(BinaryOutputBuffer& ob) const {
+    ob << name;
+    ob << make_data(&type, sizeof(Type));
+    ob << typeStr;
+    ob << isDynamic;
+    ob << make_data(&algorithm, sizeof(Algorithm));
+    ob << make_data(&inplace, sizeof(InPlaceType));
+    ob << make_data(&constant, sizeof(ConstantType));
+
+    ob << inputShapes;
+    ob << outputShapes;
+    
+    ob << parentEdges;
+    ob << childEdges;
+
+    ob << fusingPort;
+    ob << fusedWith;
+    ob << mergedWith;
+
+    ob << curNumaNode;
+
+    ob << supportedPrimitiveDescriptors;
+    ob << selectedPrimitiveDescriptorIndex;
+    ob << primitivesPriority;
+    // ob << customImplPriorities;
+    // ob << inputMemoryFormatsFilter;
+    // ob << outputMemoryFormatsFilter;
+
+    ob << originalLayers;
+    ob << parallelDomain;
+
+    // ob << internalBlobDesc;
+    // ob << internalBlobMemory;
+    // ob << internalBlobs;
+    // ob << primArgs;
+    // ob << postOpsArgs;
+    // ob << descs;
+
+    // ob << context;
+
+    ob << lastInputDims;
+
+    // ob << shapeInference;
+
+    // ob << originalInputPrecisions;
+    // ob << originalOutputPrecisions;
+    ob << keepOriginalPrecision;
+    ob << enforceBF16evenForGraphTail;
+
+    // // ob << engine;
+
+    ob << execIndex;
+
+    // ob << perfCounter;
+    // ob << profiling;
+
+    // ob << scratchpadMem;
+
+    ob << DQScales;
+}
+
+void Node::load(BinaryInputBuffer& ib) {
+}
+
+void NodeDesc::save(BinaryOutputBuffer& ob) const {
+    // ob << config;
+    // ob << implementationType;
+    // ob << executorFactory;
+}
+
+void NodeDesc::load(BinaryInputBuffer& ib) {
 }
 
 #ifndef CPU_DEBUG_CAPS

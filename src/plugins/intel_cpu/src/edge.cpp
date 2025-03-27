@@ -657,6 +657,12 @@ NodePtr Edge::modifiedInPlace() const {
     return nullptr;
 }
 
+void Edge::save(BinaryOutputBuffer& ob) const {
+}
+
+void Edge::load(BinaryInputBuffer& ib) {
+}
+
 std::ostream& operator<<(std::ostream& os, const Edge& edge) {
     return os << "(" << edge.getParent()->getName() << ")"
               << "[" << edge.getInputNum() << "] "

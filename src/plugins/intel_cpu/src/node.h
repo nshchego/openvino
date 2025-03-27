@@ -34,6 +34,7 @@
 #include "selective_build.h"
 #include "utils/bit_util.hpp"
 #include "utils/debug_capabilities.h"
+#include "utils/serialization/buffer.hpp"
 
 #define THROW_CPU_NODE_ERR(...) \
     OPENVINO_THROW("[CPU] ", getTypeStr(), " node with name '", getName(), "' ", __VA_ARGS__)
@@ -165,6 +166,10 @@ public:
                         outputConfigs.size());
         return outputConfigs[portIdx].hasZeroDims();
     }
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 
 private:
     NodeConfig config;
@@ -728,6 +733,10 @@ public:
     const bool keepOrigPrecision() const {
         return keepOriginalPrecision;
     }
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 
 protected:
     bool canFuseSimpleOperation(const NodePtr& node) const;

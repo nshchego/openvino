@@ -16,7 +16,6 @@
 #include "graph_context.h"
 #include "memory_control.hpp"
 #include "memory_state.h"
-#include "node.h"
 #include "nodes/input.h"
 #include "openvino/runtime/profiling_info.hpp"
 #include "openvino/runtime/so_ptr.hpp"
@@ -253,6 +252,10 @@ public:
               const GraphContext::CPtr& context,
               const std::vector<node::Input::InputConfig>& inputConfigs = {},
               const std::vector<node::Input::OutputConfig>& outputConfigs = {});
+
+
+    void Init(BinaryInputBuffer& ib,
+              const GraphContext::CPtr& context);
 
     /**
      * Activate execution graph

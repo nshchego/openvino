@@ -5,6 +5,7 @@
 #include "cpu_shape.h"
 
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -74,6 +75,19 @@ Shape mergeShapes(const Shape& lhs, const Shape& rhs) {
                         "Couldn't merge shapes as the dims intervals are not overlapping.");
     }
     return Shape{resultMinDims, resultMaxDims};
+}
+
+void Shape::save(BinaryOutputBuffer& ob) const {
+    ob << make_data(&type, sizeof(ShapeType));
+
+    ob << hasZeroDimensions;
+
+    ob << minDims;
+    ob << maxDims;
+    ob << dims;
+}
+
+void Shape::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu

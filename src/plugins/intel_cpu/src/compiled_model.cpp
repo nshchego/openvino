@@ -44,14 +44,6 @@ struct ImmediateSerialExecutor : public ov::threading::ITaskExecutor {
     std::mutex _mutex;
 };
 
-CompiledModel::~CompiledModel() {
-    if (m_has_sub_compiled_models) {
-        m_sub_compiled_models.clear();
-        m_sub_memory_manager->_memorys_table.clear();
-    }
-    CPU_DEBUG_CAP_ENABLE(dumpMemoryStats(m_cfg.debugCaps, m_name, m_graphs, m_socketWeights));
-}
-
 CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
                              const std::shared_ptr<const ov::IPlugin>& plugin,
                              Config cfg,
@@ -152,6 +144,26 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
                 std::make_shared<CompiledModel>(model, plugin, sub_cfg, loaded_from_cache, m_sub_memory_manager));
         }
     }
+}
+
+CompiledModel::CompiledModel(BinaryInputBuffer& ib,
+                             const std::shared_ptr<const ov::IPlugin>& plugin,
+                            //  const RemoteContextImpl::Ptr& context,
+                             const Config& config,
+                             const bool loaded_from_cache)
+    : ov::ICompiledModel::ICompiledModel(nullptr, plugin),
+      m_plugin(plugin),
+      m_cfg(config),
+      m_loaded_from_cache(loaded_from_cache) {
+
+}
+
+CompiledModel::~CompiledModel() {
+    if (m_has_sub_compiled_models) {
+        m_sub_compiled_models.clear();
+        m_sub_memory_manager->_memorys_table.clear();
+    }
+    CPU_DEBUG_CAP_ENABLE(dumpMemoryStats(m_cfg.debugCaps, m_name, m_graphs, m_socketWeights));
 }
 
 CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {

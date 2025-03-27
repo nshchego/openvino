@@ -31,7 +31,6 @@
 #include "memory_control.hpp"
 #include "memory_desc/cpu_memory_desc_utils.h"
 #include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "node.h"
 #include "nodes/common/cpu_convert.h"
 #include "nodes/common/cpu_memcpy.h"
 #include "nodes/convert.h"
@@ -51,7 +50,10 @@
 #include "utils/ngraph_utils.hpp"
 #include "utils/node_dumper.h"
 #include "utils/precision_support.h"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
 #include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 #include "utils/verbose.h"
 
 #if (OV_THREAD == OV_THREAD_TBB || OV_THREAD == OV_THREAD_TBB_AUTO)
@@ -349,6 +351,11 @@ void Graph::Init(const std::shared_ptr<const ov::Model>& model,
     Replicate(model, inputConfigs, outputConfigs);
 
     Configure();
+}
+
+void Graph::Init(BinaryInputBuffer& ib,
+                 const GraphContext::CPtr& context) {
+
 }
 
 void Graph::Activate() {
@@ -2160,19 +2167,19 @@ void Graph::assignStates(const std::vector<MemStatePtr>& states) {
 
 void Graph::export_graph(BinaryOutputBuffer& ob) {
     ob << m_name;
-    // ob << status;
-    // ob << graphHasDynamicInput;
+    ob << make_data(&status, sizeof(Status));
+    ob << graphHasDynamicInput;
 
-    // ob << graphNodes;
-    // ob << graphEdges;
+    ob << graphNodes;
+    ob << graphEdges;
 
-    // ob << inputNodesMap;
-    // ob << outputNodesMap;
+    ob << inputNodesMap;
+    ob << outputNodesMap;
 
     // ob << m_outputNodesMemBlocks;
 
-    // ob << m_executableGraphNodes;
-    // ob << m_executableSyncNodesInds;
+    ob << m_executableGraphNodes;
+    ob << m_executableSyncNodesInds;
 
 
 

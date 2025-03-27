@@ -8,6 +8,7 @@
 
 #include "cpu_types.h"
 #include "openvino/core/partial_shape.hpp"
+#include "utils/serialization/buffer.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -204,6 +205,10 @@ public:
     }
 
     enum : Dim { UNDEFINED_DIM = std::numeric_limits<Dim>::max() };
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 
 private:
     void initDims() {

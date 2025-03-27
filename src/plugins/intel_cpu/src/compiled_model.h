@@ -38,6 +38,12 @@ public:
                   const bool loaded_from_cache,
                   std::shared_ptr<SubMemoryManager> sub_memory_manager = nullptr);
 
+    CompiledModel(BinaryInputBuffer& ib,
+                  const std::shared_ptr<const ov::IPlugin>& plugin,
+                  //const RemoteContextImpl::Ptr& context,
+                  const Config& config,
+                  const bool loaded_from_cache);
+
     ~CompiledModel();
 
     std::shared_ptr<ov::IAsyncInferRequest> create_infer_request() const override;

@@ -11,6 +11,7 @@
 #include "internal_properties.hpp"
 #include "memory_desc/cpu_memory_desc.h"
 #include "nodes/node_config.h"
+#include "utils/serialization/buffer.hpp"
 #include "weights_cache.hpp"
 
 namespace ov {
@@ -95,6 +96,10 @@ public:
 
     std::string hash() const;
     const MemoryDesc& getOriginalDesc() const;
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 
 private:
     std::weak_ptr<Node> parent;
