@@ -97,7 +97,8 @@ template <typename BufferType>
 class InputBuffer : public Buffer<BufferType> {
     friend class Buffer<BufferType>;
 public:
-    InputBuffer(BufferType* const buffer, dnnl::engine& engine) : Buffer<BufferType>(buffer), m_engine(engine) {}
+    InputBuffer(BufferType* const buffer) : Buffer<BufferType>(buffer) {}
+    // InputBuffer(BufferType* const buffer, dnnl::engine& engine) : Buffer<BufferType>(buffer), m_engine(engine) {}
 
     template <typename T>
     inline BufferType& operator>>(T&& arg) {
@@ -105,20 +106,22 @@ public:
         return Buffer<BufferType>::getBuffer();
     }
 
-    dnnl::engine& get_engine() { return m_engine; }
+    // dnnl::engine& get_engine() { return m_engine; }
 private:
     template <typename T>
     inline void process(T&& object) {
         Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::buffer, object);
     }
 
-    dnnl::engine& m_engine;
+    // dnnl::engine& m_engine;
 };
 
 class BinaryInputBuffer : public InputBuffer<BinaryInputBuffer> {
 public:
-    BinaryInputBuffer(std::istream& stream, dnnl::engine& engine)
-    : InputBuffer<BinaryInputBuffer>(this, engine), _stream(stream), _impl_params(nullptr) {}
+    BinaryInputBuffer(std::istream& stream)
+    : InputBuffer<BinaryInputBuffer>(this), _stream(stream), _impl_params(nullptr) {}
+    // BinaryInputBuffer(std::istream& stream, dnnl::engine& engine)
+    // : InputBuffer<BinaryInputBuffer>(this, engine), _stream(stream), _impl_params(nullptr) {}
 
     virtual ~BinaryInputBuffer() = default;
 

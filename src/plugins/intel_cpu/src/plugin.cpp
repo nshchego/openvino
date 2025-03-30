@@ -587,43 +587,50 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
         decript_from_string = true;
     }
 
-    auto _config = config;
+    auto new_config = config;
     std::shared_ptr<ov::AlignedBuffer> model_buffer;
-    if (auto blob_it = _config.find(ov::hint::compiled_blob.name()); blob_it != _config.end()) {
+    if (auto blob_it = new_config.find(ov::hint::compiled_blob.name()); blob_it != new_config.end()) {
         auto compiled_blob = blob_it->second.as<ov::Tensor>();
         model_buffer = std::make_shared<ov::SharedBuffer<ov::Tensor>>(reinterpret_cast<char*>(compiled_blob.data()),
                                                                       compiled_blob.get_byte_size(),
                                                                       compiled_blob);
-        _config.erase(blob_it);
+        new_config.erase(blob_it);
     }
 
-    ModelDeserializer deserializer(
-        model_stream,
-        model_buffer,
-        [this](const std::shared_ptr<ov::AlignedBuffer>& model, const std::shared_ptr<ov::AlignedBuffer>& weights) {
-            return get_core()->read_model(model, weights);
-        },
-        decrypt,
-        decript_from_string);
+    // ModelDeserializer deserializer(
+    //     model_stream,
+    //     model_buffer,
+    //     [this](const std::shared_ptr<ov::AlignedBuffer>& model, const std::shared_ptr<ov::AlignedBuffer>& weights) {
+    //         return get_core()->read_model(model, weights);
+    //     },
+    //     decrypt,
+    //     decript_from_string);
 
-    std::shared_ptr<ov::Model> model;
-    deserializer >> model;
+    // std::shared_ptr<ov::Model> model;
+    // deserializer >> model;
+    std::shared_ptr<BinaryInputBuffer> ib_ptr = std::make_shared<BinaryInputBuffer>(model_stream);
+        // encryption_enabled ? std::make_unique<EncryptedBinaryInputBuffer>(model,
+        //                                                                          context_impl->get_engine(),
+        //                                                                          encryption_callbacks.decrypt)
+        //                    : std::make_unique<BinaryInputBuffer>(model, context_impl->get_engine());
+    auto& ib = *ib_ptr;
 
     Config conf = engConfig;
-    Config::ModelType modelType = getModelType(model);
+    Config::ModelType model_type;
+    ib >> make_data(&model_type, sizeof(Config::ModelType));
     conf.applyRtInfo(model);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
-    const auto& it = _config.find(ov::loaded_from_cache.name());
+    const auto& it = new_config.find(ov::loaded_from_cache.name());
     bool loaded_from_cache = false;
-    if (it != _config.end()) {
+    if (it != new_config.end()) {
         loaded_from_cache = it->second.as<bool>();
-        _config.erase(it);
+        new_config.erase(it);
     }
-    conf.readProperties(_config, modelType);
+    conf.readProperties(new_config, model_type);
 
     // import config props from caching model
-    calculate_streams(conf, model, true);
-    auto compiled_model = std::make_shared<CompiledModel>(model, shared_from_this(), conf, loaded_from_cache);
+    // calculate_streams(conf, model, true);
+    auto compiled_model = std::make_shared<CompiledModel>(ib, shared_from_this(), conf, loaded_from_cache);
     return compiled_model;
 }
 }  // namespace ov::intel_cpu

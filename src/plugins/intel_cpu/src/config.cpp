@@ -556,4 +556,8 @@ void Config::applyRtInfo(const std::shared_ptr<const ov::Model>& model) {
     }
 }
 
+void Config::applyRtInfo(BinaryInputBuffer& ib) {
+    
+}
+
 }  // namespace ov::intel_cpu
