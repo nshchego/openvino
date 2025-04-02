@@ -166,6 +166,7 @@ CompiledModel::CompiledModel(BinaryInputBuffer& ib,
 
     ib >> m_name;
     ib >> m_is_function_quantized;
+printf("--CPU-- CompiledModel::CompiledModel READ\n    m_name: '%s'\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
 
     IStreamsExecutor::Config executor_config;
     if (m_cfg.exclusiveAsyncRequests) {
@@ -499,8 +500,13 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
         OPENVINO_THROW("[ CPU ] No graph was found.");
     }
 
-    BinaryOutputBuffer out_buff(model_stream);
-    return get_graph()._graph.export_graph(out_buff);
+    BinaryOutputBuffer model_buff(model_stream);
+
+printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
+    model_buff << m_name;
+    model_buff << m_is_function_quantized;
+
+    return get_graph()._graph.export_graph(model_buff);
 }
 
 void CompiledModel::release_memory() {

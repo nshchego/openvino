@@ -581,11 +581,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "import_model");
 
     CacheDecrypt decrypt{codec_xor};
-    bool decript_from_string = false;
+    // bool decript_from_string = false;
     if (auto it = config.find(ov::cache_encryption_callbacks.name()); it != config.end()) {
         const auto& encryption_callbacks = it->second.as<EncryptionCallbacks>();
         decrypt.m_decrypt_str = encryption_callbacks.decrypt;
-        decript_from_string = true;
+        // decript_from_string = true;
     }
 
     auto new_config = config;

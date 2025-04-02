@@ -99,5 +99,31 @@ public:
     }
 };
 
+template <typename BufferType, typename T>
+class Serializer<BufferType, std::weak_ptr<T>, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
+public:
+    // static void load(BufferType& buffer, std::weak_ptr<T>& ptr, dnnl::engine& engine) {
+    //     std::string type;
+    //     buffer >> type;
+    //     if (type.compare("NONE") != 0) {
+    //         const auto load_func = dif<BufferType>::instance().get_load_function(type);
+    //         std::unique_ptr<void, void_deleter<void>> result;
+    //         load_func(buffer, result, engine);
+    //         ptr.reset(static_cast<T*>(result.release()));
+    //     }
+    // }
+
+    static void load(BufferType& buffer, std::weak_ptr<T>& ptr) {
+        // std::string type;
+        // buffer >> type;
+        // if (type.compare("NONE") != 0) {
+        //     const auto load_func = def<BufferType>::instance().get_load_function(type);
+        //     std::unique_ptr<void, void_deleter<void>> result;
+        //     load_func(buffer, result);
+        //     ptr.reset(static_cast<T*>(result.release()));
+        // }
+    }
+};
+
 }  // namespace intel_cpu
 }  // namespace ov

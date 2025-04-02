@@ -2323,6 +2323,64 @@ void Node::save(BinaryOutputBuffer& ob) const {
 }
 
 void Node::load(BinaryInputBuffer& ib) {
+    ib >> name;
+    ib >> make_data(&type, sizeof(Type));
+    ib >> typeStr;
+    ib >> isDynamic;
+    ib >> make_data(&algorithm, sizeof(Algorithm));
+    ib >> make_data(&inplace, sizeof(InPlaceType));
+    ib >> make_data(&constant, sizeof(ConstantType));
+
+    ib >> inputShapes;
+    ib >> outputShapes;
+    
+    ib >> parentEdges;
+    ib >> childEdges;
+
+    ib >> fusingPort;
+    ib >> fusedWith;
+    ib >> mergedWith;
+
+    ib >> curNumaNode;
+
+    // ib >> supportedPrimitiveDescriptors;
+    ib >> selectedPrimitiveDescriptorIndex;
+    ib >> primitivesPriority;
+    // ib >> customImplPriorities;
+    // ib >> inputMemoryFormatsFilter;
+    // ib >> outputMemoryFormatsFilter;
+
+    ib >> originalLayers;
+    ib >> parallelDomain;
+
+    // ib >> internalBlobDesc;
+    // ib >> internalBlobMemory;
+    // ib >> internalBlobs;
+    // ib >> primArgs;
+    // ib >> postOpsArgs;
+    // ib >> descs;
+
+    // ib >> context;
+
+    ib >> lastInputDims;
+
+    // ib >> shapeInference;
+
+    // ib >> originalInputPrecisions;
+    // ib >> originalOutputPrecisions;
+    ib >> keepOriginalPrecision;
+    ib >> enforceBF16evenForGraphTail;
+
+    // // ib >> engine;
+
+    ib >> execIndex;
+
+    // ib >> perfCounter;
+    // ib >> profiling;
+
+    // ib >> scratchpadMem;
+
+    ib >> DQScales;
 }
 
 void NodeDesc::save(BinaryOutputBuffer& ob) const {
