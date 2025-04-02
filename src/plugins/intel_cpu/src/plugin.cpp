@@ -20,7 +20,7 @@
 #include "utils/codec_xor.hpp"
 #include "utils/denormals.hpp"
 #include "utils/precision_support.h"
-#include "utils/serialization/serialize.hpp"
+// #include "utils/serialization/serialize.hpp"
 #include "weights_cache.hpp"
 
 #if defined(__linux__)
@@ -176,6 +176,7 @@ void Plugin::get_performance_streams(Config& config, const std::shared_ptr<ov::M
 }
 
 void Plugin::calculate_streams(Config& conf, const std::shared_ptr<ov::Model>& model, bool imported) const {
+    // TODO: check on model serialization
     const auto model_prefer_name = std::string("MODEL_PREFER_THREADS");
     if (imported && model->has_rt_info("intel_cpu_hints_config")) {
         // load model_prefer_threads from cache
@@ -618,7 +619,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     Config conf = engConfig;
     Config::ModelType model_type;
     ib >> make_data(&model_type, sizeof(Config::ModelType));
-    conf.applyRtInfo(model);
+    conf.applyRtInfo(ib);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
     const auto& it = new_config.find(ov::loaded_from_cache.name());
     bool loaded_from_cache = false;
@@ -628,8 +629,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     }
     conf.readProperties(new_config, model_type);
 
-    // import config props from caching model
-    // calculate_streams(conf, model, true);
+    ib >> conf.modelPreferThreads;
     auto compiled_model = std::make_shared<CompiledModel>(ib, shared_from_this(), conf, loaded_from_cache);
     return compiled_model;
 }

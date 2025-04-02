@@ -14,6 +14,7 @@
 #include "openvino/runtime/threading/istreams_executor.hpp"
 #include "openvino/util/common_util.hpp"
 #include "utils/debug_caps_config.h"
+#include "utils/serialization/buffer.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -120,6 +121,8 @@ struct Config {
     void updateProperties();
 
     void applyRtInfo(const std::shared_ptr<const ov::Model>& model);
+
+    void applyRtInfo(BinaryInputBuffer& ib);
 
     std::map<std::string, std::string> _config;
 

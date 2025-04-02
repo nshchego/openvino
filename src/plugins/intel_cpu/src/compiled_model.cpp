@@ -26,7 +26,8 @@
 #include "openvino/util/common_util.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/memory_stats_dump.hpp"
-#include "utils/serialization/serialize.hpp"
+// #include "utils/serialization/serialize.hpp"
+#include "utils/serialization/string_serializer.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include "nodes/executors/acl/acl_ie_scheduler.hpp"
@@ -61,6 +62,8 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
     if (!core) {
         OPENVINO_THROW("Unable to get API version. Core is unavailable");
     }
+
+    m_is_function_quantized = ov::pass::low_precision::LowPrecision::isFunctionQuantized(m_model);
 
     IStreamsExecutor::Config executor_config;
     if (m_cfg.exclusiveAsyncRequests) {
@@ -148,14 +151,104 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
 
 CompiledModel::CompiledModel(BinaryInputBuffer& ib,
                              const std::shared_ptr<const ov::IPlugin>& plugin,
-                            //  const RemoteContextImpl::Ptr& context,
                              const Config& config,
                              const bool loaded_from_cache)
     : ov::ICompiledModel::ICompiledModel(nullptr, plugin),
+      m_model_buffer(&ib),
       m_plugin(plugin),
       m_cfg(config),
       m_loaded_from_cache(loaded_from_cache) {
+    auto core = m_plugin->get_core();
+    if (!core) {
+        OPENVINO_THROW("[ CPU ] Core is not initialized in the plugin.");
+    }
+    m_mutex = std::make_shared<std::mutex>();
 
+    ib >> m_name;
+    ib >> m_is_function_quantized;
+
+    IStreamsExecutor::Config executor_config;
+    if (m_cfg.exclusiveAsyncRequests) {
+        // special case when all InferRequests are muxed into a single queue
+        m_task_executor = m_plugin->get_executor_manager()->get_executor("CPU");
+    } else {
+        executor_config = m_cfg.numSubStreams > 0 ? IStreamsExecutor::Config{"CPUMainStreamExecutor",
+                                                                             1,
+                                                                             1,
+                                                                             ov::hint::SchedulingCoreType::ANY_CORE,
+                                                                             false,
+                                                                             true}
+                                                  : m_cfg.streamExecutorConfig;
+        m_task_executor = m_plugin->get_executor_manager()->get_idle_cpu_streams_executor(executor_config);
+    }
+    if (0 != m_cfg.streamExecutorConfig.get_streams()) {
+        m_callback_executor = m_plugin->get_executor_manager()->get_idle_cpu_streams_executor(
+            IStreamsExecutor::Config{"CPUCallbackExecutor", 1, 0});
+    } else {
+        m_callback_executor = m_task_executor;
+    }
+
+    if (m_task_executor) {
+        set_task_executor(m_task_executor);
+    }
+    if (m_callback_executor) {
+        set_callback_executor(m_callback_executor);
+    }
+
+    int streams = std::max(1, executor_config.get_streams());
+    std::vector<Task> tasks;
+    tasks.resize(streams);
+    m_graphs.resize(streams);
+    if (executor_config.get_streams() != 0) {
+        auto all_graphs_ready = [&] {
+            return std::all_of(m_graphs.begin(), m_graphs.end(), [&](Graph& graph) {
+                return graph.IsReady();
+            });
+        };
+        do {
+            for (auto&& task : tasks) {
+                task = [this] {
+#if defined(OV_CPU_WITH_ACL)
+                    static std::once_flag flag_once;
+                    std::call_once(flag_once, [&]() {
+                        std::shared_ptr<arm_compute::IScheduler> acl_scheduler = std::make_shared<ACLScheduler>();
+                        arm_compute::Scheduler::set(std::static_pointer_cast<arm_compute::IScheduler>(acl_scheduler));
+                    });
+#endif
+                    CompiledModel::get_graph();
+                };
+            }
+            m_task_executor->run_and_wait(tasks);
+        } while (!all_graphs_ready());
+    } else {
+        CompiledModel::get_graph();
+    }
+    if (m_cfg.numSubStreams > 0) {
+        m_has_sub_compiled_models = true;
+        auto sub_cfg = m_cfg;
+        sub_cfg.numSubStreams = 0;
+        sub_cfg.enableNodeSplit = true;
+        auto streams_info_table = m_cfg.streamExecutorConfig.get_streams_info_table();
+        auto message = message_manager();
+        // m_sub_memory_manager = std::make_shared<SubMemoryManager>(m_cfg.numSubStreams);
+        message->set_num_sub_streams(m_cfg.numSubStreams);
+        for (int i = 0; i < m_cfg.numSubStreams; i++) {
+            std::vector<std::vector<int>> sub_streams_table;
+            sub_streams_table.push_back(streams_info_table[i + 1]);
+            sub_streams_table[0][NUMBER_OF_STREAMS] = 1;
+            sub_cfg.streamExecutorConfig = IStreamsExecutor::Config{"CPUStreamsExecutor",
+                                                                    1,
+                                                                    1,
+                                                                    ov::hint::SchedulingCoreType::ANY_CORE,
+                                                                    false,
+                                                                    true,
+                                                                    true,
+                                                                    std::move(sub_streams_table),
+                                                                    sub_cfg.streamsRankTable[i]};
+            m_sub_compiled_models.push_back(
+                std::make_shared<CompiledModel>(ib, plugin, sub_cfg, loaded_from_cache));
+        }
+    }
 }
 
 CompiledModel::~CompiledModel() {
@@ -190,8 +283,7 @@ CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {
                 GraphContext::Ptr ctx;
                 {
                     std::lock_guard<std::mutex> lock{*m_mutex.get()};
-                    auto isQuantizedFlag = (m_cfg.lpTransformsMode == Config::On) &&
-                                           ov::pass::low_precision::LowPrecision::isFunctionQuantized(m_model);
+                    auto isQuantizedFlag = (m_cfg.lpTransformsMode == Config::On) && m_is_function_quantized;
                     ctx = std::make_shared<GraphContext>(m_cfg,
                                                          m_socketWeights[socketId],
                                                          isQuantizedFlag,
@@ -199,8 +291,12 @@ CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {
                                                          m_sub_memory_manager);
                 }
 
-                const std::shared_ptr<const ov::Model> model = m_model;
-                graphLock._graph.Init(model, ctx);
+                if (m_model) {
+                    // const std::shared_ptr<const ov::Model> model = m_model;
+                    graphLock._graph.Init(m_model, ctx);
+                } else {
+                    graphLock._graph.Init(*m_model_buffer, ctx);
+                }
                 graphLock._graph.Activate();
             } catch (...) {
                 exception = std::current_exception();

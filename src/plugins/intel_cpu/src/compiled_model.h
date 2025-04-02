@@ -70,6 +70,7 @@ private:
     friend class CompiledModelHolder;
 
     const std::shared_ptr<ov::Model> m_model;
+    BinaryInputBuffer* m_model_buffer;
     const std::shared_ptr<const ov::IPlugin> m_plugin;
     std::shared_ptr<ov::threading::ITaskExecutor> m_task_executor = nullptr;      //!< Holds a task executor
     std::shared_ptr<ov::threading::ITaskExecutor> m_callback_executor = nullptr;  //!< Holds a callback executor
@@ -99,6 +100,8 @@ private:
     std::vector<std::shared_ptr<CompiledModel>> m_sub_compiled_models;
     std::shared_ptr<SubMemoryManager> m_sub_memory_manager = nullptr;
     bool m_has_sub_compiled_models = false;
+
+    bool m_is_function_quantized = false;
 };
 
 // This class provides safe access to the internal CompiledModel structures and helps to decouple SyncInferRequest and
