@@ -17,7 +17,7 @@
 #include "openvino/op/idft.hpp"
 #include "openvino/opsets/opset7_decl.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::cpu::x64;

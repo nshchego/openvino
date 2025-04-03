@@ -18,7 +18,7 @@
 #include "transformations/cpu_opset/x64/op/mha.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::cpu::x64;

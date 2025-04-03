@@ -17,7 +17,7 @@
 #include "openvino/op/split.hpp"
 #include "openvino/op/variadic_split.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl;
 

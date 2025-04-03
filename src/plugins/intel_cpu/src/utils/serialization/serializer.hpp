@@ -11,10 +11,12 @@ template <typename BufferType, typename T, typename Enable = void>
 class Serializer {
 public:
     static void save(BufferType& buffer, const T& object) {
+printf("-WRITE-\n");
         object.save(buffer);
     }
 
     static void load(BufferType& buffer, T& object) {
+printf("-READ-\n");
         object.load(buffer);
     }
 };

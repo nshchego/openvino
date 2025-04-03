@@ -15,7 +15,8 @@
 #include "openvino/core/parallel.hpp"
 #include "openvino/op/broadcast.hpp"
 #include "openvino/opsets/opset1_decl.hpp"
-#include "utils/ngraph_utils.hpp"
+// #include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 namespace ov::intel_cpu::node {
 

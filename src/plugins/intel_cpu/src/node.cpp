@@ -33,7 +33,7 @@
 #include "utils/cpu_utils.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/rt_info/memory_formats_attribute.hpp"
 #include "utils/serialization/polymorphic_serializer.hpp"
 #include "utils/serialization/string_serializer.hpp"

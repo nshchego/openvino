@@ -5,9 +5,10 @@
 #pragma once
 
 #include <cassert>
-#include <transformations/utils/utils.hpp>
 
+#include "config.h"
 #include "transformations/rt_info/primitives_priority_attribute.hpp"
+#include "transformations/utils/utils.hpp"
 
 namespace ov::intel_cpu {
 
@@ -47,5 +48,7 @@ inline bool isDynamicNgraphNode(const std::shared_ptr<const ov::Node>& op) {
     }
     return ret;
 }
+
+Config::ModelType getModelType(const std::shared_ptr<const Model>& model);
 
 }  // namespace ov::intel_cpu

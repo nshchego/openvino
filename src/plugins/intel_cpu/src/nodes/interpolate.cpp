@@ -30,7 +30,7 @@
 #include "shape_inference/static_shape.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/cpu_utils.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl;
 

@@ -21,7 +21,7 @@
 #include "selective_build.h"
 #include "shape_inference/custom/gather.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl::impl::cpu;
 

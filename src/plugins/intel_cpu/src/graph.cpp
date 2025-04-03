@@ -47,7 +47,7 @@
 #include "openvino/runtime/threading/cpu_streams_executor.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/node_dumper.h"
 #include "utils/precision_support.h"
 #include "utils/serialization/map_serializer.hpp"

@@ -26,7 +26,7 @@
 #include "openvino/util/common_util.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/memory_stats_dump.hpp"
-// #include "utils/serialization/serialize.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/serialization/string_serializer.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
@@ -167,6 +167,9 @@ CompiledModel::CompiledModel(BinaryInputBuffer& ib,
     ib >> m_name;
     ib >> m_is_function_quantized;
 printf("--CPU-- CompiledModel::CompiledModel READ\n    m_name: '%s'\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
+
+    // m_cfg.applyRtInfo(ib);
+    // m_cfg.readProperties(new_config, model_type);
 
     IStreamsExecutor::Config executor_config;
     if (m_cfg.exclusiveAsyncRequests) {
@@ -503,6 +506,8 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
     BinaryOutputBuffer model_buff(model_stream);
 
 printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
+    Config::ModelType model_type = getModelType(m_model);
+    model_buff << make_data(&model_type, sizeof(Config::ModelType));
     model_buff << m_name;
     model_buff << m_is_function_quantized;
 

@@ -16,7 +16,7 @@
 #include "openvino/runtime/threading/cpu_message.hpp"
 #include "proxy_mem_blk.h"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using OvString = ov::element_type_traits<ov::element::string>::value_type;
 

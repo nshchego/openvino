@@ -19,8 +19,8 @@
 #include "transformations/utils/utils.hpp"
 #include "utils/codec_xor.hpp"
 #include "utils/denormals.hpp"
+#include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
-// #include "utils/serialization/serialize.hpp"
 #include "weights_cache.hpp"
 
 #if defined(__linux__)
@@ -202,19 +202,19 @@ void Plugin::calculate_streams(Config& conf, const std::shared_ptr<ov::Model>& m
     }
 }
 
-static Config::ModelType getModelType(const std::shared_ptr<const Model>& model) {
-    if (op::util::has_op_with_type<op::v1::Convolution>(model) ||
-        op::util::has_op_with_type<op::v1::ConvolutionBackpropData>(model)) {
-        return Config::ModelType::CNN;
-    }
+// static Config::ModelType getModelType(const std::shared_ptr<const Model>& model) {
+//     if (op::util::has_op_with_type<op::v1::Convolution>(model) ||
+//         op::util::has_op_with_type<op::v1::ConvolutionBackpropData>(model)) {
+//         return Config::ModelType::CNN;
+//     }
 
-    if ((op::util::has_op_with_type<op::v13::ScaledDotProductAttention>(model) && !model->get_variables().empty()) ||
-        op::util::has_op_with_type<ov::op::PagedAttentionExtension>(model)) {
-        return Config::ModelType::LLM;
-    }
+    // if ((op::util::has_op_with_type<op::v13::ScaledDotProductAttention>(model) && !model->get_variables().empty()) ||
+    //     op::util::has_op_with_type<ov::op::PagedAttentionExtension>(model)) {
+    //     return Config::ModelType::LLM;
+    // }
 
-    return Config::ModelType::Unknown;
-}
+//     return Config::ModelType::Unknown;
+// }
 
 std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<const ov::Model>& model,
                                                           const ov::AnyMap& orig_config) const {
@@ -619,7 +619,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     Config conf = engConfig;
     Config::ModelType model_type;
     ib >> make_data(&model_type, sizeof(Config::ModelType));
-    conf.applyRtInfo(ib);
+    // conf.applyRtInfo(ib);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
     const auto& it = new_config.find(ov::loaded_from_cache.name());
     bool loaded_from_cache = false;

@@ -11,7 +11,7 @@
 #include "openvino/op/gelu.hpp"
 #include "openvino/op/round.hpp"
 #include "transformations/cpu_opset/common/op/swish_cpu.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 namespace ov::intel_cpu {
 

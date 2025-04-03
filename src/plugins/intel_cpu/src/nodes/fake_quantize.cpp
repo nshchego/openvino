@@ -26,7 +26,7 @@
 #include "openvino/opsets/opset1_decl.hpp"
 #include "utils/cpu_utils.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 // Quantization ranges validation is switched off by default in order to avoid regressions on user side
 // #define VALIDATE_QUANTIZATION_RANGES

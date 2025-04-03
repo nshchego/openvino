@@ -19,7 +19,7 @@
 #include "openvino/core/parallel.hpp"
 #include "openvino/op/topk.hpp"
 #include "utils/cpu_utils.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl;

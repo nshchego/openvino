@@ -17,7 +17,7 @@
 #include "openvino/opsets/opset1_decl.hpp"
 #include "selective_build.h"
 #include "utils/bfloat16.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl;

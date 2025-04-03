@@ -7,7 +7,7 @@
 #include "common/cpu_memcpy.h"
 #include "openvino/op/constant.hpp"
 #include "openvino/op/tile.hpp"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 namespace ov::intel_cpu::node {
 

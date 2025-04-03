@@ -21,7 +21,7 @@
 #include "openvino/op/binary_convolution.hpp"
 #include "openvino/opsets/opset1_decl.hpp"
 #include "utils/general_utils.h"
-#include "utils/ngraph_utils.hpp"
+#include "utils/model_utils.hpp"
 
 // WA for xbyak.h
 #ifdef _WIN32
