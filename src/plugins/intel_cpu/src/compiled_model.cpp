@@ -164,9 +164,13 @@ CompiledModel::CompiledModel(BinaryInputBuffer& ib,
     }
     m_mutex = std::make_shared<std::mutex>();
 
+printf("--CPU-- CompiledModel::CompiledModel READ\n");
     ib >> m_name;
+printf("    m_name: '%s'\n", m_name.data());
+    ib >> m_cfg.modelPreferThreads;
+printf("    modelPreferThreads: '%d'\n", m_cfg.modelPreferThreads);
     ib >> m_is_function_quantized;
-printf("--CPU-- CompiledModel::CompiledModel READ\n    m_name: '%s'\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
+printf("    m_is_function_quantized: %d\n", int(m_is_function_quantized));
 
     // m_cfg.applyRtInfo(ib);
     // m_cfg.readProperties(new_config, model_type);
@@ -508,8 +512,8 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
 printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
     Config::ModelType model_type = getModelType(m_model);
     model_buff << make_data(&model_type, sizeof(Config::ModelType));
-    model_buff << m_cfg.modelPreferThreads;
     model_buff << m_name;
+    model_buff << m_cfg.modelPreferThreads;
     model_buff << m_is_function_quantized;
 
     return get_graph()._graph.export_graph(model_buff);

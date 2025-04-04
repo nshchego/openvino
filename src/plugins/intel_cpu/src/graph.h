@@ -314,6 +314,10 @@ protected:
                    const std::vector<node::Input::InputConfig>& inputConfigs = {},
                    const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
+    void ReadGraph(const std::shared_ptr<const ov::Model>& subgraph,
+                   const std::vector<node::Input::InputConfig>& inputConfigs = {},
+                   const std::vector<node::Input::OutputConfig>& outputConfigs = {});
+
     void Configure(bool optimize = true);
     void Allocate();
 

@@ -629,7 +629,6 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     }
     conf.readProperties(new_config, model_type);
 
-    ib >> conf.modelPreferThreads;
     auto compiled_model = std::make_shared<CompiledModel>(ib, shared_from_this(), conf, loaded_from_cache);
     return compiled_model;
 }

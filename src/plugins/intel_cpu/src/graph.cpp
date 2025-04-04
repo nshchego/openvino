@@ -355,7 +355,11 @@ void Graph::Init(const std::shared_ptr<const ov::Model>& model,
 
 void Graph::Init(BinaryInputBuffer& ib,
                  const GraphContext::CPtr& context) {
+    if (IsReady()) {
+        ForgetGraphData();
+    }
 
+    m_context = context;
 }
 
 void Graph::Activate() {
