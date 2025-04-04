@@ -143,6 +143,7 @@ template <typename T>
 class Serializer<BinaryOutputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void save(BinaryOutputBuffer& buffer, const T& object) {
+printf("-WRITE T-\n");
         buffer.write(std::addressof(object), sizeof(object));
     }
 };
@@ -151,6 +152,7 @@ template <typename T>
 class Serializer<BinaryInputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void load(BinaryInputBuffer& buffer, T& object) {
+printf("-READ T-\n");
         buffer.read(std::addressof(object), sizeof(object));
     }
 };
@@ -159,6 +161,8 @@ template <typename T>
 class Serializer<BinaryOutputBuffer, Data<T>> {
 public:
     static void save(BinaryOutputBuffer& buffer, const Data<T>& bin_data) {
+// printf("-WRITE Data-\n");
+std::cout << "-WRITE Data-\n";
         buffer.write(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
     }
 };
@@ -167,6 +171,8 @@ template <typename T>
 class Serializer<BinaryInputBuffer, Data<T>> {
 public:
     static void load(BinaryInputBuffer& buffer, Data<T>& bin_data) {
+// printf("-READ Data-\n");
+std::cout << "-READ Data-\n";
         buffer.read(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
     }
 };

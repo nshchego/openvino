@@ -508,6 +508,7 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
 printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
     Config::ModelType model_type = getModelType(m_model);
     model_buff << make_data(&model_type, sizeof(Config::ModelType));
+    model_buff << m_cfg.modelPreferThreads;
     model_buff << m_name;
     model_buff << m_is_function_quantized;
 
