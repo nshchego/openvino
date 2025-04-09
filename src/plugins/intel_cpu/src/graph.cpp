@@ -68,7 +68,7 @@ Graph::~Graph() {
 
 template <typename NET>
 void Graph::CreateGraph(NET& model, const GraphContext::CPtr& context) {
-printf("[CPU] Graph::CreateGraph\n");
+printf("--CPU-- Graph::CreateGraph 1\n");
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::intel_cpu_LT, "CreateGraph");
 
     Init(model, context);
@@ -112,6 +112,7 @@ void Graph::CreateGraph(const std::vector<NodePtr>& graphNodes,
                         const std::vector<EdgePtr>& graphEdges,
                         const GraphContext::CPtr& context,
                         std::string name) {
+printf("--CPU-- Graph::CreateGraph 2\n");
     Init(graphNodes, graphEdges, context, std::move(name));
 
     Activate();

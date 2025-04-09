@@ -15,6 +15,8 @@
 #include "openvino/openvino.hpp"
 #include "openvino/pass/serialize.hpp"
 
+#include "../../../../src/common/util/include/openvino/util/codec_xor.hpp"
+
 #ifndef IN_OV_COMPONENT
 #    define IN_OV_COMPONENT
 #    define WAS_OV_LIBRARY_DEFINED
@@ -612,6 +614,8 @@ int main(int argc, char* argv[]) {
                  //device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SPEED;
                  device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SIZE;
             }
+            //ov::EncryptionCallbacks endec{ov::util::codec_xor, ov::util::codec_xor};
+            //device_config[ov::cache_encryption_callbacks.name()] = endec;
         }
         auto result = std::find_if(config.begin(), config.end(), [&](const std::pair<std::string, ov::AnyMap>& item) {
             return device_name.find(item.first) == 0;
