@@ -22,6 +22,7 @@
 #include "edge.h"
 #include "memory_desc/cpu_memory_desc_utils.h"
 #include "memory_desc/dnnl_blocked_memory_desc.h"
+#include "nodes_factory.hpp"
 #include "nodes/common/cpu_convert.h"
 #include "nodes/conv.h"
 #include "nodes/eltwise.h"
@@ -44,11 +45,6 @@ using namespace openvino;
 using namespace ov::intel_cpu::node;
 
 namespace ov::intel_cpu {
-
-Node::NodesFactory& Node::factory() {
-    static NodesFactory factoryInstance;
-    return factoryInstance;
-}
 
 Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const ShapeInferFactory& shapeInferFactory)
     : context(std::move(ctx)),
@@ -167,6 +163,12 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
     if (ov::fp16_compression_is_disabled(op)) {
         keepOriginalPrecision = true;
     }
+}
+
+Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
+    : context(ctx),
+      profiling("tmp") {
+
 }
 
 Node::Node(const std::string& type,
@@ -1583,57 +1585,6 @@ ov::element::Type Node::getRuntimePrecision() const {
     }
 
     return runtimePrecision;
-}
-
-Node* Node::NodesFactory::create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) {
-    Node* newNode = nullptr;
-    std::string errorMessage;
-    if (newNode == nullptr) {
-        try {
-            std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
-            if (ol != nullptr && ol->created()) {
-                newNode = ol.release();
-            }
-        } catch (const ov::Exception& ex) {
-            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                errorMessage += ex.what();
-            } else {
-                throw;
-            }
-        }
-    }
-
-    if (newNode == nullptr) {
-        try {
-            std::unique_ptr<Node> ol(new Reference(op, context, errorMessage));
-            if (ol != nullptr && ol->created()) {
-                newNode = ol.release();
-            }
-        } catch (const ov::Exception& ex) {
-            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                const std::string currErrorMess = ex.what();
-                if (!currErrorMess.empty()) {
-                    errorMessage += errorMessage.empty() ? currErrorMess : "\n" + currErrorMess;
-                }
-            } else {
-                throw;
-            }
-        }
-    }
-
-    if (!newNode) {
-        std::string errorDetails;
-        if (!errorMessage.empty()) {
-            errorDetails = "\nDetails:\n" + errorMessage;
-        }
-        OPENVINO_THROW("Unsupported operation of type: ",
-                       op->get_type_name(),
-                       " name: ",
-                       op->get_friendly_name(),
-                       errorDetails);
-    }
-
-    return newNode;
 }
 
 bool Node::canBePerformedAsScaleShift(const Node* parentNode) const {

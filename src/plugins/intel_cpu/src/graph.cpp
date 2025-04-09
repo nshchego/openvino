@@ -31,6 +31,7 @@
 #include "memory_control.hpp"
 #include "memory_desc/cpu_memory_desc_utils.h"
 #include "memory_desc/dnnl_blocked_memory_desc.h"
+#include "nodes_factory.hpp"
 #include "nodes/common/cpu_convert.h"
 #include "nodes/common/cpu_memcpy.h"
 #include "nodes/convert.h"
@@ -182,7 +183,7 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
             return node;
         }
 
-        return NodePtr(Node::factory().create(op, m_context));
+        return NodePtr(NodesFactory<const std::shared_ptr<ov::Node>&>::factory().create(op, m_context));
     };
 
     for (const auto& op : model->get_ordered_ops()) {
@@ -265,6 +266,76 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
             const auto parent = parentEdge->getParent();
             parent->setOriginalOutputPrecisionAtPort(parentEdge->getInputNum(), precToSet);
         }
+    }
+}
+
+void Graph::ReadGraph(BinaryInputBuffer& ib,
+                      const std::vector<node::Input::InputConfig>& inputConfigs,
+                      const std::vector<node::Input::OutputConfig>& outputConfigs) {
+    size_t nodes_num = 0lu;
+    ib >> nodes_num;
+    auto createNode = [&]() -> NodePtr {
+        // // special handling for Parameters and Results
+        // if (op->get_type_info() == op::v0::Parameter::get_type_info_static()) {
+        //     auto input_index = model->get_parameter_index(ov::as_type_ptr<op::v0::Parameter>(op));
+        //     OPENVINO_ASSERT(input_index >= 0,
+        //                     "CPU plugin cannot find op: ",
+        //                     op->get_friendly_name(),
+        //                     " in model parameter list!");
+
+        //     const auto& config = static_cast<size_t>(input_index) < inputConfigs.size() ? inputConfigs[input_index]
+        //                                                                                 : node::Input::InputConfig{};
+        //     NodePtr node = std::make_shared<node::Input>(op, m_context, config);
+        //     inputNodesMap[input_index] = node;
+
+        //     if (node->isDynamicNode()) {
+        //         graphHasDynamicInput = true;
+        //     }
+
+        //     return node;
+        // }
+
+        // if (op->get_type_info() == op::v0::Result::get_type_info_static()) {
+        //     auto output_index = model->get_result_index(ov::as_type_ptr<op::v0::Result>(op));
+        //     OPENVINO_ASSERT(output_index >= 0,
+        //                     "CPU plugin cannot find op: ",
+        //                     op->get_friendly_name(),
+        //                     " in model result list!");
+
+        //     const auto& config = static_cast<size_t>(output_index) < outputConfigs.size() ? outputConfigs[output_index]
+        //                                                                                     : node::Input::OutputConfig{};
+        //     NodePtr node = std::make_shared<node::Input>(op, m_context, config);
+        //     outputNodesMap[output_index] = node;
+
+        //     return node;
+        // }
+
+        return NodePtr(NodesFactory<BinaryInputBuffer&>::factory().create(ib, m_context));
+    };
+
+    for (size_t i = 0lu; i < nodes_num; i++) {
+        const NodePtr node = createNode();
+
+        AddNode(node);
+    //     op2node[op] = node;
+
+    //     for (size_t port = 0; port < op->get_input_size(); port++) {
+    //         auto parentOp = op->get_input_node_shared_ptr(port);
+    //         auto parentNode = op2node[parentOp];
+
+    //         CreateEdge(parentNode, node, getParentOutputPort(op, parentOp, port), static_cast<int>(port));
+    //     }
+
+    //     if (!one_of(op->get_type_info(),
+    //                 op::v0::Result::get_type_info_static(),
+    //                 op::v3::Assign::get_type_info_static(),
+    //                 op::v6::Assign::get_type_info_static())) {
+    //         for (size_t oi = 0; oi < op->get_output_size(); oi++) {
+    //             if (op->get_output_target_inputs(oi).empty()) {
+    //                 unusedOutputs.push_back(op->output(oi));
+    //             }
+    //         }
+    //     }
     }
 }
 
@@ -360,6 +431,9 @@ void Graph::Init(BinaryInputBuffer& ib,
     }
 
     m_context = context;
+    m_stream = dnnl::stream(getEngine());
+
+    ReadGraph(ib);
 }
 
 void Graph::Activate() {

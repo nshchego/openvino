@@ -52,6 +52,8 @@ public:
 
     Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, const OutputConfig& config);
 
+    Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void initOptimalPrimitiveDescriptor() override;

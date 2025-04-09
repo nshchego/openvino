@@ -7,6 +7,7 @@
 #include "cpu_streams_calculation.hpp"
 #include "internal_properties.hpp"
 #include "itt.h"
+#include "nodes_factory.hpp"
 #include "openvino/core/parallel.hpp"
 #include "openvino/op/paged_attention.hpp"
 #include "openvino/runtime/intel_cpu/properties.hpp"
@@ -562,7 +563,7 @@ ov::SupportedOpsMap Plugin::query_model(const std::shared_ptr<const ov::Model>& 
         [&](const std::shared_ptr<ov::Node>& op) {
             std::unique_ptr<Node> ptr;
             try {
-                ptr.reset(Node::factory().create(op, context));
+                ptr.reset(NodesFactory<const std::shared_ptr<ov::Node>&>::factory().create(op, context));
             } catch (const ov::Exception&) {
                 return false;
             }

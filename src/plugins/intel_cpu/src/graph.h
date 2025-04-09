@@ -314,7 +314,7 @@ protected:
                    const std::vector<node::Input::InputConfig>& inputConfigs = {},
                    const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
-    void ReadGraph(const std::shared_ptr<const ov::Model>& subgraph,
+    void ReadGraph(BinaryInputBuffer& ib,
                    const std::vector<node::Input::InputConfig>& inputConfigs = {},
                    const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 

@@ -376,6 +376,12 @@ Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
     }
 }
 
+
+Input::Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context, PassThroughShapeInferFactory()) {
+
+}
+
 void Input::cloneBlobIfRequired() {
     const auto prec = m_constOp->get_element_type();
     if (prec == ov::element::dynamic && shape_size(m_constOp->get_shape()) == 0) {

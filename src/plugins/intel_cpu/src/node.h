@@ -177,6 +177,9 @@ private:
     ExecutorFactoryLegacyPtr executorFactory;
 };
 
+// template <typename SrcType>
+// class NodesFactory;
+
 class Node {
 public:
     Node(const Node&) = delete;
@@ -225,8 +228,11 @@ public:
         openvino::itt::handle_t initOptimalPrimitiveDescriptor;
     };
 
-    class NodesFactory;
-    static NodesFactory& factory();
+    // template <typename SrcType>
+    // static NodesFactory<SrcType>& factory() {
+    //     static NodesFactory<SrcType> factory_instance;
+    //     return factory_instance;
+    // }
 
     virtual ~Node() = default;
 
@@ -780,6 +786,8 @@ protected:
 
     Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const ShapeInferFactory& shapeInferFactory);
 
+    Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory);
+
     Node(const std::string& type,
          std::vector<Shape> inputShapes,
          std::vector<Shape> outputShapes,
@@ -953,17 +961,30 @@ constexpr uint64_t PortMask(T... rest) {
     return util::bit::mask(rest...);
 }
 
-class Node::NodesFactory
-    : public openvino::cc::Factory<Type, Node*(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr)> {
-public:
-    NodesFactory();
+// class Node::NodesFactory
+//     : public openvino::cc::Factory<Type, Node*(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr)> {
+// public:
+//     NodesFactory();
 
-    Node* create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
-};
+//     Node* create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+// };
+
+// template <typename SrcType>
+// class Node::NodesFactory
+//     : public openvino::cc::Factory<Type, Node*(SrcType src, const GraphContext::CPtr&)> {
+// public:
+//     NodesFactory();
+
+//     Node* create(SrcType ib, const GraphContext::CPtr& context);
+// };
 
 template <typename NodeType>
 struct NodeImpl : public NodeType {
-    NodeImpl(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr context) : NodeType(op, context) {
+    NodeImpl(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) : NodeType(op, context) {
+        NodeType::perfCounters().template buildClassCounters<NodeType>(NameFromType(NodeType::getType()));
+    }
+
+    NodeImpl(BinaryInputBuffer& ib, const GraphContext::CPtr& context) : NodeType(ib, context) {
         NodeType::perfCounters().template buildClassCounters<NodeType>(NameFromType(NodeType::getType()));
     }
 };
