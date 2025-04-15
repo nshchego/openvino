@@ -62,6 +62,7 @@ static bool shouldBeDumped(const NodePtr& node, const DebugCapsConfig& config, c
         bool matched = false;
 
         while (ss >> type) {
+// printf("shouldBeDumped name: '%s'; actual: '%s'; req: '%s'\n", node->getName().data(), NameFromType(node->getType()).data(), type.data());
             if (NameFromType(node->getType()) == type) {  // type matches
                 matched = true;
                 break;
@@ -75,6 +76,12 @@ static bool shouldBeDumped(const NodePtr& node, const DebugCapsConfig& config, c
 
     if (auto it = dumpFilters.find(DebugCapsConfig::FILTER::BY_NAME);
         it != dumpFilters.end()) {  // filter by name configured
+// std::stringstream ss(dumpFilters.at(DebugCapsConfig::FILTER::BY_NAME));
+// std::string name;
+// while (ss >> name) {
+// printf("shouldBeDumped name: '%s'; actual: '%s'; req_name: '%s'\n",
+//     node->getName().data(), NameFromType(node->getType()).data(), name.data());
+// }
         if (it->second != "*" &&    // to have 'single char' option for matching all the names
             !std::regex_match(node->getName(), std::regex(it->second))) {  // name does not match
             return false;

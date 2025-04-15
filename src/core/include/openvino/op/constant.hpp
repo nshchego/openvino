@@ -34,7 +34,7 @@ public:
 
     // Constant() = default;
     Constant() {
-printf("--CORE-- Constant 0 %s\n", m_element_type.get_type_name().data());
+// printf("--CORE-- Constant 0 %s\n", m_element_type.get_type_name().data());
     }
 
     /// \brief Initialize a constant from ov::Tensor

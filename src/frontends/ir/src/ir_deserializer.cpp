@@ -20,6 +20,8 @@
 #include "openvino/op/util/op_types.hpp"
 #include "openvino/op/util/read_value_base.hpp"
 #include "openvino/op/util/variable.hpp"
+// #include "openvino/reference/convert.hpp"
+#include "../../../core/reference/include/openvino/reference/convert.hpp"
 #include "openvino/runtime/shared_buffer.hpp"
 #include "openvino/runtime/string_aligned_buffer.hpp"
 #include "openvino/util/xml_parse_utils.hpp"
@@ -262,49 +264,53 @@ ov::op::v5::Loop::SpecialBodyPorts ov::XmlDeserializer::parse_purpose_attribute(
 }
 
 namespace {
-template <typename src_type, typename dst_type>
-inline dst_type convert_value(src_type val) {
-    if (val > std::numeric_limits<dst_type>::max()) {
-        return std::numeric_limits<dst_type>::max();
-    } else if (val < std::numeric_limits<dst_type>::lowest()) {
-        return std::numeric_limits<dst_type>::lowest();
-    }
-    return static_cast<dst_type>(val);
-}
+// template <typename src_type, typename dst_type>
+// inline dst_type convert_value(src_type val) {
+//     if (val > std::numeric_limits<dst_type>::max()) {
+//         return std::numeric_limits<dst_type>::max();
+//     } else if (val < std::numeric_limits<dst_type>::lowest()) {
+//         return std::numeric_limits<dst_type>::lowest();
+//     }
+//     return static_cast<dst_type>(val);
+// }
 
-template <ov::element::Type_t DT_FROM, ov::element::Type_t DT_TO>
-void convert_dt(char* dst, const char* src, size_t el_num) {
-    using src_type = typename ov::element_type_traits<DT_FROM>::value_type;
-    using dst_type = typename ov::element_type_traits<DT_TO>::value_type;
+// template <ov::element::Type_t DT_FROM, ov::element::Type_t DT_TO>
+// void convert_dt(char* dst, const char* src, size_t el_num) {
+//     using src_type = typename ov::element_type_traits<DT_FROM>::value_type;
+//     using dst_type = typename ov::element_type_traits<DT_TO>::value_type;
 
-    auto src_data = reinterpret_cast<const src_type*>(src);
-    auto dst_data = reinterpret_cast<dst_type*>(dst);
-if (el_num > 1) {
-    printf("--FE_IR-- convert_dt size: %lu\n", el_num);
-}
+//     auto src_data = reinterpret_cast<const src_type*>(src);
+//     auto dst_data = reinterpret_cast<dst_type*>(dst);
+// if (el_num > 1) {
+//     printf("--FE_IR-- convert_dt size: %lu\n", el_num);
+// }
 
-    for (size_t i = 0lu; i < el_num; i++) {
-        dst_data[i] = convert_value<src_type, dst_type>(src_data[i]);
-    }
-}
+//     for (size_t i = 0lu; i < el_num; i++) {
+//         dst_data[i] = convert_value<src_type, dst_type>(src_data[i]);
+//     }
+// }
 
 void convert_dt(ov::element::Type to_dt, ov::element::Type from_dt, char* dst, const char* src, size_t el_num) {
-    if (from_dt == ov::element::i64 && to_dt == ov::element::i32) {
-        convert_dt<ov::element::Type_t::i64, ov::element::Type_t::i32>(dst, src, el_num);
-    } else if (from_dt == ov::element::f32 && to_dt == ov::element::f16) {
-        convert_dt<ov::element::Type_t::f32, ov::element::Type_t::f16>(dst, src, el_num);
-    } else if (from_dt == ov::element::f16 && to_dt == ov::element::f32) {
-        convert_dt<ov::element::Type_t::f16, ov::element::Type_t::f32>(dst, src, el_num);
+    if (from_dt == ov::element::f16 && to_dt == ov::element::f32) {
+        ov::reference::convert(reinterpret_cast<const ov::float16*>(src), reinterpret_cast<float*>(dst), el_num);
+    } else if (from_dt == ov::element::i64 && to_dt == ov::element::i32) {
+        ov::reference::convert(reinterpret_cast<const int64_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
+    } else if (from_dt == ov::element::u64 && to_dt == ov::element::i32) {
+        ov::reference::convert(reinterpret_cast<const uint64_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
     } else if (from_dt == ov::element::bf16 && to_dt == ov::element::f32) {
-        convert_dt<ov::element::Type_t::bf16, ov::element::Type_t::f32>(dst, src, el_num);
-    } else if (from_dt == ov::element::f32 && to_dt == ov::element::bf16) {
-        convert_dt<ov::element::Type_t::f32, ov::element::Type_t::bf16>(dst, src, el_num);
+        ov::reference::convert(reinterpret_cast<const ov::bfloat16*>(src), reinterpret_cast<float*>(dst), el_num);
     } else if (from_dt == ov::element::u8 && to_dt == ov::element::i32) {
-        convert_dt<ov::element::Type_t::u8, ov::element::Type_t::i32>(dst, src, el_num);
-    } else if (from_dt == ov::element::i8 && to_dt == ov::element::f32) {
-        convert_dt<ov::element::Type_t::i8, ov::element::Type_t::f32>(dst, src, el_num);
+        ov::reference::convert(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
+    } else if (from_dt == ov::element::i8 && to_dt == ov::element::i32) {
+        ov::reference::convert(reinterpret_cast<const int8_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
     } else if (from_dt == ov::element::u8 && to_dt == ov::element::f32) {
-        convert_dt<ov::element::Type_t::u8, ov::element::Type_t::f32>(dst, src, el_num);
+        ov::reference::convert(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<float*>(dst), el_num);
+    } else if (from_dt == ov::element::i8 && to_dt == ov::element::f32) {
+        ov::reference::convert(reinterpret_cast<const int8_t*>(src), reinterpret_cast<float*>(dst), el_num);
+    } else if (from_dt == ov::element::f32 && to_dt == ov::element::f16) {
+        ov::reference::convert(reinterpret_cast<const float*>(src), reinterpret_cast<ov::float16*>(dst), el_num);
+    } else if (from_dt == ov::element::f32 && to_dt == ov::element::bf16) {
+        ov::reference::convert(reinterpret_cast<const float*>(src), reinterpret_cast<ov::bfloat16*>(dst), el_num);
     } else {
         OPENVINO_THROW("Unsupported element types conversion from ", from_dt, " to ", to_dt);
     }
@@ -312,6 +318,7 @@ void convert_dt(ov::element::Type to_dt, ov::element::Type from_dt, char* dst, c
 }  // namespace
 
 void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) {
+printf("--IR_FE-- XmlDeserializer::on_adapter\n");
     static const std::unordered_set<std::string> skip_names = {"input_descriptions",
                                                                "output_descriptions",
                                                                "special_body_ports",
@@ -436,6 +443,7 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
 
             const auto el_num = ov::shape_size(shape);
             const auto el_type = ov::element::Type(el_type_str);
+printf("    DT: '%s'\n", el_type.c_type_string().data());
             std::shared_ptr<ov::AlignedBuffer> weights_buf = m_weights;
             char* data = nullptr;
 
@@ -447,10 +455,12 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
                     for (auto child : rt_info.children()) {
 printf("    RT child: '%s'\n", child.name());
                         for (auto attr : child.attributes()) {
+printf("        name: '%s'; val: '%s'\n", attr.name(), attr.value());
                             if (strcmp(attr.name(), "name") == 0 &&
                                 strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
-printf("    Child attribute: '%s':'%s'\n", attr.name(), attr.value());
-                                ov::element::Type original_dt(child.attribute("original_dtype").value());
+printf("            Child attribute: '%s':'%s'\n", attr.name(), attr.value());
+                                const ov::element::Type original_dt(child.attribute("original_dtype").value());
+printf("            DT: '%s'; ORIGIN DT:'%s'\n", el_type.c_type_string().data(), original_dt.c_type_string().data());
                                 offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
                                 origin_size = static_cast<size_t>(pugixml::get_uint64_attr(child, "original_size"));
                                 actual_size = ((el_num * el_type.bitwidth() + 7) >> 3);
@@ -1184,7 +1194,7 @@ if (params.name == "Constant_3202") {
                 }
             } else if (constant->get_output_element_type(0) == ov::element::Type_t::f32) {
                 auto sd = reinterpret_cast<const float*>(src_data);
-                for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), 10llu); i++) {
+                for (size_t i = 0lu; i < std::min(constant->get_byte_size() / sizeof(float), size_t{10}); i++) {
                 // for (size_t i = 0lu; i < constant->get_byte_size() / sizeof(float); i++) {
                     tmp += std::to_string(sd[i]) + "; ";
                 }
