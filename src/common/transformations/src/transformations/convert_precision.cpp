@@ -38,9 +38,9 @@ bool store_original_type_as_attribute(const std::shared_ptr<ov::Node>& node, con
 
 bool fuse_type_to_variable(const std::shared_ptr<op::util::Variable>& variable, const precisions_map& precisions);
 
-// bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
-//                            const precisions_map& precisions,
-//                            const std::vector<ov::Input<ov::Node>>& consumers);
+bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
+                           const precisions_map& precisions,
+                           const std::vector<ov::Input<ov::Node>>& consumers);
 bool fuse_type_to_shapeof(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions);
 bool fuse_type_to_shapeof_v0(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions);
 bool fuse_type_to_random_uniform_v8(const std::shared_ptr<ov::Node>& node, const precisions_map& precisions);
@@ -1366,7 +1366,7 @@ std::shared_ptr<Node> convert_low_precisions_int(std::shared_ptr<ov::op::v0::Con
 
 }  // namespace
 
-bool ov::fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
+bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
                            const precisions_map& precisions,
                            const std::vector<Input<Node>>& consumers) {
     // Consts marked with is_keep_const_precision should be kept in their own precision until they reach the plugin

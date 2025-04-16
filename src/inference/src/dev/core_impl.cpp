@@ -1605,7 +1605,7 @@ printf("--CORE-- CoreImpl::load_model_from_cache Exception\n");
         // throw;
     }
 
-    // fallback scenario
+    // Fallback scenario
     if (!compiled_model) {
 printf("--CORE-- CoreImpl::load_model_from_cache Could not load model from cache.\n");
         OPENVINO_ERR("Could not load model from cache.");

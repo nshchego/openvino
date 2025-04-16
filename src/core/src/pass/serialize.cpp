@@ -596,25 +596,7 @@ public:
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>>(&adapter)) {
             if (name == "value" && translate_type_name(m_node_type_name) == "Const") {
 printf("--CORE-- XmlSerializer::on_adapter CONST dt: %s\n", m_output_element_type.c_type_string().data());
-                bool attr_found = false;
-                for (auto child : m_xml_node.children()) {
-                // if (auto rt_info = m_xml_node.child("rt_info")) {
-printf("    m_xml_node child: '%s'\n", child.name());
-                    // for (auto child : rt_info.children()) {
-                    //     printf("    RT child: '%s'\n", child.name());
-                    //     for (auto attr : child.attributes()) {
-                    //         if (strcmp(attr.name(), "name") == 0 && strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
-                    //             attr_found = true;
-                    //             break;
-                    //         }
-                    //     }
-                    //     if (attr_found) {
-                    //         break;
-                    //     }
-                    // }
-                }
      
-                // if (!attr_found) {
                 const size_t size = m_weightless_const ? 0lu : a->get()->size();
                 size_t new_size = 0lu;
 if (!m_weightless_const) {
@@ -636,7 +618,6 @@ printf("    new_size: %lu; offset: %ld\n", new_size, offset);
 
                 m_xml_node.append_attribute("offset").set_value(static_cast<unsigned long long>(offset));
                 m_xml_node.append_attribute("size").set_value(static_cast<unsigned long long>(new_size));
-                // }
             }
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<ov::op::util::FrameworkNodeAttrs>>(&adapter)) {
             const auto& attrs = a->get();
@@ -1280,7 +1261,6 @@ if (ov::is_type<ov::op::v0::Constant>(n.get())) {
         }
 
         // fill <data> general attributes
-        // if (!weightless_const) {
         {
             bool compress_to_fp16 = false;
             ov::element::Type output_element_type = ov::element::dynamic;

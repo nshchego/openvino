@@ -112,11 +112,3 @@ private:
     bool m_convert_input_output_precision;
     bool m_store_original_precision_as_rt_attribute;
 };
-
-namespace ov {
-
-bool fuse_type_to_constant(const std::shared_ptr<ov::Node>& node,
-                           const precisions_map& precisions,
-                           const std::vector<ov::Input<ov::Node>>& consumers);
-
-}

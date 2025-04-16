@@ -221,14 +221,14 @@ void ModelDeserializer::process_stream(std::shared_ptr<ov::Model>& model) {
     set_info(root, model);
 }
 
-std::shared_ptr<ov::AlignedBuffer> ModelDeserializer::convert_weights(const std::shared_ptr<MappedMemory>& in_mem) {
-    // dataBlob = ov::Tensor(ov::element::u8, ov::Shape({hdr.consts_size}));
-    auto dst = std::make_shared<uint8_t>(in_mem->size());
+// std::shared_ptr<ov::AlignedBuffer> ModelDeserializer::convert_weights(const std::shared_ptr<MappedMemory>& in_mem) {
+//     // dataBlob = ov::Tensor(ov::element::u8, ov::Shape({hdr.consts_size}));
+//     auto dst = std::make_shared<uint8_t>(in_mem->size());
 
-    // mmap->data(), mmap->size();
-    auto res =
-            std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(in_mem->data(), in_mem->size(), in_mem);
-    return res;
-}
+//     // mmap->data(), mmap->size();
+//     auto res =
+//             std::make_shared<ov::SharedBuffer<std::shared_ptr<MappedMemory>>>(in_mem->data(), in_mem->size(), in_mem);
+//     return res;
+// }
 
 }  // namespace ov::intel_cpu

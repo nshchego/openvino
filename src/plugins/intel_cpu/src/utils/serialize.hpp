@@ -50,7 +50,7 @@ protected:
 
     void process_stream(std::shared_ptr<ov::Model>& model);
 
-    std::shared_ptr<ov::AlignedBuffer> convert_weights(const std::shared_ptr<MappedMemory>&);
+    // std::shared_ptr<ov::AlignedBuffer> convert_weights(const std::shared_ptr<MappedMemory>&);
 
     std::istream& m_istream;
     ModelBuilder m_model_builder;
