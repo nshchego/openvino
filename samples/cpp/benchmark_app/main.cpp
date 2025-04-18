@@ -611,7 +611,7 @@ int main(int argc, char* argv[]) {
 
             if (!FLAGS_cache_dir.empty()) {
                 // Choose between better model compilation time and cache file size.
-                 //device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SPEED;
+                //  device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SPEED;
                  device_config[ov::cache_mode.name()] = ov::CacheMode::OPTIMIZE_SIZE;
             }
             //ov::EncryptionCallbacks endec{ov::util::codec_xor, ov::util::codec_xor};

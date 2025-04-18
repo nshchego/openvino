@@ -608,6 +608,9 @@ if (!m_weightless_const) {
     }
     printf("    data: {%s}\n", tmp.data());
 }
+if (size == 0) {
+    printf("    0 size\n");
+}
                 int64_t offset = m_constant_write_handler.write(static_cast<const char*>(a->get()->get_ptr()),
                                                                 size,
                                                                 new_size,
