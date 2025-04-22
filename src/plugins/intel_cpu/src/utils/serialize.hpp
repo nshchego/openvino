@@ -1,14 +1,13 @@
 // Copyright (C) 2018-2025 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
+
 #pragma once
 
 #include <pugixml.hpp>
 
 #include "openvino/core/model.hpp"
-#include "openvino/pass/serialize.hpp"
 #include "openvino/runtime/aligned_buffer.hpp"
-#include "openvino/util/mmap_object.hpp"
 #include "utils/codec_xor.hpp"
 
 namespace ov::intel_cpu {
@@ -17,13 +16,14 @@ class ModelSerializer {
 public:
     using CacheEncrypt = std::function<std::string(const std::string&)>;
 
-    ModelSerializer(std::ostream& ostream, CacheEncrypt encrypt_fn = {});
+    ModelSerializer(std::ostream& ostream, CacheEncrypt encrypt_fn = {}, bool skip_weightless_constants = false);
 
     void operator<<(const std::shared_ptr<ov::Model>& model);
 
 private:
     std::ostream& m_ostream;
     CacheEncrypt m_cache_encrypt;
+    bool m_skip_weightless_constants;
 };
 
 class ModelDeserializer {
@@ -49,8 +49,6 @@ protected:
     void process_mmap(std::shared_ptr<ov::Model>& model, const std::shared_ptr<ov::AlignedBuffer>& memory);
 
     void process_stream(std::shared_ptr<ov::Model>& model);
-
-    // std::shared_ptr<ov::AlignedBuffer> convert_weights(const std::shared_ptr<MappedMemory>&);
 
     std::istream& m_istream;
     ModelBuilder m_model_builder;

@@ -1607,7 +1607,7 @@ printf("--CORE-- CoreImpl::load_model_from_cache Exception\n");
 
     // Fallback scenario
     if (!compiled_model) {
-printf("--CORE-- CoreImpl::load_model_from_cache Could not load model from cache.\n");
+printf("--CORE-- CoreImpl::load_model_from_cache Could not load model from cache. Compile from origin IR.\n");
         OPENVINO_ERR("Could not load model from cache.");
         compiled_model = compile_model_lambda();
     }

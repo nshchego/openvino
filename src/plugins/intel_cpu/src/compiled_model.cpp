@@ -387,7 +387,7 @@ printf("--CPU-- CompiledModel::get_property supported_properties\n");
 }
 
 void CompiledModel::export_model(std::ostream& modelStream) const {
-    ModelSerializer serializer(modelStream, m_cfg.cacheEncrypt);
+    ModelSerializer serializer(modelStream, m_cfg.cacheEncrypt, m_cfg.m_cache_mode == ov::CacheMode::OPTIMIZE_SIZE);
     serializer << m_model;
 }
 
