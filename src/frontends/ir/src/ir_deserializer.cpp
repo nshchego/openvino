@@ -429,7 +429,8 @@ printf("--IR_FE-- XmlDeserializer::on_adapter\n");
             value.copy(data, value.size());
             a->set(buffer);
         } else if (name == "value" && type == "Const") {
-            OPENVINO_ASSERT(m_weights, "Empty weights data in bin file or bin file cannot be found!");
+            OPENVINO_ASSERT(m_weights != nullptr || m_origin_weights != nullptr,
+                            "Empty weights data in bin file or bin file cannot be found!");
             std::vector<int64_t> shape;
             std::string el_type_str;
 

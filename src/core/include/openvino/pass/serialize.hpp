@@ -32,9 +32,15 @@ public:
     };
     bool run_on_model(const std::shared_ptr<ov::Model>& m) override;
 
-    Serialize(std::ostream& xmlFile, std::ostream& binFile, Version version = Version::UNSPECIFIED, bool skip_weightless_constants = false);
+    Serialize(std::ostream& xmlFile,
+              std::ostream& binFile,
+              Version version = Version::UNSPECIFIED,
+              bool skip_weightless_constants = false);
 
-    Serialize(const std::string& xmlPath, const std::string& binPath, Version version = Version::UNSPECIFIED, bool skip_weightless_constants = false);
+    Serialize(const std::string& xmlPath,
+              const std::string& binPath,
+              Version version = Version::UNSPECIFIED,
+              bool skip_weightless_constants = false);
 
     Serialize(const std::filesystem::path& xmlPath,
               const std::filesystem::path& binPath,
@@ -49,7 +55,8 @@ private:
     const std::string m_binPath;
     const Version m_version;
     const std::map<std::string, ov::OpSet> m_custom_opsets;
-    bool m_skip_weightless_constants; // If True, don't serialize weights of Constants nodes with WeightlessCache attribute.
+    // If True, don't serialize weights of Constants nodes with WeightlessCache attribute.
+    bool m_skip_weightless_constants;
 };
 
 /**
@@ -84,7 +91,8 @@ private:
     std::function<void(std::ostream&)> m_custom_data_serializer;
     std::function<std::string(const std::string&)> m_cache_encrypt;
     const Serialize::Version m_version;
-    bool m_skip_weightless_constants; // If True, don't serialize weights of Constants nodes with WeightlessCache attribute.
+    // If True, don't serialize weights of Constants nodes with WeightlessCache attribute.
+    bool m_skip_weightless_constants;
 };
 }  // namespace pass
 }  // namespace ov

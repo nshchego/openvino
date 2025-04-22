@@ -707,11 +707,21 @@ printf("    new_size: %lu; offset: %ld\n", new_size, offset);
             // to layer above (m_xml_node.parent()) as in ngfunction_2_ir() layer (m_xml_node) with empty attributes
             // is removed.
             pugi::xml_node xml_body = m_xml_node.parent().append_child(name.c_str());
-            ngfunction_2_ir(xml_body, *adapter.get(), m_constant_write_handler, m_version, m_deterministic, m_skip_weightless_constants);
+            ngfunction_2_ir(xml_body,
+                            *adapter.get(),
+                            m_constant_write_handler,
+                            m_version,
+                            m_deterministic,
+                            m_skip_weightless_constants);
             xml_body.remove_attribute("name");
             xml_body.remove_attribute("version");
         } else if (name == "net") {
-            ngfunction_2_ir(m_xml_node, *adapter.get(), m_constant_write_handler, m_version, m_deterministic, m_skip_weightless_constants);
+            ngfunction_2_ir(m_xml_node,
+                            *adapter.get(),
+                            m_constant_write_handler,
+                            m_version,
+                            m_deterministic,
+                            m_skip_weightless_constants);
         } else {
             OPENVINO_THROW("Unsupported Model name.");
         }
@@ -1094,7 +1104,9 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
         // <layers/data> general attributes
         pugi::xml_node data = layer.append_child("data");
 
-        auto append_runtime_info = [&n, &skip_weightless_constants](pugi::xml_node& node, ov::RTMap& attributes, bool& weightless_const) {
+        auto append_runtime_info = [&n, &skip_weightless_constants](pugi::xml_node& node,
+                                                                ov::RTMap& attributes,
+                                                                bool& weightless_const) {
             pugi::xml_node rt_node = node.append_child("rt_info");
             bool has_attrs = false;
             for (auto& item : attributes) {
@@ -1383,7 +1395,8 @@ void serializeFunc(std::ostream& xml_file,
                    std::ostream& bin_file,
                    std::shared_ptr<ov::Model> model,
                    ov::pass::Serialize::Version ver,
-                   bool deterministic = false) {
+                   bool deterministic = false,
+                   bool skip_weightless_constants = false) {
     auto version = static_cast<int64_t>(ver);
 
     auto& rt_info = model->get_rt_info();
@@ -1405,7 +1418,15 @@ void serializeFunc(std::ostream& xml_file,
     pugi::xml_document xml_doc;
     pugi::xml_node net_node = xml_doc.append_child(name.c_str());
     ConstantWriter constant_write_handler(bin_file);
-    XmlSerializer visitor(net_node, name, constant_write_handler, version, deterministic);
+    XmlSerializer visitor(net_node,
+                          name,
+                          constant_write_handler,
+                          version,
+                          deterministic,
+                          false,
+                          ov::element::dynamic,
+                          false,
+                          skip_weightless_constants);
     visitor.on_attribute(name, model);
 
     xml_doc.save(xml_file);
@@ -1429,7 +1450,7 @@ bool pass::Serialize::run_on_model(const std::shared_ptr<ov::Model>& model) {
             disable_fp16_compression(node);
 
     if (m_xmlFile && m_binFile) {
-        serializeFunc(*m_xmlFile, *m_binFile, model, m_version);
+        serializeFunc(*m_xmlFile, *m_binFile, model, m_version, false, m_skip_weightless_constants);
     } else {
 #if defined(OPENVINO_ENABLE_UNICODE_PATH_SUPPORT) && defined(_WIN32)
         const auto& xmlPath_ref = ov::util::string_to_wstring(m_xmlPath);
@@ -1454,7 +1475,7 @@ bool pass::Serialize::run_on_model(const std::shared_ptr<ov::Model>& model) {
         OPENVINO_ASSERT(xml_file, message_xml);
 
         try {
-            serializeFunc(xml_file, bin_file, model, m_version);
+            serializeFunc(xml_file, bin_file, model, m_version, false, m_skip_weightless_constants);
         } catch (const ov::AssertFailure&) {
             // optimization decision was made to create .bin file upfront and
             // write to it directly instead of buffering its content in memory,
@@ -1471,7 +1492,10 @@ bool pass::Serialize::run_on_model(const std::shared_ptr<ov::Model>& model) {
     return false;
 }
 
-pass::Serialize::Serialize(std::ostream& xmlFile, std::ostream& binFile, pass::Serialize::Version version, bool weightless_cache)
+pass::Serialize::Serialize(std::ostream& xmlFile,
+                           std::ostream& binFile,
+                           pass::Serialize::Version version,
+                           bool weightless_cache)
     : m_xmlFile{&xmlFile},
       m_binFile{&binFile},
       m_xmlPath{},
@@ -1479,7 +1503,10 @@ pass::Serialize::Serialize(std::ostream& xmlFile, std::ostream& binFile, pass::S
       m_version{version},
       m_skip_weightless_constants{weightless_cache} {}
 
-pass::Serialize::Serialize(const std::string& xmlPath, const std::string& binPath, pass::Serialize::Version version, bool weightless_cache)
+pass::Serialize::Serialize(const std::string& xmlPath,
+                           const std::string& binPath,
+                           pass::Serialize::Version version,
+                           bool weightless_cache)
     : m_xmlFile{nullptr},
       m_binFile{nullptr},
       m_xmlPath{valid_xml_path(xmlPath)},
@@ -1546,14 +1573,19 @@ bool pass::StreamSerialize::run_on_model(const std::shared_ptr<ov::Model>& model
     const std::string name = "net";
     pugi::xml_document xml_doc;
     pugi::xml_node net_node = xml_doc.append_child(name.c_str());
-//     if (rt_info.count("__weights_path") > 0lu) {
-// printf("--CORE-- StreamSerialize::run_on_model Weights were serialized\n");
-        ConstantWriter constant_write_handler(m_stream);
+    ConstantWriter constant_write_handler(m_stream);
 printf("--CORE-- StreamSerialize::run_on_model m_skip_weightless_constants: %s\n", m_skip_weightless_constants ? "True" : "False");
-        XmlSerializer visitor(net_node, name, constant_write_handler, version, false, false, ov::element::dynamic, false, m_skip_weightless_constants);
-        std::shared_ptr<ov::Model> fun = model;
-        visitor.on_attribute(name, fun);
-    // }
+    XmlSerializer visitor(net_node,
+                          name,
+                          constant_write_handler,
+                          version,
+                          false,
+                          false,
+                          ov::element::dynamic,
+                          false,
+                          m_skip_weightless_constants);
+    std::shared_ptr<ov::Model> fun = model;
+    visitor.on_attribute(name, fun);
 
     // IR
     hdr.model_offset = m_stream.tellp();

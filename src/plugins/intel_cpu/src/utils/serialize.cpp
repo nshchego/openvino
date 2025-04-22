@@ -29,7 +29,11 @@ void ModelSerializer::operator<<(const std::shared_ptr<ov::Model>& model) {
         xml_doc.save(stream);
     };
 
-    ov::pass::StreamSerialize serializer(m_ostream, serialize_info, m_cache_encrypt, pass::Serialize::Version::UNSPECIFIED, m_skip_weightless_constants);
+    ov::pass::StreamSerialize serializer(m_ostream,
+                                         serialize_info,
+                                         m_cache_encrypt,
+                                         pass::Serialize::Version::UNSPECIFIED,
+                                         m_skip_weightless_constants);
     serializer.run_on_model(std::const_pointer_cast<ov::Model>(model->clone()));
 }
 
