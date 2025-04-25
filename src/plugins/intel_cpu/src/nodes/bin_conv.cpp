@@ -984,6 +984,10 @@ BinaryConvolution::BinaryConvolution(const std::shared_ptr<ov::Node>& op, const 
     }
 }
 
+BinaryConvolution::BinaryConvolution(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context, NgraphShapeInferFactory(op)) {
+}
+
 void BinaryConvolution::getSupportedDescriptors() {
     withBinarization = isFusedWith(Type::FakeQuantize);
     withSum = false;

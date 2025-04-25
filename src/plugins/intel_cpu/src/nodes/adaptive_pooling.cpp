@@ -65,6 +65,10 @@ AdaptivePooling::AdaptivePooling(const std::shared_ptr<ov::Node>& op, const Grap
     spatialDimsValue.resize(spatialDimsCount);
 }
 
+AdaptivePooling::AdaptivePooling(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context, AdaptivePoolingShapeInferFactory(op)) {
+}
+
 void AdaptivePooling::getSupportedDescriptors() {
     if (getParentEdges().size() != 2) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges: ", getParentEdges().size());
