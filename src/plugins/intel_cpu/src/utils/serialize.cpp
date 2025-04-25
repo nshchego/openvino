@@ -44,12 +44,12 @@ ModelDeserializer::ModelDeserializer(std::istream& model_stream,
                                      ModelBuilder fn,
                                      const CacheDecrypt& decrypt_fn,
                                      bool decript_from_string,
-                                     const std::string& origin_weights_path)
+                                     std::string origin_weights_path)
     : m_istream(model_stream),
       m_model_builder(std::move(fn)),
       m_decript_from_string(decript_from_string),
       m_model_buffer(std::move(model_buffer)),
-      m_origin_weights_path(origin_weights_path) {
+      m_origin_weights_path(std::move(origin_weights_path)) {
     if (m_decript_from_string) {
         m_cache_decrypt.m_decrypt_str = decrypt_fn.m_decrypt_str;
     } else {

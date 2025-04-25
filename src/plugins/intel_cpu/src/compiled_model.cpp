@@ -380,7 +380,8 @@ printf("--CPU-- CompiledModel::get_property supported_properties\n");
     }
     if (name == ov::value_cache_group_size) {
         return static_cast<decltype(ov::value_cache_group_size)::value_type>(config.valueCacheGroupSize);
-    } else if (name == ov::weights_path) {
+    }
+    if (name == ov::weights_path) {
         return static_cast<decltype(ov::weights_path)::value_type>("");
     }
     OPENVINO_THROW("Unsupported property: ", name);

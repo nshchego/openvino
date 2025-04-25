@@ -37,7 +37,7 @@ public:
                       ModelBuilder fn,
                       const CacheDecrypt& encrypt_fn,
                       bool decript_from_string,
-                      const std::string& origin_weights_path = "");
+                      std::string origin_weights_path = "");
 
     virtual ~ModelDeserializer() = default;
 

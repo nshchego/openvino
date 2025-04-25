@@ -289,13 +289,21 @@ void convert_dt(ov::element::Type to_dt, ov::element::Type from_dt, char* dst, c
     } else if (from_dt == ov::element::f32 && to_dt == ov::element::bf16) {
         ov::reference::convert(reinterpret_cast<const float*>(src), reinterpret_cast<ov::bfloat16*>(dst), el_num);
     } else if (from_dt == ov::element::u4 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::u4>::value_type*>(src), reinterpret_cast<float*>(dst), el_num);
+        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::u4>::value_type*>(src),
+                               reinterpret_cast<float*>(dst),
+                               el_num);
     } else if (from_dt == ov::element::u4 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::u4>::value_type*>(src), reinterpret_cast<ov::float16*>(dst), el_num);
+        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::u4>::value_type*>(src),
+                               reinterpret_cast<ov::float16*>(dst),
+                               el_num);
     } else if (from_dt == ov::element::i4 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::i4>::value_type*>(src), reinterpret_cast<float*>(dst), el_num);
+        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::i4>::value_type*>(src),
+                               reinterpret_cast<float*>(dst),
+                               el_num);
     } else if (from_dt == ov::element::i4 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::i4>::value_type*>(src), reinterpret_cast<ov::float16*>(dst), el_num);
+        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::i4>::value_type*>(src),
+                               reinterpret_cast<ov::float16*>(dst),
+                               el_num);
     } else {
         OPENVINO_THROW("Unsupported element types conversion from ", from_dt, " to ", to_dt);
     }
@@ -457,12 +465,13 @@ printf("            DT: '%s'; ORIGIN DT:'%s'\n", el_type.c_type_string().data(),
                                 if (original_dt == el_type) {
                                     weights_buf = m_origin_weights;
                                 } else {
-                                    std::shared_ptr<char[]> new_buf(new char[actual_size]);
+                                    std::shared_ptr<char> new_buf(new char[actual_size], [](char* p) {
+                                        delete[] p;
+                                    });
                                     data = new_buf.get();
-                                    weights_buf =
-                                        std::make_shared<ov::SharedBuffer<std::shared_ptr<char[]>>>(data,
-                                                                                                    actual_size,
-                                                                                                    new_buf);
+                                    weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char>>>(data,
+                                                                                                            actual_size,
+                                                                                                            new_buf);
                                     convert_dt(el_type,
                                                original_dt,
                                                data,
@@ -947,44 +956,6 @@ static const std::string& translate_type_name(const std::string& name) {
     }
     return name;
 }
-
-// template <typename src_type, typename dst_type>
-// inline dst_type convert_value(src_type val) {
-//     if (val > std::numeric_limits<dst_type>::max()) {
-//         return std::numeric_limits<dst_type>::max();
-//     } else if (val < std::numeric_limits<dst_type>::lowest()) {
-//         return std::numeric_limits<dst_type>::lowest();
-//     }
-//     return static_cast<dst_type>(val);
-// }
-
-// namespace {
-// template <ov::element::Type_t DT_FROM, ov::element::Type_t DT_TO>
-// std::shared_ptr<ov::Node> set_weights(std::shared_ptr<ov::op::v0::Constant>& constant,
-//                                       const std::shared_ptr<ov::AlignedBuffer>& weights,
-//                                       size_t offset) {
-//     using src_type = typename ov::element_type_traits<DT_FROM>::value_type;
-//     using dst_type = typename ov::element_type_traits<DT_TO>::value_type;
-
-//     // const auto* src_data = static_cast<const src_type*>(constant->get_data_ptr());
-//     const auto src_data = reinterpret_cast<const src_type*>(weights->get_ptr<uint8_t>() + offset);
-//     const auto size = shape_size(constant->get_shape());
-// if (size > 1) {
-//     printf("--FE_IR-- set_weights size: %lu\n", size);
-// }
-
-//     auto new_constant = std::make_shared<ov::op::v0::Constant>(DT_TO, constant->get_shape());
-//     new_constant->output(0).set_names(constant->output(0).get_names());
-//     auto* dst_data = const_cast<dst_type*>(reinterpret_cast<const dst_type*>(new_constant->get_data_ptr()));
-//     if (dst_data == nullptr)
-//         OPENVINO_THROW("Can't get destination data pointer");
-
-//     for (size_t i = 0lu; i < size; ++i) {
-//         dst_data[i] = convert_value<src_type, dst_type>(src_data[i]);
-//     }
-//     return new_constant;
-// }
-// }  // namespace
 
 std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov::Output<ov::Node>>& inputs,
                                                            const pugi::xml_node& node,
