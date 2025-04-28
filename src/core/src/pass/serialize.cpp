@@ -610,16 +610,13 @@ if (!m_skip_weightless_constants) {
     }
     printf("    data: {%s}\n", tmp.data());
 }
-if (size == 0) {
-    printf("    0 size\n");
-}
                 int64_t offset = m_constant_write_handler.write(static_cast<const char*>(a->get()->get_ptr()),
                                                                 size,
                                                                 new_size,
                                                                 m_compress_to_fp16,
                                                                 m_output_element_type,
                                                                 m_data_is_temporary);
-printf("    new_size: %lu; offset: %ld\n", new_size, offset);
+printf("    size: %lu; new_size: %lu; offset: %ld\n", size, new_size, offset);
 
                 m_xml_node.append_attribute("offset").set_value(static_cast<unsigned long long>(offset));
                 m_xml_node.append_attribute("size").set_value(static_cast<unsigned long long>(new_size));
