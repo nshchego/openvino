@@ -190,6 +190,7 @@ Node::Node(const std::string& type,
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
+printf("--CPU-- Node '%s':'%s'\n", typeStr.data(), name.data());
     parentEdges.reserve(inputShapes.size());
     childEdges.reserve(outputShapes.size());
 }

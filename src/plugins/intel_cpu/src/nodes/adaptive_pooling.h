@@ -20,7 +20,7 @@ class AdaptivePooling : public Node {
 public:
     AdaptivePooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    AdaptivePooling(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    //AdaptivePooling(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;

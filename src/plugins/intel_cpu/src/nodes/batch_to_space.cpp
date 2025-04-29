@@ -50,9 +50,9 @@ BatchToSpace::BatchToSpace(const std::shared_ptr<ov::Node>& op, const GraphConte
     }
 }
 
-BatchToSpace::BatchToSpace(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
-    : Node(ib, context, NgraphShapeInferFactory(op)) {
-}
+//BatchToSpace::BatchToSpace(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+//    : Node(ib, context, NgraphShapeInferFactory(op)) {
+//}
 
 void BatchToSpace::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {

@@ -9,10 +9,12 @@ namespace ov::intel_cpu {
 
 template <>
 Node* NodesFactory<const std::shared_ptr<ov::Node>&>::create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) {
+printf("--CPU-- NodesFactory::create '%s':'%s'\n", op->get_type_name(), op->get_friendly_name().data());
     Node* newNode = nullptr;
     std::string errorMessage;
     if (newNode == nullptr) {
         try {
+printf("    Try to create CPU node\n");
             std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
             if (ol != nullptr && ol->created()) {
                 newNode = ol.release();
@@ -28,6 +30,7 @@ Node* NodesFactory<const std::shared_ptr<ov::Node>&>::create(const std::shared_p
 
     if (newNode == nullptr) {
         try {
+printf("    Try to create Reference node\n");
             std::unique_ptr<Node> ol(new node::Reference(op, context, errorMessage));
             if (ol != nullptr && ol->created()) {
                 newNode = ol.release();
