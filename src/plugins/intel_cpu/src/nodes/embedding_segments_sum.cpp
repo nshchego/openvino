@@ -75,10 +75,10 @@ void EmbeddingSegmentsSum::initSupportedPrimitiveDescriptors() {
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32}});
-    if (inputShapes.size() > DEFAULT_INDEX_IDX) {
+    if (m_input_shapes.size() > DEFAULT_INDEX_IDX) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
-    if (inputShapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
+    if (m_input_shapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, inDataPrecision);
     }
 

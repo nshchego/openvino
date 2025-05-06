@@ -57,20 +57,20 @@ StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphConte
         attrs.AXES_ID = 5;
     }
 
-    if ((attrs.isStridedSliceOp && (inputShapes.size() < 3 || inputShapes.size() > 4)) ||
+    if ((attrs.isStridedSliceOp && (m_input_shapes.size() < 3 || m_input_shapes.size() > 4)) ||
         (!attrs.isStridedSliceOp &&
-         (inputShapes.size() < (attrs.STRIDE_ID + 1) || inputShapes.size() > (attrs.AXES_ID + 1)))) {
+         (m_input_shapes.size() < (attrs.STRIDE_ID + 1) || m_input_shapes.size() > (attrs.AXES_ID + 1)))) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges");
     }
-    if (outputShapes.size() != 1) {
+    if (m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of output edges");
     }
 
-    if (inputShapes.size() > attrs.STRIDE_ID) {
+    if (m_input_shapes.size() > attrs.STRIDE_ID) {
         isStrideSpecified = true;
     }
 
-    if (inputShapes.size() > attrs.AXES_ID) {
+    if (m_input_shapes.size() > attrs.AXES_ID) {
         isAxesSpecified = true;
     }
 
@@ -113,8 +113,8 @@ StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphConte
         attrs.shrinkAxisMask = createMask(ss->get_shrink_axis_mask());
         attrs.ellipsisMask = createMask(ss->get_ellipsis_mask());
     } else {
-        const size_t length = outputShapes[0].getRank();
-        if (inputShapes.size() > attrs.AXES_ID) {
+        const size_t length = m_output_shapes[0].getRank();
+        if (m_input_shapes.size() > attrs.AXES_ID) {
             attrs.beginMask = std::vector<int>(length, 0);
             attrs.endMask = std::vector<int>(length, 0);
         } else {
@@ -160,10 +160,10 @@ StridedSlice::StridedSlice(const std::shared_ptr<ov::Node>& op, const GraphConte
 
     fillingInParameters(attrs.begin, attrs.BEGIN_ID, 0);
     fillingInParameters(attrs.end, attrs.END_ID, 0);
-    if (inputShapes.size() > attrs.STRIDE_ID) {
+    if (m_input_shapes.size() > attrs.STRIDE_ID) {
         fillingInParameters(attrs.stride, attrs.STRIDE_ID, 1);
     }
-    if (inputShapes.size() > attrs.AXES_ID) {
+    if (m_input_shapes.size() > attrs.AXES_ID) {
         fillingInParameters(attrs.axes, attrs.AXES_ID, 0);
     }
 }

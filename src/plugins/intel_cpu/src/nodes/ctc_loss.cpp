@@ -47,9 +47,9 @@ void CTCLoss::initSupportedPrimitiveDescriptors() {
     }
 
     std::vector<PortConfigurator> inDataConf;
-    inDataConf.reserve(inputShapes.size());
+    inDataConf.reserve(m_input_shapes.size());
     inDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
-    for (size_t i = 1; i < inputShapes.size(); ++i) {
+    for (size_t i = 1; i < m_input_shapes.size(); ++i) {
         inDataConf.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
 
@@ -75,7 +75,7 @@ void CTCLoss::execute([[maybe_unused]] const dnnl::stream& strm) {
     const size_t classesNum = inDims[2];
 
     int blankIndex = classesNum - 1;
-    if (inputShapes.size() > 4) {
+    if (m_input_shapes.size() > 4) {
         blankIndex = getSrcDataAtPortAs<const int>(4)[0];
     }
 

@@ -68,7 +68,7 @@ void Tile::getSupportedDescriptors() {
         THROW_CPU_NODE_ERR("has no output edges.");
     }
     const auto& dstDims0 = getOutputShapeAtPort(0).getDims();
-    for (size_t i = 1lu; i < outputShapes.size(); i++) {
+    for (size_t i = 1lu; i < m_output_shapes.size(); i++) {
         const auto& dstDims = getOutputShapeAtPort(i).getDims();
         if (dstDims.size() != dstDims0.size()) {
             THROW_CPU_NODE_ERR("has output edges 0 and ",
@@ -108,7 +108,7 @@ void Tile::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    supportedPrimitiveDescriptors = getSupportedConfigs(this, outputShapes.size());
+    supportedPrimitiveDescriptors = getSupportedConfigs(this, m_output_shapes.size());
 }
 
 bool Tile::needPrepareParams() const {

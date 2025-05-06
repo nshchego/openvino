@@ -17,6 +17,8 @@ class Convolution : public Node {
 public:
     Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Convolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void getSupportedDescriptors() override{};

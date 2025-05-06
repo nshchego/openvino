@@ -61,6 +61,10 @@ Reshape::Reshape(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     }
 }
 
+Reshape::Reshape(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+}
+
 bool Reshape::needShapeInfer() const {
     const auto& mem = getParentEdgeAt(1)->getMemory();
     if (lastSecondInputValues.empty()) {

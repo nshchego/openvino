@@ -37,9 +37,9 @@
 #include "utils/serialization/buffer.hpp"
 
 #define THROW_CPU_NODE_ERR(...) \
-    OPENVINO_THROW("[CPU] ", getTypeStr(), " node with name '", getName(), "' ", __VA_ARGS__)
+    OPENVINO_THROW("[ CPU ] ", getTypeStr(), " node with name '", getName(), "' ", __VA_ARGS__)
 #define CPU_NODE_ASSERT(condition, ...) \
-    OPENVINO_ASSERT(condition, getTypeStr(), " node with name '", getName(), "' ", __VA_ARGS__)
+    OPENVINO_ASSERT(condition, "[ CPU ] ", getTypeStr(), " node with name '", getName(), "' ", __VA_ARGS__)
 
 namespace ov {
 namespace intel_cpu {
@@ -687,17 +687,17 @@ public:
     }
 
     const Shape& getInputShapeAtPort(size_t port) const {
-        if (inputShapes.size() <= port) {
+        if (m_input_shapes.size() <= port) {
             OPENVINO_THROW("Incorrect input port number for node ", getName());
         }
-        return inputShapes[port];
+        return m_input_shapes[port];
     }
 
     const Shape& getOutputShapeAtPort(size_t port) const {
-        if (outputShapes.size() <= port) {
+        if (m_output_shapes.size() <= port) {
             OPENVINO_THROW("Incorrect output port number for node ", getName());
         }
-        return outputShapes[port];
+        return m_output_shapes[port];
     }
 
     const std::vector<MemoryPtr>& getInternalBlobs() const {
@@ -764,6 +764,9 @@ protected:
         GetPrimitiveMemoryFormatFunc;
     std::vector<GetPrimitiveMemoryFormatFunc> internalBlobDesc;
 
+    std::vector<Shape> m_input_shapes;
+    std::vector<Shape> m_output_shapes;
+    // REMOVE
     std::vector<Shape> inputShapes;
     std::vector<Shape> outputShapes;
 
@@ -787,6 +790,8 @@ protected:
     Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const ShapeInferFactory& shapeInferFactory);
 
     Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory);
+
+    Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx);
 
     Node(const std::string& type,
          std::vector<Shape> inputShapes,

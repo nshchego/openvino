@@ -413,11 +413,11 @@ MemoryInputBase::MemoryInputBase(const std::string& id,
                                  MemoryInputBase::mode mode)
     : Input(output_shape, output_prc, name, type, context),
       MemoryStateNode(id) {
-    outputShapes.emplace_back(output_shape);
+    m_output_shapes.emplace_back(output_shape);
     addOriginalOutputPrecision(output_prc);
     if (input_shape) {
         for (const auto& inp_shape : *input_shape) {
-            inputShapes.push_back(inp_shape);
+            m_input_shapes.push_back(inp_shape);
             isDynamic = isDynamic || inp_shape.isDynamic();
         }
         if (isDynamic && !shapeInference) {
@@ -885,7 +885,7 @@ void MemoryInput::resolveInPlaceEdges(Edge::LOOK look) {
 MemStatePtr MemoryInput::makeState() const {
     // assume ov::Tensor is always dense
     auto original_desc =
-        std::make_shared<CpuBlockedMemoryDesc>(getOriginalOutputPrecisionAtPort(0), outputShapes.at(0));
+        std::make_shared<CpuBlockedMemoryDesc>(getOriginalOutputPrecisionAtPort(0), m_output_shapes.at(0));
 
     auto mem_desc = getBaseMemDescAtOutputPort(0);
     const auto& eng = getEngine();
@@ -951,7 +951,7 @@ void MemoryInputSDPA::assignStateHook() {
 MemStatePtr MemoryInputSDPA::makeState() const {
     // assume ov::Tensor is always dense
     auto original_desc =
-        std::make_shared<CpuBlockedMemoryDesc>(getOriginalOutputPrecisionAtPort(0), outputShapes.at(0));
+        std::make_shared<CpuBlockedMemoryDesc>(getOriginalOutputPrecisionAtPort(0), m_output_shapes.at(0));
 
     auto mem_desc = getBaseMemDescAtOutputPort(0);
 
@@ -980,7 +980,7 @@ MemStatePtr MemoryInputSDPA::makeState() const {
         order = node->getKVCacheOrder();
     }
 
-    auto internal_desc = ArbitraryOrderDescCreator(order).createSharedDesc(kv_precision, outputShapes.at(0));
+    auto internal_desc = ArbitraryOrderDescCreator(order).createSharedDesc(kv_precision, m_output_shapes.at(0));
 
     return std::make_shared<VariableStateKVcache>(state_name,
                                                   original_desc,
@@ -1054,7 +1054,7 @@ MemoryInputSingle::MemoryInputSingle(const std::string& id,
 MemStatePtr MemoryInputSingle::makeState() const {
     // assume ov::Tensor is always dense
     auto original_desc =
-        std::make_shared<CpuBlockedMemoryDesc>(getOriginalOutputPrecisionAtPort(0), outputShapes.at(0));
+        std::make_shared<CpuBlockedMemoryDesc>(getOriginalOutputPrecisionAtPort(0), m_output_shapes.at(0));
 
     auto mem_desc = getBaseMemDescAtOutputPort(0);
     const auto& eng = getEngine();

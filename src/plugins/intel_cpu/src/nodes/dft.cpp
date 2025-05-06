@@ -47,7 +47,7 @@ DFT::DFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     lastInverse = !inverse;
 
     m_is_axes_size_const = is_type<op::v0::Constant>(op->get_input_node_ptr(AXES_INDEX));
-    if (inputShapes.size() > SIGNAL_SIZE_INDEX) {
+    if (m_input_shapes.size() > SIGNAL_SIZE_INDEX) {
         m_is_signal_size_const = is_type<op::v0::Constant>(op->get_input_node_ptr(SIGNAL_SIZE_INDEX));
     }
 }
@@ -69,7 +69,7 @@ void DFT::initSupportedPrimitiveDescriptors() {
         THROW_CPU_NODE_ERR("has unsupported 'axes' input precision: ", axesPrecision.get_type_name());
     }
 
-    if (inputShapes.size() > SIGNAL_SIZE_INDEX) {
+    if (m_input_shapes.size() > SIGNAL_SIZE_INDEX) {
         const auto& signalSizeTensorPrec = getOriginalInputPrecisionAtPort(SIGNAL_SIZE_INDEX);
         if (signalSizeTensorPrec != ov::element::i32 && signalSizeTensorPrec != ov::element::i64) {
             THROW_CPU_NODE_ERR("has unsupported 'signal_size' input precision: ", signalSizeTensorPrec.get_type_name());
@@ -78,7 +78,7 @@ void DFT::initSupportedPrimitiveDescriptors() {
 
     std::vector<PortConfigurator> inDataConfigurators(
         {{LayoutType::ncsp, ov::element::f32}, {LayoutType::ncsp, ov::element::i32}});
-    if (inputShapes.size() > SIGNAL_SIZE_INDEX) {
+    if (m_input_shapes.size() > SIGNAL_SIZE_INDEX) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
 

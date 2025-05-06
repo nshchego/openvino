@@ -253,7 +253,7 @@ Deconvolution::Deconvolution(const std::shared_ptr<ov::Node>& op, const GraphCon
     deconvAttrs.aclFastMath = context->getConfig().aclFastMath;
 #endif
 
-    externOutShape = inputShapes.size() == 3;
+    externOutShape = m_input_shapes.size() == 3;
     biasPort = externOutShape ? 3 : 2;
     if (externOutShape) {
         isConstOutShape = ov::is_type<ov::op::v0::Constant>(op->get_input_node_shared_ptr(2));
@@ -731,7 +731,7 @@ VectorDims Deconvolution::shapeInferInternal(const VectorDims& inDims, std::vect
 
     auto port_mask = shapeInference->get_port_mask();
     if (port_mask) {
-        for (size_t i = 0; i < inputShapes.size(); ++i) {
+        for (size_t i = 0; i < m_input_shapes.size(); ++i) {
             if (port_mask & 1 << i) {
                 if (outSpDims.size() != getInputShapeAtPort(i).getStaticDims()[0]) {
                     THROW_CPU_NODE_ERR(

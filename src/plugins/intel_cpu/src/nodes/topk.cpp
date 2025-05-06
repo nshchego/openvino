@@ -1928,7 +1928,7 @@ TopK::TopK(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
         vec_idx_seq.clear();
         vec_idx_block.clear();
 
-        if (inputShapes.size() != 2 || outputShapes.size() < 2) {
+        if (m_input_shapes.size() != 2 || m_output_shapes.size() < 2) {
             THROW_CPU_NODE_ERR("gets incorrect number of input/output edges!");
         }
 

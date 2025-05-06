@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
+// #include <memory>
+// #include <string>
+// #include <utility>
+// #include <vector>
 
-#include "common/permute_kernel.h"
-#include "executors/transpose_list.hpp"
+#include "executors/transpose.hpp"
+#include "node.h"
 
 namespace ov {
 namespace intel_cpu {
@@ -19,6 +19,8 @@ namespace node {
 class Transpose : public Node {
 public:
     Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    Transpose(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;

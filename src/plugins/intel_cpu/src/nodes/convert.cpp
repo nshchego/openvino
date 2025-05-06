@@ -63,11 +63,11 @@ Convert::Convert(const Shape& shape,
 void Convert::getSupportedDescriptors() {
     // if tensor descriptors are set via setDescs method we need to update the inDims/outDims data
     // from correspond tensor descriptors.
-    if (outputShapes.empty()) {
-        outputShapes.push_back(output->getShape());
+    if (m_output_shapes.empty()) {
+        m_output_shapes.push_back(output->getShape());
     }
-    if (inputShapes.empty()) {
-        inputShapes.push_back(input->getShape());
+    if (m_input_shapes.empty()) {
+        m_input_shapes.push_back(input->getShape());
     }
     if (getParentEdges().size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges");
@@ -125,7 +125,7 @@ void Convert::initSupportedPrimitiveDescriptors() {
         dataConfigOut.setMemDesc(dataConfigOut.getMemDesc()->cloneWithNewPrecision(output->getPrecision()));
         config.outConfs.push_back(dataConfigOut);
         supportedPrimitiveDescriptorsBuilder(config);
-    } else if (inputShapes.size() == 1 && outputShapes.size() == 1) {
+    } else if (m_input_shapes.size() == 1 && m_output_shapes.size() == 1) {
         const Shape& insShape = getInputShapeAtPort(0);
         auto insPrecision = getOriginalInputPrecisionAtPort(0);
         const Shape& outputShape = getOutputShapeAtPort(0);

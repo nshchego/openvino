@@ -86,7 +86,7 @@ void EmbeddingBagPacked::initSupportedPrimitiveDescriptors() {
 
     std::vector<PortConfigurator> inDataConfigurators(
         {{LayoutType::ncsp, inDataPrecision}, {LayoutType::ncsp, ov::element::i32}});
-    if (inputShapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
+    if (m_input_shapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, inDataPrecision);
     }
 

@@ -1901,11 +1901,11 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
         dataRank = getInputShapeAtPort(DATA_ID).getRank();
         if (const auto interp = ov::as_type_ptr<const ov::opset4::Interpolate>(op)) {
             is_version11 = false;
-            const auto numInputs = inputShapes.size();
+            const auto numInputs = m_input_shapes.size();
             if (numInputs != 3 && numInputs != 4) {
                 THROW_CPU_NODE_ERR("has incorrect number of input edges");
             }
-            if (outputShapes.size() != 1) {
+            if (m_output_shapes.size() != 1) {
                 THROW_CPU_NODE_ERR("has incorrect number of output edges");
             }
             isAxesSpecified = numInputs != 3;
@@ -2009,11 +2009,11 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
             }
         } else if (const auto interp = ov::as_type_ptr<const ov::op::v11::Interpolate>(op)) {
             is_version11 = true;
-            const auto numInputs = inputShapes.size();
+            const auto numInputs = m_input_shapes.size();
             if (numInputs != 2 && numInputs != 3) {
                 THROW_CPU_NODE_ERR("has incorrect number of input edges");
             }
-            if (outputShapes.size() != 1) {
+            if (m_output_shapes.size() != 1) {
                 THROW_CPU_NODE_ERR("has incorrect number of output edges");
             }
             isAxesSpecified = numInputs != 2;

@@ -965,11 +965,11 @@ int TensorIterator::getNumIteration(const std::vector<PortMap>& inputPortMap,
     int numIterations = 1;
     bool isDefault = true;
     for (const auto& rule : inputPortMap) {
-        if (rule.from < 0 || rule.from >= static_cast<int64_t>(inputShapes.size())) {
+        if (rule.from < 0 || rule.from >= static_cast<int64_t>(m_input_shapes.size())) {
             THROW_CPU_NODE_ERR(": Invalid \"from\" value: \"from\" = ",
                                rule.from,
                                " inputs number = ",
-                               inputShapes.size(),
+                               m_input_shapes.size(),
                                " (out of range)");
         }
 
@@ -1000,11 +1000,11 @@ int TensorIterator::getNumIteration(const std::vector<PortMap>& inputPortMap,
             continue;
         }
 
-        if (rule.from < 0 || rule.from >= static_cast<int64_t>(outputShapes.size())) {
+        if (rule.from < 0 || rule.from >= static_cast<int64_t>(m_output_shapes.size())) {
             THROW_CPU_NODE_ERR(": Invalid \"from\" value: \"from\" = ",
                                rule.from,
                                " inputs number = ",
-                               outputShapes.size(),
+                               m_output_shapes.size(),
                                " (out of range)");
         }
 

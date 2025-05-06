@@ -217,7 +217,7 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
         const auto port = unusedOutput.get_index();
         const auto nodeName =
             std::string("stub_") + std::to_string(unusedOutput.get_index()) + "_" + parentNode->getName();
-        const NodePtr outNode = std::make_shared<node::Input>(parentNode->outputShapes[port],
+        const NodePtr outNode = std::make_shared<node::Input>(parentNode->m_output_shapes[port],
                                                               parentNode->getOriginalOutputPrecisionAtPort(port),
                                                               nodeName,
                                                               "Result",
@@ -269,12 +269,20 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
     }
 }
 
-void Graph::ReadGraph(BinaryInputBuffer& ib,
-                      const std::vector<node::Input::InputConfig>& inputConfigs,
-                      const std::vector<node::Input::OutputConfig>& outputConfigs) {
+void Graph::deserialize_graph(BinaryInputBuffer& ib,
+                              const std::vector<node::Input::InputConfig>& inputConfigs,
+                              const std::vector<node::Input::OutputConfig>& outputConfigs) {
+printf("--CPU-- Graph::deserialize_graph\n");
+
+    validate_stream_offset(ib);
+
+    ib >> m_name;
+    ib >> make_data(&m_status, sizeof(Status));
+    ib >> graphHasDynamicInput;
+
     size_t nodes_num = 0lu;
     ib >> nodes_num;
-    auto createNode = [&]() -> NodePtr {
+    auto create_node = [&]() -> NodePtr {
         // // special handling for Parameters and Results
         // if (op->get_type_info() == op::v0::Parameter::get_type_info_static()) {
         //     auto input_index = model->get_parameter_index(ov::as_type_ptr<op::v0::Parameter>(op));
@@ -314,9 +322,11 @@ void Graph::ReadGraph(BinaryInputBuffer& ib,
     };
 
     for (size_t i = 0lu; i < nodes_num; i++) {
-        const NodePtr node = createNode();
+        const NodePtr node = create_node();
 
-        AddNode(node);
+        graphNodes.push_back(node);
+
+        // AddNode(node);
     //     op2node[op] = node;
 
     //     for (size_t port = 0; port < op->get_input_size(); port++) {
@@ -433,14 +443,14 @@ void Graph::Init(BinaryInputBuffer& ib,
     m_context = context;
     m_stream = dnnl::stream(getEngine());
 
-    ReadGraph(ib);
+    deserialize_graph(ib);
 }
 
 void Graph::Activate() {
     // @todo It is possible that execution graph is already created in scope of
     // the allocation context collection from the outer graph so the state for inner graph is "Ready"
     // We probably want to avoid such uncertancy
-    // OPENVINO_ASSERT(status == Status::Initialized, "Invalid graph status: ", static_cast<int>(status));
+    // OPENVINO_ASSERT(m_status == Status::Initialized, "Invalid graph status: ", static_cast<int>(status));
     Allocate();
 
     CreatePrimitivesAndExecConstants();
@@ -455,7 +465,7 @@ void Graph::Activate() {
 }
 
 void Graph::Configure([[maybe_unused]] bool optimize) {
-    OPENVINO_ASSERT(status == Status::NotReady, "Invalid graph status");
+    OPENVINO_ASSERT(m_status == Status::NotReady, "Invalid graph status");
 
     GraphOptimizer optimizer;
 
@@ -489,7 +499,7 @@ void Graph::Configure([[maybe_unused]] bool optimize) {
 
     SortTopologically();
 
-    status = Status::Initialized;
+    m_status = Status::Initialized;
 }
 
 void Graph::InitNodes() {
@@ -646,7 +656,7 @@ static bool isReorderAvailable(const MemoryDescPtr& parentDesc,
     dnnl::primitive_attr attr;
 
     dnnl_primitive_desc_t result = nullptr;
-    auto status = dnnl_reorder_primitive_desc_create(&result,
+    auto m_status = dnnl_reorder_primitive_desc_create(&result,
                                                      srcMemDesc.get(),
                                                      eng.get(),
                                                      dstMemDesc.get(),
@@ -664,7 +674,7 @@ static bool isReorderAvailable(const MemoryDescPtr& parentDesc,
         dnnl_primitive_desc_destroy(result);
     }
 
-    return dnnl_success == status;
+    return dnnl_success == m_status;
 }
 
 void Graph::insertReorder(EdgePtr& edge, bool isOptimized, std::unordered_set<std::string>& uniqueLayerNames) {
@@ -952,7 +962,7 @@ std::vector<size_t> Graph::CreateExecutionGraph() {
         ExtractExecutableNodesAndSyncPoints(syncNodesInds, graphNodes);
 
     if (hasDynNodes) {
-        status = Status::ReadyDynamic;
+        m_status = Status::ReadyDynamic;
         // Here we use the following heuristic: if the number of sync nodes is less than 10 times of the number of exec
         // nodes, it does make sense to use Sequential dynamic shapes processing due to the high overheads on context
         // switching when the dynamic shapes are being processed in parallel and there are a lot of sync points. Also
@@ -960,10 +970,10 @@ std::vector<size_t> Graph::CreateExecutionGraph() {
         // parallel.
         const auto exec2sync = m_executableGraphNodes.size() / m_executableSyncNodesInds.size();
         if (exec2sync < 10 || parallel_get_max_threads() < 2) {
-            status = Status::ReadyDynamicSeq;
+            m_status = Status::ReadyDynamicSeq;
         }
     } else {
-        status = Status::ReadyStatic;
+        m_status = Status::ReadyStatic;
     }
 
     return syncNodesInds;
@@ -1406,7 +1416,7 @@ void Graph::PullOutputData(std::unordered_map<std::size_t, ov::SoPtr<ITensor>>& 
 }
 
 VecMemoryDescs Graph::getOutputMemoryDescriptors() const {
-    OPENVINO_ASSERT(status == Status::Initialized, "Invalid graph status");
+    OPENVINO_ASSERT(m_status == Status::Initialized, "Invalid graph status");
 
     VecMemoryDescs result;
     result.reserve(outputNodesMap.size());
@@ -1710,12 +1720,12 @@ static int GetNumaNodeId(const GraphContext::CPtr& context) {
 }
 
 void Graph::Infer(SyncInferRequest* request) {
-    DEBUG_LOG("Infer graph: ", GetName(), ". Status: ", static_cast<int>(status));
+    DEBUG_LOG("Infer graph: ", GetName(), ". Status: ", static_cast<int>(m_status));
     const int numaId = GetNumaNodeId(m_context);
 
     m_context->allocateMemory();
 
-    switch (status) {
+    switch (m_status) {
     case Status::ReadyDynamic:
         InferDynamic(request, numaId, UpdateNodes(m_executableGraphNodes));
         break;
@@ -1728,7 +1738,7 @@ void Graph::Infer(SyncInferRequest* request) {
     default:
         OPENVINO_ASSERT(IsReady(),
                         "Wrong state of the ov::intel_cpu::Graph. Topology is not ready: ",
-                        static_cast<int>(status));
+                        static_cast<int>(m_status));
     }
 
     if (infer_count != -1) {
@@ -1789,7 +1799,7 @@ void Graph::SortTopologically() {
     // Sort in / out child edges by port index
     // Make first N (N == port_num) edge indexes match with port index
     for (auto& node : graphNodes) {
-        int port_num = node->outputShapes.size();
+        int port_num = node->m_output_shapes.size();
         std::vector<EdgePtr> res(port_num);
 
         for (size_t i = 0; i < node->childEdges.size(); i++) {
@@ -1907,7 +1917,7 @@ void Graph::DropDWConvNode(const NodePtr& node) {
         return;
     }
 
-    parentConv->outputShapes[0] = node->outputShapes[0];
+    parentConv->m_output_shapes[0] = node->m_output_shapes[0];
 
     for (size_t i = 0; i < 1; i++) {
         auto p_edge = parents[i].lock();
@@ -1954,10 +1964,10 @@ void Graph::DropDWConvNode(const NodePtr& node) {
         RemoveEdge(p_edge);
         const int outNum = parentConv->parentEdges.size();
 
-        parentConv->inputShapes.push_back(node->getInputShapeAtPort(portCandidate));
+        parentConv->m_input_shapes.push_back(node->getInputShapeAtPort(portCandidate));
         CreateEdge(parent, parentConv, inNum, outNum);
     }
-    parentConv->outputShapes[0] = node->getOutputShapeAtPort(0);
+    parentConv->m_output_shapes[0] = node->getOutputShapeAtPort(0);
 }
 
 void Graph::RemoveDroppedNodes() {
@@ -2244,11 +2254,21 @@ void Graph::assignStates(const std::vector<MemStatePtr>& states) {
 }
 
 void Graph::export_graph(BinaryOutputBuffer& ob) {
+printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
+    ob << ob.get_pos();
+
     ob << m_name;
-    ob << make_data(&status, sizeof(Status));
+    ob << make_data(&m_status, sizeof(Status));
     ob << graphHasDynamicInput;
 
-    ob << graphNodes;
+    // ob << graphNodes;
+    ob << graphNodes.size();
+    for (auto& n : graphNodes) {
+        ob << int(n->getType());
+        // auto node_type = n->getType();
+        // ob << make_data(&node_type, sizeof(Type));
+        ob << *n;
+    }
     ob << graphEdges;
 
     ob << inputNodesMap;

@@ -86,7 +86,7 @@ void Split::initSupportedPrimitiveDescriptors() {
 
     const auto& srcShape = getInputShapeAtPort(0);
     const auto& dstFirstDims = getOutputShapeAtPort(0).getDims();
-    for (const auto& outputShape : outputShapes) {
+    for (const auto& outputShape : m_output_shapes) {
         const auto& o_Dims = outputShape.getDims();
         if (dstFirstDims.size() != o_Dims.size()) {
             THROW_CPU_NODE_ERR("only supports output blobs with equal number of dimensions");
@@ -117,7 +117,7 @@ void Split::initSupportedPrimitiveDescriptors() {
             }
 
             bool blocked = true;
-            for (size_t i = 0; i < outputShapes.size(); i++) {
+            for (size_t i = 0; i < m_output_shapes.size(); i++) {
                 const auto& outBlkDims = getOutputShapeAtPort(i).getDims();
                 if (outBlkDims[channelsPos] == Shape::UNDEFINED_DIM || outBlkDims[channelsPos] % item.first != 0) {
                     blocked = false;
@@ -148,17 +148,17 @@ void Split::initSupportedPrimitiveDescriptors() {
         config.inConfs[1].setMemDesc(std::make_shared<CpuBlockedMemoryDesc>(axisPrecision, Shape(VectorDims{1})));
         if (INPUTS_NUM == 3) {
             config.inConfs[2].setMemDesc(
-                std::make_shared<CpuBlockedMemoryDesc>(axisPrecision, Shape(VectorDims{outputShapes.size()})));
+                std::make_shared<CpuBlockedMemoryDesc>(axisPrecision, Shape(VectorDims{m_output_shapes.size()})));
             config.inConfs[2].constant(constSplitLengths);
         }
 
-        config.outConfs.resize(outputShapes.size());
+        config.outConfs.resize(m_output_shapes.size());
 
-        for (size_t i = 0; i < outputShapes.size(); i++) {
+        for (size_t i = 0; i < m_output_shapes.size(); i++) {
             config.outConfs[i].inPlace(-1);
             config.outConfs[i].constant(false);
             config.outConfs[i].setMemDesc(
-                std::make_shared<CpuBlockedMemoryDesc>(itr->second->createDesc(inpPrecision, outputShapes[i])));
+                std::make_shared<CpuBlockedMemoryDesc>(itr->second->createDesc(inpPrecision, m_output_shapes[i])));
         }
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::ref);
 
@@ -173,14 +173,14 @@ void Split::initSupportedPrimitiveDescriptors() {
     }
 
     // in place only makes sense when we split by dense blocks since strided tensors are not supported by most nodes.
-    const auto& parentdDims = inputShapes[0].getDims();
+    const auto& parentdDims = m_input_shapes[0].getDims();
     if (parentdDims[axis] != Shape::UNDEFINED_DIM &&
         std::all_of(parentdDims.begin(),
                     parentdDims.begin() + axis,
                     [](size_t dim) {
                         return dim == 1;
                     }) &&
-        std::all_of(outputShapes.begin(), outputShapes.end(), [OV_CAPTURE_CPY_AND_THIS](const Shape& shape) {
+        std::all_of(m_output_shapes.begin(), m_output_shapes.end(), [OV_CAPTURE_CPY_AND_THIS](const Shape& shape) {
             return shape.getDims()[axis] != Shape::UNDEFINED_DIM;
         })) {
         for (auto refPdIndex : pdIndexesToReuse) {
@@ -206,16 +206,16 @@ void Split::initSupportedPrimitiveDescriptors() {
         config.inConfs[1].setMemDesc(std::make_shared<CpuBlockedMemoryDesc>(axisPrecision, Shape(VectorDims{1})));
         if (INPUTS_NUM == 3) {
             config.inConfs[2].setMemDesc(
-                std::make_shared<CpuBlockedMemoryDesc>(axisPrecision, Shape(VectorDims{outputShapes.size()})));
+                std::make_shared<CpuBlockedMemoryDesc>(axisPrecision, Shape(VectorDims{m_output_shapes.size()})));
             config.inConfs[2].constant(constSplitLengths);
         }
-        config.outConfs.resize(outputShapes.size());
+        config.outConfs.resize(m_output_shapes.size());
 
-        for (size_t i = 0; i < outputShapes.size(); i++) {
+        for (size_t i = 0; i < m_output_shapes.size(); i++) {
             config.outConfs[i].inPlace(-1);
             config.outConfs[i].constant(false);
             config.outConfs[i].setMemDesc(
-                creatorsMap.at(LayoutType::ncsp)->createSharedDesc(inpPrecision, outputShapes[i]));
+                creatorsMap.at(LayoutType::ncsp)->createSharedDesc(inpPrecision, m_output_shapes[i]));
         }
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::ref);
     }
@@ -269,7 +269,7 @@ void Split::prepareParams() {
 
     dstMemPtrs.clear();
     std::vector<BlockedMemoryDescCPtr> outDescs;
-    for (size_t port = 0; port < outputShapes.size(); ++port) {
+    for (size_t port = 0; port < m_output_shapes.size(); ++port) {
         const auto& outMemPtr = this->getDstMemoryAtPort(port);
         if (!outMemPtr || !outMemPtr->isDefined()) {
             THROW_CPU_NODE_ERR("has undefined destination memory");
@@ -569,12 +569,12 @@ void Split::resolveInPlaceEdges(Edge::LOOK look) {
     auto& config = selected_pd->getConfig();
     size_t numberOfOutputs = config.outConfs.size();
     size_t inplaceInpIndx = selected_pd->getConfig().outConfs[0].inPlace();
-    auto baseDim = inputShapes.front().getDims()[axis];
+    auto baseDim = m_input_shapes.front().getDims()[axis];
     CPU_NODE_ASSERT(baseDim != Shape::UNDEFINED_DIM, "can not use inPlace memory with splitting on dynamic dimension");
     auto baseMemBlock = getParentEdgeAt(inplaceInpIndx)->getMemory().getMemoryBlock();
     ptrdiff_t offset = 0;
     for (size_t i = 0; i < numberOfOutputs; ++i) {
-        auto partDim = outputShapes[i].getDims()[axis];
+        auto partDim = m_output_shapes[i].getDims()[axis];
         CPU_NODE_ASSERT(partDim != Shape::UNDEFINED_DIM,
                         "can not use inPlace memory with splitting on dynamic dimension");
         const auto& childEdges = getChildEdgesAtPort(i);

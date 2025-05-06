@@ -35,7 +35,7 @@ GatherElements::GatherElements(const std::shared_ptr<ov::Node>& op, const GraphC
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
-    if (inputShapes.size() != 2 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 2 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has invalid number of input/output edges.");
     }
 

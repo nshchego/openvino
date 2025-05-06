@@ -15,6 +15,8 @@ class Reshape : public Node {
 public:
     Reshape(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Reshape(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     bool created() const override;

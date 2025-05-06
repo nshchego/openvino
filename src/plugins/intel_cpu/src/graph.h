@@ -50,11 +50,11 @@ public:
     ~Graph();
 
     bool IsStatic() const {
-        return Status::ReadyStatic == status;
+        return Status::ReadyStatic == m_status;
     }
 
     bool IsDynamic() const {
-        return one_of(status, Status::ReadyDynamic, Status::ReadyDynamicSeq);
+        return one_of(m_status, Status::ReadyDynamic, Status::ReadyDynamicSeq);
     }
 
     bool IsReady() const {
@@ -289,7 +289,7 @@ public:
 
 protected:
     void ForgetGraphData() {
-        status = Status::NotReady;
+        m_status = Status::NotReady;
 
         inputNodesMap.clear();
         outputNodesMap.clear();
@@ -297,7 +297,7 @@ protected:
         graphEdges.clear();
         m_executableSyncNodesInds.clear();
     }
-    Status status{Status::NotReady};
+    Status m_status{Status::NotReady};
 
     // For dumping purposes. -1 - no counting, all other positive
     // values mean increment it within each Infer() call
@@ -314,9 +314,9 @@ protected:
                    const std::vector<node::Input::InputConfig>& inputConfigs = {},
                    const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
-    void ReadGraph(BinaryInputBuffer& ib,
-                   const std::vector<node::Input::InputConfig>& inputConfigs = {},
-                   const std::vector<node::Input::OutputConfig>& outputConfigs = {});
+    void deserialize_graph(BinaryInputBuffer& ib,
+                           const std::vector<node::Input::InputConfig>& inputConfigs = {},
+                           const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
     void Configure(bool optimize = true);
     void Allocate();

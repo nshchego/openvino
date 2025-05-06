@@ -222,6 +222,10 @@ Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     poolingAttrs.algorithm = algorithm;
 }
 
+Pooling::Pooling(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+}
+
 std::vector<memory::format_tag> Pooling::getAvailableFormatsForDims(const Shape& dims) const {
     switch (dims.getRank()) {
     case 0:

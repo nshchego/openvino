@@ -88,6 +88,13 @@ void Shape::save(BinaryOutputBuffer& ob) const {
 }
 
 void Shape::load(BinaryInputBuffer& ib) {
+    ib >> make_data(&type, sizeof(ShapeType));
+
+    ib >> hasZeroDimensions;
+
+    ib >> minDims;
+    ib >> maxDims;
+    ib >> dims;
 }
 
 }  // namespace ov::intel_cpu

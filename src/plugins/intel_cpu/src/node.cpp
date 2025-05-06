@@ -55,6 +55,7 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
       typeStr(op->get_type_name()),
       type(TypeFromName(op->get_type_name())),
       profiling(op->get_friendly_name()) {
+printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
     for (size_t i = 0; i < op->get_input_size(); i++) {
         const auto& shape = op->get_input_partial_shape(i);
         if (shape.rank().is_dynamic()) {
@@ -65,11 +66,11 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
         }
 
         bool isScalar = shape.rank().get_length() == 0;
-        inputShapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
+        m_input_shapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
         originalInputPrecisions.emplace_back(op->get_input_element_type(i));
     }
 
-    parentEdges.reserve(inputShapes.size());
+    parentEdges.reserve(m_input_shapes.size());
 
     if (typeStr != "Result" && typeStr != "Assign") {
         if (op->get_output_size() == 0) {
@@ -85,19 +86,19 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
             }
 
             bool isScalar = shape.rank().get_length() == 0;
-            outputShapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
+            m_output_shapes.emplace_back(isScalar ? ov::PartialShape{1} : shape);
             originalOutputPrecisions.emplace_back(op->get_output_element_type(i));
         }
 
-        childEdges.reserve(outputShapes.size());
+        childEdges.reserve(m_output_shapes.size());
     }
 
-    isDynamic = std::any_of(inputShapes.begin(),
-                            inputShapes.end(),
+    isDynamic = std::any_of(m_input_shapes.begin(),
+                            m_input_shapes.end(),
                             [](const Shape& shape) {
                                 return shape.isDynamic();
                             }) ||
-                std::any_of(outputShapes.begin(), outputShapes.end(), [](const Shape& shape) {
+                std::any_of(m_output_shapes.begin(), m_output_shapes.end(), [](const Shape& shape) {
                     return shape.isDynamic();
                 });
 
@@ -165,12 +166,6 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
     }
 }
 
-Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
-    : context(ctx),
-      profiling("tmp") {
-
-}
-
 Node::Node(const std::string& type,
            std::vector<Shape> inShapes,
            std::vector<Shape> outShapes,
@@ -178,8 +173,8 @@ Node::Node(const std::string& type,
            std::vector<ov::element::Type> outputPrecisions,
            const std::string& name,
            const GraphContext::CPtr& ctx)
-    : inputShapes(std::move(inShapes)),
-      outputShapes(std::move(outShapes)),
+    : m_input_shapes(std::move(inShapes)),
+      m_output_shapes(std::move(outShapes)),
 
       context(ctx),
       originalInputPrecisions(std::move(inputPrecisions)),
@@ -190,9 +185,23 @@ Node::Node(const std::string& type,
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
-printf("--CPU-- Node '%s':'%s'\n", typeStr.data(), name.data());
-    parentEdges.reserve(inputShapes.size());
-    childEdges.reserve(outputShapes.size());
+printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), typeStr.data(), name.data());
+    parentEdges.reserve(m_input_shapes.size());
+    childEdges.reserve(m_output_shapes.size());
+}
+
+Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
+    : context(ctx),
+      profiling("tmp") {
+    load(ib);
+printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
+}
+
+Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx)
+    : context(ctx),
+      profiling("tmp") {
+    load(ib);
+printf("--CPU-- Node_4 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
 }
 
 void Node::addEdge(const EdgePtr& edge) {
@@ -489,7 +498,7 @@ bool Node::canBeInPlace() const {
     }
 
     auto inShape = getInputShapeAtPort(0);
-    for (size_t cIdx = 0; cIdx < outputShapes.size(); cIdx++) {
+    for (size_t cIdx = 0; cIdx < m_output_shapes.size(); cIdx++) {
         if (getOutputShapeAtPort(cIdx) != inShape) {
             return false;
         }
@@ -703,7 +712,7 @@ std::vector<EdgePtr> Node::getChildEdgesAtPort(int inputNum) const {
         OPENVINO_THROW("Node ", getName(), ". negative input number is not supported ", inputNum);
     }
 
-    if (static_cast<size_t>(inputNum) >= outputShapes.size()) {
+    if (static_cast<size_t>(inputNum) >= m_output_shapes.size()) {
         OPENVINO_THROW("Node ", getName(), " contains less output ports than ", inputNum);
     }
 
@@ -854,10 +863,10 @@ bool Node::outputShapeDataDependency() const {
 }
 
 void Node::redefineOutputMemory(const std::vector<VectorDims>& newOutputShapes) {
-    if (newOutputShapes.size() != outputShapes.size()) {
+    if (newOutputShapes.size() != m_output_shapes.size()) {
         OPENVINO_THROW("Number shapes mismatch with real outputs number for node with name: ", getName());
     }
-    for (size_t i = 0lu; i < outputShapes.size(); i++) {
+    for (size_t i = 0lu; i < m_output_shapes.size(); i++) {
         redefineOutputMemory(i, newOutputShapes[i]);
     }
 }
@@ -1722,11 +1731,11 @@ std::pair<std::vector<float>, std::vector<float>> Node::getScalesAndShifts(const
 }
 
 bool Node::isInputTensorAtPortEmpty(size_t port) const {
-    if (inputShapes.size() <= port) {
+    if (m_input_shapes.size() <= port) {
         OPENVINO_THROW("Incorrect input port number for node ", getName());
     }
 
-    if (inputShapes[port].hasZeroDims()) {
+    if (m_input_shapes[port].hasZeroDims()) {
         return true;
     }
     auto edge = getParentEdgeAt(port);
@@ -1740,11 +1749,11 @@ bool Node::isInputTensorAtPortEmpty(size_t port) const {
 }
 
 bool Node::isOutputTensorAtPortEmpty(size_t port) const {
-    if (outputShapes.size() <= port) {
+    if (m_output_shapes.size() <= port) {
         OPENVINO_THROW("Incorrect output port number for node ", getName());
     }
-    if (outputShapes[port].isStatic()) {
-        return outputShapes[port].hasZeroDims();
+    if (m_output_shapes[port].isStatic()) {
+        return m_output_shapes[port].hasZeroDims();
     }
     auto&& mem = getChildEdgeAt(port)->getMemory();
     if (mem.isDefined() && !mem.getDesc().empty()) {
@@ -1763,7 +1772,7 @@ bool Node::hasEmptyInputTensors() const {
 }
 
 bool Node::hasEmptyOutputTensors() const {
-    for (size_t i = 0; i < outputShapes.size(); i++) {
+    for (size_t i = 0; i < m_output_shapes.size(); i++) {
         if (isOutputTensorAtPortEmpty(i)) {
             return true;
         }
@@ -1781,7 +1790,7 @@ bool Node::inputShapesDefined() const {
 }
 
 bool Node::outputShapesDefined() const {
-    for (size_t i = 0; i < outputShapes.size(); i++) {
+    for (size_t i = 0; i < m_output_shapes.size(); i++) {
         if (!getChildEdgeAt(i)->getMemory().getDesc().isDefined()) {
             return false;
         }
@@ -1829,7 +1838,7 @@ std::vector<VectorDims> Node::shapeInferGeneric(const std::vector<Shape>& shapes
 
         std::unordered_map<size_t, MemoryPtr> input_values;
         if (input_value_port_mask) {
-            for (size_t port = 0; port < inputShapes.size(); ++port) {
+            for (size_t port = 0; port < m_input_shapes.size(); ++port) {
                 if (input_value_port_mask & (1 << port)) {
                     input_values[port] = getSrcMemoryAtPort(port);
                 }
@@ -1851,14 +1860,14 @@ IShapeInfer::Result Node::shapeInfer() const {
     std::vector<std::reference_wrapper<const VectorDims>> input_shapes;
     auto input_value_port_mask = shapeInference->get_port_mask();
 
-    input_shapes.reserve(inputShapes.size());
-    for (size_t port = 0; port < inputShapes.size(); ++port) {
+    input_shapes.reserve(m_input_shapes.size());
+    for (size_t port = 0; port < m_input_shapes.size(); ++port) {
         input_shapes.emplace_back(std::ref(getParentEdgeAt(port)->getMemory().getStaticDims()));
     }
 
     std::unordered_map<size_t, MemoryPtr> input_values;
     if (input_value_port_mask) {
-        for (size_t port = 0; port < inputShapes.size(); ++port) {
+        for (size_t port = 0; port < m_input_shapes.size(); ++port) {
             if (input_value_port_mask & (1 << port)) {
                 input_values[port] = getSrcMemoryAtPort(port);
             }
@@ -1977,7 +1986,7 @@ void Node::fuseDQScales(const float* scaleData, const size_t scaleSize) {
 }
 
 int Node::inPlaceInputPort(int portIdx) const {
-    if (inputShapes.empty()) {
+    if (m_input_shapes.empty()) {
         // special case - a dead end node
         return -1;
     }
@@ -2000,7 +2009,7 @@ int Node::inPlaceInputPort(int portIdx) const {
 }
 
 int Node::inPlaceOutPort(int portIdx) const {
-    if (outputShapes.empty()) {
+    if (m_output_shapes.empty()) {
         // special case - a dead end node
         return -1;
     }
@@ -2214,6 +2223,8 @@ void Node::resolveInPlaceDirection() {
 }
 
 void Node::save(BinaryOutputBuffer& ob) const {
+    ob << ob.get_pos();
+
     ob << name;
     ob << make_data(&type, sizeof(Type));
     ob << typeStr;
@@ -2222,19 +2233,19 @@ void Node::save(BinaryOutputBuffer& ob) const {
     ob << make_data(&inplace, sizeof(InPlaceType));
     ob << make_data(&constant, sizeof(ConstantType));
 
-    ob << inputShapes;
-    ob << outputShapes;
+    ob << m_input_shapes;
+    ob << m_output_shapes;
     
-    ob << parentEdges;
-    ob << childEdges;
+    // ob << parentEdges;
+    // ob << childEdges;
 
     ob << fusingPort;
-    ob << fusedWith;
-    ob << mergedWith;
+    // ob << fusedWith;
+    // ob << mergedWith;
 
     ob << curNumaNode;
 
-    ob << supportedPrimitiveDescriptors;
+    // ob << supportedPrimitiveDescriptors;
     ob << selectedPrimitiveDescriptorIndex;
     ob << primitivesPriority;
     // ob << customImplPriorities;
@@ -2272,9 +2283,15 @@ void Node::save(BinaryOutputBuffer& ob) const {
     // ob << scratchpadMem;
 
     ob << DQScales;
+    
+    ob << ob.get_pos();
 }
 
 void Node::load(BinaryInputBuffer& ib) {
+printf("--CPU-- Node::load\n");
+
+    validate_stream_offset(ib);
+
     ib >> name;
     ib >> make_data(&type, sizeof(Type));
     ib >> typeStr;
@@ -2283,15 +2300,15 @@ void Node::load(BinaryInputBuffer& ib) {
     ib >> make_data(&inplace, sizeof(InPlaceType));
     ib >> make_data(&constant, sizeof(ConstantType));
 
-    ib >> inputShapes;
-    ib >> outputShapes;
+    ib >> m_input_shapes;
+    ib >> m_output_shapes;
     
-    ib >> parentEdges;
-    ib >> childEdges;
+    // ib >> parentEdges;
+    // ib >> childEdges;
 
     ib >> fusingPort;
-    ib >> fusedWith;
-    ib >> mergedWith;
+    // ib >> fusedWith;
+    // ib >> mergedWith;
 
     ib >> curNumaNode;
 
@@ -2333,6 +2350,8 @@ void Node::load(BinaryInputBuffer& ib) {
     // ib >> scratchpadMem;
 
     ib >> DQScales;
+
+    validate_stream_offset(ib);
 }
 
 void NodeDesc::save(BinaryOutputBuffer& ob) const {

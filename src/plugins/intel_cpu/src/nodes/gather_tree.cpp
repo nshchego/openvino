@@ -34,10 +34,10 @@ GatherTree::GatherTree(const std::shared_ptr<ov::Node>& op, const GraphContext::
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    if (inputShapes.size() != 4) {
+    if (m_input_shapes.size() != 4) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges.");
     }
-    if (outputShapes.size() != 1) {
+    if (m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of output edges.");
     }
 

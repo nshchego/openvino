@@ -69,28 +69,31 @@ private:
 class BinaryOutputBuffer : public OutputBuffer<BinaryOutputBuffer> {
 public:
     BinaryOutputBuffer(std::ostream& stream)
-    : OutputBuffer<BinaryOutputBuffer>(this), stream(stream), _impl_params(nullptr), _strm(nullptr) {}
+    : OutputBuffer<BinaryOutputBuffer>(this), m_stream(stream), m_impl_params(nullptr), m_strm(nullptr) {}
 
     virtual ~BinaryOutputBuffer() = default;
 
     virtual void write(void const* data, const std::streamsize size) {
-        auto const written_size = stream.rdbuf()->sputn(reinterpret_cast<const char*>(data), size);
+        auto const written_size = m_stream.rdbuf()->sputn(reinterpret_cast<const char*>(data), size);
         OPENVINO_ASSERT(written_size == size,
-                        "[GPU] Failed to write " + std::to_string(size) + " bytes to stream! Wrote " +
+                        "[ CPU ] Failed to write " + std::to_string(size) + " bytes to stream! Wrote " +
                             std::to_string(written_size));
     }
 
     virtual void flush() {}
 
-    void setKernelImplParams(void* impl_params) { _impl_params = impl_params; }
-    void* getKernelImplParams() const { return _impl_params; }
-    void set_stream(void* strm) { _strm = strm; }
-    void* get_stream() const { return _strm; }
+    void setKernelImplParams(void* impl_params) { m_impl_params = impl_params; }
+    void* getKernelImplParams() const { return m_impl_params; }
+    void set_stream(void* strm) { m_strm = strm; }
+    void* get_stream() const { return m_strm; }
 
+    size_t get_pos() {
+        return m_stream.tellp();
+    }
 private:
-    std::ostream& stream;
-    void* _impl_params;
-    void* _strm;
+    std::ostream& m_stream;
+    void* m_impl_params;
+    void* m_strm;
 };
 
 template <typename BufferType>
@@ -119,31 +122,34 @@ private:
 class BinaryInputBuffer : public InputBuffer<BinaryInputBuffer> {
 public:
     BinaryInputBuffer(std::istream& stream)
-    : InputBuffer<BinaryInputBuffer>(this), _stream(stream), _impl_params(nullptr) {}
+    : InputBuffer<BinaryInputBuffer>(this), m_stream(stream), m_impl_params(nullptr) {}
     // BinaryInputBuffer(std::istream& stream, dnnl::engine& engine)
-    // : InputBuffer<BinaryInputBuffer>(this, engine), _stream(stream), _impl_params(nullptr) {}
+    // : InputBuffer<BinaryInputBuffer>(this, engine), m_stream(stream), m_impl_params(nullptr) {}
 
     virtual ~BinaryInputBuffer() = default;
 
     virtual void read(void* const data, std::streamsize size) {
-        auto const read_size = _stream.rdbuf()->sgetn(reinterpret_cast<char*>(data), size);
+        auto const read_size = m_stream.rdbuf()->sgetn(reinterpret_cast<char*>(data), size); // TODO: get raw ptr instead of copy
         OPENVINO_ASSERT(read_size == size,
-            "[GPU] Failed to read " + std::to_string(size) + " bytes from stream! Read " + std::to_string(read_size));
+            "[ CPU ] Failed to read " + std::to_string(size) + " bytes from stream! Read " + std::to_string(read_size));
     }
 
-    void setKernelImplParams(void* impl_params) { _impl_params = impl_params; }
-    void* getKernelImplParams() const { return _impl_params; }
+    void setKernelImplParams(void* impl_params) { m_impl_params = impl_params; }
+    void* getKernelImplParams() const { return m_impl_params; }
 
+    size_t get_pos() const {
+        return m_stream.tellg();
+    }
 private:
-    std::istream& _stream;
-    void* _impl_params;
+    std::istream& m_stream;
+    void* m_impl_params;
 };
 
 template <typename T>
 class Serializer<BinaryOutputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void save(BinaryOutputBuffer& buffer, const T& object) {
-printf("-WRITE T-\n");
+printf("-WRITE- T at %llu\n", buffer.get_pos());
         buffer.write(std::addressof(object), sizeof(object));
     }
 };
@@ -152,7 +158,7 @@ template <typename T>
 class Serializer<BinaryInputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void load(BinaryInputBuffer& buffer, T& object) {
-printf("-READ T-\n");
+printf("-READ- T at %llu\n", buffer.get_pos());
         buffer.read(std::addressof(object), sizeof(object));
     }
 };
@@ -161,8 +167,8 @@ template <typename T>
 class Serializer<BinaryOutputBuffer, Data<T>> {
 public:
     static void save(BinaryOutputBuffer& buffer, const Data<T>& bin_data) {
-// printf("-WRITE Data-\n");
-std::cout << "-WRITE Data-\n";
+printf("-WRITE Data- at %llu\n", buffer.get_pos());
+// std::cout << "-WRITE Data-\n";
         buffer.write(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
     }
 };
@@ -171,11 +177,27 @@ template <typename T>
 class Serializer<BinaryInputBuffer, Data<T>> {
 public:
     static void load(BinaryInputBuffer& buffer, Data<T>& bin_data) {
-// printf("-READ Data-\n");
-std::cout << "-READ Data-\n";
+printf("-READ Data- at %llu\n", buffer.get_pos());
+// std::cout << "-READ Data-\n";
         buffer.read(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
     }
 };
+
+inline void validate_stream_offset(BinaryInputBuffer& in_buf) {
+    const auto act_pos = in_buf.get_pos();
+    size_t exp_pos = 0lu;
+    in_buf >> exp_pos;
+
+if (exp_pos != act_pos) {
+    printf("[ ERROR ] Invalid input stream position. Expected: %llu; Actual: %llu\n",
+            exp_pos, act_pos);
+}
+    OPENVINO_ASSERT(exp_pos == act_pos,
+                    "Invalid input stream position. Expected: ",
+                    exp_pos,
+                    "; Actual: ",
+                    act_pos);
+}
 
 }  // namespace intel_cpu
 }  // namespace ov

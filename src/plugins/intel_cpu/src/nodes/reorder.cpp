@@ -54,6 +54,10 @@ Reorder::Reorder(const MemoryDesc& input,
     this->output = output.clone();
 }
 
+Reorder::Reorder(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+}
+
 void Reorder::getSupportedDescriptors() {
     if (getParentEdges().size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges.");

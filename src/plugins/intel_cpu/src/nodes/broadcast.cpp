@@ -111,7 +111,7 @@ void Broadcast::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
     }
-    supportedPrimitiveDescriptors = getSupportedConfigs(this, outputShapes.size());
+    supportedPrimitiveDescriptors = getSupportedConfigs(this, m_output_shapes.size());
 }
 
 bool Broadcast::needPrepareParams() const {

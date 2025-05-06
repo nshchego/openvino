@@ -66,9 +66,9 @@ void CTCGreedyDecoderSeqLen::initSupportedPrimitiveDescriptors() {
     }
 
     std::vector<PortConfigurator> inDataConf;
-    inDataConf.reserve(inputShapes.size());
+    inDataConf.reserve(m_input_shapes.size());
     inDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
-    for (size_t i = 1; i < inputShapes.size(); ++i) {
+    for (size_t i = 1; i < m_input_shapes.size(); ++i) {
         inDataConf.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
 
@@ -92,7 +92,7 @@ void CTCGreedyDecoderSeqLen::execute([[maybe_unused]] const dnnl::stream& strm) 
     const size_t TC = T * C;
 
     int blankIndex = C - 1;
-    if (inputShapes.size() > BLANK_INDEX) {
+    if (m_input_shapes.size() > BLANK_INDEX) {
         blankIndex = (getSrcDataAtPortAs<const int>(BLANK_INDEX))[0];
     }
 

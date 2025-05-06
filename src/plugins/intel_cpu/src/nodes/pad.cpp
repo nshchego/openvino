@@ -42,15 +42,15 @@ Pad::Pad(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
-    if (inputShapes.size() != 3 && inputShapes.size() != 4) {
+    if (m_input_shapes.size() != 3 && m_input_shapes.size() != 4) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges");
     }
-    if (outputShapes.size() != 1) {
+    if (m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("Incorrect number of output edges");
     }
 
-    const size_t srcDimsRank = inputShapes[DATA_ID].getRank();
-    const size_t dstDimsRank = outputShapes[DATA_ID].getRank();
+    const size_t srcDimsRank = m_input_shapes[DATA_ID].getRank();
+    const size_t dstDimsRank = m_output_shapes[DATA_ID].getRank();
     if (srcDimsRank != dstDimsRank) {
         THROW_CPU_NODE_ERR("has incorrect number of input/output dimensions!");
     }

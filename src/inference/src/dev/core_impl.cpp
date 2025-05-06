@@ -1489,9 +1489,11 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::compile_model_and_cache(ov::Plugin& 
                     plugin.get_property(ov::internal::compiled_model_runtime_properties.name(), {}).as<std::string>();
             }
             cacheContent.cacheManager->write_cache_entry(cacheContent.blobId, [&](std::ostream& networkStream) {
+printf("--CORE-- WRITE compile_model_and_cache 0 pos: %lld\n", static_cast<int64_t>(networkStream.tellp()));
                 networkStream << ov::CompiledBlobHeader(ov::get_openvino_version().buildNumber,
                                                         ov::ModelCache::calculate_file_info(cacheContent.modelPath),
                                                         compiled_model_runtime_properties);
+printf("--CORE-- WRITE compile_model_and_cache 1 pos: %lld\n", static_cast<int64_t>(networkStream.tellp()));
                 compiled_model->export_model(networkStream);
             });
         } catch (...) {
@@ -1524,7 +1526,9 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                              "Core::load_model_from_cache::ReadStreamAndImport");
                 ov::CompiledBlobHeader header;
                 try {
+printf("--CORE-- READ load_model_from_cache 0 pos: %lld\n", static_cast<int64_t>(networkStream.tellg()));
                     networkStream >> header;
+printf("--CORE-- READ load_model_from_cache 1 pos: %lld\n", static_cast<int64_t>(networkStream.tellg()));
                     if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                         // Original file is changed, don't use cache
                         OPENVINO_THROW("Original model file is changed");
@@ -1588,6 +1592,10 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+//std::exception_ptr eptr = std::current_exception();
+//if (eptr) {
+//    printf("--CORE-- CoreImpl::load_model_from_cache EXCEPTION: %s\n", eptr->what());
+//}
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;

@@ -33,15 +33,15 @@ void Reference::initSupportedPrimitiveDescriptors() {
     }
 
     std::vector<PortConfigurator> inputConfigurators;
-    inputConfigurators.reserve(inputShapes.size());
-    for (size_t i = 0; i < inputShapes.size(); i++) {
-        inputConfigurators.emplace_back(LayoutType::ncsp, ovCoreNode->get_input_element_type(i), inputShapes[i]);
+    inputConfigurators.reserve(m_input_shapes.size());
+    for (size_t i = 0; i < m_input_shapes.size(); i++) {
+        inputConfigurators.emplace_back(LayoutType::ncsp, ovCoreNode->get_input_element_type(i), m_input_shapes[i]);
     }
 
     std::vector<PortConfigurator> outputConfigurators;
-    outputConfigurators.reserve(inputShapes.size());
-    for (size_t i = 0; i < outputShapes.size(); i++) {
-        outputConfigurators.emplace_back(LayoutType::ncsp, ovCoreNode->get_output_element_type(i), outputShapes[i]);
+    outputConfigurators.reserve(m_input_shapes.size());
+    for (size_t i = 0; i < m_output_shapes.size(); i++) {
+        outputConfigurators.emplace_back(LayoutType::ncsp, ovCoreNode->get_output_element_type(i), m_output_shapes[i]);
     }
 
     addSupportedPrimDesc(inputConfigurators, outputConfigurators, impl_desc_type::ref);
@@ -75,8 +75,8 @@ void Reference::executeDynamicImpl(const dnnl::stream& strm) {
         Node::redefineOutputMemory(result.dims);
         outputs = prepareOutputs();
     } else if (ShapeInferStatus::skip == result.status) {
-        outputs.reserve(outputShapes.size());
-        for (size_t i = 0; i < outputShapes.size(); ++i) {
+        outputs.reserve(m_output_shapes.size());
+        for (size_t i = 0; i < m_output_shapes.size(); ++i) {
             auto mem_desc = getBaseMemDescAtOutputPort(i);
             if (mem_desc->isDefined()) {
                 outputs.emplace_back(ovCoreNode->get_output_element_type(i), mem_desc->getShape().getStaticDims());
@@ -97,7 +97,7 @@ void Reference::executeDynamicImpl(const dnnl::stream& strm) {
             newOutputDims.emplace_back(tensor.get_shape());
         }
         Node::redefineOutputMemory(newOutputDims);
-        for (size_t i = 0; i < outputShapes.size(); ++i) {
+        for (size_t i = 0; i < m_output_shapes.size(); ++i) {
             auto memory = getDstMemoryAtPort(i);
             auto& tensor = outputs[i];
             if (memory->getSize() != tensor.get_byte_size()) {
@@ -128,7 +128,7 @@ bool Reference::needShapeInfer() const {
 
 ov::TensorVector Reference::prepareInputs() const {
     ov::TensorVector inputs;
-    for (size_t i = 0lu; i < inputShapes.size(); i++) {
+    for (size_t i = 0lu; i < m_input_shapes.size(); i++) {
         void* srcDataPtr = getSrcDataAtPort(i);
         ov::Shape shape = ovCoreNode->get_input_partial_shape(i).rank().get_length() == 0
                               ? ov::Shape{}
@@ -148,7 +148,7 @@ ov::TensorVector Reference::prepareInputs() const {
 
 ov::TensorVector Reference::prepareOutputs() const {
     ov::TensorVector outputs;
-    for (size_t i = 0lu; i < outputShapes.size(); i++) {
+    for (size_t i = 0lu; i < m_output_shapes.size(); i++) {
         void* dstDataPtr = getDstDataAtPort(i);
         ov::Shape shape = ovCoreNode->get_output_partial_shape(i).rank().get_length() == 0
                               ? ov::Shape{}

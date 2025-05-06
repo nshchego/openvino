@@ -1110,11 +1110,11 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
             THROW_CPU_NODE_ERR("supports 'levels' attribute greater than or equal to 2");
         }
 
-        if (inputShapes.size() != 5) {
-            THROW_CPU_NODE_ERR("has incorrect number of input edges: ", inputShapes.size());
+        if (m_input_shapes.size() != 5) {
+            THROW_CPU_NODE_ERR("has incorrect number of input edges: ", m_input_shapes.size());
         }
-        if (outputShapes.size() != 1) {
-            THROW_CPU_NODE_ERR("has incorrect number of output edges: ", outputShapes.size());
+        if (m_output_shapes.size() != 1) {
+            THROW_CPU_NODE_ERR("has incorrect number of output edges: ", m_output_shapes.size());
         }
 
         auto initAxisIdx = [&](const VectorDims& inputDims) {

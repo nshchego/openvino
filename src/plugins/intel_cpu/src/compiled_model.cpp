@@ -165,6 +165,8 @@ CompiledModel::CompiledModel(BinaryInputBuffer& ib,
     m_mutex = std::make_shared<std::mutex>();
 
 printf("--CPU-- CompiledModel::CompiledModel READ\n");
+    validate_stream_offset(ib);
+
     ib >> m_name;
 printf("    m_name: '%s'\n", m_name.data());
     ib >> m_cfg.modelPreferThreads;
@@ -509,9 +511,11 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
 
     BinaryOutputBuffer model_buff(model_stream);
 
-printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
+// printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
     Config::ModelType model_type = getModelType(m_model);
     model_buff << make_data(&model_type, sizeof(Config::ModelType));
+printf("--CPU-- WRITE export_model 0 pos: %llu\n", model_buff.get_pos());
+    model_buff << model_buff.get_pos();
     model_buff << m_name;
     model_buff << m_cfg.modelPreferThreads;
     model_buff << m_is_function_quantized;

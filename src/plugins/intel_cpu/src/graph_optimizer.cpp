@@ -480,7 +480,7 @@ void GraphOptimizer::FuseConvolutionMatMulDeconvAndBias(Graph& graph) {
                     graph.CreateEdge(biasNode, targetNode, inNum, outNum);
                 }
                 // Add the Bias inputshape into conv/FC/Deconv/Matmul.
-                targetNode->inputShapes.push_back(biasOutputShape);
+                targetNode->m_input_shapes.push_back(biasOutputShape);
             }
         }
         DEBUG_LOG("GraphOptimizer##FusingBias:Node ##: ",
@@ -678,7 +678,7 @@ void GraphOptimizer::FuseMultiplyAndAdd(Graph& graph) {
 
                 auto& parentEltwise = parentNode;
 
-                parentEltwise->inputShapes.push_back(parent->getOutputShapeAtPort(0));
+                parentEltwise->m_input_shapes.push_back(parent->getOutputShapeAtPort(0));
                 graph.CreateEdge(parent, parentEltwise, inNum, parentEltwise->getParentEdges().size());
             }
         }
@@ -1032,7 +1032,7 @@ void GraphOptimizer::FuseConvolutionAndZeroPoints(Graph& graph) {
 
         auto G = convNode->getGroupNum();
         const size_t groupOffset = convNode->getAlgorithm() == Algorithm::ConvolutionGrouped ? 1 : 0;
-        auto& weightsConstantDims = weightsConstant->outputShapes[0].getStaticDims();
+        auto& weightsConstantDims = weightsConstant->m_output_shapes[0].getStaticDims();
 
         auto OC = weightsConstantDims[0 + groupOffset];
         auto IC = weightsConstantDims[1 + groupOffset];
@@ -1279,8 +1279,8 @@ void GraphOptimizer::FuseConvolutionAndDWConvolution(Graph& graph) {
         const auto weightRank = convChild->getWeightDims().size();
         const auto stridesSize = convChild->getStride().size();
         bool isSupportedParams =
-            dimsEqualStrong(convChild->outputShapes[0].getDims()[1], convChild->getGroupNum()) &&
-            convChild->outputShapes[0].getDims()[1] != 1 &&
+            dimsEqualStrong(convChild->m_output_shapes[0].getDims()[1], convChild->getGroupNum()) &&
+            convChild->m_output_shapes[0].getDims()[1] != 1 &&
             everyone_is(3u,
                         static_cast<unsigned int>(convChild->getWeightDims()[weightRank - 1]),
                         static_cast<unsigned int>(convChild->getWeightDims()[weightRank - 2])) &&
@@ -1301,12 +1301,12 @@ void GraphOptimizer::FuseConvolutionAndDWConvolution(Graph& graph) {
     };
 
     auto isFusingWorthwhile = [&](const NodePtr& parentNode, const NodePtr& childNode) {
-        if (!childNode->inputShapes[0].isStatic() || !childNode->outputShapes[0].isStatic()) {
+        if (!childNode->m_input_shapes[0].isStatic() || !childNode->m_output_shapes[0].isStatic()) {
             return false;
         }
 
-        auto inDims = childNode->inputShapes[0].getStaticDims();
-        auto outDims = childNode->outputShapes[0].getStaticDims();
+        auto inDims = childNode->m_input_shapes[0].getStaticDims();
+        auto outDims = childNode->m_output_shapes[0].getStaticDims();
         int elemSize = childNode->getOriginalOutputPrecisionAtPort(0).size();
 
         int L3_cache_size = dnnl::utils::get_cache_size(3, false);
@@ -1783,10 +1783,10 @@ void GraphOptimizer::FuseConvolutionSumAndConvolutionSumActivation(Graph& graph)
         if (!mergedConv->fusedWith.empty() && (mergedConv->fusedWith[0]->getType() == Type::Convolution ||
                                                mergedConv->fusedWith[0]->getType() == Type::BinaryConvolution)) {
             // Merged with DW_conv. Shape may change
-            mergedConv->inputShapes.push_back(mergedConv->fusedWith[0]->getOutputShapeAtPort(0));
+            mergedConv->m_input_shapes.push_back(mergedConv->fusedWith[0]->getOutputShapeAtPort(0));
         } else {
             size_t secondTermPort = sum->getFusingPort() == 0 ? 1 : 0;
-            mergedConv->inputShapes.push_back(sum->getInputShapeAtPort(secondTermPort));
+            mergedConv->m_input_shapes.push_back(sum->getInputShapeAtPort(secondTermPort));
         }
 
         size_t childIdx = 0lu;
@@ -2160,7 +2160,7 @@ void GraphOptimizer::FuseEltwiseAndSimple(Graph& graph) {
                             outNum = remEdge->getOutputNum();
                             graph.RemoveEdge(remEdge);
                         }
-                        parent->outputShapes[inNum] = child->inputShapes[outNum];
+                        parent->m_output_shapes[inNum] = child->m_input_shapes[outNum];
                         graph.CreateEdge(parent, child, inNum, outNum);
                     }
                 } else {
@@ -2177,10 +2177,10 @@ void GraphOptimizer::FuseEltwiseAndSimple(Graph& graph) {
                         graph.RemoveEdge(remEdge);
                     }
 
-                    if (parentNode->inputShapes.size() < static_cast<size_t>(outNum) + 1) {
-                        parentNode->inputShapes.resize(outNum + 1);
+                    if (parentNode->m_input_shapes.size() < static_cast<size_t>(outNum) + 1) {
+                        parentNode->m_input_shapes.resize(outNum + 1);
                     }
-                    parentNode->inputShapes[outNum] = parent->getOutputShapeAtPort(inNum);
+                    parentNode->m_input_shapes[outNum] = parent->getOutputShapeAtPort(inNum);
 
                     graph.CreateEdge(parent, parentNode, inNum, outNum);
                 }
@@ -3055,8 +3055,8 @@ void GraphOptimizer::reshapeRnnSeq(Graph& graph) {
             return false;
         }
         auto rnnNode = std::dynamic_pointer_cast<RNN>(node);
-        return rnnNode && !rnnNode->hasNativeOrder() && node->outputShapes[0].getRank() == 4 &&
-               node->outputShapes[0].getDims()[1] == 1;
+        return rnnNode && !rnnNode->hasNativeOrder() && node->m_output_shapes[0].getRank() == 4 &&
+               node->m_output_shapes[0].getDims()[1] == 1;
     };
 
     for (size_t i = 0; i < graphNodes.size(); i++) {
@@ -3072,7 +3072,7 @@ void GraphOptimizer::reshapeRnnSeq(Graph& graph) {
         auto maxDims = parentNode->getOutputShapeAtPort(0).getMaxDims();
         minDims.erase(minDims.begin() + 1);
         maxDims.erase(maxDims.begin() + 1);
-        parentNode->outputShapes[0] = {minDims, maxDims};
+        parentNode->m_output_shapes[0] = {minDims, maxDims};
 
         for (size_t j = 0; j < childrenEdges.size(); j++) {
             auto edge = childrenEdges[j];
@@ -3225,13 +3225,13 @@ void GraphOptimizer::MatchSdpaKvCache(Graph& graph) {
         auto memInputNode = std::dynamic_pointer_cast<node::MemoryInputBase>(node);
         OPENVINO_ASSERT(memInputNode, "MemoryInput node ", node->getName(), " has unexpected dynamic type");
 
-        std::optional<std::vector<Shape>> inputShapes;
+        std::optional<std::vector<Shape>> input_shapes;
         std::optional<std::vector<ov::element::Type>> inputPrcs;
         if (!node->getParentEdges().empty()) {
-            inputShapes = std::optional<std::vector<Shape>>(std::vector<Shape>{});
+            input_shapes = std::optional<std::vector<Shape>>(std::vector<Shape>{});
             inputPrcs = std::optional<std::vector<ov::element::Type>>(std::vector<ov::element::Type>{});
 
-            auto& input_shape_vec = *inputShapes;
+            auto& input_shape_vec = *input_shapes;
             auto& input_prc_vec = *inputPrcs;
 
             for (size_t i = 0; i < node->getParentEdges().size(); i++) {
@@ -3262,7 +3262,7 @@ void GraphOptimizer::MatchSdpaKvCache(Graph& graph) {
                                                               memInputNode->getOutputShapeAtPort(0),
                                                               memInputNode->getOriginalOutputPrecisionAtPort(0),
                                                               graph.getGraphContext(),
-                                                              inputShapes,
+                                                              input_shapes,
                                                               inputPrcs,
                                                               sdpa);
 
@@ -3360,13 +3360,13 @@ void GraphOptimizer::DropRedundantMemoryOutput(Graph& graph) {
         auto memInputNode = std::dynamic_pointer_cast<node::MemoryInputBase>(node);
         OPENVINO_ASSERT(memInputNode, "MemoryInput node ", node->getName(), " has unexpected dynamic type");
 
-        std::optional<std::vector<Shape>> inputShapes;
+        std::optional<std::vector<Shape>> input_shapes;
         std::optional<std::vector<ov::element::Type>> inputPrcs;
         if (!node->getParentEdges().empty()) {
-            inputShapes = std::optional<std::vector<Shape>>(std::vector<Shape>{});
+            input_shapes = std::optional<std::vector<Shape>>(std::vector<Shape>{});
             inputPrcs = std::optional<std::vector<ov::element::Type>>(std::vector<ov::element::Type>{});
 
-            auto& input_shape_vec = *inputShapes;
+            auto& input_shape_vec = *input_shapes;
             auto& input_prc_vec = *inputPrcs;
             for (size_t i = 0; i < node->getParentEdges().size(); i++) {
                 input_shape_vec.push_back(node->getInputShapeAtPort(i));
@@ -3399,7 +3399,7 @@ void GraphOptimizer::DropRedundantMemoryOutput(Graph& graph) {
                                                                   memInputNode->getOutputShapeAtPort(0),
                                                                   memInputNode->getOriginalOutputPrecisionAtPort(0),
                                                                   graph.getGraphContext(),
-                                                                  inputShapes,
+                                                                  input_shapes,
                                                                   inputPrcs,
                                                                   memInpNd->getSubGraph());
         graph.AddNode(memInputSingle);

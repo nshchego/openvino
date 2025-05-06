@@ -77,16 +77,16 @@ void Range::initSupportedPrimitiveDescriptors() {
           getOriginalInputPrecisionAtPort(RANGE_LIMIT) == ov::element::f32 &&
           getOriginalInputPrecisionAtPort(RANGE_DELTA) == ov::element::f32 &&
           getOriginalOutputPrecisionAtPort(0) == ov::element::f32)) {
-        inDataConf.reserve(inputShapes.size());
-        for (size_t i = 0; i < inputShapes.size(); ++i) {
+        inDataConf.reserve(m_input_shapes.size());
+        for (size_t i = 0; i < m_input_shapes.size(); ++i) {
             inDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
         }
         outDataConf.reserve(1);
         outDataConf.emplace_back(LayoutType::ncsp, ov::element::f32);
         addSupportedPrimDesc(inDataConf, outDataConf, impl_desc_type::ref_any);
     } else {
-        inDataConf.reserve(inputShapes.size());
-        for (size_t i = 0; i < inputShapes.size(); ++i) {
+        inDataConf.reserve(m_input_shapes.size());
+        for (size_t i = 0; i < m_input_shapes.size(); ++i) {
             inDataConf.emplace_back(LayoutType::ncsp);
         }
         outDataConf.reserve(1);

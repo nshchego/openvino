@@ -179,6 +179,10 @@ Subgraph::Subgraph(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr
     is_dynamic = isDynamicNgraphNode(op);
 }
 
+Subgraph::Subgraph(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+}
+
 uint64_t Subgraph::getBodyHash(const std::shared_ptr<snippets::op::Subgraph>& snippet) {
     uint64_t seed = 0;
     ov::snippets::pass::Hash hash_function(seed);
@@ -195,15 +199,15 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
         {ov::element::f32, ov::element::i32, ov::element::bf16, ov::element::f16, ov::element::i8, ov::element::u8};
 
     bool dimRanksAreEqual = true;
-    for (size_t i = 0; dimRanksAreEqual && i < inputShapes.size(); i++) {
-        for (size_t j = 0; dimRanksAreEqual && j < outputShapes.size(); j++) {
-            if (inputShapes[i].getRank() != outputShapes[j].getRank()) {
+    for (size_t i = 0; dimRanksAreEqual && i < m_input_shapes.size(); i++) {
+        for (size_t j = 0; dimRanksAreEqual && j < m_output_shapes.size(); j++) {
+            if (m_input_shapes[i].getRank() != m_output_shapes[j].getRank()) {
                 dimRanksAreEqual = false;
             }
         }
     }
 
-    const size_t ndims = outputShapes[0].getRank();
+    const size_t ndims = m_output_shapes[0].getRank();
     // Domain sensitive operations and dynamic Subgraphs support only Planar layout
     const bool isOnlyPlanarApplicable = subgraph_attrs->snippet->has_domain_sensitive_ops();
     const bool isChannelsFirstApplicable = dnnl::impl::utils::one_of(ndims, 1u, 2u, 3u, 4u, 5u) && dimRanksAreEqual &&
@@ -217,7 +221,7 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
     bool isBlockedApplicable =
         dnnl::impl::utils::one_of(ndims, 3u, 4u, 5u) && dimRanksAreEqual && !isOnlyPlanarApplicable && !isDynamic;
 
-    for (const auto& inShape : inputShapes) {
+    for (const auto& inShape : m_input_shapes) {
         if (isDynamic && inShape.getRank() != 1) {
             isBlockedApplicable =
                 isBlockedApplicable && inShape.getMinDims()[1] != Shape::UNDEFINED_DIM && inShape.getMinDims()[1] > 1;
@@ -273,8 +277,8 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
 
         size_t offset = 0;
         NodeConfig config;
-        config.inConfs.resize(inputShapes.size());
-        for (size_t i = 0; i < inputShapes.size(); i++) {
+        config.inConfs.resize(m_input_shapes.size());
+        for (size_t i = 0; i < m_input_shapes.size(); i++) {
             const auto originalInputPrecision = getOriginalInputPrecisionAtPort(i);
             const auto precision =
                 ((originalInputPrecision == ov::element::f32) &&
@@ -293,14 +297,14 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
             PortConfig portConfig;
             portConfig.inPlace((!i && canBeInPlace() && equalPrecisions) ? 0 : -1);
             portConfig.constant(false);
-            if (inputShapes[i].getDims()[0] == 1) {
+            if (m_input_shapes[i].getDims()[0] == 1) {
                 inputMask.reset(0);  // accepts any stride on batch axis
             }
-            portConfig.setMemDesc(createMemoryDesc(inputShapes[i], precision, offset), inputMask);
+            portConfig.setMemDesc(createMemoryDesc(m_input_shapes[i], precision, offset), inputMask);
             config.inConfs[i] = portConfig;
         }
-        config.outConfs.resize(outputShapes.size());
-        for (size_t i = 0; i < outputShapes.size(); i++) {
+        config.outConfs.resize(m_output_shapes.size());
+        for (size_t i = 0; i < m_output_shapes.size(); i++) {
             auto precision = getOriginalOutputPrecisionAtPort(i);
             if (supportedPrecisions.count(precision) == 0) {
                 THROW_CPU_NODE_ERR("doesn't support ", precision, " precision.");
@@ -310,10 +314,10 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
             PortConfig portConfig;
             portConfig.inPlace(-1);
             portConfig.constant(false);
-            if (outputShapes[i].getDims()[0] == 1) {
+            if (m_output_shapes[i].getDims()[0] == 1) {
                 outputMask.reset(0);  // accepts any stride on batch axis
             }
-            portConfig.setMemDesc(createMemoryDesc(outputShapes[i], precision, offset), outputMask);
+            portConfig.setMemDesc(createMemoryDesc(m_output_shapes[i], precision, offset), outputMask);
             config.outConfs[i] = portConfig;
         }
 

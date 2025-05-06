@@ -92,14 +92,14 @@ void If::initSupportedPrimitiveDescriptors() {
     config.inConfs.reserve(getParentEdges().size());
     config.outConfs.reserve(getChildEdges().size());
 
-    for (size_t i = 0; i < inputShapes.size(); i++) {
+    for (size_t i = 0; i < m_input_shapes.size(); i++) {
         PortConfig dataConf{};
         auto descCreator = BlockedDescCreator::getCommonCreators().at(LayoutType::ncsp);
         dataConf.setMemDesc(descCreator->createSharedDesc(getOriginalInputPrecisionAtPort(i), getInputShapeAtPort(i)));
         config.inConfs.emplace_back(dataConf);
     }
 
-    for (size_t i = 0; i < outputShapes.size(); i++) {
+    for (size_t i = 0; i < m_output_shapes.size(); i++) {
         PortConfig dataConf{};
         auto descCreator = BlockedDescCreator::getCommonCreators().at(LayoutType::ncsp);
         dataConf.setMemDesc(

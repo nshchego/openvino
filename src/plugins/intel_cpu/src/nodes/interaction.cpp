@@ -291,7 +291,7 @@ void Interaction::prepareParams() {
     const auto& denseFeatureDims = getParentEdgeAt(0)->getMemory().getStaticDims();
     batchSize = denseFeatureDims[0];
     featureSize = denseFeatureDims[1];
-    inputSizes = inputShapes.size();
+    inputSizes = m_input_shapes.size();
     interactFeatureSize = inputSizes * (inputSizes - 1) / 2;
     outputFeaturesLen = interactFeatureSize + featureSize;
     std::vector<int64_t> lhsShape({static_cast<int64_t>(inputSizes), static_cast<int64_t>(featureSize)});
@@ -312,7 +312,7 @@ void Interaction::prepareParams() {
         ptr = std::make_shared<Memory>(getEngine(), intel_cpu::DnnlBlockedMemoryDesc(prc, shape));
     };
     initMemoryPtr(dataPrecision, intel_cpu::Shape{inputSizes, featureSize}, inputMemPtr);
-    initMemoryPtr(dataPrecision, intel_cpu::Shape{inputShapes.size(), inputShapes.size()}, outputMemPtr);
+    initMemoryPtr(dataPrecision, intel_cpu::Shape{m_input_shapes.size(), m_input_shapes.size()}, outputMemPtr);
     initMemoryPtr(dataPrecision, intel_cpu::Shape{interactFeatureSize}, flatMemPtr);
 
     jit_move_scale_compile_params jcp;

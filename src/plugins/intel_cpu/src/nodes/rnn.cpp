@@ -1449,9 +1449,9 @@ void RNN::execute(const dnnl::stream& strm) {
             args[state_o_tags[s]] = getDstMemoryAtPort(s)->getPrimitive();
         }
     } else {
-        size_t n_ports_with_init_states = outputShapes.size() - 1;  // first is a sequence data
+        size_t n_ports_with_init_states = m_output_shapes.size() - 1;  // first is a sequence data
         for (size_t s = 0; s < std::min(S, n_ports_with_init_states); s++) {
-            if (s < outputShapes.size()) {
+            if (s < m_output_shapes.size()) {
                 args[state_o_tags[s]] = getDstMemoryAtPort(s + 1)->getPrimitive();
             }
         }

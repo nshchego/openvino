@@ -20,6 +20,8 @@ public:
             const std::string& name,
             const GraphContext::CPtr& context);
 
+    Reorder(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;

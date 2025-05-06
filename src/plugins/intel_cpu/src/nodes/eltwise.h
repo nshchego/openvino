@@ -37,6 +37,8 @@ public:
 public:
     Eltwise(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Eltwise(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void selectOptimalPrimitiveDescriptor() override;

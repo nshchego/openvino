@@ -368,12 +368,12 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, co
 
     auto extImgPatcher = ov::as_type_ptr<const ov::opset3::ExtractImagePatches>(op);
 
-    if (inputShapes.size() != 1 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 1 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input or output edges!",
                            " Input: ",
-                           inputShapes.size(),
+                           m_input_shapes.size(),
                            "); Output: ",
-                           outputShapes.size());
+                           m_output_shapes.size());
     }
 
     if (getInputShapeAtPort(0).getRank() != 4) {

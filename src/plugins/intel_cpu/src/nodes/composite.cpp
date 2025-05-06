@@ -49,7 +49,7 @@ void Composite::selectOptimalPrimitiveDescriptor() {
         graphInputConfig.emplace_back(node::Input::InputConfig{std::move(desc), isInPlace});
     }
 
-    std::vector<Input::OutputConfig> graphOutputConfig(outputShapes.size(), node::Input::OutputConfig{true, isInPlace});
+    std::vector<Input::OutputConfig> graphOutputConfig(m_output_shapes.size(), node::Input::OutputConfig{true, isInPlace});
 
     // configure the inner graph to get the information about output memory descriptors
     m_graph.Init(m_body, context, graphInputConfig, graphOutputConfig);

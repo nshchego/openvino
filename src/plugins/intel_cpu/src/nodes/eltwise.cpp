@@ -1326,6 +1326,10 @@ Eltwise::Eltwise(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     getInitializers().at(op->get_type_info())(op, *this);
 }
 
+Eltwise::Eltwise(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+}
+
 size_t Eltwise::getOpInputsNum() const {
     switch (getAlgorithm()) {
     case Algorithm::EltwiseIsFinite:
@@ -1396,7 +1400,7 @@ size_t Eltwise::getOpInputsNum() const {
 
 bool Eltwise::isWithBroadcast() {
     const auto& oDims = getOutputShapeAtPort(0).getDims();
-    for (size_t i = 0; i < inputShapes.size(); i++) {
+    for (size_t i = 0; i < m_input_shapes.size(); i++) {
         const auto& iDims = getInputShapeAtPort(i).getDims();
         if (!dimsEqualWeak(iDims, oDims)) {
             return true;

@@ -37,7 +37,7 @@ GRN::GRN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
         THROW_CPU_NODE_ERR("is not an instance of GRN from opset1.");
     }
 
-    if (inputShapes.size() != 1 || outputShapes.size() != 1) {
+    if (m_input_shapes.size() != 1 || m_output_shapes.size() != 1) {
         THROW_CPU_NODE_ERR("has incorrect number of input/output edges!");
     }
 

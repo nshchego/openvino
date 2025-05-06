@@ -85,7 +85,7 @@ RDFT::RDFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
         THROW_CPU_NODE_ERR("has invalid number of input/output edges: ", numInputs);
     }
 
-    const auto axesRank = inputShapes[AXES_INDEX].getRank();
+    const auto axesRank = m_input_shapes[AXES_INDEX].getRank();
     if (axesRank != 1) {
         THROW_CPU_NODE_ERR("has invalid 'axes' input tensor with rank: ", axesRank);
     }
@@ -96,12 +96,12 @@ RDFT::RDFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
     if (axesNode) {
         axes = axesNode->cast_vector<int>();
         isAxesConstant = true;
-        auto rank = inputShapes[DATA_INDEX].getRank() - static_cast<size_t>(inverse);
+        auto rank = m_input_shapes[DATA_INDEX].getRank() - static_cast<size_t>(inverse);
         normalizeAxes(axes, rank);
     }
 
     if (numInputs > 2) {
-        const auto signalSizeRank = inputShapes[SIGNAL_SIZE_INDEX].getRank();
+        const auto signalSizeRank = m_input_shapes[SIGNAL_SIZE_INDEX].getRank();
         if (signalSizeRank != 1) {
             THROW_CPU_NODE_ERR("has invalid 'signalSize' input tensor with rank: ", signalSizeRank);
         }
@@ -112,7 +112,7 @@ RDFT::RDFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
         isSignalSizesConstant = true;
         signalSizes = signalSizesNode->cast_vector<int>();
     } else if (isAxesConstant) {
-        const auto& inputShape = inputShapes[DATA_INDEX].getDims();
+        const auto& inputShape = m_input_shapes[DATA_INDEX].getDims();
         signalSizes = getDefaultSignalSizes(inputShape, axes, inverse);
     }
 }
@@ -134,7 +134,7 @@ void RDFT::initSupportedPrimitiveDescriptors() {
         THROW_CPU_NODE_ERR("has unsupported 'axes' input precision: ", axesPrecision.get_type_name());
     }
 
-    if (inputShapes.size() > SIGNAL_SIZE_INDEX) {
+    if (m_input_shapes.size() > SIGNAL_SIZE_INDEX) {
         const auto& signalSizePrecision = getOriginalInputPrecisionAtPort(SIGNAL_SIZE_INDEX);
         if (signalSizePrecision != ov::element::i32 && signalSizePrecision != ov::element::i64) {
             THROW_CPU_NODE_ERR("has unsupported 'signalSize' input precision: ", signalSizePrecision.get_type_name());
@@ -143,7 +143,7 @@ void RDFT::initSupportedPrimitiveDescriptors() {
 
     std::vector<PortConfigurator> configurators(
         {{LayoutType::ncsp, ov::element::f32}, {LayoutType::ncsp, ov::element::i32}});
-    if (inputShapes.size() > SIGNAL_SIZE_INDEX) {
+    if (m_input_shapes.size() > SIGNAL_SIZE_INDEX) {
         configurators.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
 
@@ -192,7 +192,7 @@ void RDFT::prepareParams() {
             axes.resize(newAxesSize);
         }
         auto axesPtr = axesMem->getDataAs<const int>();
-        auto inputRank = inputShapes[DATA_INDEX].getRank() - static_cast<size_t>(inverse);
+        auto inputRank = m_input_shapes[DATA_INDEX].getRank() - static_cast<size_t>(inverse);
         for (size_t i = 0; i < axes.size(); i++) {
             axes[i] = axesPtr[i] < 0 ? axesPtr[i] + inputRank : axesPtr[i];
         }
@@ -237,7 +237,7 @@ bool RDFT::axesChanged() const {
         return true;
     }
     auto axesPtr = axesMem->getDataAs<const int>();
-    auto inputRank = inputShapes[DATA_INDEX].getRank() - static_cast<size_t>(inverse);
+    auto inputRank = m_input_shapes[DATA_INDEX].getRank() - static_cast<size_t>(inverse);
     for (size_t i = 0; i < axes.size(); i++) {
         auto newAxis = axesPtr[i] < 0 ? axesPtr[i] + inputRank : axesPtr[i];
         if (static_cast<size_t>(axes[i]) != newAxis) {

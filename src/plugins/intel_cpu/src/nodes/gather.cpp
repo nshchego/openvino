@@ -235,7 +235,7 @@ void Gather::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    const auto& parentDims = inputShapes[0].getDims();
+    const auto& parentDims = m_input_shapes[0].getDims();
     const auto axisDim = parentDims[axis];
     if (Shape::UNDEFINED_DIM == axisDim) {
         return;
@@ -984,7 +984,7 @@ void Gather::resolveInPlaceEdges(Edge::LOOK look) {
 
     auto& config = selected_pd->getConfig();
     size_t inplaceInpIndx = selected_pd->getConfig().outConfs[outputPort].inPlace();
-    const auto baseDim = inputShapes.front().getDims()[axis];
+    const auto baseDim = m_input_shapes.front().getDims()[axis];
     CPU_NODE_ASSERT(baseDim != Shape::UNDEFINED_DIM, "can not use inPlace memory with splitting on dynamic dimention");
     auto baseMemBlock = getParentEdgeAt(inplaceInpIndx)->getMemory().getMemoryBlock();
     const auto index = constIndices.front();

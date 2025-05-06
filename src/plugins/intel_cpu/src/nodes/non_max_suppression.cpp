@@ -115,7 +115,7 @@ void NonMaxSuppression::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    const auto inputs_num = inputShapes.size();
+    const auto inputs_num = m_input_shapes.size();
     if (inputs_num > NMS_MAX_OUTPUT_BOXES_PER_CLASS) {
         check1DInput(getInputShapeAtPort(NMS_MAX_OUTPUT_BOXES_PER_CLASS),
                      "max_output_boxes_per_class",
@@ -142,8 +142,8 @@ void NonMaxSuppression::initSupportedPrimitiveDescriptors() {
     }
 
     std::vector<PortConfigurator> outDataConf;
-    outDataConf.reserve(outputShapes.size());
-    for (size_t i = 0; i < outputShapes.size(); ++i) {
+    outDataConf.reserve(m_output_shapes.size());
+    for (size_t i = 0; i < m_output_shapes.size(); ++i) {
         ov::element::Type outPrecision = i == NMS_SELECTED_SCORES ? ov::element::f32 : ov::element::i32;
         outDataConf.emplace_back(LayoutType::ncsp, outPrecision);
     }
@@ -220,7 +220,7 @@ void NonMaxSuppression::createJitKernel() {
 }
 
 void NonMaxSuppression::executeDynamicImpl(const dnnl::stream& strm) {
-    if (hasEmptyInputTensors() || (inputShapes.size() > NMS_MAX_OUTPUT_BOXES_PER_CLASS &&
+    if (hasEmptyInputTensors() || (m_input_shapes.size() > NMS_MAX_OUTPUT_BOXES_PER_CLASS &&
                                    getSrcDataAtPortAs<int>(NMS_MAX_OUTPUT_BOXES_PER_CLASS)[0] == 0)) {
         redefineOutputMemory({{0, 3}, {0, 3}, {1}});
         *getDstDataAtPortAs<int>(NMS_VALID_OUTPUTS) = 0;
@@ -230,7 +230,7 @@ void NonMaxSuppression::executeDynamicImpl(const dnnl::stream& strm) {
 }
 
 void NonMaxSuppression::execute([[maybe_unused]] const dnnl::stream& strm) {
-    const auto inputs_num = inputShapes.size();
+    const auto inputs_num = m_input_shapes.size();
 
     size_t max_number_of_boxes = m_output_boxes_per_class * m_batches_num * m_classes_num;
     if (inputs_num > NMS_MAX_OUTPUT_BOXES_PER_CLASS) {

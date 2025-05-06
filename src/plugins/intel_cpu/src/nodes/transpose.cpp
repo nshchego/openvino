@@ -12,6 +12,8 @@
 #include "openvino/op/constant.hpp"
 #include "openvino/op/transpose.hpp"
 #include "shape_inference/custom/transpose.hpp"
+#include "executors/transpose_list.hpp"
+
 using namespace dnnl;
 
 namespace ov::intel_cpu::node {
@@ -52,6 +54,10 @@ Transpose::Transpose(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
             }
         }
     }
+}
+
+Transpose::Transpose(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
 }
 
 void Transpose::getSupportedDescriptors() {}

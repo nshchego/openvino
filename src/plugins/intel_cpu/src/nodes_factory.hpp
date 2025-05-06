@@ -122,7 +122,7 @@ public:
     NodesFactory() : Factory("NodesFactory") {
         using namespace node;
         // INTEL_CPU_NODE(CumSum, Type::CumSum);
-        // INTEL_CPU_NODE(Convolution, Type::Convolution);
+        INTEL_CPU_NODE(Convolution, Type::Convolution);
         // INTEL_CPU_NODE(BinaryConvolution, Type::BinaryConvolution);
         // INTEL_CPU_NODE(SpaceToBatch, Type::SpaceToBatch);
         // INTEL_CPU_NODE(Lrn, Type::Lrn);
@@ -132,23 +132,23 @@ public:
         // INTEL_CPU_NODE(If, Type::If);
         // INTEL_CPU_NODE(Broadcast, Type::Broadcast);
         // INTEL_CPU_NODE(ExperimentalDetectronTopKROIs, Type::ExperimentalDetectronTopKROIs);
-        // INTEL_CPU_NODE(Reorder, Type::Reorder);
+        INTEL_CPU_NODE(Reorder, Type::Reorder);
         // INTEL_CPU_NODE(MatrixNms, Type::MatrixNms);
         // INTEL_CPU_NODE(AdaptivePooling, Type::AdaptivePooling);
-        // INTEL_CPU_NODE(Pooling, Type::Pooling);
-        // INTEL_CPU_NODE(Eltwise, Type::Eltwise);
+        INTEL_CPU_NODE(Pooling, Type::Pooling);
+        INTEL_CPU_NODE(Eltwise, Type::Eltwise);
         // INTEL_CPU_NODE(SoftMax, Type::Softmax);
         // INTEL_CPU_NODE(EmbeddingBagPacked, Type::EmbeddingBagPackedSum);
         // INTEL_CPU_NODE(EmbeddingBagPacked, Type::EmbeddingBagPacked);
         INTEL_CPU_NODE(Input, Type::Input);
-        // INTEL_CPU_NODE(Input, Type::Output);
+        INTEL_CPU_NODE(Input, Type::Output);
         // INTEL_CPU_NODE(MemoryInput, Type::MemoryInput);
         // INTEL_CPU_NODE(MemoryOutput, Type::MemoryOutput);
         // INTEL_CPU_NODE(Tile, Type::Tile);
         // INTEL_CPU_NODE(GatherTree, Type::GatherTree);
         // INTEL_CPU_NODE(FullyConnected, Type::FullyConnected);
         // INTEL_CPU_NODE(CTCGreedyDecoder, Type::CTCGreedyDecoder);
-        // INTEL_CPU_NODE(Transpose, Type::Transpose);
+        INTEL_CPU_NODE(Transpose, Type::Transpose);
         // INTEL_CPU_NODE(ReorgYolo, Type::ReorgYolo);
         // INTEL_CPU_NODE(EmbeddingSegmentsSum, Type::EmbeddingSegmentsSum);
         // INTEL_CPU_NODE(ShapeOf, Type::ShapeOf);
@@ -178,7 +178,7 @@ public:
         // INTEL_CPU_NODE(EmbeddingBagOffset, Type::EmbeddingBagOffsets);
         // INTEL_CPU_NODE(Roll, Type::Roll);
         // INTEL_CPU_NODE(Pad, Type::Pad);
-        // INTEL_CPU_NODE(Reshape, Type::Reshape);
+         INTEL_CPU_NODE(Reshape, Type::Reshape);
         // INTEL_CPU_NODE(MVN, Type::MVN);
         // INTEL_CPU_NODE(MatMul, Type::MatMul);
         // INTEL_CPU_NODE(Multinomial, Type::Multinomial);
@@ -223,7 +223,7 @@ public:
         // INTEL_CPU_NODE(STFT, Type::STFT);
         // INTEL_CPU_NODE(ISTFT, Type::ISTFT);
         // INTEL_CPU_NODE(ExtractImagePatches, Type::ExtractImagePatches);
-        // INTEL_CPU_NODE(Subgraph, Type::Subgraph);
+        INTEL_CPU_NODE(Subgraph, Type::Subgraph);
         // INTEL_CPU_NODE(Composite, Type::SubModel);
         // INTEL_CPU_NODE(ScaledDotProductAttention, Type::ScaledDotProductAttention);
         // INTEL_CPU_NODE(SearchSorted, Type::SearchSorted);

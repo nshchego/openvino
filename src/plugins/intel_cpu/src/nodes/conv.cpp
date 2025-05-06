@@ -249,6 +249,10 @@ Convolution::Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext
     useJitPlanar = ((IC == 1 && groupOC * groupNum == 1) && isAvx2FP32);
 }
 
+Convolution::Convolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+}
+
 bool Convolution::canBeExecutedInInt8() const {
     auto inputDataType = DnnlExtensionUtils::ElementTypeToDataType(getOriginalInputPrecisionAtPort(0));
     auto weightsDataType = DnnlExtensionUtils::ElementTypeToDataType(getOriginalInputPrecisionAtPort(1));
@@ -752,14 +756,14 @@ void Convolution::addFusedNode(const NodePtr& fusingNode) {
         auto convolutionNode = std::dynamic_pointer_cast<Convolution>(fusingNode);
         CPU_NODE_ASSERT(convolutionNode, "Unexpected dynamic node type");
         withDWConv = true;
-        auto& inActivationDims = convolutionNode->inputShapes[0].getStaticDims();
-        dw_conv_ih = inActivationDims[convolutionNode->inputShapes[0].getRank() - 2];
-        dw_conv_iw = inActivationDims[convolutionNode->inputShapes[0].getRank() - 1];
+        auto& inActivationDims = convolutionNode->m_input_shapes[0].getStaticDims();
+        dw_conv_ih = inActivationDims[convolutionNode->m_input_shapes[0].getRank() - 2];
+        dw_conv_iw = inActivationDims[convolutionNode->m_input_shapes[0].getRank() - 1];
 
-        auto& outDims = convolutionNode->outputShapes[0].getStaticDims();
+        auto& outDims = convolutionNode->m_output_shapes[0].getStaticDims();
         dw_conv_oc = outDims[1];
 
-        const auto& dwWeightsDims = convolutionNode->inputShapes[1].getStaticDims();
+        const auto& dwWeightsDims = convolutionNode->m_input_shapes[1].getStaticDims();
         dw_conv_kernel.push_back(dwWeightsDims[dwWeightsDims.size() - 1]);
         dw_conv_kernel.push_back(dwWeightsDims[dwWeightsDims.size() - 2]);
         dw_conv_strides = convolutionNode->getStride();
