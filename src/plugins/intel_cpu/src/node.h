@@ -90,29 +90,29 @@ private:
 class NodeDesc {
 public:
     NodeDesc(NodeConfig conf, impl_desc_type type)
-        : config(std::move(conf)),
-          implementationType(type),
+        : m_config(std::move(conf)),
+          m_implementation_type(type),
           executorFactory(nullptr) {}
 
     NodeDesc(NodeConfig conf, impl_desc_type type, ExecutorFactoryLegacyPtr factory)
-        : config(std::move(conf)),
-          implementationType(type),
+        : m_config(std::move(conf)),
+          m_implementation_type(type),
           executorFactory(std::move(factory)) {}
 
     const NodeConfig& getConfig() const {
-        return config;
+        return m_config;
     }
 
     void setConfig(const NodeConfig& config) {
-        this->config = config;
+        m_config = config;
     }
 
     impl_desc_type getImplementationType() const {
-        return implementationType;
+        return m_implementation_type;
     }
 
     void setImplementationType(impl_desc_type type) {
-        implementationType = type;
+        m_implementation_type = type;
     }
 
     ExecutorFactoryLegacyPtr getExecutorFactory() const {
@@ -172,8 +172,8 @@ public:
     void load(BinaryInputBuffer& ib);
 
 private:
-    NodeConfig config;
-    impl_desc_type implementationType;
+    NodeConfig m_config;
+    impl_desc_type m_implementation_type;
     ExecutorFactoryLegacyPtr executorFactory;
 };
 
@@ -370,33 +370,7 @@ public:
 
     virtual void addFusedNode(const NodePtr& fusingNode);
 
-    virtual void fuseInto(NodePtr& parentNode) {
-        // The graph supports fusing only of consecutive nodes and some graph logic requires to know through which input
-        // port a node was fused into parent one.
-        for (size_t i = 0; i < getParentEdges().size(); i++) {
-            if (getParentEdgeAt(i)->getParent().get() == parentNode.get()) {
-                setFusingPort(i);
-                break;
-            }
-        }
-
-        auto parentFusedNodes = parentNode->getFusedWith();
-        if (getFusingPort() < 0 && !parentFusedNodes.empty()) {
-            for (size_t i = 0; i < getParentEdges().size(); i++) {
-                if (getParentEdgeAt(i)->getParent().get() == parentFusedNodes[parentFusedNodes.size() - 1].get()) {
-                    setFusingPort(i);
-                    break;
-                }
-            }
-        }
-
-        if (getFusingPort() == -1) {
-            OPENVINO_THROW("Cannot determine fusing port between nodes: ", parentNode->getName(), " and ", getName());
-        }
-
-        parentNode->addFusedNode(getParentEdgeAt(getFusingPort())->getChild());
-        parentNode->addOriginalLayer(getOriginalLayers());
-    }
+    virtual void fuseInto(NodePtr& parentNode);
 
     void clearFusedWith() {
         fusedWith.clear();

@@ -658,6 +658,10 @@ NodePtr Edge::modifiedInPlace() const {
 }
 
 void Edge::save(BinaryOutputBuffer& ob) const {
+    // bool useExternalMemory = false;
+    // EdgeWeakPtr memoryFromEdge;
+    // MemoryPtr memoryPtr;
+    // Status status = Status::Uninitialized;
 }
 
 void Edge::load(BinaryInputBuffer& ib) {

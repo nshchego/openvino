@@ -170,6 +170,14 @@ struct NodeConfig {
 
     std::vector<PortConfig> inConfs;
     std::vector<PortConfig> outConfs;
+
+    void save(BinaryOutputBuffer& ob) const {
+
+    }
+
+    void load(BinaryInputBuffer& ib) {
+
+    }
 };
 
 }  // namespace intel_cpu

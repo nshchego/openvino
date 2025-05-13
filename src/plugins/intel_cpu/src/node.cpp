@@ -1909,6 +1909,32 @@ void Node::addFusedNode(const NodePtr& fusingNode) {
     fusedWith.push_back(fusingNode);
 }
 
+void Node::fuseInto(NodePtr& parent_node) {
+    // The graph supports fusing only of consecutive nodes and some graph logic requires to know through which input
+    // port a node was fused into parent one.
+    for (size_t i = 0; i < getParentEdges().size(); i++) {
+        if (getParentEdgeAt(i)->getParent().get() == parent_node.get()) {
+            setFusingPort(i);
+            break;
+        }
+    }
+
+    auto parent_fused_nodes = parent_node->getFusedWith();
+    if (getFusingPort() < 0 && !parent_fused_nodes.empty()) {
+        for (size_t i = 0; i < getParentEdges().size(); i++) {
+            if (getParentEdgeAt(i)->getParent().get() == parent_fused_nodes[parent_fused_nodes.size() - 1].get()) {
+                setFusingPort(i);
+                break;
+            }
+        }
+    }
+
+    OPENVINO_ASSERT(getFusingPort() > -1, "Cannot determine fusing port between nodes: ", parent_node->getName(), " and ", getName());
+
+    parent_node->addFusedNode(getParentEdgeAt(getFusingPort())->getChild());
+    parent_node->addOriginalLayer(getOriginalLayers());
+}
+
 void Node::addSupportedPrimDesc(const std::vector<PortConfigurator>& inPortConfigs,
                                 const std::vector<PortConfigurator>& outPortConfigs,
                                 impl_desc_type implType) {
@@ -2223,7 +2249,7 @@ void Node::resolveInPlaceDirection() {
 }
 
 void Node::save(BinaryOutputBuffer& ob) const {
-    ob << ob.get_pos();
+    ob << ob.get_pos();  // Read/Write sync position
 
     ob << name;
     ob << make_data(&type, sizeof(Type));
@@ -2235,17 +2261,12 @@ void Node::save(BinaryOutputBuffer& ob) const {
 
     ob << m_input_shapes;
     ob << m_output_shapes;
-    
-    // ob << parentEdges;
-    // ob << childEdges;
 
     ob << fusingPort;
-    // ob << fusedWith;
-    // ob << mergedWith;
 
     ob << curNumaNode;
 
-    // ob << supportedPrimitiveDescriptors;
+    ob << supportedPrimitiveDescriptors;
     ob << selectedPrimitiveDescriptorIndex;
     ob << primitivesPriority;
     // ob << customImplPriorities;
@@ -2261,8 +2282,6 @@ void Node::save(BinaryOutputBuffer& ob) const {
     // ob << primArgs;
     // ob << postOpsArgs;
     // ob << descs;
-
-    // ob << context;
 
     ob << lastInputDims;
 
@@ -2302,17 +2321,12 @@ printf("--CPU-- Node::load\n");
 
     ib >> m_input_shapes;
     ib >> m_output_shapes;
-    
-    // ib >> parentEdges;
-    // ib >> childEdges;
 
     ib >> fusingPort;
-    // ib >> fusedWith;
-    // ib >> mergedWith;
 
     ib >> curNumaNode;
 
-    // ib >> supportedPrimitiveDescriptors;
+    ib >> supportedPrimitiveDescriptors;
     ib >> selectedPrimitiveDescriptorIndex;
     ib >> primitivesPriority;
     // ib >> customImplPriorities;
@@ -2328,8 +2342,6 @@ printf("--CPU-- Node::load\n");
     // ib >> primArgs;
     // ib >> postOpsArgs;
     // ib >> descs;
-
-    // ib >> context;
 
     ib >> lastInputDims;
 
@@ -2355,12 +2367,16 @@ printf("--CPU-- Node::load\n");
 }
 
 void NodeDesc::save(BinaryOutputBuffer& ob) const {
-    // ob << config;
-    // ob << implementationType;
-    // ob << executorFactory;
+    ob << m_config;
+    ob << int32_t(m_implementation_type);
 }
 
 void NodeDesc::load(BinaryInputBuffer& ib) {
+    int32_t tmp;
+
+    ib >> m_config;
+    ib >> tmp;
+    m_implementation_type = impl_desc_type(tmp);
 }
 
 #ifndef CPU_DEBUG_CAPS

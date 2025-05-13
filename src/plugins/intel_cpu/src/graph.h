@@ -87,7 +87,7 @@ public:
                      const GraphContext::CPtr& context,
                      std::string name);
 
-    void PushInputData(const std::size_t& index, const ov::SoPtr<ITensor>& input);
+    void PushInputData(const std::size_t index, const ov::SoPtr<ITensor>& input);
     void PullOutputData(std::unordered_map<std::size_t, ov::SoPtr<ITensor>>& output);
 
     // Returns Output nodes memory descriptors
@@ -103,40 +103,32 @@ public:
         return m_name;
     }
 
-    NodePtr getInputNodeByIndex(std::size_t index) {
-        auto input = inputNodesMap.find(index);
-        if (input == inputNodesMap.end())
-            return nullptr;
-        return input->second;
+    NodePtr getInputNodeByIndex(const size_t index) {
+        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input index '", index, "'.");
+        return m_input_nodes[index];
     }
 
     NodePtr getOutputNodeByIndex(std::size_t index) {
-        auto output = outputNodesMap.find(index);
-        if (output == outputNodesMap.end())
-            return nullptr;
-        return output->second;
+        OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output index '", index, "'.");
+        return m_input_nodes[index];
     }
 
-    NodeConstPtr getInputNodeByIndex(std::size_t index) const {
-        auto input = inputNodesMap.find(index);
-        if (input == inputNodesMap.end())
-            return nullptr;
-        return input->second;
+    NodeConstPtr getInputNodeByIndex(const size_t index) const {
+        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input index '", index, "'.");
+        return m_input_nodes[index];
     }
 
     NodeConstPtr getOutputNodeByIndex(std::size_t index) const {
-        auto output = outputNodesMap.find(index);
-        if (output == outputNodesMap.end())
-            return nullptr;
-        return output->second;
+        OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output index '", index, "'.");
+        return m_input_nodes[index];
     }
 
     size_t inputsNumber() const {
-        return inputNodesMap.size();
+        return m_input_nodes.size();
     }
 
     size_t outputsNumber() const {
-        return outputNodesMap.size();
+        return m_output_nodes.size();
     }
 
     dnnl::engine getEngine() const {
@@ -288,15 +280,7 @@ public:
     void export_graph(BinaryOutputBuffer& ob);
 
 protected:
-    void ForgetGraphData() {
-        m_status = Status::NotReady;
-
-        inputNodesMap.clear();
-        outputNodesMap.clear();
-        graphNodes.clear();
-        graphEdges.clear();
-        m_executableSyncNodesInds.clear();
-    }
+    void ForgetGraphData();
     Status m_status{Status::NotReady};
 
     // For dumping purposes. -1 - no counting, all other positive
@@ -304,7 +288,7 @@ protected:
     int infer_count = -1;
 
     std::vector<NodePtr> graphNodes;
-    std::vector<EdgePtr> graphEdges;
+    std::vector<EdgePtr> m_graph_edges;
 
     std::string m_name;
 
@@ -367,9 +351,8 @@ private:
     void insertConvert(EdgePtr& edge);
 
 private:
-    // TODO: change std::map to std::unordered_map
-    std::map<std::size_t, NodePtr> inputNodesMap;
-    std::map<std::size_t, NodePtr> outputNodesMap;
+    std::vector<NodePtr> m_input_nodes;
+    std::vector<NodePtr> m_output_nodes;
 
     OutputMemoryBlocks m_outputNodesMemBlocks;
 
