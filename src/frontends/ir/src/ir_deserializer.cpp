@@ -455,22 +455,22 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
                                     OPENVINO_THROW("Incorrect weights in bin file!");
                                 }
 
-                                if (original_dt == el_type) {
+                                // if (original_dt == el_type) {
                                     weights_buf = m_origin_weights;
-                                } else {
-                                    std::shared_ptr<char> new_buf(new char[actual_size], [](char* p) {
-                                        delete[] p;
-                                    });
-                                    data = new_buf.get();
-                                    weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char>>>(data,
-                                                                                                            actual_size,
-                                                                                                            new_buf);
-                                    convert_dt(el_type,
-                                               original_dt,
-                                               data,
-                                               m_origin_weights->get_ptr<char>() + offset,
-                                               el_num);
-                                }
+                                // } else {
+                                    // std::shared_ptr<char> new_buf(new char[actual_size], [](char* p) {
+                                    //     delete[] p;
+                                    // });
+                                    // data = new_buf.get();
+                                    // weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char>>>(data,
+                                    //                                                                         actual_size,
+                                    //                                                                         new_buf);
+                                    // convert_dt(el_type,
+                                    //            original_dt,
+                                    //            data,
+                                    //            m_origin_weights->get_ptr<char>() + offset,
+                                    //            el_num);
+                                // }
 
                                 attr_found = true;
                                 break;
