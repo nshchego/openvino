@@ -8,8 +8,7 @@
 #include "buffer.hpp"
 #include "helpers.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 template <typename BufferType>
 class Serializer<BufferType, std::string, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
@@ -33,5 +32,4 @@ printf("-READ string-\n");
     }
 };
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

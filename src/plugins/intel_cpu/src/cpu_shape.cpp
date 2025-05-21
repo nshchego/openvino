@@ -5,6 +5,7 @@
 #include "cpu_shape.h"
 
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
@@ -78,7 +79,7 @@ Shape mergeShapes(const Shape& lhs, const Shape& rhs) {
 }
 
 void Shape::save(BinaryOutputBuffer& ob) const {
-    ob << make_data(&type, sizeof(ShapeType));
+    ob << type;
 
     ob << hasZeroDimensions;
 
@@ -88,7 +89,7 @@ void Shape::save(BinaryOutputBuffer& ob) const {
 }
 
 void Shape::load(BinaryInputBuffer& ib) {
-    ib >> make_data(&type, sizeof(ShapeType));
+    ib >> type;
 
     ib >> hasZeroDimensions;
 

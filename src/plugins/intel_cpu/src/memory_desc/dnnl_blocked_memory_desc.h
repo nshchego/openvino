@@ -10,6 +10,7 @@
 #include "dnnl_memory_desc.h"
 #include "memory_desc/blocked_memory_desc.h"
 #include "openvino/util/util.hpp"
+#include "utils/serialization/bind.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -20,6 +21,8 @@ OPENVINO_DISABLE_WARNING_MSVC_BEGIN(4250)  // Visual Studio warns us about inher
                                            // intentionally so turn it off
 class DnnlBlockedMemoryDesc : public BlockedMemoryDesc, public DnnlMemoryDesc {
 public:
+    DnnlBlockedMemoryDesc() = default;
+
     // Creates planar DnnlBlockedMemoryDesc
     DnnlBlockedMemoryDesc(ov::element::Type prc, const Shape& shape, const VectorDims& strides = {});
 
@@ -66,6 +69,12 @@ public:
 
     using DnnlMemoryDesc::getPrecision;
     using DnnlMemoryDesc::setPrecision;
+
+    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::DnnlBlockedMemoryDesc)
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     DnnlBlockedMemoryDesc(ov::element::Type prc,

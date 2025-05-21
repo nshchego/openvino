@@ -6,6 +6,7 @@
 
 #include "blocked_memory_desc.h"
 #include "dnnl_extension_utils.h"
+#include "utils/serialization/bind.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -14,6 +15,8 @@ class DnnlBlockedMemoryDesc;
 
 class CpuBlockedMemoryDesc : public BlockedMemoryDesc {
 public:
+    CpuBlockedMemoryDesc() = default;
+
     CpuBlockedMemoryDesc(ov::element::Type prc, const Shape& shape);
 
     CpuBlockedMemoryDesc(ov::element::Type prc,
@@ -85,6 +88,12 @@ public:
     size_t getPaddedElementsCount() const override;
 
     MemoryDescPtr cloneWithNewPrecision(const ov::element::Type prec) const override;
+
+    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::CpuBlockedMemoryDesc)
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     size_t getElementOffset(size_t elemNumber) const override;

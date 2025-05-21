@@ -8,14 +8,13 @@
 #include <utility>
 #include <iostream>
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 template <typename T, typename Enable = void>
-class static_instance;
+class StaticInstance;
 
 template <typename T>
-class static_instance<T, typename std::enable_if<std::is_default_constructible<T>::value>::type> {
+class StaticInstance<T, typename std::enable_if<std::is_default_constructible<T>::value>::type> {
 public:
     static T& get_instance() {
         return instantiate();
@@ -32,10 +31,10 @@ private:
 };
 
 template <typename T>
-const T& static_instance<T, typename std::enable_if<std::is_default_constructible<T>::value>::type>::instance = static_instance<T>::instantiate();
+const T& StaticInstance<T, typename std::enable_if<std::is_default_constructible<T>::value>::type>::instance = StaticInstance<T>::instantiate();
 
 template <typename T>
-class static_instance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type> {
+class StaticInstance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type> {
 public:
     static T& get_instance() {
         return instantiate();
@@ -51,7 +50,6 @@ private:
 };
 
 template <typename T>
-const T& static_instance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type>::instance = static_instance<T>::instantiate();
+const T& StaticInstance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type>::instance = StaticInstance<T>::instantiate();
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

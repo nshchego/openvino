@@ -80,6 +80,10 @@ public:
 
     std::string serializeFormat() const override;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 protected:
     /**
      * @brief Check descs on compatibility

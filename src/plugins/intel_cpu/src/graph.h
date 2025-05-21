@@ -229,7 +229,7 @@ public:
     void SortTopologically();
 
     bool hasDynamicInput() const {
-        return graphHasDynamicInput;
+        return m_graph_has_dynamic_input;
     }
 
     void Init(const std::vector<NodePtr>& graphNodes,
@@ -292,7 +292,7 @@ protected:
 
     std::string m_name;
 
-    bool graphHasDynamicInput = false;
+    bool m_graph_has_dynamic_input = false;
 
     void Replicate(const std::shared_ptr<const ov::Model>& subgraph,
                    const std::vector<node::Input::InputConfig>& inputConfigs = {},

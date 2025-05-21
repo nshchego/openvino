@@ -51,6 +51,7 @@
 #include "utils/model_utils.hpp"
 #include "utils/node_dumper.h"
 #include "utils/precision_support.h"
+#include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/map_serializer.hpp"
 #include "utils/serialization/polymorphic_serializer.hpp"
 #include "utils/serialization/string_serializer.hpp"
@@ -161,7 +162,7 @@ void Graph::Replicate(const std::shared_ptr<const ov::Model>& model,
             m_input_nodes[input_index] = node;
 
             if (node->isDynamicNode()) {
-                graphHasDynamicInput = true;
+                m_graph_has_dynamic_input = true;
             }
 
             return node;
@@ -275,8 +276,8 @@ printf("--CPU-- Graph::deserialize_graph\n");
     validate_stream_offset(ib);
 
     ib >> m_name;
-    ib >> make_data(&m_status, sizeof(Status));
-    ib >> graphHasDynamicInput;
+    ib >> m_status;
+    ib >> m_graph_has_dynamic_input;
 
     size_t counter = 0lu;
 
@@ -2287,8 +2288,8 @@ printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
     ob << ob.get_pos();  // Read/Write sync position
 
     ob << m_name;
-    ob << make_data(&m_status, sizeof(Status));
-    ob << graphHasDynamicInput;
+    ob << m_status;
+    ob << m_graph_has_dynamic_input;
 
     // Serialize all nodes
     {
@@ -2298,9 +2299,7 @@ printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
         size_t node_idx = 0lu;
 
         for (const auto& n : graphNodes) {
-            ob << int(n->getType()); // TODO: use uint16_t to reduce blob size?
-            // auto node_type = n->getType();
-            // ob << make_data(&node_type, sizeof(Type));
+            ob << n->getType();
             ob << *n;
 
             if (auto fused_size = n->getFusedWith().size()) {
@@ -2380,8 +2379,8 @@ printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
 
     // ob << m_outputNodesMemBlocks;
 
-    ob << m_executableGraphNodes;
-    ob << m_executableSyncNodesInds;
+    // ob << m_executableGraphNodes;
+    // ob << m_executableSyncNodesInds;
 
 
 

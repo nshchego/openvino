@@ -22,6 +22,7 @@
 #include "utils/denormals.hpp"
 #include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
+#include "utils/serialization/internal_types.hpp"
 #include "weights_cache.hpp"
 
 #if defined(__linux__)
@@ -619,7 +620,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
 
     Config conf = engConfig;
     Config::ModelType model_type;
-    ib >> make_data(&model_type, sizeof(Config::ModelType));
+    ib >> model_type;
     // conf.applyRtInfo(ib);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
     const auto& it = new_config.find(ov::loaded_from_cache.name());

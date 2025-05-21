@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -77,6 +78,30 @@ std::string BlockedMemoryDesc::serializeFormat() const {
     }
 
     return result.str();
+}
+
+void BlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
+    MemoryDesc::save(ob);
+    ob << ob.get_pos();  // TODO: remove
+
+    ob << blockedDims;
+    ob << strides;
+    ob << order;
+    ob << offsetPaddingToData;
+
+    ob << ob.get_pos();  // TODO: remove
+}
+
+void BlockedMemoryDesc::load(BinaryInputBuffer& ib) {
+    MemoryDesc::load(ib);
+    validate_stream_offset(ib);  // TODO: remove
+
+    ib >> blockedDims;
+    ib >> strides;
+    ib >> order;
+    ib >> offsetPaddingToData;
+
+    validate_stream_offset(ib);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

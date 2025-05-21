@@ -8,8 +8,7 @@
 #include <utility>
 #include <type_traits>
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 template <typename T>
 struct Data {
@@ -27,5 +26,4 @@ static Data<T> make_data(T&& data, uint64_t number_of_bytes) {
     return {std::forward<T>(data), number_of_bytes};
 }
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

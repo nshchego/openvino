@@ -5,11 +5,10 @@
 #pragma once
 
 #include <map>
-#include <type_traits>
+// #include <type_traits>
 #include "buffer.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 template <typename BufferType, typename Key, typename Value>
 class Serializer<BufferType, std::map<Key, Value>, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
@@ -39,6 +38,4 @@ printf("-READ map-\n");
     }
 };
 
-
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

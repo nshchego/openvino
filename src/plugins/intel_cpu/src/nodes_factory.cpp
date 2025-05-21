@@ -4,6 +4,7 @@
 
 #include "nodes_factory.hpp"
 #include "nodes/reference.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
 
@@ -66,11 +67,8 @@ template <>
 Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& ib, const GraphContext::CPtr& context) {
     Node* new_node = nullptr;
     std::string error_message;
-    // Type node_type;
-    // ib >> make_data(&node_type, sizeof(Type));
-    int nt_int = 0;
-    ib >> nt_int;
-    const Type node_type = Type(nt_int);
+    intel_cpu::Type node_type;
+    ib >> node_type;
 
     if (new_node == nullptr) {
         try {

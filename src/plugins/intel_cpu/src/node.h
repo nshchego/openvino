@@ -89,6 +89,8 @@ private:
 
 class NodeDesc {
 public:
+    NodeDesc() = default;
+
     NodeDesc(NodeConfig conf, impl_desc_type type)
         : m_config(std::move(conf)),
           m_implementation_type(type),
@@ -714,9 +716,9 @@ public:
         return keepOriginalPrecision;
     }
 
-    void save(BinaryOutputBuffer& ob) const;
+    virtual void save(BinaryOutputBuffer& ob) const;
 
-    void load(BinaryInputBuffer& ib);
+    virtual void load(BinaryInputBuffer& ib);
 
 protected:
     bool canFuseSimpleOperation(const NodePtr& node) const;

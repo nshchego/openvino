@@ -20,6 +20,8 @@
 #include "openvino/op/avg_pool.hpp"
 #include "openvino/op/max_pool.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 // to access and change C pooling primitive desc internal padding field
 #include <common/pooling_pd.hpp>
@@ -224,6 +226,7 @@ Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
 
 Pooling::Pooling(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
+    load(in_buf);
 }
 
 std::vector<memory::format_tag> Pooling::getAvailableFormatsForDims(const Shape& dims) const {
@@ -776,6 +779,50 @@ void Pooling::setPostOps(dnnl::primitive_attr& attr) {
     }
 
     attr.set_post_ops(ops);
+}
+
+void Pooling::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    ob << poolingAttrs.exclude_pad;
+    ob << poolingAttrs.auto_pad;
+    ob << poolingAttrs.pad_type;
+    ob << poolingAttrs.algorithm;
+    ob << poolingAttrs.rounding;
+    ob << poolingAttrs.stride;
+    ob << poolingAttrs.kernel;
+    ob << poolingAttrs.dilation;
+    ob << poolingAttrs.data_pad_begin;
+    ob << poolingAttrs.data_pad_end;
+    ob << poolingAttrs.effective_pad_begin;
+    ob << poolingAttrs.effective_pad_end;
+    ob << poolingAttrs.effective_dilation;
+    
+    ob << inShape;
+
+    ob << isNotMaxPool1;
+    ob << useACL;
+}
+
+void Pooling::load(BinaryInputBuffer& ib) {
+    ib >> poolingAttrs.exclude_pad;
+    ib >> poolingAttrs.auto_pad;
+    ib >> poolingAttrs.pad_type;
+    ib >> poolingAttrs.algorithm;
+    ib >> poolingAttrs.rounding;
+    ib >> poolingAttrs.stride;
+    ib >> poolingAttrs.kernel;
+    ib >> poolingAttrs.dilation;
+    ib >> poolingAttrs.data_pad_begin;
+    ib >> poolingAttrs.data_pad_end;
+    ib >> poolingAttrs.effective_pad_begin;
+    ib >> poolingAttrs.effective_pad_end;
+    ib >> poolingAttrs.effective_dilation;
+    
+    ib >> inShape;
+
+    ib >> isNotMaxPool1;
+    ib >> useACL;
 }
 
 }  // namespace ov::intel_cpu::node

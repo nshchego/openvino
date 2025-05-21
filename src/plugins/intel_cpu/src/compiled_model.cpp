@@ -27,6 +27,7 @@
 #include "utils/debug_capabilities.h"
 #include "utils/memory_stats_dump.hpp"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/string_serializer.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
@@ -511,9 +512,7 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
 
     BinaryOutputBuffer model_buff(model_stream);
 
-// printf("--CPU-- CompiledModel::export_model WRITE\n    m_name: %s\n    m_is_function_quantized: %d\n", m_name.data(), int(m_is_function_quantized));
-    Config::ModelType model_type = getModelType(m_model);
-    model_buff << make_data(&model_type, sizeof(Config::ModelType));
+    model_buff << getModelType(m_model);
 printf("--CPU-- WRITE export_model 0 pos: %llu\n", model_buff.get_pos());
     model_buff << model_buff.get_pos();
     model_buff << m_name;

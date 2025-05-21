@@ -12,8 +12,7 @@
 #include "openvino/core/except.hpp"
 #include "serializer.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 template <typename BufferType>
 class Buffer {
@@ -140,6 +139,10 @@ public:
     size_t get_pos() const {
         return m_stream.tellg();
     }
+
+    void* get_ptr() {
+        return m_stream.rdbuf().gptr();
+    }
 private:
     std::istream& m_stream;
     void* m_impl_params;
@@ -199,5 +202,15 @@ if (exp_pos != act_pos) {
                     act_pos);
 }
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu
+
+#define BIND_BINARY_BUFFER_WITH_TYPE(cls_name)                   \
+            namespace ov::intel_cpu {                            \
+                BIND_TO_BUFFER(BinaryOutputBuffer, cls_name)     \
+                BIND_TO_BUFFER(BinaryInputBuffer, cls_name)      \
+            }
+
+// #define BIND_BINARY_BUFFER_WITH_TYPE(cls_name)                   \
+//             namespace ov::intel_cpu {                            \
+//                 BIND_TO_BUFFER(BinaryOutputBuffer, cls_name)     \
+//             }

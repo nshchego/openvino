@@ -4,8 +4,7 @@
 
 #pragma once
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
     
 template <typename BufferType, typename T, typename Enable = void>
 class Serializer {
@@ -21,5 +20,4 @@ printf("-READ-\n");
     }
 };
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

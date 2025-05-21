@@ -157,6 +157,12 @@ public:
 
     static constexpr size_t UNDEFINED_SIZE = std::numeric_limits<size_t>::max();
 
+    virtual const std::string& get_type_info() const = 0;
+
+    virtual void save(BinaryOutputBuffer& ob) const;
+
+    virtual void load(BinaryInputBuffer& ib);
+
 protected:
     MemoryDesc() : type(MemoryDescType::Undef) {}
     MemoryDesc(Shape shape, MemoryDescType type) : type(type), shape(std::move(shape)) {}

@@ -768,4 +768,17 @@ std::string DnnlBlockedMemoryDesc::serializeFormat() const {
     return BlockedMemoryDesc::serializeFormat();
 }
 
+// TODO: No need to overload?
+void DnnlBlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
+    BlockedMemoryDesc::save(ob);
+    DnnlMemoryDesc::save(ob);
+}
+
+void DnnlBlockedMemoryDesc::load(BinaryInputBuffer& ib) {
+    BlockedMemoryDesc::load(ib);
+    DnnlMemoryDesc::load(ib);
+}
+
 }  // namespace ov::intel_cpu
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::DnnlBlockedMemoryDesc)

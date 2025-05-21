@@ -6,6 +6,7 @@
 
 #include "dnnl_blocked_memory_desc.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
 
@@ -365,4 +366,20 @@ MemoryDescPtr CpuBlockedMemoryDesc::cloneWithNewPrecision(const ov::element::Typ
     return newDesc;
 }
 
+void CpuBlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
+    BlockedMemoryDesc::save(ob);
+
+    ob << precision;
+    ob << offsetPadding;
+}
+
+void CpuBlockedMemoryDesc::load(BinaryInputBuffer& ib) {
+    BlockedMemoryDesc::load(ib);
+
+    ib >> precision;
+    ib >> offsetPadding;
+}
+
 }  // namespace ov::intel_cpu
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::CpuBlockedMemoryDesc)

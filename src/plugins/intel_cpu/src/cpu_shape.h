@@ -172,6 +172,7 @@ public:
         }
 
         return size;
+        // return std::accumulate(minDims.begin(), minDims.end(), );
     }
 
     ov::PartialShape toPartialShape() const {

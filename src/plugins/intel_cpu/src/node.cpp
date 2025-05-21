@@ -36,6 +36,7 @@
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
 #include "utils/rt_info/memory_formats_attribute.hpp"
+#include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/polymorphic_serializer.hpp"
 #include "utils/serialization/string_serializer.hpp"
 #include "utils/serialization/vector_serializer.hpp"
@@ -2252,12 +2253,12 @@ void Node::save(BinaryOutputBuffer& ob) const {
     ob << ob.get_pos();  // Read/Write sync position
 
     ob << name;
-    ob << make_data(&type, sizeof(Type));
+    ob << type;
     ob << typeStr;
     ob << isDynamic;
-    ob << make_data(&algorithm, sizeof(Algorithm));
-    ob << make_data(&inplace, sizeof(InPlaceType));
-    ob << make_data(&constant, sizeof(ConstantType));
+    ob << algorithm;
+    ob << inplace;
+    ob << constant;
 
     ob << m_input_shapes;
     ob << m_output_shapes;
@@ -2265,16 +2266,21 @@ void Node::save(BinaryOutputBuffer& ob) const {
     ob << fusingPort;
 
     ob << curNumaNode;
+    ob << ob.get_pos();  // TODO: remove
 
     ob << supportedPrimitiveDescriptors;
+    ob << ob.get_pos();  // TODO: remove
     ob << selectedPrimitiveDescriptorIndex;
+    ob << ob.get_pos();  // TODO: remove
     ob << primitivesPriority;
     // ob << customImplPriorities;
     // ob << inputMemoryFormatsFilter;
     // ob << outputMemoryFormatsFilter;
+    ob << ob.get_pos();  // TODO: remove
 
     ob << originalLayers;
     ob << parallelDomain;
+    ob << ob.get_pos();  // TODO: remove
 
     // ob << internalBlobDesc;
     // ob << internalBlobMemory;
@@ -2312,12 +2318,12 @@ printf("--CPU-- Node::load\n");
     validate_stream_offset(ib);
 
     ib >> name;
-    ib >> make_data(&type, sizeof(Type));
+    ib >> type;
     ib >> typeStr;
     ib >> isDynamic;
-    ib >> make_data(&algorithm, sizeof(Algorithm));
-    ib >> make_data(&inplace, sizeof(InPlaceType));
-    ib >> make_data(&constant, sizeof(ConstantType));
+    ib >> algorithm;
+    ib >> inplace;
+    ib >> constant;
 
     ib >> m_input_shapes;
     ib >> m_output_shapes;
@@ -2325,16 +2331,21 @@ printf("--CPU-- Node::load\n");
     ib >> fusingPort;
 
     ib >> curNumaNode;
+    validate_stream_offset(ib);  // TODO: Remove
 
     ib >> supportedPrimitiveDescriptors;
+    validate_stream_offset(ib);  // TODO: Remove
     ib >> selectedPrimitiveDescriptorIndex;
+    validate_stream_offset(ib);  // TODO: Remove
     ib >> primitivesPriority;
     // ib >> customImplPriorities;
     // ib >> inputMemoryFormatsFilter;
     // ib >> outputMemoryFormatsFilter;
+    validate_stream_offset(ib);  // TODO: Remove
 
     ib >> originalLayers;
     ib >> parallelDomain;
+    validate_stream_offset(ib);  // TODO: Remove
 
     // ib >> internalBlobDesc;
     // ib >> internalBlobMemory;
@@ -2368,15 +2379,16 @@ printf("--CPU-- Node::load\n");
 
 void NodeDesc::save(BinaryOutputBuffer& ob) const {
     ob << m_config;
-    ob << int32_t(m_implementation_type);
+    ob << ob.get_pos();  // TODO: remove
+    // ob << m_implementation_type;
+    // ob << ob.get_pos();  // TODO: remove
 }
 
 void NodeDesc::load(BinaryInputBuffer& ib) {
-    int32_t tmp;
-
     ib >> m_config;
-    ib >> tmp;
-    m_implementation_type = impl_desc_type(tmp);
+    validate_stream_offset(ib);  // TODO: Remove
+    // ib >> m_implementation_type;
+    // validate_stream_offset(ib);  // TODO: Remove
 }
 
 #ifndef CPU_DEBUG_CAPS

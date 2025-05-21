@@ -82,15 +82,18 @@ public:
         return false;
     }
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
+
 private:
-    void cloneBlobIfRequired();
+    void cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const ov::element::Type& dt);
     void initSupportedPdDefault();
     void initSupportedPdFromMemDesc();
 
-private:
-    std::shared_ptr<ov::op::v0::Constant> m_constOp;
+    // std::shared_ptr<ov::op::v0::Constant> m_constOp;
     MemoryCPtr memoryPtr;
-    bool isMeanImage = false;
     MemoryDescPtr extMemDesc = nullptr;
     bool m_useParentMemoryDescForOutput = false;
     bool m_isInPlace = false;
