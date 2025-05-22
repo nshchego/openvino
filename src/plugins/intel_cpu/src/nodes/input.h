@@ -88,12 +88,11 @@ public:
 
 
 private:
-    void cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const ov::element::Type& dt);
+    void cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const ov::element::Type& dt, bool validate_blob = true);
     void initSupportedPdDefault();
     void initSupportedPdFromMemDesc();
 
-    // std::shared_ptr<ov::op::v0::Constant> m_constOp;
-    MemoryCPtr memoryPtr;
+    MemoryCPtr m_memory_ptr;
     MemoryDescPtr extMemDesc = nullptr;
     bool m_useParentMemoryDescForOutput = false;
     bool m_isInPlace = false;

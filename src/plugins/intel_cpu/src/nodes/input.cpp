@@ -361,7 +361,7 @@ Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
                 op::v0::Result::get_type_info_static(),
                 op::v3::ReadValue::get_type_info_static(),
                 op::v6::ReadValue::get_type_info_static(),
-                ov::intel_cpu::ReadValueWithSubgraph::get_type_info_static())) {
+                intel_cpu::ReadValueWithSubgraph::get_type_info_static())) {
         OPENVINO_THROW_NOT_IMPLEMENTED("CPU Input node doesn't support ngraph operation ",
                                        op->get_type_name(),
                                        " with name ",
@@ -382,115 +382,126 @@ Input::Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
     load(ib);
     if (constant == ConstantType::Const) {
         // if (weightless_cache) {
-            // Load from origin weights. Convert.
+        //     if (weightless_attribute)
+            // Load from origin weights. Convert. Check subnormal and overflows
             // cloneBlobIfRequired();
         // } else {
-            // check isBlobAligned, prec != element::string,
-            // (!weightCache || context->getNumNumaNodes() == 1 || context->getCPUStreamExecutor()->get_streams_num() == 1)
-            // memoryPtr = std::make_shared<Memory>(getEngine(), memDesc, ib->data())
+            // Load from a serialized blob. No need to convert and check subnormal.
+
+            // return m_stream.rdbuf().gptr();
+            auto buff = dynamic_cast<SharedStreamBuffer>(ib.rdbuf());
+            OPENVINO_ASSERT(buff, "[CPU] Input node deserialization. Unexpected input buffer type.")
+
+            element::Type dt;
+            intel_cpu::Shape shape;
+            size_t shift = 0lu;
+            ib >> dt;
+            ib >> shape;
+            ib >> shift;
+            cloneBlobIfRequired(buff->get_data(), shape, dt, false);
+            buff.pubseekoff(shift, buff.cur);
         // }
     }
 }
 
-void Input::cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const element::Type& prec) {
-    const size_t size = shape.getElementsCount();
-    if (prec == element::dynamic && size == 0lu) {
-        memoryPtr = MemoryDescUtils::makeEmptyMemory(context);
+void Input::cloneBlobIfRequired(void* src_ptr, const intel_cpu::Shape& shape, const element::Type& prec, bool validate_blob) {
+    const size_t el_number = shape.getElementsCount();
+    if (prec == element::dynamic && el_number == 0lu) {
+        m_memory_ptr = MemoryDescUtils::makeEmptyMemory(context);
         return;
     }
 
-    CpuBlockedMemoryDesc memDesc(prec, shape);
-
-    bool needFlushDenormalsToZero = true;
-    if (context->getConfig().DAZOn) {
-        // DAZ has been set, processor automatically converts all denormal source operands
-        // to a zero with the sign of the original operand before performing any
-        // computations on them, thus no need to flush them to zero manually
-        needFlushDenormalsToZero = false;
-    }
-
-    // The presence of subnormals is better to determined at IR read time.
-    auto checkSubnormalsAndBF16Overflows = [&](bool& has_subnormals, bool& has_bf16_overflows) {
-        if (prec == element::f32) {
-            auto const* u32data = reinterpret_cast<uint32_t>(src);
-            auto const* f32data = reinterpret_cast<float>(src);
-
-            if (!size) {
-                return;
-            }
-            // Only bf16 inferencePrecision cases need to be checked for saturation
-            const bool do_bf16_saturation_check =
-                (context->getConfig().inferencePrecision == element::bf16) ? true : false;
-
-#if defined(OPENVINO_ARCH_X86_64)
-            auto fn = jit_has_subnormals_function();
-            auto fn_bf16_check = jit_has_bf16_overflows_function();
-            if (fn && fn_bf16_check) {
-                static const size_t batch_size = 2048;
-                const size_t iterations_num = size / batch_size + 1;
-
-                std::atomic<bool> has_subnormals_local(false);
-                std::atomic<bool> has_bf16_overflows_local(false);
-                if (needFlushDenormalsToZero || do_bf16_saturation_check) {
-                    parallel_for(iterations_num, [&](int n) {
-                        auto ptr = f32data + n * batch_size;
-                        jit_has_special_value_base::args_t args = {
-                            reinterpret_cast<const float*>(ptr),
-                            std::min(batch_size, static_cast<size_t>(f32data + size - ptr)),
-                            false};
-
-                        if (needFlushDenormalsToZero && !has_subnormals_local) {
-                            fn(&args);
-                            if (args.hasTargetValues) {
-                                has_subnormals_local = true;
-                            }
-                        }
-
-                        if (do_bf16_saturation_check && !has_bf16_overflows_local) {
-                            // batch_size is small enough, so source data are still cache-hot
-                            args.hasTargetValues = false;
-                            fn_bf16_check(&args);
-                            if (args.hasTargetValues) {
-                                has_bf16_overflows_local = true;
-                            }
-                        }
-                    });
-                }
-
-                has_subnormals = has_subnormals_local;
-                has_bf16_overflows = has_bf16_overflows_local;
-
-                return;
-            }
-#endif
-
-            uint32_t mantissaMask = 0x007fffff;
-            uint32_t exponentMask = 0x7f800000;
-            const float bf16_max = std::numeric_limits<ov::bfloat16>::max();
-            for (size_t i = 0; i < size; ++i) {
-                if (needFlushDenormalsToZero && (u32data[i] & exponentMask) == 0 && (u32data[i] & mantissaMask) != 0) {
-                    has_subnormals = true;
-                }
-
-                if (do_bf16_saturation_check && (f32data[i] < -bf16_max || f32data[i] > bf16_max)) {
-                    has_bf16_overflows = true;
-                }
-
-                if ((!needFlushDenormalsToZero || has_subnormals) &&
-                    (!do_bf16_saturation_check || has_bf16_overflows)) {
-                    return;
-                }
-            }
-        }
-    };
-
+    const size_t byte_size = el_number * prec.size();
+    CpuBlockedMemoryDesc mem_desc(prec, shape);
     bool has_subnormals = false;
     bool has_bf16_overflows = false;
 
-    // if (!Weightless_cache) {
-    checkSubnormalsAndBF16Overflows(has_subnormals, has_bf16_overflows);
+    if (validate_blob) {
+        bool needFlushDenormalsToZero = true;
+        if (context->getConfig().DAZOn) {
+            // DAZ has been set, processor automatically converts all denormal source operands
+            // to a zero with the sign of the original operand before performing any
+            // computations on them, thus no need to flush them to zero manually
+            needFlushDenormalsToZero = false;
+        }
 
-    const size_t byte_size = size * prec.size();
+        // The presence of subnormals is better to determined at IR read time.
+        auto checkSubnormalsAndBF16Overflows = [&](bool& has_subnormals, bool& has_bf16_overflows) {
+            if (prec == element::f32) {
+                auto const* u32data = reinterpret_cast<uint32_t>(src_ptr);
+                auto const* f32data = reinterpret_cast<float>(src_ptr);
+
+                if (el_number == 0lu) {
+                    return;
+                }
+                // Only bf16 inferencePrecision cases need to be checked for saturation
+                const bool do_bf16_saturation_check =
+                    (context->getConfig().inferencePrecision == element::bf16) ? true : false;
+
+    #if defined(OPENVINO_ARCH_X86_64)
+                auto fn = jit_has_subnormals_function();
+                auto fn_bf16_check = jit_has_bf16_overflows_function();
+                if (fn && fn_bf16_check) {
+                    static const size_t batch_size = 2048;
+                    const size_t iterations_num = el_number / batch_size + 1;
+
+                    std::atomic<bool> has_subnormals_local(false);
+                    std::atomic<bool> has_bf16_overflows_local(false);
+                    if (needFlushDenormalsToZero || do_bf16_saturation_check) {
+                        parallel_for(iterations_num, [&](int n) {
+                            auto ptr = f32data + n * batch_size;
+                            jit_has_special_value_base::args_t args = {
+                                reinterpret_cast<const float*>(ptr),
+                                std::min(batch_size, static_cast<size_t>(f32data + el_number - ptr)),
+                                false};
+
+                            if (needFlushDenormalsToZero && !has_subnormals_local) {
+                                fn(&args);
+                                if (args.hasTargetValues) {
+                                    has_subnormals_local = true;
+                                }
+                            }
+
+                            if (do_bf16_saturation_check && !has_bf16_overflows_local) {
+                                // batch_size is small enough, so source data are still cache-hot
+                                args.hasTargetValues = false;
+                                fn_bf16_check(&args);
+                                if (args.hasTargetValues) {
+                                    has_bf16_overflows_local = true;
+                                }
+                            }
+                        });
+                    }
+
+                    has_subnormals = has_subnormals_local;
+                    has_bf16_overflows = has_bf16_overflows_local;
+
+                    return;
+                }
+    #endif
+
+                constexpr uint32_t mantissaMask = 0x007fffff;
+                constexpr uint32_t exponentMask = 0x7f800000;
+                const float bf16_max = std::numeric_limits<ov::bfloat16>::max();
+                for (size_t i = 0; i < el_number; ++i) {
+                    if (needFlushDenormalsToZero && (u32data[i] & exponentMask) == 0 && (u32data[i] & mantissaMask) != 0) {
+                        has_subnormals = true;
+                    }
+
+                    if (do_bf16_saturation_check && (f32data[i] < -bf16_max || f32data[i] > bf16_max)) {
+                        has_bf16_overflows = true;
+                    }
+
+                    if ((!needFlushDenormalsToZero || has_subnormals) &&
+                        (!do_bf16_saturation_check || has_bf16_overflows)) {
+                        return;
+                    }
+                }
+            }
+        };
+
+        checkSubnormalsAndBF16Overflows(has_subnormals, has_bf16_overflows);
+    }
     
     auto cloneBlob = [&, this]() {
         MemoryPtr memory;
@@ -499,30 +510,30 @@ void Input::cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const 
         // oneDNN always allocate 1byte for element type with bitWidth < 8 (u4,u1...)
         // but ngraph Constant uses actual bitWidth for data storage allocation
         // in that case we make a copy to avoid overflow
-        if (byte_size >= memDesc.getCurrentMemSize()) {
+        if (byte_size >= mem_desc.getCurrentMemSize()) { // TODO: check
             if (prec == element::string) {
                 memory =
-                    std::make_shared<StringMemory>(getEngine(), memDesc, m_constOp->get_data_ptr<element::string>());
+                    std::make_shared<StringMemory>(getEngine(), mem_desc, reinterpret_cast<StringMemory::OvString>(src_ptr));
             } else {
-                memory = std::make_shared<Memory>(getEngine(), memDesc, src);
+                memory = std::make_shared<Memory>(getEngine(), mem_desc, src_ptr);
             }
         } else {
             if (prec == element::string) {
-                memory = std::make_shared<StringMemory>(getEngine(), memDesc);
-                auto src = reinterpret_cast<StringMemory::OvString>(src);
+                memory = std::make_shared<StringMemory>(getEngine(), mem_desc);
+                auto src = reinterpret_cast<StringMemory::OvString>(src_ptr);
                 auto dst = memory->getDataAs<StringMemory::OvString>();
-                std::copy(src, src + size, dst);
+                std::copy(src, src + el_number, dst);
             } else {
-                memory = std::make_shared<Memory>(getEngine(), memDesc);
-                memcpy(memory->getData(), src, byte_size);
+                memory = std::make_shared<Memory>(getEngine(), mem_desc);
+                memcpy(memory->getData(), src_ptr, byte_size);
             }
         }
 
         MemoryPtr ptr;
-        if (memDesc.getPrecision() == element::string) {
-            ptr = std::make_shared<StringMemory>(getEngine(), memDesc);
+        if (mem_desc.getPrecision() == element::string) {
+            ptr = std::make_shared<StringMemory>(getEngine(), mem_desc);
         } else {
-            ptr = std::make_shared<StaticMemory>(getEngine(), memDesc);
+            ptr = std::make_shared<StaticMemory>(getEngine(), mem_desc);
         }
         ptr->load(*memory.get(), has_subnormals, has_bf16_overflows);
 
@@ -542,25 +553,25 @@ void Input::cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const 
 
     auto blobKey = [&]() {
         char ptr[32];
-        snprintf(ptr, sizeof ptr, "%p", src);
+        snprintf(ptr, sizeof ptr, "%p", src_ptr);
         return getName() + "_" + std::to_string(byte_size) + "_" + ptr;
     };
 
-    const auto weightCache = context->getWeightsCache();
+    const auto weight_cache = context->getWeightsCache();
     const bool clone_is_not_needed =
         prec != element::string &&
         // IRs already have all subnormals flushed to zero, but in
         // read_model scenario with directly loaded original model still can have subnormals
-        isBlobAligned(src) && !has_subnormals && !has_bf16_overflows &&
+        isBlobAligned(src_ptr) && !has_subnormals && !has_bf16_overflows &&
         // Blob should be cloned in cache only if original weights are stored on other numa node.
         // This is possible only in multistream case on multisocket machine.
         // TODO: don't clone blob for multisocket + multistream case if current stream is run on the numa node where
         // original weights are stored.
-        (!weightCache || context->getNumNumaNodes() == 1 || context->getCPUStreamExecutor()->get_streams_num() == 1);
+        (!weight_cache || context->getNumNumaNodes() == 1 || context->getCPUStreamExecutor()->get_streams_num() == 1);
 
-    memoryPtr = clone_is_not_needed ? std::make_shared<Memory>(getEngine(), memDesc, src)
-                                    : std::const_pointer_cast<const IMemory>(
-                                          weightCache ? *weightCache->findOrCreate(blobKey(), cloneBlob) : cloneBlob());
+    m_memory_ptr = clone_is_not_needed ? std::make_shared<Memory>(getEngine(), mem_desc, src_ptr)
+                                       : std::const_pointer_cast<const IMemory>(
+                                              weight_cache ? *weight_cache->findOrCreate(blobKey(), cloneBlob) : cloneBlob());
 }
 
 static std::vector<Shape> createInputShapes(const Shape& shape, const Type type) {
@@ -621,7 +632,7 @@ Input::Input(const MemoryDescPtr& memDesc,
 Input::Input(const MemoryPtr& mem, const std::string& name, const std::string& type, const GraphContext::CPtr& context)
     : Input(mem->getDesc().getShape(), mem->getDesc().getPrecision(), name, type, context) {
     extMemDesc = mem->getDescPtr();
-    memoryPtr = mem;
+    m_memory_ptr = mem;
     constant = Node::ConstantType::Const;
 }
 
@@ -639,7 +650,7 @@ Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
 }
 
 MemoryCPtr Input::getMemoryPtr() const {
-    return memoryPtr;
+    return m_memory_ptr;
 }
 
 void Input::getSupportedDescriptors() {
@@ -803,6 +814,10 @@ void Input::save(BinaryOutputBuffer& ob) const {
 
     ob << m_useParentMemoryDescForOutput;
     ob << m_isInPlace;
+
+    ob << m_memory_ptr->getPrecision();
+    ob << m_memory_ptr->getShape;
+    ob << m_memory_ptr->getSize();
 }
 
 void Input::load(BinaryInputBuffer& ib) {

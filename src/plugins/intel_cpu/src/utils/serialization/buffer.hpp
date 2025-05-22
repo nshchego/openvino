@@ -140,9 +140,10 @@ public:
         return m_stream.tellg();
     }
 
-    void* get_ptr() {
-        return m_stream.rdbuf().gptr();
+    const std::streambuf* rdbuf() {
+        return m_stream.rdbuf();
     }
+
 private:
     std::istream& m_stream;
     void* m_impl_params;

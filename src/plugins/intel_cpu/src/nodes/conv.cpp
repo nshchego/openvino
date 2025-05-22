@@ -251,6 +251,7 @@ Convolution::Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext
 
 Convolution::Convolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
+    load(in_buf);
 }
 
 bool Convolution::canBeExecutedInInt8() const {
@@ -822,6 +823,99 @@ void Convolution::initializeInputZeroPoints(const uint8_t* inputZpData, const si
     } else {
         m_attrs.inputZeroPointsType = ZeroPointsType::PerChannel;
     }
+}
+
+void Convolution::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    ob << m_atoi;
+
+    ob << m_attrs.stride;
+    ob << m_attrs.dilation;
+    ob << m_attrs.paddingL;
+    ob << m_attrs.paddingR;
+    ob << m_attrs.autoPadding;
+    ob << m_attrs.withBias;
+    ob << m_attrs.weightsNonTransposed;
+    ob << m_attrs.isGrouped;
+    ob << m_attrs.isGraphQuantized;
+    ob << m_attrs.fcSemantic;
+    ob << m_attrs.nonConstantWeights;
+    ob << m_attrs.inputZeroPointsType;
+    ob << m_attrs.dqScales;
+    // ob << m_attrs.postOps;
+
+    // ob << m_memory;
+    // ob << m_factory;
+    // ob << m_executor;
+    // ob << fallbackExecutor;
+
+    ob << withSum;
+    ob << withDWConv;
+    ob << withSumBroadcast;
+
+    ob << dw_conv_oc;
+    ob << dw_conv_ih;
+    ob << dw_conv_iw;
+    ob << dw_conv_kernel;
+    ob << dw_conv_strides;
+    ob << dw_conv_in_dt;
+
+    ob << groupNum;
+    ob << IC;
+    ob << groupIC;
+    ob << groupOC;
+
+    // ob << subgraph;
+    // ob << fusedConstNodes;
+
+    ob << useJitPlanar;
+}
+
+void Convolution::load(BinaryInputBuffer& ib) {
+    ib >> m_atoi;
+
+    ib >> m_attrs.stride;
+    ib >> m_attrs.dilation;
+    ib >> m_attrs.paddingL;
+    ib >> m_attrs.paddingR;
+    ib >> m_attrs.autoPadding;
+    ib >> m_attrs.withBias;
+    ib >> m_attrs.weightsNonTransposed;
+    ib >> m_attrs.isGrouped;
+    ib >> m_attrs.isGraphQuantized;
+    ib >> m_attrs.fcSemantic;
+    ib >> m_attrs.nonConstantWeights;
+    ib >> m_attrs.inputZeroPointsType;
+    ib >> m_attrs.dqScales;
+    // ib >> m_attrs.postOps;
+
+    ib >> m_attrs;
+    // ib >> m_memory;
+    // ib >> m_factory;
+    // ib >> m_executor;
+    // ib >> fallbackExecutor;
+
+    ib >> withSum;
+    ib >> withDWConv;
+    ib >> withSumBroadcast;
+
+    ib >> dw_conv_oc;
+    ib >> dw_conv_ih;
+    ib >> dw_conv_iw;
+    ib >> dw_conv_kernel;
+    ib >> dw_conv_strides;
+    ib >> dw_conv_in_dt;
+
+    ib >> groupNum;
+    ib >> IC;
+    ib >> groupIC;
+    ib >> groupOC;
+
+    // ib >> subgraph;
+    // ib >> fusedConstNodes;
+
+    ib >> useJitPlanar;
 }
 
 }  // namespace ov::intel_cpu::node

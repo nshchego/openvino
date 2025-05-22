@@ -72,6 +72,10 @@ public:
         return m_attrs.isGrouped && 1 == groupOC && 1 == groupIC;
     }
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 protected:
     void addFusedNode(const NodePtr& fusingNode) override;
     void redefineOutputMemory(const std::vector<VectorDims>& newOutputShapes) override;

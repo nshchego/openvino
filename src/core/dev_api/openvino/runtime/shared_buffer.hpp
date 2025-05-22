@@ -34,6 +34,10 @@ class SharedStreamBuffer : public std::streambuf {
 public:
     SharedStreamBuffer(char* data, size_t size) : m_data(data), m_size(size), m_offset(0) {}
 
+    const char* get_data() {
+        return m_data;
+    }
+
 protected:
     // override std::streambuf methods
     std::streamsize xsgetn(char* s, std::streamsize count) override {
