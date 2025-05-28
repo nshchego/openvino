@@ -97,7 +97,7 @@ protected:
     mutable VectorDims blockedDims;
     mutable VectorDims strides;
     mutable VectorDims order;
-    mutable VectorDims offsetPaddingToData;
+    mutable VectorDims m_offset_padding_to_data;
 };
 
 using BlockedMemoryDescPtr = std::shared_ptr<BlockedMemoryDesc>;

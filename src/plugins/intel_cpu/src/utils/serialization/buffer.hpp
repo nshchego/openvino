@@ -6,9 +6,8 @@
 
 #include <ostream>
 
-
 #include "helpers.hpp"
-#include "onednn/dnnl.h"
+// #include "onednn/dnnl.h"
 #include "openvino/core/except.hpp"
 #include "serializer.hpp"
 
@@ -142,6 +141,10 @@ public:
 
     const std::streambuf* rdbuf() {
         return m_stream.rdbuf();
+    }
+
+    std::istream& seekg(std::istream::off_type offset, std::ios_base::seekdir way) {
+        return m_stream.seekg(offset, way);
     }
 
 private:

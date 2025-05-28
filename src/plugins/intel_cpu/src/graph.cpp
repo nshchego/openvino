@@ -473,6 +473,37 @@ void Graph::Init(BinaryInputBuffer& ib,
     m_stream = dnnl::stream(getEngine());
 
     deserialize_graph(ib);
+
+    
+    // SortTopologically();
+    // InitNodes();
+
+    // optimizer.ApplyCommonGraphOptimizations(*this);
+
+    // SortTopologically();
+
+    InitDescriptors();
+
+    // ResolveInplaceDirections();
+
+    InitOptimalPrimitiveDescriptors();
+
+    // ResolveEdgeConflicts();
+
+    // optimizer.ShareReorders(*this);
+    // RemoveDroppedNodes();
+
+    // SortTopologically();
+
+    // ResolveComplexInplaceConflicts();
+
+    // optimizer.ApplyImplSpecificGraphOptimizations(*this);
+
+    // SortTopologically();
+
+    // ResolveComplexInplaceConflicts();
+
+    // SortTopologically();
 }
 
 void Graph::Activate() {

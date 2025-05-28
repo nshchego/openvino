@@ -4,10 +4,9 @@
 
 #pragma once
 
-#include <node.h>
-
 #include <set>
 
+// #include "openvino/core/node.hpp"
 #include "cpu/x64/jit_generator.hpp"
 #include "emitters/utils.hpp"
 #include "snippets/generator.hpp"

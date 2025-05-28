@@ -2,17 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "memory_desc/dnnl_blocked_memory_desc.h"
+#include "dnnl_blocked_memory_desc.h"
 
-#include <algorithm>
 #include <common/memory_desc_wrapper.hpp>
-#include <cstdint>
-#include <oneapi/dnnl/dnnl.hpp>
 
-#include "cpu_types.h"
-#include "dnnl_extension_utils.h"
-#include "memory_desc/cpu_blocked_memory_desc.h"
+#include "cpu_blocked_memory_desc.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/helpers.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
 
@@ -696,7 +693,7 @@ void DnnlBlockedMemoryDesc::initStrides() {
 
 void DnnlBlockedMemoryDesc::initOffsetPadding() {
     const auto& padded_offset = desc.get()->padded_offsets;
-    offsetPaddingToData = VectorDims(std::begin(padded_offset), std::begin(padded_offset) + getOrder().size());
+    m_offset_padding_to_data = VectorDims(std::begin(padded_offset), std::begin(padded_offset) + getOrder().size());
 }
 
 MemoryDescPtr DnnlBlockedMemoryDesc::cloneWithNewPrecision(const ov::element::Type prec) const {
@@ -768,15 +765,32 @@ std::string DnnlBlockedMemoryDesc::serializeFormat() const {
     return BlockedMemoryDesc::serializeFormat();
 }
 
-// TODO: No need to overload?
 void DnnlBlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
     BlockedMemoryDesc::save(ob);
     DnnlMemoryDesc::save(ob);
+
+    ob << desc.get()->format_kind;
+    ob << desc.get()->data_type;
+    ob << desc.get()->ndims;
+    ob << make_data(desc.get()->dims, sizeof(dnnl::impl::dims_t));
+    ob << make_data(desc.get()->padded_dims, sizeof(dnnl::impl::dims_t));
+    ob << make_data(desc.get()->padded_offsets, sizeof(dnnl::impl::dims_t));
+    ob << make_data(desc.get()->format_desc.blocking.strides, sizeof(dnnl::impl::dims_t));
+    ob << desc.get()->offset0;
 }
 
 void DnnlBlockedMemoryDesc::load(BinaryInputBuffer& ib) {
     BlockedMemoryDesc::load(ib);
     DnnlMemoryDesc::load(ib);
+
+    ib >> desc.get()->format_kind;
+    ib >> desc.get()->data_type;
+    ib >> desc.get()->ndims;
+    ib >> make_data(desc.get()->dims, sizeof(dnnl::impl::dims_t));
+    ib >> make_data(desc.get()->padded_dims, sizeof(dnnl::impl::dims_t));
+    ib >> make_data(desc.get()->padded_offsets, sizeof(dnnl::impl::dims_t));
+    ib >> make_data(desc.get()->format_desc.blocking.strides, sizeof(dnnl::impl::dims_t));
+    ib >> desc.get()->offset0;
 }
 
 }  // namespace ov::intel_cpu

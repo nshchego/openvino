@@ -6,12 +6,12 @@
 
 #include "cpu/x64/jit_generator.hpp"
 #include "memory_desc/cpu_memory_desc_utils.h"
-#include "nodes/node_config.h"
 #include "openvino/core/parallel.hpp"
-#include "openvino/core/shape.hpp"
-#include "openvino/core/type/element_type.hpp"
+#include "openvino/op/constant.hpp"
+#include "openvino/runtime/shared_buffer.hpp"
 #include "shape_inference/shape_inference_pass_through.hpp"
 #include "transformations/cpu_opset/common/op/read_value_with_subgraph.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl::cpu::x64;
@@ -380,31 +380,9 @@ Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
 Input::Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
     : Node(ib, context, PassThroughShapeInferFactory()) {
     load(ib);
-    if (constant == ConstantType::Const) {
-        // if (weightless_cache) {
-        //     if (weightless_attribute)
-            // Load from origin weights. Convert. Check subnormal and overflows
-            // cloneBlobIfRequired();
-        // } else {
-            // Load from a serialized blob. No need to convert and check subnormal.
-
-            // return m_stream.rdbuf().gptr();
-            auto buff = dynamic_cast<SharedStreamBuffer>(ib.rdbuf());
-            OPENVINO_ASSERT(buff, "[CPU] Input node deserialization. Unexpected input buffer type.")
-
-            element::Type dt;
-            intel_cpu::Shape shape;
-            size_t shift = 0lu;
-            ib >> dt;
-            ib >> shape;
-            ib >> shift;
-            cloneBlobIfRequired(buff->get_data(), shape, dt, false);
-            buff.pubseekoff(shift, buff.cur);
-        // }
-    }
 }
 
-void Input::cloneBlobIfRequired(void* src_ptr, const intel_cpu::Shape& shape, const element::Type& prec, bool validate_blob) {
+void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& shape, const element::Type& prec, bool validate_blob) {
     const size_t el_number = shape.getElementsCount();
     if (prec == element::dynamic && el_number == 0lu) {
         m_memory_ptr = MemoryDescUtils::makeEmptyMemory(context);
@@ -428,8 +406,8 @@ void Input::cloneBlobIfRequired(void* src_ptr, const intel_cpu::Shape& shape, co
         // The presence of subnormals is better to determined at IR read time.
         auto checkSubnormalsAndBF16Overflows = [&](bool& has_subnormals, bool& has_bf16_overflows) {
             if (prec == element::f32) {
-                auto const* u32data = reinterpret_cast<uint32_t>(src_ptr);
-                auto const* f32data = reinterpret_cast<float>(src_ptr);
+                auto u32data = reinterpret_cast<const uint32_t *>(src_ptr);
+                auto f32data = reinterpret_cast<const float *>(src_ptr);
 
                 if (el_number == 0lu) {
                     return;
@@ -513,14 +491,14 @@ void Input::cloneBlobIfRequired(void* src_ptr, const intel_cpu::Shape& shape, co
         if (byte_size >= mem_desc.getCurrentMemSize()) { // TODO: check
             if (prec == element::string) {
                 memory =
-                    std::make_shared<StringMemory>(getEngine(), mem_desc, reinterpret_cast<StringMemory::OvString>(src_ptr));
+                    std::make_shared<StringMemory>(getEngine(), mem_desc, reinterpret_cast<const StringMemory::OvString*>(src_ptr));
             } else {
                 memory = std::make_shared<Memory>(getEngine(), mem_desc, src_ptr);
             }
         } else {
             if (prec == element::string) {
                 memory = std::make_shared<StringMemory>(getEngine(), mem_desc);
-                auto src = reinterpret_cast<StringMemory::OvString>(src_ptr);
+                auto src = reinterpret_cast<const StringMemory::OvString*>(src_ptr);
                 auto dst = memory->getDataAs<StringMemory::OvString>();
                 std::copy(src, src + el_number, dst);
             } else {
@@ -626,27 +604,27 @@ Input::Input(const MemoryDescPtr& memDesc,
              const std::string& type,
              const GraphContext::CPtr& context)
     : Input(memDesc->getShape(), memDesc->getPrecision(), name, type, context) {
-    extMemDesc = memDesc;
+    m_ext_mem_desc = memDesc;
 }
 
 Input::Input(const MemoryPtr& mem, const std::string& name, const std::string& type, const GraphContext::CPtr& context)
     : Input(mem->getDesc().getShape(), mem->getDesc().getPrecision(), name, type, context) {
-    extMemDesc = mem->getDescPtr();
+    m_ext_mem_desc = mem->getDescPtr();
     m_memory_ptr = mem;
     constant = Node::ConstantType::Const;
 }
 
 Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, const InputConfig& config)
     : Input(op, context) {
-    extMemDesc = config.desc;
-    m_isInPlace = config.inPlace;
+    m_ext_mem_desc = config.desc;
+    m_is_in_place = config.inPlace;
 }
 
 Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, const OutputConfig& config)
     : Input(op, context) {
-    extMemDesc = config.desc;
-    m_useParentMemoryDescForOutput = config.useParentMemoryDescForOutput;
-    m_isInPlace = config.inPlace;
+    m_ext_mem_desc = config.desc;
+    m_use_parent_memory_desc_for_output = config.useParentMemoryDescForOutput;
+    m_is_in_place = config.inPlace;
 }
 
 MemoryCPtr Input::getMemoryPtr() const {
@@ -676,7 +654,7 @@ void Input::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    if (extMemDesc) {
+    if (m_ext_mem_desc) {
         initSupportedPdFromMemDesc();
     } else {
         initSupportedPdDefault();
@@ -684,7 +662,7 @@ void Input::initSupportedPrimitiveDescriptors() {
 }
 
 void Input::initOptimalPrimitiveDescriptor() {
-    if (m_useParentMemoryDescForOutput || extMemDesc) {
+    if (m_use_parent_memory_desc_for_output || m_ext_mem_desc) {
         return;
     }
 
@@ -692,14 +670,14 @@ void Input::initOptimalPrimitiveDescriptor() {
 }
 
 void Input::selectOptimalPrimitiveDescriptor() {
-    if (!(m_useParentMemoryDescForOutput && getType() == Type::Output)) {
+    if (!(m_use_parent_memory_desc_for_output && getType() == Type::Output)) {
         return Node::selectOptimalPrimitiveDescriptor();
     }
 
     // ignore previous configuration
     supportedPrimitiveDescriptors.clear();
 
-    const int inPlacePort = m_isInPlace ? 0 : -1;
+    const int inPlacePort = m_is_in_place ? 0 : -1;
     // and just use parent memory descriptor for Output node to avoid reorders insertion
     std::vector<PortConfig> inConfs;
     for (size_t i = 0; i < getParentEdges().size(); i++) {
@@ -766,7 +744,7 @@ void Input::initSupportedPdDefault() {
 
 void Input::initSupportedPdFromMemDesc() {
     NodeConfig config;
-    PortConfig portConfig(extMemDesc, BlockedMemoryDesc::FULL_MASK, m_isInPlace ? 0 : -1, false);
+    PortConfig portConfig(m_ext_mem_desc, BlockedMemoryDesc::FULL_MASK, m_is_in_place ? 0 : -1, false);
 
     if (getType() == Type::Input || getType() == Type::MemoryInput) {
         config.outConfs.push_back(portConfig);
@@ -778,7 +756,7 @@ void Input::initSupportedPdFromMemDesc() {
 }
 
 void Input::resolveInPlaceEdges(Edge::LOOK look) {
-    if (!m_isInPlace) {
+    if (!m_is_in_place) {
         return Node::resolveInPlaceEdges(look);
     }
 
@@ -812,17 +790,50 @@ void Input::resolveInPlaceEdges(Edge::LOOK look) {
 void Input::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-    ob << m_useParentMemoryDescForOutput;
-    ob << m_isInPlace;
+    ob << m_use_parent_memory_desc_for_output;
+    ob << m_is_in_place;
+    ob << m_use_origin_weights;
 
-    ob << m_memory_ptr->getPrecision();
-    ob << m_memory_ptr->getShape;
-    ob << m_memory_ptr->getSize();
+    if (constant == ConstantType::Const) {
+        CPU_NODE_ASSERT(m_memory_ptr, "has uninitialized memory.");
+
+        ob << m_memory_ptr->getPrecision();
+        ob << m_memory_ptr->getShape();
+        ob << m_memory_ptr->getSize();
+        
+        if (!m_use_origin_weights) {
+            ob.write(m_memory_ptr->getData(), m_memory_ptr->getSize());
+        }
+    }
 }
 
 void Input::load(BinaryInputBuffer& ib) {
-    ib >> m_useParentMemoryDescForOutput;
-    ib >> m_isInPlace;
+    ib >> m_use_parent_memory_desc_for_output;
+    ib >> m_is_in_place;
+    ib >> m_use_origin_weights;
+
+    if (constant == ConstantType::Const) {
+        // return m_stream.rdbuf().gptr();
+        auto buff = dynamic_cast<const SharedStreamBuffer *>(ib.rdbuf());
+        CPU_NODE_ASSERT(buff, "got unexpected input buffer type.");
+
+        element::Type dt;
+        intel_cpu::Shape shape;
+        size_t byte_size = 0lu;
+
+        ib >> dt;
+        ib >> shape;
+        ib >> byte_size;
+
+        if (m_use_origin_weights) {
+            // cloneBlobIfRequired(origin_blob, shape, origin_dt, true);
+            // convert
+        } else {
+            // Load from a serialized blob. No need to convert and check subnormals.
+            cloneBlobIfRequired(buff->get_data(), shape, dt, false);
+            ib.seekg(byte_size, std::ios_base::cur);
+        }
+    }
 }
 
 }  // namespace ov::intel_cpu::node

@@ -132,4 +132,12 @@ jit_permute_config_params TransposeExecutor::prepareParams(const PermuteParams& 
     return jcp;
 }
 
+void TransposeParams::save(BinaryOutputBuffer& ob) const {
+    ob << permuteParams;
+}
+
+void TransposeParams::load(BinaryInputBuffer& ib) {
+    ib >> permuteParams;
+}
+
 }  // namespace ov::intel_cpu

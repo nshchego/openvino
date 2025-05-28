@@ -34,8 +34,8 @@ class SharedStreamBuffer : public std::streambuf {
 public:
     SharedStreamBuffer(char* data, size_t size) : m_data(data), m_size(size), m_offset(0) {}
 
-    const char* get_data() {
-        return m_data;
+    const char* get_data() const {
+        return gptr();
     }
 
 protected:

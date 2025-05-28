@@ -4,13 +4,9 @@
 
 #pragma once
 
-#include <node.h>
+#include "node.h"
 
-#include <openvino/op/constant.hpp>
-
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Input : public Node {
 public:
@@ -88,16 +84,16 @@ public:
 
 
 private:
-    void cloneBlobIfRequired(void* src, const intel_cpu::Shape& shape, const ov::element::Type& dt, bool validate_blob = true);
+    void cloneBlobIfRequired(const void* src, const intel_cpu::Shape& shape, const ov::element::Type& dt, bool validate_blob = true);
     void initSupportedPdDefault();
     void initSupportedPdFromMemDesc();
 
-    MemoryCPtr m_memory_ptr;
-    MemoryDescPtr extMemDesc = nullptr;
-    bool m_useParentMemoryDescForOutput = false;
-    bool m_isInPlace = false;
+    MemoryCPtr m_memory_ptr = nullptr;
+    MemoryDescPtr m_ext_mem_desc = nullptr;
+    bool m_use_parent_memory_desc_for_output = false;
+    bool m_is_in_place = false;
+    // Specifies whether to load weights from the original IR during graph deserialization.
+    bool m_use_origin_weights = false;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

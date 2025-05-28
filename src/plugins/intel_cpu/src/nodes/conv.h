@@ -1,15 +1,13 @@
 // Copyright (C) 2018-2025 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
+
 #pragma once
 
-#include "common/dnnl_executor.h"
 #include "node.h"
+#include "common/dnnl_executor.h"
 #include "nodes/executors/convolution_config.hpp"
-#include "nodes/executors/executor.hpp"
 #include "nodes/executors/executor_factory.hpp"
-#include "oneapi/dnnl/dnnl.hpp"
-#include "openvino/core/type/element_type.hpp"
 
 namespace ov::intel_cpu::node {
 

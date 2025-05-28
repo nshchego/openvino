@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include <common/memory_desc_wrapper.hpp>
-
-#include "dnnl_extension_utils.h"
+#include "blocked_memory_desc.h"
 #include "dnnl_memory_desc.h"
-#include "memory_desc/blocked_memory_desc.h"
 #include "openvino/util/util.hpp"
 #include "utils/serialization/bind.hpp"
 
@@ -46,7 +43,7 @@ public:
     }
 
     const VectorDims& getOffsetPaddingToData() const override {
-        return offsetPaddingToData;
+        return m_offset_padding_to_data;
     }
 
     const VectorDims& getStrides() const override {

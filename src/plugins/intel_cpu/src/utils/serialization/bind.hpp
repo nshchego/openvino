@@ -4,10 +4,9 @@
 
 #pragma once
 
-// #include <memory>
-// #include <type_traits>
 #include <unordered_map>
 #include <functional>
+
 #include "buffer.hpp"
 #include "static_instance.hpp"
 

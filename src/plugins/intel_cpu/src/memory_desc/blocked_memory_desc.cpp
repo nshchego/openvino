@@ -87,7 +87,7 @@ void BlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
     ob << blockedDims;
     ob << strides;
     ob << order;
-    ob << offsetPaddingToData;
+    ob << m_offset_padding_to_data;
 
     ob << ob.get_pos();  // TODO: remove
 }
@@ -99,7 +99,7 @@ void BlockedMemoryDesc::load(BinaryInputBuffer& ib) {
     ib >> blockedDims;
     ib >> strides;
     ib >> order;
-    ib >> offsetPaddingToData;
+    ib >> m_offset_padding_to_data;
 
     validate_stream_offset(ib);  // TODO: remove
 }

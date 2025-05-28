@@ -40,6 +40,10 @@ public:
     void execute(const dnnl::stream& strm) override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 protected:
     IShapeInfer::Result shapeInfer() const override;
 

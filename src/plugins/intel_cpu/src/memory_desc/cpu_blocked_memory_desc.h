@@ -59,7 +59,7 @@ public:
      * @return offsets
      */
     const VectorDims& getOffsetPaddingToData() const override {
-        return offsetPaddingToData;
+        return m_offset_padding_to_data;
     }
     /**
      * @brief Returns the offset to the current memory block

@@ -4,36 +4,18 @@
 
 #include "conv.h"
 
-#include <cassert>
-#include <cstdlib>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "common/cpu_convert.h"
 #include "cpu/x64/cpu_isa_traits.hpp"
-#include "cpu_types.h"
-#include "dnnl_extension_utils.h"
 #include "eltwise.h"
-#include "graph.h"
-#include "input.h"
 #include "memory_desc/cpu_blocked_memory_desc.h"
-#include "memory_desc/cpu_memory_desc.h"
 #include "memory_desc/cpu_memory_desc_utils.h"
 #include "memory_desc/dnnl_blocked_memory_desc.h"
-#include "node.h"
-#include "nodes/executors/convolution_config.hpp"
-#include "nodes/executors/memory_arguments.hpp"
-#include "oneapi/dnnl/dnnl.hpp"
-#include "oneapi/dnnl/dnnl_common.hpp"
-#include "openvino/core/type/element_type.hpp"
 #include "openvino/op/convolution.hpp"
 #include "openvino/op/group_conv.hpp"
-#include "post_ops.hpp"
 #include "shape_inference/custom/convolution.hpp"
 #include "utils/debug_capabilities.h"
-#include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -890,7 +872,6 @@ void Convolution::load(BinaryInputBuffer& ib) {
     ib >> m_attrs.dqScales;
     // ib >> m_attrs.postOps;
 
-    ib >> m_attrs;
     // ib >> m_memory;
     // ib >> m_factory;
     // ib >> m_executor;

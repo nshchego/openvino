@@ -5,14 +5,16 @@
 #include "cpu_convert.h"
 
 #include "cpu_memcpy.h"
+#include "cpu_memory.h"
 #include "openvino/core/type/nf4.hpp"
+#include "selective_build.h"
 #include "utils/bfloat16.hpp"
 
 #if defined(OPENVINO_ARCH_X86_64)
 #    include "cpu/x64/jit_avx512_core_fp8cvt.hpp"
 #    include "nodes/kernels/x64/jit_kernel.hpp"
 #else
-#    include "cpu_memory.h"
+//#    include "cpu_memory.h"
 #    include "openvino/core/type/element_type_traits.hpp"
 #    include "selective_build.h"
 #    include "utils/general_utils.h"

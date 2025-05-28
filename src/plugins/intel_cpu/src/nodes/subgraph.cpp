@@ -51,6 +51,9 @@
 
 #include "utils/cpu_utils.hpp"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #ifdef SNIPPETS_LIBXSMM_TPP
 #    include "snippets/lowered/pass/optimize_domain.hpp"
@@ -180,7 +183,10 @@ Subgraph::Subgraph(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr
 }
 
 Subgraph::Subgraph(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
-    : Node(in_buf, context) {
+    : Node(in_buf, context),
+      host_isa(getHostIsa()),
+      subgraph_attrs(std::make_shared<SubgraphAttrs>()) {
+    load(in_buf);
 }
 
 uint64_t Subgraph::getBodyHash(const std::shared_ptr<snippets::op::Subgraph>& snippet) {
@@ -830,6 +836,46 @@ void Subgraph::execute(const dnnl::stream& strm) {
 
 void Subgraph::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
+}
+
+void Subgraph::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    // ob << host_isa;
+    ob << subgraph_attrs->bodyHash;
+    ob << subgraph_attrs->inMemOrders;
+    ob << subgraph_attrs->outMemOrders;
+    ob << subgraph_attrs->inMemPrecs;
+    ob << subgraph_attrs->outMemPrecs;
+
+    ob << broadcastable_inputs;
+    ob << input_num;
+    ob << output_num;
+    // ob << srcMemPtrs;
+    // ob << dstMemPtrs;
+    ob << start_offset_in;
+    ob << start_offset_out;
+    // ob << repacked_constant_input_config;
+    ob << is_dynamic;
+}
+
+void Subgraph::load(BinaryInputBuffer& ib) {
+    // ib >> host_isa;
+    ib >> subgraph_attrs->bodyHash;
+    ib >> subgraph_attrs->inMemOrders;
+    ib >> subgraph_attrs->outMemOrders;
+    ib >> subgraph_attrs->inMemPrecs;
+    ib >> subgraph_attrs->outMemPrecs;
+
+    ib >> broadcastable_inputs;
+    ib >> input_num;
+    ib >> output_num;
+    // ib >> srcMemPtrs;
+    // ib >> dstMemPtrs;
+    ib >> start_offset_in;
+    ib >> start_offset_out;
+    // ib >> repacked_constant_input_config;
+    ib >> is_dynamic;
 }
 
 }  // namespace ov::intel_cpu::node

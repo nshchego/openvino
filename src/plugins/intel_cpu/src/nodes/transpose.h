@@ -4,17 +4,10 @@
 
 #pragma once
 
-// #include <memory>
-// #include <string>
-// #include <utility>
-// #include <vector>
-
-#include "executors/transpose.hpp"
 #include "node.h"
+#include "executors/transpose.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Transpose : public Node {
 public:
@@ -45,6 +38,10 @@ public:
         this->isOptimized = isOptimized;
     }
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;
     std::shared_ptr<ExecutorContext> transpose_context;
@@ -66,6 +63,4 @@ private:
     bool isOptimized = false;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

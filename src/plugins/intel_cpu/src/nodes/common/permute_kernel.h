@@ -21,6 +21,8 @@ struct PermuteParams {
 
     size_t hash() const;
     bool operator==(const PermuteParams& rhs) const;
+    void save(BinaryOutputBuffer& ob) const;
+    void load(BinaryInputBuffer& ib);
 };
 
 struct jit_permute_config_params {

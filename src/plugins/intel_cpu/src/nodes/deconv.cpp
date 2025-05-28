@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "openvino/op/constant.hpp"
 #include "openvino/op/convolution.hpp"
 #include "openvino/op/group_conv.hpp"
 #include "openvino/opsets/opset1_decl.hpp"

@@ -193,6 +193,7 @@ printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), t
 
 Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
     : context(ctx),
+      engine(context->getEngine()),
       profiling("tmp") {
     load(ib);
 printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
@@ -200,6 +201,7 @@ printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr
 
 Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx)
     : context(ctx),
+      engine(context->getEngine()),
       profiling("tmp") {
     load(ib);
 printf("--CPU-- Node_4 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
@@ -1448,6 +1450,9 @@ void Node::initOptimalPrimitiveDescriptor() {
     if (one_of(getType(), Type::RNNCell, Type::RNNSeq)) {  // can be skipped for RNN node
         return;
     }
+    if (one_of(getType(), Type::Pooling, Type::AdaptivePooling)) {
+        printf("Node::initOptimalPrimitiveDescriptor\n");
+    }
 
     auto selected_pd = getSelectedPrimitiveDescriptor();
     if (selected_pd == nullptr) {
@@ -2293,8 +2298,8 @@ void Node::save(BinaryOutputBuffer& ob) const {
 
     // ob << shapeInference;
 
-    // ob << originalInputPrecisions;
-    // ob << originalOutputPrecisions;
+    ob << originalInputPrecisions;
+    ob << originalOutputPrecisions;
     ob << keepOriginalPrecision;
     ob << enforceBF16evenForGraphTail;
 
@@ -2358,8 +2363,8 @@ printf("--CPU-- Node::load\n");
 
     // ib >> shapeInference;
 
-    // ib >> originalInputPrecisions;
-    // ib >> originalOutputPrecisions;
+    ib >> originalInputPrecisions;
+    ib >> originalOutputPrecisions;
     ib >> keepOriginalPrecision;
     ib >> enforceBF16evenForGraphTail;
 

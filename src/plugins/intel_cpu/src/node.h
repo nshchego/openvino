@@ -21,7 +21,7 @@
 #include "cpu_types.h"
 #include "edge.h"
 #include "graph_context.h"
-#include "memory_desc/cpu_memory_desc.h"
+// #include "memory_desc/cpu_memory_desc.h"
 #include "memory_desc/dnnl_memory_desc.h"
 #include "memory_format_filter.hpp"
 #include "nodes/executors/executor.hpp"
@@ -589,29 +589,21 @@ public:
     }
 
     ov::element::Type getOriginalInputPrecisionAtPort(size_t port) const {
-        if (originalInputPrecisions.size() <= port) {
-            OPENVINO_THROW("Incorrect input port number for node ", getName());
-        }
+        CPU_NODE_ASSERT(originalInputPrecisions.size() > port, "was asked for an incorrect input port number.");
         return originalInputPrecisions[port];
     }
     ov::element::Type getOriginalOutputPrecisionAtPort(size_t port) const {
-        if (originalOutputPrecisions.size() <= port) {
-            OPENVINO_THROW("Incorrect output port number for node ", getName());
-        }
+        CPU_NODE_ASSERT(originalOutputPrecisions.size() > port, "was asked for an incorrect output port number.");
         return originalOutputPrecisions[port];
     }
 
     void setOriginalInputPrecisionAtPort(size_t port, ov::element::Type precision) {
-        if (originalInputPrecisions.size() <= port) {
-            OPENVINO_THROW("Incorrect input port number for node ", getName());
-        }
+        CPU_NODE_ASSERT(originalInputPrecisions.size() > port, "was asked for an incorrect input port number.");
         originalInputPrecisions[port] = precision;
     }
 
     void setOriginalOutputPrecisionAtPort(size_t port, ov::element::Type precision) {
-        if (originalOutputPrecisions.size() <= port) {
-            OPENVINO_THROW("Incorrect output port number for node ", getName());
-        }
+        CPU_NODE_ASSERT(originalOutputPrecisions.size() > port, "was asked for an incorrect output port number.");
         originalOutputPrecisions[port] = precision;
     }
 

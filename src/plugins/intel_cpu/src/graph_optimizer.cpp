@@ -22,6 +22,7 @@
 #include "nodes/scaled_attn.h"
 #include "nodes/transpose.h"
 #include "onednn/dnnl.h"
+#include "openvino/op/constant.hpp"
 #include "openvino/opsets/opset1_decl.hpp"
 #include "utils/cpu_utils.hpp"
 #include "utils/debug_capabilities.h"
