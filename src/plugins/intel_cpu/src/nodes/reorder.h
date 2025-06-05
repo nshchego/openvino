@@ -64,6 +64,10 @@ public:
 
     static void reorderData(const IMemory& input, const IMemory& output, const MultiCachePtr& cache = nullptr);
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     dnnl::reorder::primitive prim;
     std::shared_ptr<MemoryDesc> input;

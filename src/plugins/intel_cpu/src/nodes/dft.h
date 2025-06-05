@@ -14,6 +14,9 @@ namespace node {
 class DFT : public Node {
 public:
     DFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    DFT(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     ~DFT() override = default;
 
     void getSupportedDescriptors() override;

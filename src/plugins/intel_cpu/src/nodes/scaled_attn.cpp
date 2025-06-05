@@ -1211,7 +1211,7 @@ void ScaledDotProductAttention::createPrimitive() {
     auto rtPrecision = getRuntimePrecision();
     const auto keyDims = getInputShapeAtPort(1).getDims();
     const auto valueDims = getInputShapeAtPort(2).getDims();
-    const auto& cpuConfig = context->getConfig();
+    const auto& cpuConfig = m_context->getConfig();
     const auto keyS = *(keyDims.end() - 1);
     const auto valueS = *(valueDims.end() - 1);
 
@@ -1240,42 +1240,42 @@ void ScaledDotProductAttention::createPrimitive() {
 #ifdef OPENVINO_ARCH_X86_64
         if (rtPrecision == ov::element::bf16) {
             if (ov::with_cpu_x86_bfloat16()) {
-                executor = std::make_shared<AttentionExecutor<KT_ONEDNN, ov::bfloat16>>(context,
+                executor = std::make_shared<AttentionExecutor<KT_ONEDNN, ov::bfloat16>>(m_context,
                                                                                         m_key_quant_param.groupSize,
                                                                                         m_value_quant_param.groupSize,
                                                                                         m_key_quant_param.isByChannel);
             } else {
-                executor = std::make_shared<AttentionExecutor<KT_REF, ov::bfloat16>>(context,
+                executor = std::make_shared<AttentionExecutor<KT_REF, ov::bfloat16>>(m_context,
                                                                                      m_key_quant_param.groupSize,
                                                                                      m_value_quant_param.groupSize,
                                                                                      m_key_quant_param.isByChannel);
             }
         } else if (rtPrecision == ov::element::f16) {
             if (with_cpu_x86_avx512_core_fp16()) {
-                executor = std::make_shared<AttentionExecutor<KT_ONEDNN, ov::float16>>(context,
+                executor = std::make_shared<AttentionExecutor<KT_ONEDNN, ov::float16>>(m_context,
                                                                                        m_key_quant_param.groupSize,
                                                                                        m_value_quant_param.groupSize,
                                                                                        m_key_quant_param.isByChannel);
             } else {
-                executor = std::make_shared<AttentionExecutor<KT_REF, ov::float16>>(context,
+                executor = std::make_shared<AttentionExecutor<KT_REF, ov::float16>>(m_context,
                                                                                     m_key_quant_param.groupSize,
                                                                                     m_value_quant_param.groupSize,
                                                                                     m_key_quant_param.isByChannel);
             }
         } else {
 #    ifdef OV_CPU_WITH_MLAS
-            executor = std::make_shared<AttentionExecutor<KT_MLAS, float>>(context,
+            executor = std::make_shared<AttentionExecutor<KT_MLAS, float>>(m_context,
                                                                            m_key_quant_param.groupSize,
                                                                            m_value_quant_param.groupSize,
                                                                            m_key_quant_param.isByChannel);
 #    else
             if (with_cpu_x86_avx512_core()) {
-                executor = std::make_shared<AttentionExecutor<KT_ONEDNN, float>>(context,
+                executor = std::make_shared<AttentionExecutor<KT_ONEDNN, float>>(m_context,
                                                                                  m_key_quant_param.groupSize,
                                                                                  m_value_quant_param.groupSize,
                                                                                  m_key_quant_param.isByChannel);
             } else {
-                executor = std::make_shared<AttentionExecutor<KT_REF, float>>(context,
+                executor = std::make_shared<AttentionExecutor<KT_REF, float>>(m_context,
                                                                               m_key_quant_param.groupSize,
                                                                               m_value_quant_param.groupSize,
                                                                               m_key_quant_param.isByChannel);
@@ -1284,18 +1284,18 @@ void ScaledDotProductAttention::createPrimitive() {
         }
 #elif defined(OV_CPU_WITH_ACL)
         if (rtPrecision == ov::element::f16) {
-            executor = std::make_shared<AttentionExecutor<KT_ACL, ov::float16>>(context,
+            executor = std::make_shared<AttentionExecutor<KT_ACL, ov::float16>>(m_context,
                                                                                 m_key_quant_param.groupSize,
                                                                                 m_value_quant_param.groupSize,
                                                                                 m_key_quant_param.isByChannel);
         } else {
-            executor = std::make_shared<AttentionExecutor<KT_ACL, float>>(context,
+            executor = std::make_shared<AttentionExecutor<KT_ACL, float>>(m_context,
                                                                           m_key_quant_param.groupSize,
                                                                           m_value_quant_param.groupSize,
                                                                           m_key_quant_param.isByChannel);
         }
 #else
-        executor = std::make_shared<AttentionExecutor<KT_REF, float>>(context,
+        executor = std::make_shared<AttentionExecutor<KT_REF, float>>(m_context,
                                                                       m_key_quant_param.groupSize,
                                                                       m_value_quant_param.groupSize,
                                                                       m_key_quant_param.isByChannel);
@@ -1303,7 +1303,7 @@ void ScaledDotProductAttention::createPrimitive() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
     if (!result.first) {
         THROW_CPU_NODE_ERR("AttentionExecutor creation fails with precision " + rtPrecision.to_string());
@@ -1593,7 +1593,7 @@ void ScaledDotProductAttention::resetBeamTablePastkv(const MemoryPtr& mem_cur_k,
             auto newMemDesc = std::make_shared<CpuBlockedMemoryDesc>(
                 ov::element::f32,
                 ov::intel_cpu::Shape{static_cast<size_t>(parallel_get_max_threads()), m_key_quant_param.groupSize * S});
-            auto scratchMem = context->getScratchPad()->createScratchPadMem(newMemDesc);
+            auto scratchMem = m_context->getScratchPad()->createScratchPadMem(newMemDesc);
             auto temp_buffer = scratchMem->getDataAs<float>();
             attn_quantkv(cur_k,
                          cur_v,
@@ -2013,7 +2013,7 @@ void ScaledDotProductAttention::updatePastkv(const MemoryPtr& mem_cur_k, const M
                     ov::element::f32,
                     ov::intel_cpu::Shape{static_cast<size_t>(parallel_get_max_threads()),
                                          m_key_quant_param.groupSize * S});
-                auto scratchMem = context->getScratchPad()->createScratchPadMem(newMemDesc);
+                auto scratchMem = m_context->getScratchPad()->createScratchPadMem(newMemDesc);
                 auto temp_buffer = scratchMem->getDataAs<float>();
                 // L0 is set to 0 here because past_kv is reset by set_state API, re-initializing
                 attn_quantkv(init_k,
@@ -2039,7 +2039,7 @@ void ScaledDotProductAttention::updatePastkv(const MemoryPtr& mem_cur_k, const M
         auto newMemDesc = std::make_shared<CpuBlockedMemoryDesc>(
             ov::element::f32,
             ov::intel_cpu::Shape{static_cast<size_t>(parallel_get_max_threads()), m_key_quant_param.groupSize * S});
-        auto scratchMem = context->getScratchPad()->createScratchPadMem(newMemDesc);
+        auto scratchMem = m_context->getScratchPad()->createScratchPadMem(newMemDesc);
         auto temp_buffer = scratchMem->getDataAs<float>();
         attn_quantkv(cur_k,
                      cur_v,
@@ -2061,8 +2061,8 @@ ov::element::Type ScaledDotProductAttention::getKVCachePrecision() {
     ov::element::Type kvcache_precision;
     // TODO: SDPA only supports same key/value cache precision.
     auto rtPrecision = getRuntimePrecision();
-    auto keyCachePrecisionHint = context->getConfig().keyCachePrecision;
-    auto valueCachePrecisionHint = context->getConfig().valueCachePrecision;
+    auto keyCachePrecisionHint = m_context->getConfig().keyCachePrecision;
+    auto valueCachePrecisionHint = m_context->getConfig().valueCachePrecision;
     bool enableKVCacheFP16 = m_config.config.fuse_concat && mayiuse(cpu_isa_t::avx2) &&
                              rtPrecision != ov::element::bf16 &&
                              (keyCachePrecisionHint == ov::element::f16 && valueCachePrecisionHint == ov::element::f16);

@@ -255,7 +255,7 @@ void ISTFT::createPrimitive() {
         return RDFTExecutor::build(key.isInverse, getSelectedPrimitiveDescriptor());
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     rdft_executor = result.first;
 

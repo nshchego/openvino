@@ -292,6 +292,11 @@ Deconvolution::Deconvolution(const std::shared_ptr<ov::Node>& op, const GraphCon
     attr = std::make_shared<dnnl::primitive_attr>();
 }
 
+Deconvolution::Deconvolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Deconvolution::createDnnlCompatibleWeights() {
     MemoryPtr blob = getSrcMemoryAtPort(1);
 
@@ -1082,7 +1087,7 @@ void Deconvolution::prepareParams() {
 
     auto prevExecPtr = execPtr;
     execPtr = nullptr;
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
 
     execPtr = result.first;
@@ -1303,7 +1308,7 @@ void Deconvolution::initSupportedPrimitiveDescriptors() {
             std::make_shared<DeconvExecutorFactory>(deconvAttrs,
                                                     srcMemoryDescs,
                                                     dstMemoryDescs,
-                                                    std::make_shared<ExecutorContext>(context, getImplPriority()));
+                                                    std::make_shared<ExecutorContext>(m_context, getImplPriority()));
 
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::gemm_acl, factory);
     };

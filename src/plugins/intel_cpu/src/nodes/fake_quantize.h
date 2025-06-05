@@ -68,6 +68,8 @@ class FakeQuantize : public Node {
 public:
     FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    FakeQuantize(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void initSupportedPrimitiveDescriptors() override;
     void getSupportedDescriptors() override;
     bool created() const override;

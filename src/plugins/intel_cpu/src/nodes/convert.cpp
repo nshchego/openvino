@@ -9,6 +9,7 @@
 #include "openvino/op/convert.hpp"
 #include "openvino/opsets/opset1_decl.hpp"
 #include "shape_inference/shape_inference_pass_through.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 using namespace dnnl;
 
@@ -44,6 +45,11 @@ Convert::Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
 
     auto convert = ov::as_type_ptr<const ov::opset1::Convert>(op);
     convertParams.origPrc = convert->get_destination_type();
+}
+
+Convert::Convert(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 Convert::Convert(const Shape& shape,
@@ -110,7 +116,7 @@ void Convert::initSupportedPrimitiveDescriptors() {
             std::make_shared<ConvertExecutorFactory>(convertParams,
                                                      srcMemoryDesc,
                                                      dstMemoryDesc,
-                                                     std::make_shared<ExecutorContext>(context, getImplPriority()));
+                                                     std::make_shared<ExecutorContext>(m_context, getImplPriority()));
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, factory);
     };
 
@@ -196,6 +202,42 @@ void Convert::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool Convert::created() const {
     return getType() == Type::Convert;
+}
+
+void Convert::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    // ob << input;
+    // ob << output;
+    ob << convertParams.srcPrc;
+    ob << convertParams.origPrc;
+    ob << convertParams.dstPrc;
+    ob << convertParams.size;
+    // ob << config;
+}
+
+void Convert::load(BinaryInputBuffer& ib) {
+    // ib >> input;
+    // ib >> output;
+    ib >> convertParams.srcPrc;
+    ib >> convertParams.origPrc;
+    ib >> convertParams.dstPrc;
+    ib >> convertParams.size;
+    // ib >> config;
+
+    for (auto& desc : supportedPrimitiveDescriptors) {
+        auto& config = desc.getConfig();
+        MemoryDescPtr src_memory_desc = config.inConfs[0].getMemDesc();
+        MemoryDescPtr dst_memory_desc = config.outConfs[0].getMemDesc();
+        convertParams.srcPrc = src_memory_desc->getPrecision();
+        convertParams.dstPrc = dst_memory_desc->getPrecision();
+        auto factory =
+            std::make_shared<ConvertExecutorFactory>(convertParams,
+                                                     src_memory_desc,
+                                                     dst_memory_desc,
+                                                     std::make_shared<ExecutorContext>(m_context, getImplPriority()));
+        desc.setExecutorFactory(factory);
+    }
 }
 
 }  // namespace ov::intel_cpu::node

@@ -14,6 +14,8 @@ class Bucketize : public Node {
 public:
     Bucketize(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Bucketize(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override{};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
@@ -27,6 +29,10 @@ public:
     bool neverExecute() const override;
     bool isExecutable() const override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     template <typename T, typename T_BOUNDARIES, typename T_IND>

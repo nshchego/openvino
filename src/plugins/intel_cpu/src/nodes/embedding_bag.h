@@ -19,6 +19,8 @@ public:
                  size_t perSampleWeightsIdx,
                  size_t defaultIndexIdx);
 
+    EmbeddingBag(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void execute(const uint8_t* srcData,
                  const uint8_t* weightsData,
                  const ov::element::Type& srcPrc,

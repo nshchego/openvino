@@ -80,6 +80,8 @@ class BinaryConvolution : public Node {
 public:
     BinaryConvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    BinaryConvolution(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void createPrimitive() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -96,6 +98,10 @@ public:
     impl_desc_type getImplType() {
         return implType;
     }
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     bool withSum = false;

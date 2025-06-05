@@ -51,6 +51,11 @@ CTCGreedyDecoder::CTCGreedyDecoder(const std::shared_ptr<ov::Node>& op, const Gr
     mergeRepeated = greedyDecOp->get_ctc_merge_repeated();
 }
 
+CTCGreedyDecoder::CTCGreedyDecoder(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void CTCGreedyDecoder::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

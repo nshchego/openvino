@@ -984,9 +984,10 @@ BinaryConvolution::BinaryConvolution(const std::shared_ptr<ov::Node>& op, const 
     }
 }
 
-//BinaryConvolution::BinaryConvolution(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
-//    : Node(ib, context, NgraphShapeInferFactory(op)) {
-//}
+BinaryConvolution::BinaryConvolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
 
 void BinaryConvolution::getSupportedDescriptors() {
     withBinarization = isFusedWith(Type::FakeQuantize);
@@ -1433,6 +1434,13 @@ void BinaryConvolution::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool BinaryConvolution::created() const {
     return getType() == Type::BinaryConvolution;
+}
+
+void BinaryConvolution::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void BinaryConvolution::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

@@ -53,6 +53,11 @@ ExperimentalDetectronTopKROIs::ExperimentalDetectronTopKROIs(const std::shared_p
     max_rois_num_ = topKROI->get_max_rois();
 }
 
+ExperimentalDetectronTopKROIs::ExperimentalDetectronTopKROIs(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronTopKROIs::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

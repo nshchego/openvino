@@ -23,6 +23,7 @@
 #include "openvino/core/parallel.hpp"
 #include "utils/general_utils.h"
 #include "utils/precision_support.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -56,6 +57,7 @@ Reorder::Reorder(const MemoryDesc& input,
 
 Reorder::Reorder(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void Reorder::getSupportedDescriptors() {
@@ -182,7 +184,7 @@ void Reorder::prepareReorderAsTranspose(const MemoryDescPtr& parentDesc, const M
     transposeParams.permuteParams.order = transposeOrder;
     transposeParams.permuteParams.data_size = parentDesc->getPrecision().size();
 
-    auto transpose_context = std::make_shared<ExecutorContext>(context, getImplPriority());
+    auto transpose_context = std::make_shared<ExecutorContext>(m_context, getImplPriority());
     auto factory = std::make_shared<TransposeExecutorFactory>(transposeParams,
                                                               std::vector<MemoryDescPtr>{parentDesc},
                                                               std::vector<MemoryDescPtr>{transposedDesc},
@@ -328,7 +330,7 @@ void Reorder::createReorderPrimitive(const DnnlMemoryDescPtr& srcDesc, const Dnn
     CPU_NODE_ASSERT(src_desc.get_ndims() == dst_desc.get_ndims(),
                     "OneDNN doesn't support reorder with different ranks.");
 
-    prim = getReorderPrim(context->getParamsCache(), getEngine(), src_desc, dst_desc);
+    prim = getReorderPrim(m_context->getParamsCache(), getEngine(), src_desc, dst_desc);
     CPU_NODE_ASSERT(prim, "could not create reorder primitive: unsupported reorder case.");
 
     selectedPD->setImplementationType(
@@ -551,6 +553,32 @@ void Reorder::reorderData(const IMemory& input, const IMemory& output, const Mul
             OPENVINO_THROW("Could not make onednn reorder.");
         }
     }
+}
+
+void Reorder::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    // ob << prim;
+    // ob << input;
+    // ob << output;
+    ob << src_permutation;
+    ob << isOptimized;
+    ob << isNspc2NcspCase;
+    ob << isNcsp2NspcCase;
+    ob << canUseNspc2Ncsp;
+    ob << canUseNcsp2Nspc;
+}
+
+void Reorder::load(BinaryInputBuffer& ib) {
+    // ib >> prim;
+    // ib >> input;
+    // ib >> output;
+    ib >> src_permutation;
+    ib >> isOptimized;
+    ib >> isNspc2NcspCase;
+    ib >> isNcsp2NspcCase;
+    ib >> canUseNspc2Ncsp;
+    ib >> canUseNcsp2Nspc;
 }
 
 }  // namespace ov::intel_cpu::node

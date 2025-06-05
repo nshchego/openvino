@@ -55,6 +55,11 @@ GatherTree::GatherTree(const std::shared_ptr<ov::Node>& op, const GraphContext::
     }
 }
 
+GatherTree::GatherTree(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GatherTree::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

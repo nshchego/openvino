@@ -110,6 +110,11 @@ DepthToSpace::DepthToSpace(const std::shared_ptr<ov::Node>& op, const GraphConte
     attrs.blockStep = static_cast<size_t>(std::pow(attrs.blockSize, nSpatialDims));
 }
 
+DepthToSpace::DepthToSpace(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void DepthToSpace::getSupportedDescriptors() {}
 
 void DepthToSpace::initSupportedPrimitiveDescriptors() {
@@ -202,7 +207,7 @@ void DepthToSpace::prepareParams() {
         return std::make_shared<DepthToSpaceExecutor>(key);
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(attrs, builder);
     if (!result.first) {
         THROW_CPU_NODE_ERR("DepthToSpaceExecutor was not found.");

@@ -32,7 +32,7 @@ public:
                     const MemoryDescArgs& descriptors,
                     const MemoryFormatFilter& memoryFormatFilter = {},
                     const std::string& implementationPriority = {})
-        : m_attrs(attrs),
+        : m_attrs(attrs), // TODO: std::move?
           m_context(std::move(context)),
           m_suitableImplementations(filter(m_attrs, descriptors, memoryFormatFilter, implementationPriority)) {
         OPENVINO_ASSERT(!m_suitableImplementations.empty(), "No suitable implementations found");

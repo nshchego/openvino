@@ -109,6 +109,11 @@ CausalMaskPreprocess::CausalMaskPreprocess(const std::shared_ptr<ov::Node>& op, 
     m_config = node->get_config();
 }
 
+CausalMaskPreprocess::CausalMaskPreprocess(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool CausalMaskPreprocess::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                                 std::string& errorMessage) noexcept {
     try {
@@ -163,6 +168,13 @@ void CausalMaskPreprocess::initSupportedPrimitiveDescriptors() {
 
 void CausalMaskPreprocess::execute(const dnnl::stream& strm) {
     m_executor->execute(strm, this, m_config);
+}
+
+void CausalMaskPreprocess::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void CausalMaskPreprocess::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

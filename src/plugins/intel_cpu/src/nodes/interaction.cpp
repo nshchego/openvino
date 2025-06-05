@@ -194,6 +194,11 @@ Interaction::Interaction(const std::shared_ptr<ov::Node>& op, const GraphContext
     }
 }
 
+Interaction::Interaction(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Interaction::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

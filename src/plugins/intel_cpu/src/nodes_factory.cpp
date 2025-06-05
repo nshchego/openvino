@@ -3,6 +3,7 @@
 //
 
 #include "nodes_factory.hpp"
+
 #include "nodes/reference.h"
 #include "utils/serialization/internal_types.hpp"
 
@@ -13,19 +14,18 @@ Node* NodesFactory<const std::shared_ptr<ov::Node>&>::create(const std::shared_p
 printf("--CPU-- NodesFactory::create '%s':'%s'\n", op->get_type_name(), op->get_friendly_name().data());
     Node* new_node = nullptr;
     std::string error_message;
-    if (new_node == nullptr) {
-        try {
-printf("    Try to create CPU node\n");
-            std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
-            if (ol != nullptr && ol->created()) {
-                new_node = ol.release();
-            }
-        } catch (const ov::Exception& ex) {
-            if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                error_message += ex.what();
-            } else {
-                throw;
-            }
+
+    try {
+printf("--CPU-- FACTORY ov::Node. Try to create CPU node %s\n", op->get_type_name());
+        std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
+        if (ol != nullptr && ol->created()) {
+            new_node = ol.release();
+        }
+    } catch (const ov::Exception& ex) {
+        if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
+            error_message += ex.what();
+        } else {
+            throw;
         }
     }
 
@@ -38,9 +38,9 @@ printf("    Try to create Reference node\n");
             }
         } catch (const ov::Exception& ex) {
             if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                const std::string currErrorMess = ex.what();
-                if (!currErrorMess.empty()) {
-                    error_message += error_message.empty() ? currErrorMess : "\n" + currErrorMess;
+                const std::string curr_error_mess = ex.what();
+                if (!curr_error_mess.empty()) {
+                    error_message += error_message.empty() ? curr_error_mess : "\n" + curr_error_mess;
                 }
             } else {
                 throw;
@@ -70,39 +70,37 @@ Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& ib, const Grap
     intel_cpu::Type node_type;
     ib >> node_type;
 
-    if (new_node == nullptr) {
+    try {
+printf("--CPU-- FACTORY Stream. Try to deserialize CPU node %d\n", int(node_type));
+        std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, node_type, ib, context));
+        if (ol != nullptr && ol->created()) {
+            new_node = ol.release();
+        }
+    } catch (const ov::Exception& ex) {
+        if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
+            error_message += ex.what();
+        } else {
+            throw;
+        }
+    }
+
+    if (new_node == nullptr && node_type == Type::Reference) {
         try {
-printf("    Try to deserialize CPU node %d\n", int(node_type));
-            std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, node_type, ib, context));
+            std::unique_ptr<Node> ol(new node::Reference(ib, context, error_message));
             if (ol != nullptr && ol->created()) {
                 new_node = ol.release();
             }
         } catch (const ov::Exception& ex) {
             if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-                error_message += ex.what();
+                const std::string curr_error_mess = ex.what();
+                if (!curr_error_mess.empty()) {
+                    error_message += error_message.empty() ? curr_error_mess : "\n" + curr_error_mess;
+                }
             } else {
                 throw;
             }
         }
     }
-
-    // if (new_node == nullptr) {
-    //     try {
-    //         std::unique_ptr<Node> ol(new Reference(op, context, error_message));
-    //         if (ol != nullptr && ol->created()) {
-    //             new_node = ol.release();
-    //         }
-    //     } catch (const ov::Exception& ex) {
-    //         if (dynamic_cast<const ov::NotImplemented*>(&ex) != nullptr) {
-    //             const std::string currErrorMess = ex.what();
-    //             if (!currErrorMess.empty()) {
-    //                 error_message += error_message.empty() ? currErrorMess : "\n" + currErrorMess;
-    //             }
-    //         } else {
-    //             throw;
-    //         }
-    //     }
-    // }
 
     if (!new_node) {
         std::string error_details;
@@ -111,8 +109,6 @@ printf("    Try to deserialize CPU node %d\n", int(node_type));
         }
         OPENVINO_THROW("Unsupported operation of type: ",
                        NameFromType(node_type),
-                       " name: ",
-                    //    op->get_friendly_name(),
                        error_details);
     }
 

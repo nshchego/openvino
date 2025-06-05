@@ -318,6 +318,11 @@ GenerateProposals::GenerateProposals(const std::shared_ptr<ov::Node>& op, const 
     roi_indices_.resize(post_nms_topn_);
 }
 
+GenerateProposals::GenerateProposals(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GenerateProposals::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

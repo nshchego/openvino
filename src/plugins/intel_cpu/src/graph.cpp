@@ -289,14 +289,14 @@ printf("--CPU-- Graph::deserialize_graph\n");
     }
 
     // Add fused nodes
-    std::map<int, std::vector<int>> fused_nodes_map;
-    ib >> fused_nodes_map;
-    for (const auto& it : fused_nodes_map) {
-        auto& target = graphNodes[it.first];
-        for (auto f_idx : it.second) {
-            target->addFusedNode(graphNodes[f_idx]);
-        }
-    }
+    // std::map<int, std::vector<int>> fused_nodes_map;
+    // ib >> fused_nodes_map;
+    // for (const auto& it : fused_nodes_map) {
+    //     auto& target = graphNodes[it.first];
+    //     for (auto f_idx : it.second) {
+    //         target->addFusedNode(graphNodes[f_idx]);
+    //     }
+    // }
 
     // Add merged nodes
     std::map<int, std::vector<int>> merged_nodes_map;
@@ -474,7 +474,6 @@ void Graph::Init(BinaryInputBuffer& ib,
 
     deserialize_graph(ib);
 
-    
     // SortTopologically();
     // InitNodes();
 
@@ -482,7 +481,7 @@ void Graph::Init(BinaryInputBuffer& ib,
 
     // SortTopologically();
 
-    InitDescriptors();
+    // InitDescriptors();
 
     // ResolveInplaceDirections();
 
@@ -2325,7 +2324,7 @@ printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
     // Serialize all nodes
     {
         ob << graphNodes.size();
-        std::map<int, std::vector<int>> fused_nodes;
+        // std::map<int, std::vector<int>> fused_nodes;
         std::map<int, std::vector<int>> merged_nodes;
         size_t node_idx = 0lu;
 
@@ -2333,17 +2332,17 @@ printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
             ob << n->getType();
             ob << *n;
 
-            if (auto fused_size = n->getFusedWith().size()) {
-                fused_nodes[node_idx].reserve(fused_size);
-                for (const auto& f_node : n->getFusedWith()) {
-                    for (size_t f_idx = 0lu; f_idx < graphNodes.size(); f_idx++) {
-                        if (f_node == graphNodes[f_idx]) {
-                            fused_nodes[node_idx].emplace_back(f_idx);
-                            break;
-                        }
-                    }
-                }
-            }
+            // if (auto fused_size = n->getFusedWith().size()) {
+            //     fused_nodes[node_idx].reserve(fused_size);
+            //     for (const auto& f_node : n->getFusedWith()) {
+            //         for (size_t f_idx = 0lu; f_idx < graphNodes.size(); f_idx++) {
+            //             if (f_node == graphNodes[f_idx]) {
+            //                 fused_nodes[node_idx].emplace_back(f_idx);
+            //                 break;
+            //             }
+            //         }
+            //     }
+            // }
 
             if (auto merged_size = n->getMergeWith().size()) {
                 merged_nodes[node_idx].reserve(merged_size);
@@ -2360,7 +2359,7 @@ printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
             node_idx++;
         }
 
-        ob << fused_nodes;
+        // ob << fused_nodes;
         ob << merged_nodes;
     }
 

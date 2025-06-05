@@ -104,23 +104,23 @@ public:
     }
 
     NodePtr getInputNodeByIndex(const size_t index) {
-        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input index '", index, "'.");
+        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input node index '", index, "'.");
         return m_input_nodes[index];
     }
 
-    NodePtr getOutputNodeByIndex(std::size_t index) {
-        OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output index '", index, "'.");
-        return m_input_nodes[index];
+    NodePtr getOutputNodeByIndex(const size_t index) {
+        OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output node index '", index, "'.");
+        return m_output_nodes[index];
     }
 
     NodeConstPtr getInputNodeByIndex(const size_t index) const {
-        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input index '", index, "'.");
+        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input node index '", index, "'.");
         return m_input_nodes[index];
     }
 
-    NodeConstPtr getOutputNodeByIndex(std::size_t index) const {
-        OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output index '", index, "'.");
-        return m_input_nodes[index];
+    NodeConstPtr getOutputNodeByIndex(const size_t index) const {
+        OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output node index '", index, "'.");
+        return m_output_nodes[index];
     }
 
     size_t inputsNumber() const {

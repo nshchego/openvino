@@ -507,7 +507,7 @@ void Pooling::prepareParams() {
             return std::make_shared<DnnlExecutorLegacy>(first_desc);
         };
 
-        auto cache = context->getParamsCache();
+        auto cache = m_context->getParamsCache();
         auto result = cache->getOrCreate(key, builder);
 
         dnnlExecPtr = result.first;
@@ -658,7 +658,7 @@ void Pooling::initSupportedPrimitiveDescriptors() {
                 std::make_shared<PoolingExecutorFactory>(poolingAttrs,
                                                          srcMemoryDescs,
                                                          dstMemoryDescs,
-                                                         std::make_shared<ExecutorContext>(context, getImplPriority()));
+                                                         std::make_shared<ExecutorContext>(m_context, getImplPriority()));
             supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::undef, factory);
         };
 

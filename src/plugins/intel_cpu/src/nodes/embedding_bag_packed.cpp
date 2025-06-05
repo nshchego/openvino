@@ -56,6 +56,12 @@ EmbeddingBagPacked::EmbeddingBagPacked(const std::shared_ptr<ov::Node>& op, cons
     }
 }
 
+EmbeddingBagPacked::EmbeddingBagPacked(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context),
+      EmbeddingBag(in_buf, context) {
+    load(in_buf);
+}
+
 void EmbeddingBagPacked::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

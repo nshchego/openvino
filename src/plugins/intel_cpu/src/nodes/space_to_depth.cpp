@@ -202,7 +202,7 @@ void SpaceToDepth::prepareParams() {
         return std::make_shared<SpaceToDepthExecutor>(key);
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(attrs, builder);
     if (!result.first) {
         THROW_CPU_NODE_ERR("executor was not found.");

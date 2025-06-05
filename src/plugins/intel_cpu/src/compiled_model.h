@@ -65,6 +65,14 @@ public:
         return m_name;
     }
 
+    const std::vector<ov::Output<const ov::Node>>& inputs() const override {
+        return m_inputs;
+    }
+
+    const std::vector<ov::Output<const ov::Node>>& outputs() const override {
+        return m_outputs;
+    }
+
 private:
     std::shared_ptr<ov::ISyncInferRequest> create_sync_infer_request() const override;
     friend class CompiledModelHolder;
@@ -74,6 +82,8 @@ private:
     const std::shared_ptr<const ov::IPlugin> m_plugin;
     std::shared_ptr<ov::threading::ITaskExecutor> m_task_executor = nullptr;      //!< Holds a task executor
     std::shared_ptr<ov::threading::ITaskExecutor> m_callback_executor = nullptr;  //!< Holds a callback executor
+    std::vector<ov::Output<const ov::Node>> m_inputs;
+    std::vector<ov::Output<const ov::Node>> m_outputs;
 
     // Generic synchronization primitive on CompiledModel level.
     // Usage example: helps to avoid data races during CPU Graph initialization in multi-streams scenario

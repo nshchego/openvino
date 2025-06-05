@@ -301,6 +301,11 @@ ExperimentalDetectronROIFeatureExtractor::ExperimentalDetectronROIFeatureExtract
     pooled_width_ = output_dim_;
 }
 
+ExperimentalDetectronROIFeatureExtractor::ExperimentalDetectronROIFeatureExtractor(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronROIFeatureExtractor::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

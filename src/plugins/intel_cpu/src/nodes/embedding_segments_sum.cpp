@@ -43,6 +43,12 @@ EmbeddingSegmentsSum::EmbeddingSegmentsSum(const std::shared_ptr<ov::Node>& op, 
     }
 }
 
+EmbeddingSegmentsSum::EmbeddingSegmentsSum(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context),
+      EmbeddingBag(in_buf, context) {
+    load(in_buf);
+}
+
 void EmbeddingSegmentsSum::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

@@ -2316,7 +2316,7 @@ void Reduce::prepareParams() {
             fuse_low_precision ? DnnlExtensionUtils::ElementTypeToDataType(intermediate_prec) : jcp.src_dt;
         reduce_post_jcp.src_data_size = DnnlExtensionUtils::sizeOfDataType(reduce_post_jcp.src_dt);
         ReduceKey key = {reduce_post_jcp, attr.get_post_ops()};
-        auto cache = context->getParamsCache();
+        auto cache = m_context->getParamsCache();
         auto result = cache->getOrCreate(key, builder);
         if (!result.first) {
             THROW_CPU_NODE_ERR("has not found jit_uni_reduce_post_kernel_f32.");

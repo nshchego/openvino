@@ -959,7 +959,7 @@ void RNN::fillWeights() {
         return w_state_mem;
     };
 
-    if (auto weight_cache = context->getWeightsCache()) {
+    if (auto weight_cache = m_context->getWeightsCache()) {
         const std::string hash_w =
             getName() + "_0_" +
             std::to_string(dnnl::impl::primitive_hashing::get_md_hash(*w_data_desc->getDnnlDesc().get()));
@@ -1029,7 +1029,7 @@ void RNN::fillBiases() {
         return w_bias_data_mem;
     };
 
-    if (auto weight_cache = context->getWeightsCache()) {
+    if (auto weight_cache = m_context->getWeightsCache()) {
         const std::string hash_str =
             getName() + "_2_" +
             std::to_string(dnnl::impl::primitive_hashing::get_md_hash(*w_bias_data_desc->getDnnlDesc().get()));
@@ -1047,12 +1047,12 @@ void RNN::prepareMemory(const DnnlMemoryDescPtr& new_desc, size_t idx) {
     auto create = [&]() {
         Memory memory{getEngine(), m_initial_weights[idx]->getDescPtr(), m_initial_weights[idx]->getData()};
         MemoryPtr res_ptr = std::make_shared<Memory>(getEngine(), new_desc);
-        node::Reorder::reorderData(memory, *res_ptr, context->getParamsCache());
+        node::Reorder::reorderData(memory, *res_ptr, m_context->getParamsCache());
         return res_ptr;
     };
 
     MemoryPtr res_ptr;
-    if (auto weight_cache = context->getWeightsCache()) {
+    if (auto weight_cache = m_context->getWeightsCache()) {
         const std::string hash_str =
             getName() + "_" + std::to_string(idx) + "_" +
             std::to_string(dnnl::impl::primitive_hashing::get_md_hash(*new_desc->getDnnlDesc().get()));
@@ -1373,7 +1373,7 @@ void RNN::prepareParams() {
         return descPtr ? std::make_shared<RnnDnnlExecutor>(descPtr) : nullptr;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
     auto prevExecPtr = execPtr;
     execPtr = result.first;

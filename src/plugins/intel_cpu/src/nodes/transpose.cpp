@@ -59,8 +59,6 @@ Transpose::Transpose(BinaryInputBuffer& in_buf, const GraphContext::CPtr& contex
     load(in_buf);
 }
 
-void Transpose::getSupportedDescriptors() {}
-
 void Transpose::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -80,7 +78,7 @@ void Transpose::initSupportedPrimitiveDescriptors() {
         creatorsMap.at(LayoutType::ncsp)->createSharedDesc(ov::element::i32, getInputShapeAtPort(INPUT_ORDER_IDX)));
     config.outConfs[0].inPlace(isOptimized ? 0 : -1);
     config.outConfs[0].constant(false);
-    transpose_context = std::make_shared<ExecutorContext>(context, getImplPriority());
+    transpose_context = std::make_shared<ExecutorContext>(m_context, getImplPriority());
 
     auto supportedPrimitiveDescriptorsBuilder = [this](const NodeConfig& config,
                                                        const TransposeParams& transposeParams) {
@@ -157,7 +155,7 @@ void Transpose::prepareParams() {
         auto dstMemPtr = getDstMemoryAtPort(0);
         auto dstDesc = dstMemPtr->getDescWithType<DnnlMemoryDesc>()->getDnnlDesc();
         auto srcDesc = dnnl::memory::desc(dstDesc.get_dims(), dstDesc.get_data_type(), memory::format_tag::acdb);
-        auto result = getReorderPrim(context->getParamsCache(), getEngine(), srcDesc, dstDesc);
+        auto result = getReorderPrim(m_context->getParamsCache(), getEngine(), srcDesc, dstDesc);
         if (!result) {
             THROW_CPU_NODE_ERR("reorder primitive descriptor was not found.");
         }
@@ -199,7 +197,7 @@ void Transpose::prepareParams() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(transposeParams.permuteParams, builder);
 
     if (!result.first) {

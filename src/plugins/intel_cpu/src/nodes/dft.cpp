@@ -52,6 +52,11 @@ DFT::DFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     }
 }
 
+DFT::DFT(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void DFT::getSupportedDescriptors() {}
 
 void DFT::initSupportedPrimitiveDescriptors() {

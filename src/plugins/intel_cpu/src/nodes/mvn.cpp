@@ -2027,7 +2027,7 @@ void MVN::initSupportedPrimitiveDescriptors() {
                 std::make_shared<MVNExecutorFactory>(mvnAttrs,
                                                      srcMemoryDescs,
                                                      dstMemoryDescs,
-                                                     std::make_shared<ExecutorContext>(context, getImplPriority()));
+                                                     std::make_shared<ExecutorContext>(m_context, getImplPriority()));
             if (!factory->isEmpty()) {
                 supportedPrimitiveDescriptors.emplace_back(config, impl_type, factory);
             }
@@ -2232,7 +2232,7 @@ void MVN::prepareParams() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
     execPtr = result.first;
 }

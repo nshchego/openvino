@@ -21,7 +21,6 @@
 #include "cpu_types.h"
 #include "edge.h"
 #include "graph_context.h"
-// #include "memory_desc/cpu_memory_desc.h"
 #include "memory_desc/dnnl_memory_desc.h"
 #include "memory_format_filter.hpp"
 #include "nodes/executors/executor.hpp"
@@ -94,12 +93,12 @@ public:
     NodeDesc(NodeConfig conf, impl_desc_type type)
         : m_config(std::move(conf)),
           m_implementation_type(type),
-          executorFactory(nullptr) {}
+          m_executor_factory(nullptr) {}
 
     NodeDesc(NodeConfig conf, impl_desc_type type, ExecutorFactoryLegacyPtr factory)
         : m_config(std::move(conf)),
           m_implementation_type(type),
-          executorFactory(std::move(factory)) {}
+          m_executor_factory(std::move(factory)) {}
 
     const NodeConfig& getConfig() const {
         return m_config;
@@ -118,21 +117,21 @@ public:
     }
 
     ExecutorFactoryLegacyPtr getExecutorFactory() const {
-        return executorFactory;
+        return m_executor_factory;
     }
 
     template <typename T,
               typename std::enable_if<!std::is_pointer<T>::value && !std::is_reference<T>::value, int>::type = 0,
               typename std::enable_if<std::is_base_of<ExecutorFactoryLegacy, T>::value, int>::type = 0>
     std::shared_ptr<T> getExecutorFactoryAs() {
-        auto casted = std::dynamic_pointer_cast<T>(executorFactory);
+        auto casted = std::dynamic_pointer_cast<T>(m_executor_factory);
         if (!casted)
             OPENVINO_THROW("Cannot dynamically cast ExecutorFactory");
         return casted;
     }
 
     void setExecutorFactory(ExecutorFactoryLegacyPtr factory) {
-        executorFactory = std::move(factory);
+        m_executor_factory = std::move(factory);
     }
 
     bool hasZeroInputDims() const {
@@ -176,11 +175,8 @@ public:
 private:
     NodeConfig m_config;
     impl_desc_type m_implementation_type;
-    ExecutorFactoryLegacyPtr executorFactory;
+    ExecutorFactoryLegacyPtr m_executor_factory;
 };
-
-// template <typename SrcType>
-// class NodesFactory;
 
 class Node {
 public:
@@ -229,12 +225,6 @@ public:
         openvino::itt::handle_t createPrimitive;
         openvino::itt::handle_t initOptimalPrimitiveDescriptor;
     };
-
-    // template <typename SrcType>
-    // static NodesFactory<SrcType>& factory() {
-    //     static NodesFactory<SrcType> factory_instance;
-    //     return factory_instance;
-    // }
 
     virtual ~Node() = default;
 
@@ -391,15 +381,15 @@ public:
     }
 
     int getFusingPort() const {
-        return fusingPort;
+        return m_fusing_port;
     }
 
     void setFusingPort(int fusingPort) {
-        this->fusingPort = fusingPort;
+        this->m_fusing_port = fusingPort;
     }
 
     const std::string& getName() const {
-        return name;
+        return m_name;
     }
 
     void addOriginalLayer(const std::string& layerName);
@@ -655,16 +645,12 @@ public:
     }
 
     const Shape& getInputShapeAtPort(size_t port) const {
-        if (m_input_shapes.size() <= port) {
-            OPENVINO_THROW("Incorrect input port number for node ", getName());
-        }
+        CPU_NODE_ASSERT(m_input_shapes.size() > port, "was asked for an incorrect input port number.");
         return m_input_shapes[port];
     }
 
     const Shape& getOutputShapeAtPort(size_t port) const {
-        if (m_output_shapes.size() <= port) {
-            OPENVINO_THROW("Incorrect output port number for node ", getName());
-        }
+        CPU_NODE_ASSERT(m_output_shapes.size() > port, "was asked for an incorrect output port number.");
         return m_output_shapes[port];
     }
 
@@ -734,14 +720,11 @@ protected:
 
     std::vector<Shape> m_input_shapes;
     std::vector<Shape> m_output_shapes;
-    // REMOVE
-    std::vector<Shape> inputShapes;
-    std::vector<Shape> outputShapes;
 
     std::vector<NodePtr> fusedWith;
     std::vector<NodePtr> mergedWith;
 
-    int curNumaNode = -1;
+    int m_cur_numa_node = -1;
 
     void toNumaNode(int numaID);
     virtual void toNumaNodeImpl(int numaID);
@@ -781,7 +764,7 @@ protected:
     std::unordered_map<int, MemoryPtr> postOpsArgs;
     std::vector<dnnl::primitive_desc> descs;
 
-    const GraphContext::CPtr context;
+    const GraphContext::CPtr m_context;
 
     Algorithm algorithm = Algorithm::Default;
 
@@ -865,7 +848,7 @@ protected:
 
     MemoryPtr getScratchPadMem(const MemoryDescPtr& desc) {
         if (!scratchpadMem || !scratchpadMem->getDesc().isCompatible(*desc)) {
-            scratchpadMem = context->getScratchPad()->createScratchPadMem(desc);
+            scratchpadMem = m_context->getScratchPad()->createScratchPadMem(desc);
         }
         return scratchpadMem;
     }
@@ -901,11 +884,11 @@ private:
     std::vector<ov::element::Type> originalInputPrecisions;
     std::vector<ov::element::Type> originalOutputPrecisions;
 
-    int fusingPort;
+    int m_fusing_port;
 
     const dnnl::engine engine;
 
-    std::string name;
+    std::string m_name;
     std::string typeStr;
     Type type;
     int execIndex = -1;
@@ -933,23 +916,6 @@ template <class... T>
 constexpr uint64_t PortMask(T... rest) {
     return util::bit::mask(rest...);
 }
-
-// class Node::NodesFactory
-//     : public openvino::cc::Factory<Type, Node*(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr)> {
-// public:
-//     NodesFactory();
-
-//     Node* create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
-// };
-
-// template <typename SrcType>
-// class Node::NodesFactory
-//     : public openvino::cc::Factory<Type, Node*(SrcType src, const GraphContext::CPtr&)> {
-// public:
-//     NodesFactory();
-
-//     Node* create(SrcType ib, const GraphContext::CPtr& context);
-// };
 
 template <typename NodeType>
 struct NodeImpl : public NodeType {

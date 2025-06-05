@@ -202,6 +202,11 @@ FullyConnected::FullyConnected(const std::shared_ptr<ov::Node>& op, const GraphC
     }
 }
 
+FullyConnected::FullyConnected(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool FullyConnected::canBeExecutedInInt8() const {
     auto srcType = getOriginalInputPrecisionAtPort(0);
     auto weiType = getOriginalInputPrecisionAtPort(1);
@@ -516,9 +521,9 @@ void FullyConnected::initSupportedPrimitiveDescriptors() {
 
     attrs.sparseWeights = useSparseWeightsDecompression(getParentEdgeAt(WEIGHTS)->getParent(),
                                                         getOriginalInputPrecisionAtPort(DATA),
-                                                        context->getConfig().fcSparseWeiDecompressionRate);
-    attrs.dynamicQuantizationGroupSize = context->getConfig().fcDynamicQuantizationGroupSize;
-    attrs.modelType = context->getConfig().modelType;
+                                                        m_context->getConfig().fcSparseWeiDecompressionRate);
+    attrs.dynamicQuantizationGroupSize = m_context->getConfig().fcDynamicQuantizationGroupSize;
+    attrs.modelType = m_context->getConfig().modelType;
 
     attrs.postOps = getPostOps(fusedWith);
 
@@ -553,7 +558,7 @@ void FullyConnected::initSupportedPrimitiveDescriptors() {
         {ARG_DST, dstDescs[0]},
     };
 
-    auto executionContext = std::make_shared<ExecutorContext>(context, getImplPriority(), privateWeightCache);
+    auto executionContext = std::make_shared<ExecutorContext>(m_context, getImplPriority(), privateWeightCache);
     factory = std::make_shared<ExecutorFactory<FCAttrs>>(attrs, executionContext, descs);
     const std::vector<MemoryDescArgs> nodeDescriptorsList = factory->getProperMemoryDescriptors(descs);
     const MemoryDescArgs& nodeDescriptors = nodeDescriptorsList.front();
@@ -589,33 +594,33 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
         // wgt
         // split N direction
         tp_cfg.cached_splited_weight =
-            attrs.weightsNonTransposed ? split_vertical(context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size)
-                                       : split_horizontal(context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size);
+            attrs.weightsNonTransposed ? split_vertical(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size)
+                                       : split_horizontal(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size);
         memory[ARG_WEI] = tp_cfg.cached_splited_weight;
         // bias
         if (attrs.withBias) {
             auto bias = getSrcMemoryAtPort(BIAS);
-            auto select_bias = split_horizontal(context->getEngine(), bias, 0, tp_cfg.w_rank, tp_cfg.w_size);
+            auto select_bias = split_horizontal(m_context->getEngine(), bias, 0, tp_cfg.w_rank, tp_cfg.w_size);
             tp_cfg.cached_splited_bias = std::move(select_bias);
         } else {
-            tp_cfg.cached_splited_bias = MemoryDescUtils::makeEmptyMemory(context);
+            tp_cfg.cached_splited_bias = MemoryDescUtils::makeEmptyMemory(m_context);
         }
         memory[ARG_BIAS] = tp_cfg.cached_splited_bias;
         // dst
         memory[ARG_DST] = getDstMemoryAtPort(0);
-        tp_cfg.cached_dst = split_horizontal(context->getEngine(), dst, -1, tp_cfg.w_rank, tp_cfg.w_size, false);
+        tp_cfg.cached_dst = split_horizontal(m_context->getEngine(), dst, -1, tp_cfg.w_rank, tp_cfg.w_size, false);
 
         if (auto it = memory.find(ARG_DST | ARG_ATTR_SCALES); it != memory.end()) {
             memory[ARG_DST | ARG_ATTR_SCALES] =
-                split_horizontal(context->getEngine(), it->second, 0, tp_cfg.w_rank, tp_cfg.w_size);
+                split_horizontal(m_context->getEngine(), it->second, 0, tp_cfg.w_rank, tp_cfg.w_size);
         }
 
         if (auto it = memory.find(ARG_WEI | ARG_ATTR_SCALES); it != memory.end()) {
             auto scale_mem = std::const_pointer_cast<IMemory>(it->second);
             memory[ARG_WEI | ARG_ATTR_SCALES] =
                 attrs.weightsNonTransposed
-                    ? split_vertical(context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
-                    : split_horizontal(context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
+                    ? split_vertical(m_context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
+                    : split_horizontal(m_context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
         }
 
         if (auto it = memory.find(ARG_WEI | ARG_ATTR_ZERO_POINTS); it != memory.end()) {
@@ -626,8 +631,8 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
             } else {
                 tp_cfg.cached_zeropoint =
                     attrs.weightsNonTransposed
-                        ? split_vertical(context->getEngine(), zeropoint_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
-                        : split_horizontal(context->getEngine(), zeropoint_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
+                        ? split_vertical(m_context->getEngine(), zeropoint_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
+                        : split_horizontal(m_context->getEngine(), zeropoint_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
             }
         }
     }

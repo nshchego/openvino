@@ -89,6 +89,11 @@ DetectionOutput::DetectionOutput(const std::shared_ptr<ov::Node>& op, const Grap
                     : CodeType::CORNER);
 }
 
+DetectionOutput::DetectionOutput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void DetectionOutput::prepareParams() {
     const auto& idPriorDims = getParentEdgeAt(ID_PRIOR)->getMemory().getShape().getStaticDims();
     const auto& idConfDims = getParentEdgeAt(ID_CONF)->getMemory().getShape().getStaticDims();

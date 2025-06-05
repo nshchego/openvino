@@ -385,7 +385,7 @@ Input::Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
 void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& shape, const element::Type& prec, bool validate_blob) {
     const size_t el_number = shape.getElementsCount();
     if (prec == element::dynamic && el_number == 0lu) {
-        m_memory_ptr = MemoryDescUtils::makeEmptyMemory(context);
+        m_memory_ptr = MemoryDescUtils::makeEmptyMemory(m_context);
         return;
     }
 
@@ -396,7 +396,7 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
 
     if (validate_blob) {
         bool needFlushDenormalsToZero = true;
-        if (context->getConfig().DAZOn) {
+        if (m_context->getConfig().DAZOn) {
             // DAZ has been set, processor automatically converts all denormal source operands
             // to a zero with the sign of the original operand before performing any
             // computations on them, thus no need to flush them to zero manually
@@ -414,7 +414,7 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
                 }
                 // Only bf16 inferencePrecision cases need to be checked for saturation
                 const bool do_bf16_saturation_check =
-                    (context->getConfig().inferencePrecision == element::bf16) ? true : false;
+                    (m_context->getConfig().inferencePrecision == element::bf16) ? true : false;
 
     #if defined(OPENVINO_ARCH_X86_64)
                 auto fn = jit_has_subnormals_function();
@@ -535,7 +535,7 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
         return getName() + "_" + std::to_string(byte_size) + "_" + ptr;
     };
 
-    const auto weight_cache = context->getWeightsCache();
+    const auto weight_cache = m_context->getWeightsCache();
     const bool clone_is_not_needed =
         prec != element::string &&
         // IRs already have all subnormals flushed to zero, but in
@@ -545,7 +545,7 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
         // This is possible only in multistream case on multisocket machine.
         // TODO: don't clone blob for multisocket + multistream case if current stream is run on the numa node where
         // original weights are stored.
-        (!weight_cache || context->getNumNumaNodes() == 1 || context->getCPUStreamExecutor()->get_streams_num() == 1);
+        (!weight_cache || m_context->getNumNumaNodes() == 1 || m_context->getCPUStreamExecutor()->get_streams_num() == 1);
 
     m_memory_ptr = clone_is_not_needed ? std::make_shared<Memory>(getEngine(), mem_desc, src_ptr)
                                        : std::const_pointer_cast<const IMemory>(

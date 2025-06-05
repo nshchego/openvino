@@ -21,6 +21,8 @@ class If : public Node {
 public:
     If(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    If(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void initSupportedPrimitiveDescriptors() override;
     void getSupportedDescriptors() override {}

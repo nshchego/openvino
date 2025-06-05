@@ -984,7 +984,7 @@ void NormalizeL2::prepareParams() {
         return NormalizeL2Executor::getNormalizeL2Executor(key.attrs, key.kernel_attrs, key.dims);
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
 
     if (!result.first) {

@@ -2242,7 +2242,7 @@ void Interpolate::initSupportedPrimitiveDescriptors() {
                 interpAttrs,
                 srcMemoryDescs,
                 dstMemoryDescs,
-                std::make_shared<ExecutorContext>(context, getImplPriority()));
+                std::make_shared<ExecutorContext>(m_context, getImplPriority()));
             if (!factory->isEmpty()) {
                 supportedPrimitiveDescriptors.emplace_back(config, implDetail, factory);
             }
@@ -2517,7 +2517,7 @@ void Interpolate::prepareParams() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     execPtr = result.first;
 

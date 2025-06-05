@@ -56,6 +56,11 @@ GatherElements::GatherElements(const std::shared_ptr<ov::Node>& op, const GraphC
     axis_ = axis;
 }
 
+GatherElements::GatherElements(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GatherElements::prepareParams() {
     const auto& dataDims = getParentEdgeAt(dataIndex_)->getMemory().getStaticDims();
     const auto& dstDims = getChildEdgeAt(0)->getMemory().getStaticDims();

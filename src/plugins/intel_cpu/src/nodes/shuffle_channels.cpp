@@ -104,8 +104,8 @@ void ShuffleChannels::initSupportedPrimitiveDescriptors() {
     }
 
     // use ncsp as default for non-quantized networks and nspc for quantized
-    auto firstCreatorType = context->isGraphQuantized() ? LayoutType::nspc : LayoutType::ncsp;
-    auto secondCreatorType = context->isGraphQuantized() ? LayoutType::ncsp : LayoutType::nspc;
+    auto firstCreatorType = m_context->isGraphQuantized() ? LayoutType::nspc : LayoutType::ncsp;
+    auto secondCreatorType = m_context->isGraphQuantized() ? LayoutType::ncsp : LayoutType::nspc;
 
     addSupportedPrimDesc({{firstCreatorType, precision}}, {{firstCreatorType, precision}}, impl_type);
     addSupportedPrimDesc({{secondCreatorType, precision}}, {{secondCreatorType, precision}}, impl_type);
@@ -153,7 +153,7 @@ void ShuffleChannels::prepareParams() {
     attrs.srcDims = srcMemPtr->getStaticDims();
     attrs.srcBlockedDims = srcMemPtr->getDescWithType<BlockedMemoryDesc>()->getBlockDims();
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(attrs, builder);
     if (!result.first) {
         THROW_CPU_NODE_ERR("executor was not found for node.");

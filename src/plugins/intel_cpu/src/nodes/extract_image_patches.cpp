@@ -403,6 +403,11 @@ ExtractImagePatches::ExtractImagePatches(const std::shared_ptr<ov::Node>& op, co
     }
 }
 
+ExtractImagePatches::ExtractImagePatches(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExtractImagePatches::prepareParams() {
     const auto& srcMemPtr0 = getSrcMemoryAtPort(0);
     const auto& dstMemPtr = getDstMemoryAtPort(0);
@@ -439,7 +444,7 @@ void ExtractImagePatches::prepareParams() {
                                                                 key.padType,
                                                                 key.prcSize);
     };
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     execPtr = result.first;
 }

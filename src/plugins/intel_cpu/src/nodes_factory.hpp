@@ -78,7 +78,6 @@
 #include "nodes/range.h"
 #include "nodes/rdft.h"
 #include "nodes/reduce.h"
-#include "nodes/reference.h"
 #include "nodes/region_yolo.h"
 #include "nodes/reorder.h"
 #include "nodes/reorg_yolo.h"
@@ -171,7 +170,7 @@ public:
         // INTEL_CPU_NODE(ExperimentalDetectronROIFeatureExtractor, Type::ExperimentalDetectronROIFeatureExtractor);
         // INTEL_CPU_NODE(Math, Type::Math);
         // INTEL_CPU_NODE(MultiClassNms, Type::MulticlassNms);
-        // INTEL_CPU_NODE(Convert, Type::Convert);
+        INTEL_CPU_NODE(Convert, Type::Convert);
         // INTEL_CPU_NODE(Col2Im, Type::Col2Im);
         // INTEL_CPU_NODE(ColorConvert, Type::ColorConvert);
         // INTEL_CPU_NODE(EmbeddingBagOffset, Type::EmbeddingBagOffsetsSum);

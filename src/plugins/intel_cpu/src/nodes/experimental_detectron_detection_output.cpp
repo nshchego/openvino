@@ -263,6 +263,11 @@ ExperimentalDetectronDetectionOutput::ExperimentalDetectronDetectionOutput(const
     deltas_weights_ = attributes.deltas_weights;
 }
 
+ExperimentalDetectronDetectionOutput::ExperimentalDetectronDetectionOutput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronDetectionOutput::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

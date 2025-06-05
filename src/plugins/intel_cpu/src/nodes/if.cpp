@@ -80,13 +80,18 @@ If::If(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     }
 }
 
+If::If(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void If::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
     }
 
-    m_thenGraph.Init(m_op->get_then_body(), context);
-    m_elseGraph.Init(m_op->get_else_body(), context);
+    m_thenGraph.Init(m_op->get_then_body(), m_context);
+    m_elseGraph.Init(m_op->get_else_body(), m_context);
 
     NodeConfig config;
     config.inConfs.reserve(getParentEdges().size());

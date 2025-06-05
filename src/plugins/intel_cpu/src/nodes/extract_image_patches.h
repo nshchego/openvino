@@ -45,6 +45,8 @@ class ExtractImagePatches : public Node {
 public:
     ExtractImagePatches(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    ExtractImagePatches(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override{};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
@@ -96,6 +98,9 @@ private:
                                        const VectorDims& rates,
                                        const ExtImgPatcherPadType& padType,
                                        const size_t prcSize);
+
+        ExtractImagePatchesJitExecutor(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
         void exec(void* src, void* dst, const VectorDims& istrides, const VectorDims& ostrides) override;
         void executeOptimizedGeneric(void* src,
                                      void* dst,
@@ -114,6 +119,9 @@ private:
                                        const VectorDims& rates,
                                        const ExtImgPatcherPadType& padType,
                                        const size_t prcSize);
+
+        ExtractImagePatchesRefExecutor(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
         void exec(void* src, void* dst, const VectorDims& istrides, const VectorDims& ostrides) override;
         void executeReference(void* src, void* dst, const VectorDims& istrides, const VectorDims& ostrides) const;
 

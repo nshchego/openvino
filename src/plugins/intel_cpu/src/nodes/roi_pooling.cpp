@@ -550,7 +550,7 @@ void ROIPooling::prepareParams() {
     auto builder = [](const RoiPoolingKey& key) {
         return ROIPoolingExecutor::createROIPoolingNewExecutor(key.refParams);
     };
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
     execPtr = result.first;
 }

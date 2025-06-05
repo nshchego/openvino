@@ -320,6 +320,11 @@ ExperimentalDetectronGenerateProposalsSingleImage::ExperimentalDetectronGenerate
     roi_indices_.resize(post_nms_topn_);
 }
 
+ExperimentalDetectronGenerateProposalsSingleImage::ExperimentalDetectronGenerateProposalsSingleImage(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronGenerateProposalsSingleImage::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

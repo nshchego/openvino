@@ -60,6 +60,12 @@ EmbeddingBagOffset::EmbeddingBagOffset(const std::shared_ptr<ov::Node>& op, cons
     }
 }
 
+EmbeddingBagOffset::EmbeddingBagOffset(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context),
+      EmbeddingBag(in_buf, context) {
+    load(in_buf);
+}
+
 void EmbeddingBagOffset::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

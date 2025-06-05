@@ -46,6 +46,11 @@ ExperimentalDetectronPriorGridGenerator::ExperimentalDetectronPriorGridGenerator
     stride_w_ = attr.stride_x;
 }
 
+ExperimentalDetectronPriorGridGenerator::ExperimentalDetectronPriorGridGenerator(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ExperimentalDetectronPriorGridGenerator::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

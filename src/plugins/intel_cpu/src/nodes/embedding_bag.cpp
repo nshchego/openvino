@@ -37,6 +37,13 @@ EmbeddingBag::EmbeddingBag(const std::shared_ptr<ov::Node>& op,
     }
 }
 
+EmbeddingBag::EmbeddingBag(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : INDICES_IDX(0),
+      PER_SAMPLE_WEIGHTS_IDX(0),
+      DEFAULT_INDEX_IDX(0) {
+    // load(in_buf);
+}
+
 void EmbeddingBag::prepareParams(const VectorDims& indexStaticShape) {
     _embDepth = 1lu;
     for (size_t i = 1lu; i < indexStaticShape.size(); i++) {

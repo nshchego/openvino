@@ -50,9 +50,10 @@ BatchToSpace::BatchToSpace(const std::shared_ptr<ov::Node>& op, const GraphConte
     }
 }
 
-//BatchToSpace::BatchToSpace(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
-//    : Node(ib, context, NgraphShapeInferFactory(op)) {
-//}
+BatchToSpace::BatchToSpace(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
 
 void BatchToSpace::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
@@ -269,6 +270,13 @@ void BatchToSpace::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool BatchToSpace::created() const {
     return getType() == Type::BatchToSpace;
+}
+
+void BatchToSpace::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void BatchToSpace::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node

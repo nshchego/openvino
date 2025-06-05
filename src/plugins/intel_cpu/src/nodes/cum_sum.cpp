@@ -67,6 +67,11 @@ CumSum::CumSum(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     }
 }
 
+CumSum::CumSum(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void CumSum::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

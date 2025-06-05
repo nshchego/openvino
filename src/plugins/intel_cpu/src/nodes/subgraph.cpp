@@ -288,9 +288,9 @@ void Subgraph::initSupportedPrimitiveDescriptors() {
             const auto originalInputPrecision = getOriginalInputPrecisionAtPort(i);
             const auto precision =
                 ((originalInputPrecision == ov::element::f32) &&
-                 one_of(context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
+                 one_of(m_context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
                  subgraph_attrs->snippet->has_domain_sensitive_ops())
-                    ? context->getConfig().inferencePrecision
+                    ? m_context->getConfig().inferencePrecision
                     : originalInputPrecision;
             if (supportedPrecisions.count(precision) == 0) {
                 THROW_CPU_NODE_ERR("doesn't support ", precision, " precision.");
@@ -504,7 +504,7 @@ Subgraph::DataFlowPasses Subgraph::getDataFlowPasses() {
                                            ov::snippets::pass::AnalyzeBroadcastableInputs,
                                            broadcastable_inputs);
 
-    if (one_of(context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
+    if (one_of(m_context->getConfig().inferencePrecision, ov::element::bf16, ov::element::f16) &&
         subgraph_attrs->snippet->has_domain_sensitive_ops()) {
         // enforce BF16 precisions to supported operations
         // MatMul has to be decomposed to Brgemm operations before enforcement
@@ -514,7 +514,7 @@ Subgraph::DataFlowPasses Subgraph::getDataFlowPasses() {
                                                ov::snippets::pass::MatMulToBrgemm,
                                                pass::EnforcePrecision,
                                                element::f32,
-                                               context->getConfig().inferencePrecision);
+                                               m_context->getConfig().inferencePrecision);
     }
 
 #if defined(OPENVINO_ARCH_X86_64)
@@ -611,7 +611,7 @@ Subgraph::ControlFlowPasses Subgraph::getControlFlowPasses() {
                                            ov::intel_cpu::pass::InsertBrgemmCopyBuffers);
     SNIPPETS_REGISTER_PASS_ABSOLUTE_X86_64(Place::PipelineEnd,
                                            ov::intel_cpu::pass::InitRepackedConstantInputs,
-                                           context->getParamsCache(),
+                                           m_context->getParamsCache(),
                                            repacked_constant_input_config);
 
 #ifdef SNIPPETS_LIBXSMM_TPP
@@ -713,7 +713,7 @@ void Subgraph::prepareWeights() {
     }
 
 #if defined(OPENVINO_ARCH_X86_64)
-    srcMemPtrs = SubgraphExecutor::prepare_weights(srcMemPtrs, repacked_constant_input_config, context);
+    srcMemPtrs = SubgraphExecutor::prepare_weights(srcMemPtrs, repacked_constant_input_config, m_context);
 #else
     OPENVINO_THROW("Weight repacking is unimplemented on this platform");
 #endif
@@ -721,7 +721,7 @@ void Subgraph::prepareWeights() {
 
 void Subgraph::prepareParams() {
 #if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
-    const auto& cache = context->getParamsCache();
+    const auto& cache = m_context->getParamsCache();
 
     auto builder = [this, &cache](const SubgraphKey& key) -> std::shared_ptr<SubgraphBaseExecutor> {
         const auto& snippet = subgraph_attrs->snippet;
@@ -793,7 +793,7 @@ IShapeInfer::Result Subgraph::shapeInfer() const {
         return std::make_shared<SubgraphShapeInferResult>(Node::shapeInfer());
     };
 
-    const auto cache = context->getParamsCache();
+    const auto cache = m_context->getParamsCache();
     const auto result = cache->getOrCreate(SubgraphShapeInferResultKey(in_shapes, subgraph_attrs->bodyHash), builder);
     return result.first->result;
 }

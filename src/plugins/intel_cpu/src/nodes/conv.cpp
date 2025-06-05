@@ -321,7 +321,7 @@ void Convolution::selectOptimalPrimitiveDescriptor() {
      * - more total memory usage when fallback is not needed (by size of a graph data structure itself)
      */
     if (withSum && isDynamicNode()) {
-        subgraph = std::make_shared<FusedSubgraph>(fusedWith, *this, context);
+        subgraph = std::make_shared<FusedSubgraph>(fusedWith, *this, m_context);
     }
 }
 
@@ -379,7 +379,7 @@ std::tuple<VecMemoryDescs, MemoryDescPtr> Convolution::initMemoryDescriptors(ov:
 }
 
 ExecutorFactoryPtr<ConvAttrs> Convolution::createExecutorFactory(const MemoryDescArgs& descs, const ConvAttrs& attrs) {
-    auto executionContext = std::make_shared<ExecutorContext>(context, getImplPriority(), privateWeightCache);
+    auto executionContext = std::make_shared<ExecutorContext>(m_context, getImplPriority(), privateWeightCache);
     return std::make_shared<ExecutorFactory<ConvAttrs>>(attrs, executionContext, descs, memoryFormatFilter);
 }
 
@@ -443,7 +443,7 @@ void Convolution::initSupportedPrimitiveDescriptors() {
         m_atoi[ARG_BIAS] = BIAS;
     }
 
-    m_attrs.isGraphQuantized = context->isGraphQuantized();
+    m_attrs.isGraphQuantized = m_context->isGraphQuantized();
     m_attrs.fcSemantic = false;
     m_attrs.nonConstantWeights = !getParentEdgeAt(WEIGHTS)->getParent()->isConstant();
     m_attrs.weightsNonTransposed = false;
@@ -572,7 +572,7 @@ void Convolution::createPrimitive() {
     }
 
     if (!m_attrs.withBias) {
-        m_memory[ARG_BIAS] = MemoryDescUtils::makeEmptyMemory(context);
+        m_memory[ARG_BIAS] = MemoryDescUtils::makeEmptyMemory(m_context);
     }
 
     if (withDWConv) {
@@ -897,6 +897,18 @@ void Convolution::load(BinaryInputBuffer& ib) {
     // ib >> fusedConstNodes;
 
     ib >> useJitPlanar;
+
+    const auto [dst_type, sum_type] = getDstAndSumPrecision();
+    m_attrs.postOps = getPostOps(fusedWith, sum_type);
+    auto [src_descs, dst_desc] = initMemoryDescriptors(dst_type);
+    MemoryDescArgs descs{
+        {ARG_SRC, src_descs[DATA]},
+        {ARG_WEI, src_descs[WEIGHTS]},
+        {ARG_BIAS, m_attrs.withBias ? src_descs[BIAS] : MemoryDescUtils::makeEmptyDesc()},
+        {ARG_DST, dst_desc}
+    };
+
+    m_factory = createExecutorFactory(descs, m_attrs);
 }
 
 }  // namespace ov::intel_cpu::node

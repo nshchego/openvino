@@ -41,6 +41,11 @@ CTCLoss::CTCLoss(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     unique = ctcLossOp->get_unique();
 }
 
+CTCLoss::CTCLoss(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void CTCLoss::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

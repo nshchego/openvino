@@ -14,7 +14,7 @@ class BatchToSpace : public Node {
 public:
     BatchToSpace(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    //BatchToSpace(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    BatchToSpace(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override{};
     void initSupportedPrimitiveDescriptors() override;
@@ -41,6 +41,10 @@ public:
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     template <typename T>

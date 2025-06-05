@@ -70,6 +70,11 @@ Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     this->axis = axis;
 }
 
+Concat::Concat(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Concat::getSupportedDescriptors() {
     const auto& firstParentDims = getInputShapeAtPort(0).getDims();
     for (size_t i = 1; i < getParentEdges().size(); i++) {
@@ -280,7 +285,7 @@ void Concat::selectOptimalPrimitiveDescriptor() {
             maxCount = it.second;
             convertTo = it.first;
         } else if (it.second == maxCount) {
-            if ((context->isGraphQuantized() && it.first == LayoutType::nspc) || it.first == LayoutType::nCsp8c ||
+            if ((m_context->isGraphQuantized() && it.first == LayoutType::nspc) || it.first == LayoutType::nCsp8c ||
                 it.first == LayoutType::nCsp16c) {
                 convertTo = it.first;
             }

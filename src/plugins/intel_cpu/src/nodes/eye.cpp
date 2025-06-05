@@ -40,6 +40,11 @@ Eye::Eye(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     }
 }
 
+Eye::Eye(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Eye::getSupportedDescriptors() {
     if (!one_of(getParentEdges().size(), 3u, 4u)) {
         THROW_CPU_NODE_ERR("has incorrect number of input edges: ", getParentEdges().size());

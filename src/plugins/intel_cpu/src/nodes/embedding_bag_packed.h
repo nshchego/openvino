@@ -15,6 +15,8 @@ class EmbeddingBagPacked : public Node, public EmbeddingBag {
 public:
     EmbeddingBagPacked(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    EmbeddingBagPacked(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override{};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;

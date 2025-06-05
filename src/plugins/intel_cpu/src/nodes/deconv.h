@@ -16,6 +16,8 @@ class Deconvolution : public Node {
 public:
     Deconvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Deconvolution(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void createDescriptor(const std::vector<MemoryDescPtr>& inputDesc,

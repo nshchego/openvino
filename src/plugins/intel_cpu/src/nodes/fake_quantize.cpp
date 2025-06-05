@@ -1405,6 +1405,11 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
     }
 }
 
+FakeQuantize::FakeQuantize(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 std::vector<LayoutType> FakeQuantize::getDataFormats() const {
     // Special case for first FQ in the network
     const auto& dims = getInputShapeAtPort(0).getDims();
@@ -1662,7 +1667,7 @@ void FakeQuantize::createPrimitive() {
             key.jqp.broadcasted = broadcasted;
         }
 
-        auto cache = context->getParamsCache();
+        auto cache = m_context->getParamsCache();
         auto buildExecutor = [](const FakeQuantKey& key) {
             return std::make_shared<FakeQuantizeJitExecutor>(key.jqp);
         };

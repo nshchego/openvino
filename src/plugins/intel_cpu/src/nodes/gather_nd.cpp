@@ -58,6 +58,11 @@ GatherND::GatherND(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr
     }
 }
 
+GatherND::GatherND(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GatherND::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;

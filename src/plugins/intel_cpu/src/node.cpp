@@ -48,15 +48,14 @@ using namespace ov::intel_cpu::node;
 namespace ov::intel_cpu {
 
 Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const ShapeInferFactory& shapeInferFactory)
-    : context(std::move(ctx)),
-
-      fusingPort(-1),
-      engine(context->getEngine()),
-      name(op->get_friendly_name()),
+    : m_context(std::move(ctx)),
+      m_fusing_port(-1),
+      engine(m_context->getEngine()),
+      m_name(op->get_friendly_name()),
       typeStr(op->get_type_name()),
       type(TypeFromName(op->get_type_name())),
       profiling(op->get_friendly_name()) {
-printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
+printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
     for (size_t i = 0; i < op->get_input_size(); i++) {
         const auto& shape = op->get_input_partial_shape(i);
         if (shape.rank().is_dynamic()) {
@@ -74,9 +73,7 @@ printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr
     parentEdges.reserve(m_input_shapes.size());
 
     if (typeStr != "Result" && typeStr != "Assign") {
-        if (op->get_output_size() == 0) {
-            OPENVINO_THROW("Node with type '", typeStr, "' and name '", name, "' does not have any outputs.");
-        }
+        CPU_NODE_ASSERT(op->get_output_size(), "does not have any outputs.");
         for (size_t i = 0; i < op->get_output_size(); i++) {
             const auto& shape = op->get_output_partial_shape(i);
             if (shape.rank().is_dynamic()) {
@@ -112,7 +109,7 @@ printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr
     parallelDomain = getRTInfoValue(rtInfo, "parallelDomain");
 
     if (originalLayers.empty()) {
-        addOriginalLayer(name);
+        addOriginalLayer(m_name);
     }
 
     primitivesPriority = getImplPriorityValue(op);
@@ -177,34 +174,34 @@ Node::Node(const std::string& type,
     : m_input_shapes(std::move(inShapes)),
       m_output_shapes(std::move(outShapes)),
 
-      context(ctx),
+      m_context(ctx),
       originalInputPrecisions(std::move(inputPrecisions)),
       originalOutputPrecisions(std::move(outputPrecisions)),
-      fusingPort(-1),
+      m_fusing_port(-1),
       engine(ctx->getEngine()),
-      name(name),
+      m_name(name),
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
-printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), typeStr.data(), name.data());
+printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), typeStr.data(), m_name.data());
     parentEdges.reserve(m_input_shapes.size());
     childEdges.reserve(m_output_shapes.size());
 }
 
 Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
-    : context(ctx),
-      engine(context->getEngine()),
+    : m_context(ctx),
+      engine(m_context->getEngine()),
       profiling("tmp") {
     load(ib);
-printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
+printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
 }
 
 Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx)
-    : context(ctx),
-      engine(context->getEngine()),
+    : m_context(ctx),
+      engine(m_context->getEngine()),
       profiling("tmp") {
     load(ib);
-printf("--CPU-- Node_4 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), name.data());
+printf("--CPU-- Node_4 Created '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
 }
 
 void Node::addEdge(const EdgePtr& edge) {
@@ -242,6 +239,9 @@ bool Node::isEdgesEmpty(const std::vector<EdgeWeakPtr>& edges) const {
 }
 
 void Node::createPrimitive() {
+if (m_name == "Subtract_3166") {
+    printf("TODO: Remove\n");
+}
     if (inputShapesDefined() && isExecutable()) {
         if (needPrepareParams()) {
             prepareParams();
@@ -689,14 +689,11 @@ std::string Node::getPrimitiveDescriptorType() const {
 }
 
 EdgePtr Node::getParentEdgeAt(size_t idx) const {
-    if (idx >= parentEdges.size()) {
-        OPENVINO_THROW("Node ", getName(), " contains less parent edges than ", idx);
-    }
-    auto parentEdgePtr = parentEdges[idx].lock();
-    if (!parentEdgePtr) {
-        OPENVINO_THROW("Node ", getName(), " contains empty parent edge for index ", idx);
-    }
-    return parentEdgePtr;
+    CPU_NODE_ASSERT(idx < parentEdges.size(), "contains less parent edges than ", idx);
+    auto parent_edge_ptr = parentEdges[idx].lock();
+    CPU_NODE_ASSERT(parent_edge_ptr, "contains empty parent edge for index ", idx);
+
+    return parent_edge_ptr;
 }
 
 EdgePtr Node::getChildEdgeAt(size_t idx) const {
@@ -1123,14 +1120,14 @@ void Node::prepareMemory(const DnnlMemoryDescPtr& intDesc, size_t indx) {
         Memory memory{engine, newDesc, internalBlob->getData()};
 
         MemoryPtr _ptr = std::make_shared<Memory>(engine, intDesc);
-        node::Reorder::reorderData(memory, *_ptr, context->getParamsCache());
+        node::Reorder::reorderData(memory, *_ptr, m_context->getParamsCache());
         return _ptr;
     };
 
     MemoryPtr ptr;
-    auto weightCache = context->getWeightsCache();
+    auto weightCache = m_context->getWeightsCache();
     if (weightCache != nullptr && memory::format_kind::blocked == intDesc->getDnnlDesc().get_format_kind()) {
-        const auto string_hash = name + "_" + std::to_string(indx) + "_" +
+        const auto string_hash = m_name + "_" + std::to_string(indx) + "_" +
                                  DnnlExtensionUtils::computeWeightsStringHash(internalBlob, intDesc);
         ptr = *weightCache->findOrCreate(string_hash, create);
     } else {
@@ -1183,7 +1180,7 @@ MemoryPtr Node::prepareWeightMemory(DnnlMemoryDescPtr dstWeightDesc, DnnlMemoryD
     auto create = [&]() {
         Memory srcMemory{getEngine(), srcWeightDesc, edgeMem->getData()};
         MemoryPtr _ptr = std::make_shared<Memory>(getEngine(), dstWeightDesc);
-        node::Reorder::reorderData(srcMemory, *_ptr, context->getParamsCache());
+        node::Reorder::reorderData(srcMemory, *_ptr, m_context->getParamsCache());
 
         return _ptr;
     };
@@ -1198,7 +1195,7 @@ MemoryPtr Node::prepareWeightMemory(DnnlMemoryDescPtr dstWeightDesc, DnnlMemoryD
         return itr->second;
     }
 
-    auto weightCache = context->getWeightsCache();
+    auto weightCache = m_context->getWeightsCache();
     if (weightCache != nullptr) {
         const auto string_hash = DnnlExtensionUtils::computeWeightsStringHash(edgeMem, dstWeightDesc);
         ptr = *weightCache->findOrCreate(string_hash, create);
@@ -1220,13 +1217,13 @@ void Node::toNumaNode(int numaNodeID) {
 }
 
 void Node::toNumaNodeImpl(int numaNodeID) {
-    if (curNumaNode == numaNodeID) {
+    if (m_cur_numa_node == numaNodeID) {
         return;
     }
 
     // create scratch pad from specified numa node
     if (scratchpadMem) {
-        scratchpadMem = context->getScratchPad()->createScratchPadMem(scratchpadMem->getDescPtr());
+        scratchpadMem = m_context->getScratchPad()->createScratchPadMem(scratchpadMem->getDescPtr());
         primArgs[DNNL_ARG_SCRATCHPAD] = scratchpadMem->getPrimitive();
     }
 
@@ -1238,7 +1235,7 @@ void Node::toNumaNodeImpl(int numaNodeID) {
         mbind_move(it->second, numaNodeID);
     }
 
-    curNumaNode = numaNodeID;
+    m_cur_numa_node = numaNodeID;
 }
 
 bool Node::isInPlace() const {
@@ -1455,9 +1452,7 @@ void Node::initOptimalPrimitiveDescriptor() {
     }
 
     auto selected_pd = getSelectedPrimitiveDescriptor();
-    if (selected_pd == nullptr) {
-        OPENVINO_THROW("Preferable primitive descriptor is not set for ", getName());
-    }
+    CPU_NODE_ASSERT(selected_pd, "doesn't have preferable primitive descriptor.");
 
     auto config = selected_pd->getConfig();
     for (size_t i = 0; i < config.inConfs.size(); i++) {
@@ -1813,6 +1808,9 @@ bool Node::needPrepareParams() const {
 }
 
 bool Node::inputShapesModified() const {
+if (getType() == Type::Convert) {
+    printf("--CPU-- inputShapesModified\n");
+}
     if (lastInputDims.size() != getParentEdges().size()) {
         if (lastInputDims.empty()) {
             return true;
@@ -2255,9 +2253,10 @@ void Node::resolveInPlaceDirection() {
 }
 
 void Node::save(BinaryOutputBuffer& ob) const {
+printf("--CPU-- Node::save %s:%d:%s\n", getTypeStr().data(), int(getType()), getName().data());
     ob << ob.get_pos();  // Read/Write sync position
 
-    ob << name;
+    ob << m_name;
     ob << type;
     ob << typeStr;
     ob << isDynamic;
@@ -2268,19 +2267,20 @@ void Node::save(BinaryOutputBuffer& ob) const {
     ob << m_input_shapes;
     ob << m_output_shapes;
 
-    ob << fusingPort;
+    ob << m_fusing_port;
 
-    ob << curNumaNode;
+    ob << m_cur_numa_node;
     ob << ob.get_pos();  // TODO: remove
 
+if (type == Type::Transpose && m_name == "Subtract_2565_original") {
+    printf("TODO: Remove\n");
+}
     ob << supportedPrimitiveDescriptors;
     ob << ob.get_pos();  // TODO: remove
     ob << selectedPrimitiveDescriptorIndex;
     ob << ob.get_pos();  // TODO: remove
     ob << primitivesPriority;
-    // ob << customImplPriorities;
-    // ob << inputMemoryFormatsFilter;
-    // ob << outputMemoryFormatsFilter;
+    ob << customImplPriorities;
     ob << ob.get_pos();  // TODO: remove
 
     ob << originalLayers;
@@ -2294,7 +2294,7 @@ void Node::save(BinaryOutputBuffer& ob) const {
     // ob << postOpsArgs;
     // ob << descs;
 
-    ob << lastInputDims;
+    // ob << lastInputDims;  // Skip to call prepareParams()
 
     // ob << shapeInference;
 
@@ -2302,8 +2302,6 @@ void Node::save(BinaryOutputBuffer& ob) const {
     ob << originalOutputPrecisions;
     ob << keepOriginalPrecision;
     ob << enforceBF16evenForGraphTail;
-
-    // // ob << engine;
 
     ob << execIndex;
 
@@ -2314,6 +2312,12 @@ void Node::save(BinaryOutputBuffer& ob) const {
 
     ob << DQScales;
     
+    ob << fusedWith.size();
+    for (const auto& n : fusedWith) {
+        ob << n->getType();
+        ob << *n;
+    }
+    
     ob << ob.get_pos();
 }
 
@@ -2322,7 +2326,7 @@ printf("--CPU-- Node::load\n");
 
     validate_stream_offset(ib);
 
-    ib >> name;
+    ib >> m_name;
     ib >> type;
     ib >> typeStr;
     ib >> isDynamic;
@@ -2333,19 +2337,20 @@ printf("--CPU-- Node::load\n");
     ib >> m_input_shapes;
     ib >> m_output_shapes;
 
-    ib >> fusingPort;
+    ib >> m_fusing_port;
 
-    ib >> curNumaNode;
+    ib >> m_cur_numa_node;
     validate_stream_offset(ib);  // TODO: Remove
 
     ib >> supportedPrimitiveDescriptors;
+if (type == Type::Transpose && m_name == "Subtract_2565_original") {
+    printf("TODO: Remove\n");
+}
     validate_stream_offset(ib);  // TODO: Remove
     ib >> selectedPrimitiveDescriptorIndex;
     validate_stream_offset(ib);  // TODO: Remove
     ib >> primitivesPriority;
-    // ib >> customImplPriorities;
-    // ib >> inputMemoryFormatsFilter;
-    // ib >> outputMemoryFormatsFilter;
+    ib >> customImplPriorities;
     validate_stream_offset(ib);  // TODO: Remove
 
     ib >> originalLayers;
@@ -2359,7 +2364,7 @@ printf("--CPU-- Node::load\n");
     // ib >> postOpsArgs;
     // ib >> descs;
 
-    ib >> lastInputDims;
+    // ib >> lastInputDims; // Skip to call prepareParams()
 
     // ib >> shapeInference;
 
@@ -2367,8 +2372,6 @@ printf("--CPU-- Node::load\n");
     ib >> originalOutputPrecisions;
     ib >> keepOriginalPrecision;
     ib >> enforceBF16evenForGraphTail;
-
-    // // ib >> engine;
 
     ib >> execIndex;
 
@@ -2379,21 +2382,26 @@ printf("--CPU-- Node::load\n");
 
     ib >> DQScales;
 
+    size_t nodes_num;
+    ib >> nodes_num;
+    fusedWith.reserve(nodes_num);
+    for (size_t i = 0lu; i < nodes_num; i++) {
+        fusedWith.emplace_back(NodePtr(NodesFactory<BinaryInputBuffer&>::factory().create(ib, m_context)));
+    }
+
     validate_stream_offset(ib);
 }
 
 void NodeDesc::save(BinaryOutputBuffer& ob) const {
     ob << m_config;
     ob << ob.get_pos();  // TODO: remove
-    // ob << m_implementation_type;
-    // ob << ob.get_pos();  // TODO: remove
+    ob << m_implementation_type;
 }
 
 void NodeDesc::load(BinaryInputBuffer& ib) {
     ib >> m_config;
     validate_stream_offset(ib);  // TODO: Remove
-    // ib >> m_implementation_type;
-    // validate_stream_offset(ib);  // TODO: Remove
+    ib >> m_implementation_type;
 }
 
 #ifndef CPU_DEBUG_CAPS

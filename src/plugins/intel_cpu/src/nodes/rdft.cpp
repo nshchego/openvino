@@ -1106,7 +1106,7 @@ void RDFT::createPrimitive() {
         return executor;
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, buildExecutor);
     executor = result.first;
 

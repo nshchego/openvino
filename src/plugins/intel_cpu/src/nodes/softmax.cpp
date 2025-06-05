@@ -212,7 +212,7 @@ void SoftMax::prepareParams() {
         return std::make_shared<DnnlExecutorLegacy>(prim_desc);
     };
 
-    auto cache = context->getParamsCache();
+    auto cache = m_context->getParamsCache();
     auto result = cache->getOrCreate(key, builder);
 
     execPtr = result.first;

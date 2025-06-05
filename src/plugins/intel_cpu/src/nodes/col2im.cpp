@@ -21,6 +21,11 @@ Col2Im::Col2Im(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
     padsEnd = col2Im->get_pads_end();
 }
 
+Col2Im::Col2Im(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool Col2Im::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!ov::is_type<ov::op::v15::Col2Im>(op)) {
@@ -88,6 +93,7 @@ struct Col2Im::Col2ImExecute {
         ctx.node.executeImpl<TData, TIndex>();
     }
 };
+
 void Col2Im::execute([[maybe_unused]] const dnnl::stream& strm) {
     auto dataPrecision = getParentEdgeAt(0)->getMemory().getDesc().getPrecision();
     auto indexPrecision = getParentEdgeAt(1)->getMemory().getDesc().getPrecision();
@@ -105,4 +111,12 @@ void Col2Im::execute([[maybe_unused]] const dnnl::stream& strm) {
               OV_CASE2(ov::element::i8, ov::element::i32, int8_t, int32_t),
               OV_CASE2(ov::element::u8, ov::element::i32, uint8_t, int32_t))
 }
+
+void Col2Im::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+}
+
+void Col2Im::load(BinaryInputBuffer& ib) {
+}
+
 }  // namespace ov::intel_cpu::node

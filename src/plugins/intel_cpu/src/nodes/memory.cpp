@@ -156,7 +156,7 @@ MemoryOutputBase::~MemoryOutputBase() {
     if (inputNode) {
         inputNode->deregisterSibling(this);
     }
-    context->getMemoryStatesRegister()->remove(this);
+    m_context->getMemoryStatesRegister()->remove(this);
 }
 
 MemoryInputBase& MemoryOutputBase::getInputNode() {
@@ -397,7 +397,7 @@ MemoryInputBase::MemoryInputBase(const std::shared_ptr<ov::Node>& op, const Grap
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
     if (created()) {
-        context->getMemoryStatesRegister()->registerInput(this);
+        m_context->getMemoryStatesRegister()->registerInput(this);
     }
     executeHook = &MemoryInputBase::assignState;
 }
@@ -449,7 +449,7 @@ MemoryInputBase::~MemoryInputBase() {
     if (outputNode) {
         outputNode->deregisterSibling(this);
     }
-    context->getMemoryStatesRegister()->remove(this);
+    m_context->getMemoryStatesRegister()->remove(this);
 }
 
 MemoryOutputBase& MemoryInputBase::getOutputNode() {
@@ -684,7 +684,7 @@ void MemoryInput::initOptimalPrimitiveDescriptor() {
         }
 
         // configure the inner graph to get the information about output memory descriptors
-        subGraph->Init(body, context, graphInputConfig, graphOutputConfig);
+        subGraph->Init(body, m_context, graphInputConfig, graphOutputConfig);
     }
 }
 

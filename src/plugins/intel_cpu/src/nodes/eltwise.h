@@ -106,6 +106,10 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     executorPtr execPtr = nullptr;
     BroadcastingPolicy broadcastingPolicy;
@@ -119,7 +123,7 @@ private:
     std::vector<ptrdiff_t> start_offset_in = {};
     ptrdiff_t start_offset_out = 0;
 
-    std::vector<ov::element::Type> inpPrc;
+    std::vector<ov::element::Type> m_input_prc;
     ov::element::Type outPrc;
 
     // blocked dims for which kernel compiled and params prepared
@@ -138,8 +142,6 @@ private:
 
     std::vector<float> scales = {};
     std::vector<float> shifts = {};
-    MemoryPtr scalesMemory;
-    MemoryPtr shiftsMemory;
 
     std::vector<float> depthwiseData = {};
     MemoryPtr depthwiseMemory;

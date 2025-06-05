@@ -74,6 +74,8 @@ class DeformableConvolution : public Node {
 public:
     DeformableConvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    DeformableConvolution(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;

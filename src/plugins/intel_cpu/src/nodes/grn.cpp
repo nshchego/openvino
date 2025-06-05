@@ -50,6 +50,11 @@ GRN::GRN(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     bias = grn->get_bias();
 }
 
+GRN::GRN(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void GRN::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
