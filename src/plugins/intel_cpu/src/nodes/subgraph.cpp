@@ -187,6 +187,17 @@ Subgraph::Subgraph(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
       host_isa(getHostIsa()),
       subgraph_attrs(std::make_shared<SubgraphAttrs>()) {
     load(in_buf);
+
+#if defined(OPENVINO_ARCH_ARM64)
+    subgraph_attrs->snippet->set_generator(
+        std::make_shared<aarch64::CPUGenerator>(host_isa, context->getParamsCache()));
+#elif defined(OPENVINO_ARCH_X86_64)
+    subgraph_attrs->snippet->set_generator(std::make_shared<CPUGenerator>(host_isa, context->getParamsCache()));
+#else
+    THROW_CPU_NODE_ERR("Subgraphs code-generator is not supported on non-x64 platforms");
+#endif
+
+    // shapeInference = SnippetShapeInferFactory(subgraph_attrs->snippet).makeShapeInfer();
 }
 
 uint64_t Subgraph::getBodyHash(const std::shared_ptr<snippets::op::Subgraph>& snippet) {
@@ -371,17 +382,22 @@ ov::element::Type Subgraph::getRuntimePrecision() const {
 
 void Subgraph::createPrimitive() {
     if (!hasEmptyInputTensors()) {
-        const auto config = getSelectedPrimitiveDescriptor()->getConfig();
-        input_num = config.inConfs.size();
-        output_num = config.outConfs.size();
+        if (!m_model_from_cache) {
+            const auto config = getSelectedPrimitiveDescriptor()->getConfig();
+            input_num = config.inConfs.size();
+            output_num = config.outConfs.size();
 
-        initMemoryPtrs();
-        initPluginBlockedShapes();
-        initAttributes();
-        optimizeIR();
-        prepareWeights();
-        // Init starts offsets should be after `prepareWeights`
-        initStartOffsets();
+            initMemoryPtrs();
+            initPluginBlockedShapes();
+            initAttributes();
+            optimizeIR();
+            prepareWeights();
+            // Init starts offsets should be after `prepareWeights`
+            initStartOffsets();
+        } else {
+            initMemoryPtrs();
+            prepareWeights();
+        }
     }
 
     Node::createPrimitive();
@@ -848,6 +864,10 @@ void Subgraph::save(BinaryOutputBuffer& ob) const {
     ob << subgraph_attrs->inMemPrecs;
     ob << subgraph_attrs->outMemPrecs;
 
+    ob << subgraph_attrs->snippet->is_quantized();
+    ob << subgraph_attrs->snippet->has_domain_sensitive_ops();
+    ob << bool(false);
+
     ob << broadcastable_inputs;
     ob << input_num;
     ob << output_num;
@@ -857,6 +877,7 @@ void Subgraph::save(BinaryOutputBuffer& ob) const {
     ob << start_offset_out;
     // ob << repacked_constant_input_config;
     ob << is_dynamic;
+    ob << in_shapes;
 }
 
 void Subgraph::load(BinaryInputBuffer& ib) {
@@ -866,6 +887,13 @@ void Subgraph::load(BinaryInputBuffer& ib) {
     ib >> subgraph_attrs->outMemOrders;
     ib >> subgraph_attrs->inMemPrecs;
     ib >> subgraph_attrs->outMemPrecs;
+    
+    bool is_quantized, has_domain_sensitive_ops, has_broadcast_sensitive_ops;
+    ib >> is_quantized;
+    ib >> has_domain_sensitive_ops;
+    ib >> has_broadcast_sensitive_ops;
+    subgraph_attrs->snippet = std::make_shared<snippets::op::Subgraph>();
+    subgraph_attrs->snippet->init_config(is_quantized, has_domain_sensitive_ops, has_broadcast_sensitive_ops);
 
     ib >> broadcastable_inputs;
     ib >> input_num;
@@ -876,6 +904,7 @@ void Subgraph::load(BinaryInputBuffer& ib) {
     ib >> start_offset_out;
     // ib >> repacked_constant_input_config;
     ib >> is_dynamic;
+    ib >> in_shapes;
 }
 
 }  // namespace ov::intel_cpu::node

@@ -2086,6 +2086,11 @@ Interpolate::Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext
     }
 }
 
+Interpolate::Interpolate(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context) {
+    load(ib);
+}
+
 void Interpolate::getSupportedDescriptors() {
     if (getParentEdges().size() != 2 && getParentEdges().size() != 3 && getParentEdges().size() != 4) {
         // v4: data, target_shape, scale, axis(optional).

@@ -110,6 +110,12 @@ void Subgraph::init_config() {
     }
 }
 
+void Subgraph::init_config(bool is_quantized, bool has_domain_sensitive_ops, bool has_broadcast_sensitive_ops) {
+    config.m_is_quantized = is_quantized;
+    config.m_has_domain_sensitive_ops = has_domain_sensitive_ops;
+    config.m_has_broadcast_sensitive_ops = has_broadcast_sensitive_ops;
+}
+
 auto Subgraph::get_estimated_buffer_count(const ov::NodeVector& ops) -> size_t {
     // The count of potential unique Buffers - it's hidden virtual ports as well
     // We should go through Subgraph and calculate potential non-inplace Buffers count.

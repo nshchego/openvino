@@ -14,6 +14,8 @@ class Inverse : public Node {
 public:
     Inverse(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Inverse(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
 
@@ -28,6 +30,10 @@ public:
     [[nodiscard]] bool canBeInPlace() const override {
         return false;
     }
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     /// Inverse params

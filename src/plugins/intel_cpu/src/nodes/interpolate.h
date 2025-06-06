@@ -76,6 +76,8 @@ public:
 public:
     Interpolate(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Interpolate(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void createPrimitive() override;

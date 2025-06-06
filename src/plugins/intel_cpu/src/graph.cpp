@@ -288,6 +288,8 @@ printf("--CPU-- Graph::deserialize_graph\n");
         AddNode(node);
     }
 
+    // executableGraphNodes TODO init
+
     // Add fused nodes
     // std::map<int, std::vector<int>> fused_nodes_map;
     // ib >> fused_nodes_map;
@@ -465,44 +467,10 @@ void Graph::Init(const std::shared_ptr<const ov::Model>& model,
 
 void Graph::Init(BinaryInputBuffer& ib,
                  const GraphContext::CPtr& context) {
-    if (IsReady()) {
-        ForgetGraphData();
-    }
-
     m_context = context;
     m_stream = dnnl::stream(getEngine());
 
     deserialize_graph(ib);
-
-    // SortTopologically();
-    // InitNodes();
-
-    // optimizer.ApplyCommonGraphOptimizations(*this);
-
-    // SortTopologically();
-
-    // InitDescriptors();
-
-    // ResolveInplaceDirections();
-
-    InitOptimalPrimitiveDescriptors();
-
-    // ResolveEdgeConflicts();
-
-    // optimizer.ShareReorders(*this);
-    // RemoveDroppedNodes();
-
-    // SortTopologically();
-
-    // ResolveComplexInplaceConflicts();
-
-    // optimizer.ApplyImplSpecificGraphOptimizations(*this);
-
-    // SortTopologically();
-
-    // ResolveComplexInplaceConflicts();
-
-    // SortTopologically();
 }
 
 void Graph::Activate() {

@@ -191,7 +191,8 @@ printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), t
 Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
     : m_context(ctx),
       engine(m_context->getEngine()),
-      profiling("tmp") {
+      profiling("tmp"),
+      m_model_from_cache(true) {
     load(ib);
 printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
 }
@@ -199,8 +200,10 @@ printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr
 Node::Node(BinaryInputBuffer& ib, const GraphContext::CPtr& ctx)
     : m_context(ctx),
       engine(m_context->getEngine()),
-      profiling("tmp") {
+      profiling("tmp"),
+      m_model_from_cache(true) {
     load(ib);
+    // profiling.execute->strA;
 printf("--CPU-- Node_4 Created '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
 }
 
@@ -2322,7 +2325,7 @@ if (type == Type::Transpose && m_name == "Subtract_2565_original") {
 }
 
 void Node::load(BinaryInputBuffer& ib) {
-printf("--CPU-- Node::load\n");
+// printf("--CPU-- Node::load\n");
 
     validate_stream_offset(ib);
 
@@ -2343,9 +2346,9 @@ printf("--CPU-- Node::load\n");
     validate_stream_offset(ib);  // TODO: Remove
 
     ib >> supportedPrimitiveDescriptors;
-if (type == Type::Transpose && m_name == "Subtract_2565_original") {
-    printf("TODO: Remove\n");
-}
+// if (type == Type::Transpose && m_name == "Subtract_2565_original") {
+//     printf("TODO: Remove\n");
+// }
     validate_stream_offset(ib);  // TODO: Remove
     ib >> selectedPrimitiveDescriptorIndex;
     validate_stream_offset(ib);  // TODO: Remove

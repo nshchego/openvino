@@ -28,6 +28,11 @@ Inverse::Inverse(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     m_const_input = is_type<op::v0::Constant>(op->get_input_node_ptr(INPUT_PORT));
 }
 
+Inverse::Inverse(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
+    : Node(ib, context) {
+    load(ib);
+}
+
 bool Inverse::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (op->get_type_info() != op::v14::Inverse::get_type_info_static()) {
@@ -198,6 +203,12 @@ void Inverse::lu_solve(float* output, std::vector<float>& L, std::vector<float>&
             output[batch_column_idx + row * m_side] = X[row];
         }
     });
+}
+
+void Inverse::save(BinaryOutputBuffer& ob) const {
+}
+
+void Inverse::load(BinaryInputBuffer& ib) {
 }
 
 }  // namespace ov::intel_cpu::node
