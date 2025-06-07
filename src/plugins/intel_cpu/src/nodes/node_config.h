@@ -4,8 +4,13 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "memory_desc/blocked_memory_desc.h"
-#include "memory_desc/dnnl_blocked_memory_desc.h"
+#include "memory_desc/cpu_memory_desc.h"
+#include "openvino/core/except.hpp"
 #include "utils/serialization/bind.hpp"
 
 namespace ov {
@@ -57,12 +62,12 @@ public:
         if (nullptr == m_mem_desc) {
             OPENVINO_THROW("ParameterMismatch: PortDescGeneric constructor got nullptr");
         }
-        if (auto dn = std::dynamic_pointer_cast<DnnlMemoryDesc>(m_mem_desc)) {
-            printf("DnnlMemoryDesc passed\n");
-        }
-        if (auto dn = std::dynamic_pointer_cast<DnnlBlockedMemoryDesc>(m_mem_desc)) {
-            printf("DnnlBlockedMemoryDesc passed\n");
-        }
+        //if (auto dn = std::dynamic_pointer_cast<DnnlMemoryDesc>(m_mem_desc)) {
+        //    printf("DnnlMemoryDesc passed\n");
+        //}
+        //if (auto dn = std::dynamic_pointer_cast<DnnlBlockedMemoryDesc>(m_mem_desc)) {
+        //    printf("DnnlBlockedMemoryDesc passed\n");
+        //}
     }
     bool isCompatible(const PortDescGeneric& rhs) const {
         return m_mem_desc->isCompatible(*rhs.m_mem_desc);
@@ -91,12 +96,12 @@ public:
         if (nullptr == m_mem_desc) {
             OPENVINO_THROW("ParameterMismatch: PortDescBlocked constructor got nullptr");
         }
-        if (auto dn = std::dynamic_pointer_cast<DnnlMemoryDesc>(m_mem_desc)) {
-            printf("DnnlMemoryDesc passed\n");
-        }
-        if (auto dn = std::dynamic_pointer_cast<DnnlBlockedMemoryDesc>(m_mem_desc)) {
-            printf("DnnlBlockedMemoryDesc passed\n");
-        }
+        //if (auto dn = std::dynamic_pointer_cast<DnnlMemoryDesc>(m_mem_desc)) {
+        //    printf("DnnlMemoryDesc passed\n");
+        //}
+        //if (auto dn = std::dynamic_pointer_cast<DnnlBlockedMemoryDesc>(m_mem_desc)) {
+        //    printf("DnnlBlockedMemoryDesc passed\n");
+        //}
     }
     bool isCompatible(const PortDescBlocked& rhs) const {
         return m_mem_desc->isCompatible(*rhs.m_mem_desc, m_cmp_mask) && (((~m_cmp_mask) | rhs.m_cmp_mask).all());

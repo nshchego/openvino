@@ -188,6 +188,9 @@ Subgraph::Subgraph(const OutputVector& args, const std::shared_ptr<ov::Model>& b
 Subgraph::Subgraph(const NodeVector& args, const std::shared_ptr<ov::Model>& body)
         : Subgraph(as_output_vector(args), body) {}
 
+Subgraph::Subgraph(std::shared_ptr<lowered::LinearIR> linear_ir)
+        : m_linear_ir(std::move(linear_ir)) {}
+
 std::shared_ptr<Node> Subgraph::clone_with_new_inputs(const OutputVector& inputs) const {
     INTERNAL_OP_SCOPE(Subgraph);
     return make_shared<Subgraph>(inputs, body().clone());
@@ -295,7 +298,7 @@ auto Subgraph::constant_input_should_be_inside_body(const std::shared_ptr<ov::No
         node);
 }
 
-bool Subgraph::check_broadcast(const std::shared_ptr<const ov::Node>& node) noexcept {
+bool Subgraph::check_broadcast(const std::shared_ptr<const ov::Node>& node) {
     const auto elementwise = ov::as_type_ptr<const ov::op::util::BinaryElementwiseArithmetic>(node);
     return
         (elementwise == nullptr) ||
@@ -565,7 +568,7 @@ snippets::Schedule Subgraph::generate(const void* compile_params) const {
 }
 
 const std::shared_ptr<RuntimeConfigurator>& Subgraph::get_runtime_configurator() const {
-    OPENVINO_ASSERT(m_generator, "Generator has not been inited!");
+    assert(m_generator && "Generator has not been inited!");
     return m_generator->get_target_machine()->get_runtime_configurator();
 }
 

@@ -1456,11 +1456,9 @@ bool ov::CoreImpl::device_supports_internal_property(const ov::Plugin& plugin, c
 }
 
 bool ov::CoreImpl::device_supports_model_caching(const ov::Plugin& plugin, const ov::AnyMap& arguments) const {
-    ov::AnyMap properties;
-    if (arguments.count(ov::device::priorities.name())) {
-        properties[ov::device::priorities.name()] = arguments.at(ov::device::priorities.name()).as<std::string>();
-    }
-    return plugin.supports_model_caching(properties);
+    ov::AnyMap properties_to_virtual_dev = arguments.empty() ? ov::AnyMap{ov::device::priorities("")} : arguments;
+    return ov::is_virtual_device(plugin.get_name()) ? plugin.supports_model_caching(properties_to_virtual_dev)
+                                                    : plugin.supports_model_caching();
 }
 
 bool ov::CoreImpl::device_supports_cache_dir(const ov::Plugin& plugin) const {
@@ -1589,21 +1587,25 @@ printf("--CORE-- READ load_model_from_cache 1 pos: %lld\n", static_cast<int64_t>
                                          : plugin.import_model(networkStream, update_config);
             });
     } catch (const HeaderException&) {
+printf("--CORE-- HeaderException\n");
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
-//std::exception_ptr eptr = std::current_exception();
-//if (eptr) {
+// std::exception_ptr eptr = std::current_exception();
+// if (eptr) {
 //    printf("--CORE-- CoreImpl::load_model_from_cache EXCEPTION: %s\n", eptr->what());
-//}
+// }
+printf("--CORE-- Exception\n");
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
     }
 
     // fallback scenario
-    if (!compiled_model)
+    if (!compiled_model) {
+printf("--CORE-- No compiled model\n");
         compiled_model = compile_model_lambda();
+    }
 
     return compiled_model;
 }
@@ -1734,18 +1736,19 @@ ov::CoreConfig::CacheConfig ov::CoreConfig::get_cache_config_for_device(const ov
 }
 
 ov::CoreConfig::CacheConfig ov::CoreConfig::CacheConfig::create(const std::string& dir) {
-    std::shared_ptr<ov::ICacheManager> cache_manager = nullptr;
-
+    CacheConfig cache_config{dir, nullptr};
     if (!dir.empty()) {
-#ifdef OPENVINO_ENABLE_UNICODE_PATH_SUPPORT
-        ov::util::create_directory_recursive(ov::util::string_to_wstring(dir));
-#else
-        ov::util::create_directory_recursive(dir);
-#endif
-        cache_manager = std::make_shared<ov::FileStorageCacheManager>(dir);
+        if constexpr (std::is_same_v<std::filesystem::path::value_type, std::wstring::value_type>) {
+            // if path native type is same as wstring type (e.g. Windows) convert to wstring
+            // in case of string has unicode without conversion wrong created dir may have incorrect name
+            // should be removed if cache_dir will path instead of string
+            ov::util::create_directory_recursive(ov::util::string_to_wstring(dir));
+        } else {
+            ov::util::create_directory_recursive(dir);
+        }
+        cache_config._cacheManager = std::make_shared<ov::FileStorageCacheManager>(dir);
     }
-
-    return {dir, std::move(cache_manager)};
+    return cache_config;
 }
 
 std::mutex& ov::CoreImpl::get_mutex(const std::string& dev_name) const {

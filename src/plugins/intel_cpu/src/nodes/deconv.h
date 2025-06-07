@@ -4,9 +4,25 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <oneapi/dnnl/dnnl.hpp>
+#include <oneapi/dnnl/dnnl_common.hpp>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "common/dnnl_executor.h"
-#include "executors/deconv_list.hpp"
+#include "cpu_memory.h"
+#include "cpu_types.h"
+#include "graph_context.h"
+#include "memory_desc/cpu_memory_desc.h"
 #include "node.h"
+#include "nodes/executors/deconv.hpp"
+#include "onednn/iml_type_mapper.h"
+#include "openvino/core/node.hpp"
+#include "openvino/core/type/element_type.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -56,6 +72,11 @@ public:
     bool canFuseBias() const;
     bool canBeExecutedInInt8() const override;
     const std::vector<impl_desc_type>& getDefaultImplPriority() override;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 
 protected:
     AttrPtr initPrimitiveAttr() override;

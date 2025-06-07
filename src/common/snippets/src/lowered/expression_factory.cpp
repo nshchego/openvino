@@ -36,9 +36,10 @@ std::shared_ptr<Expression> ExpressionFactory::build(const std::shared_ptr<Node>
     return create(n, inputs, m_shape_infer_factory);
 }
 
-void ExpressionFactory::create_expression_outputs(const ExpressionPtr& expr) {
-    OPENVINO_ASSERT(expr != nullptr, "Failed expression outputs creation: expression is null");
-    const auto& node = expr->get_node();
+void ExpressionFactory::create_expression_outputs(const ExpressionPtr& expr, const std::shared_ptr<Node>& node) {
+    OPENVINO_ASSERT(expr != nullptr, "Failed expression outputs creation: expression is null.");
+    OPENVINO_ASSERT(node != nullptr, "Failed expression outputs creation: OV node is null.");
+    // const auto& node = expr->get_node();
 
     expr->m_output_port_connectors.resize(node->get_output_size(), nullptr);
     for (const auto& output : node->outputs()) {
@@ -69,7 +70,7 @@ ExpressionPtr ExpressionFactory::create(const std::shared_ptr<ov::op::v0::Parame
     OPENVINO_ASSERT(inputs.empty(), "Parameter cannot have inputs");
     // Note: ctor of shared_ptr isn't friend class for Expression -> we cannot use directly make_shared<Expression>(args)
     auto expr = std::shared_ptr<Expression>(new Expression(par, shape_infer_factory, false));
-    create_expression_outputs(expr);
+    create_expression_outputs(expr, par);
     expr->validate();
     return expr;
 }
@@ -91,7 +92,7 @@ ExpressionPtr ExpressionFactory::create(const std::shared_ptr<op::LoopBegin>& n,
     OPENVINO_ASSERT(inputs.empty(), "LoopBegin cannot have inputs");
     auto expr = std::shared_ptr<Expression>(new Expression(n, shape_infer_factory, false));
     init_expression_inputs(expr, inputs);
-    create_expression_outputs(expr);
+    create_expression_outputs(expr, n);
     expr->validate();
     return expr;
 }

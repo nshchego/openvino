@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include <cassert>
+
 #include "snippets/lowered/expression.hpp"
 
 #include "snippets/itt.hpp"
@@ -28,27 +30,26 @@ Expression::Expression(const std::shared_ptr<Node>& n, const std::shared_ptr<ISh
 }
 
 const PortConnectorPtr& Expression::get_input_port_connector(size_t i) const {
-    OPENVINO_ASSERT(i < m_input_port_connectors.size(), "Failed to get input port connector: target input port must be less than input count!");
+    assert(i < m_input_port_connectors.size() && "Failed to get input port connector: target input port must be less than input count!");
     return m_input_port_connectors[i];
 }
 const PortConnectorPtr& Expression::get_output_port_connector(size_t i) const {
-    OPENVINO_ASSERT(i < m_output_port_connectors.size(), "Failed to get output port connector: target output port must be less than output count!");
+    assert(i < m_output_port_connectors.size() && "Failed to get output port connector: target output port must be less than output count!");
     return m_output_port_connectors[i];
 }
 
 const PortDescriptorPtr& Expression::get_input_port_descriptor(size_t i) const {
-    OPENVINO_ASSERT(i < m_input_port_descriptors.size(), "Failed to get input port descriptor: target input port must be less than input count!");
+    assert(i < m_input_port_descriptors.size() && "Failed to get input port descriptor: target input port must be less than input count!");
     return m_input_port_descriptors[i];
 }
 const PortDescriptorPtr& Expression::get_output_port_descriptor(size_t i) const {
-    OPENVINO_ASSERT(i < m_output_port_descriptors.size(), "Failed to get output port descriptor: target output port must be less than output count!");
+    assert(i < m_output_port_descriptors.size() && "Failed to get output port descriptor: target output port must be less than output count!");
     return m_output_port_descriptors[i];
 }
 
 std::shared_ptr<Node> Expression::get_node() const {
-    if (!m_source_node)
-        OPENVINO_THROW("An attempt to get uninitialized node from lowered expression");
-    return  m_source_node;
+    OPENVINO_ASSERT(m_source_node, "An attempt to get uninitialized node from lowered expression");
+    return m_source_node;
 }
 
 std::shared_ptr<Emitter> Expression::get_emitter() const {
@@ -122,9 +123,9 @@ ExpressionPtr Expression::clone_with_new_inputs(const std::shared_ptr<Node>& new
             dst[i] = src[i]->clone();
         return dst;
     };
-    const auto& cloned = clone();
     OPENVINO_ASSERT(m_source_node->get_type_info() == new_node->get_type_info(),
                     "Can't clone expression for a new node with incompatible type");
+    auto cloned = clone();
     cloned->m_source_node = new_node;
 
     // Initialize Port Attributes: PortConnectors and PortDescriptors

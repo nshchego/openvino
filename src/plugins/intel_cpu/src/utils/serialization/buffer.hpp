@@ -7,7 +7,6 @@
 #include <ostream>
 
 #include "helpers.hpp"
-// #include "onednn/dnnl.h"
 #include "openvino/core/except.hpp"
 #include "serializer.hpp"
 

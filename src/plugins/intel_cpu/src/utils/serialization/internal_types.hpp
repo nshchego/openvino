@@ -10,7 +10,7 @@
 namespace ov::intel_cpu {
 
 template <typename BufferType>
-class Serializer<BufferType, ov::element::Type, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
+class Serializer<BufferType, element::Type, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void save(BufferType& buffer, const ov::element::Type& et) {
 // printf("-WRITE ov::element::Type-\n");
@@ -20,7 +20,7 @@ public:
 };
 
 template <typename BufferType>
-class Serializer<BufferType, ov::element::Type, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
+class Serializer<BufferType, element::Type, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, ov::element::Type& et) {
 // printf("-READ ov::element::Type-\n");

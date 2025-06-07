@@ -4,10 +4,27 @@
 
 #include "reference.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <oneapi/dnnl/dnnl_common.hpp>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "common/cpu_memcpy.h"
-#include "shape_inference/shape_inference.hpp"
+#include "cpu_memory.h"
+#include "cpu_types.h"
+#include "graph_context.h"
+#include "memory_desc/cpu_memory_desc.h"
+#include "node.h"
+#include "onednn/iml_type_mapper.h"
+#include "openvino/core/except.hpp"
+#include "openvino/core/node.hpp"
+#include "openvino/core/type/element_type.hpp"
+#include "openvino/runtime/tensor.hpp"
+#include "shape_inference/shape_inference_cpu.hpp"
+#include "shape_inference/shape_inference_status.hpp"
 #include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/string_serializer.hpp"
 
@@ -113,8 +130,8 @@ void Reference::executeDynamicImpl(const dnnl::stream& strm) {
                     i);
             }
             if (tensor.get_element_type() == element::string) {
-                auto srcPtr = tensor.data<StringMemory::OvString>();
-                auto dstPtr = memory->getDataAs<StringMemory::OvString>();
+                auto* srcPtr = tensor.data<StringMemory::OvString>();
+                auto* dstPtr = memory->getDataAs<StringMemory::OvString>();
                 std::copy(srcPtr, srcPtr + tensor.get_size(), dstPtr);
             } else {
                 cpu_memcpy(memory->getData(), tensor.data(), tensor.get_byte_size());
@@ -135,14 +152,14 @@ bool Reference::needShapeInfer() const {
 
 ov::TensorVector Reference::prepareInputs() const {
     ov::TensorVector inputs;
-    for (size_t i = 0lu; i < m_input_shapes.size(); i++) {
+    for (size_t i = 0LU; i < m_input_shapes.size(); i++) {
         void* srcDataPtr = getSrcDataAtPort(i);
         ov::Shape shape = m_ov_node->get_input_partial_shape(i).rank().get_length() == 0
                               ? ov::Shape{}
                               : getParentEdgeAt(i)->getMemory().getStaticDims();
 
         if (std::any_of(shape.begin(), shape.end(), [](const size_t dim) {
-                return dim == 0lu;
+                return dim == 0LU;
             })) {
             inputs.emplace_back(m_ov_node->get_input_element_type(i), shape);
         } else {
@@ -155,14 +172,14 @@ ov::TensorVector Reference::prepareInputs() const {
 
 ov::TensorVector Reference::prepareOutputs() const {
     ov::TensorVector outputs;
-    for (size_t i = 0lu; i < m_output_shapes.size(); i++) {
+    for (size_t i = 0LU; i < m_output_shapes.size(); i++) {
         void* dstDataPtr = getDstDataAtPort(i);
         ov::Shape shape = m_ov_node->get_output_partial_shape(i).rank().get_length() == 0
                               ? ov::Shape{}
                               : getChildEdgeAt(i)->getMemory().getStaticDims();
 
         if (std::any_of(shape.begin(), shape.end(), [](const size_t dim) {
-                return dim == 0lu;
+                return dim == 0LU;
             })) {
             outputs.emplace_back(m_ov_node->get_output_element_type(i), shape);
         } else {

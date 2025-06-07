@@ -106,6 +106,14 @@ public:
         return get_type_info().name;
     }
 
+    // const DiscreteTypeInfo& get_core_type_info() const {
+    //     return m_core_type_info;
+    // }
+
+    class IExpressionSerializer {
+
+    };
+
 protected:
     // Note: The constructor initialization is private since an expression can be created only by Linear IR.
     //       The method must be used only by Linear IR builder of expressions!
@@ -133,6 +141,11 @@ protected:
     //   3. This number can be negative, positive and zero.
     double m_exec_num = 0;
     std::set<Reg> m_live_regs{};
+
+    std::shared_ptr<IExpressionSerializer> m_serializer{ nullptr };
+
+// private:
+//     const DiscreteTypeInfo& m_core_type_info;
 };
 
 } // namespace lowered

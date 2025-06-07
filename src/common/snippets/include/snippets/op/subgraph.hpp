@@ -82,6 +82,8 @@ public:
 
     Subgraph(const NodeVector& args, const std::shared_ptr<ov::Model>& body);
 
+    Subgraph(std::shared_ptr<lowered::LinearIR> linear_ir);
+
     bool visit_attributes(AttributeVisitor& visitor) override;
 
     void validate_and_infer_types() override;
@@ -103,7 +105,7 @@ public:
     bool is_quantized() const { return config.m_is_quantized; }
 #ifdef SNIPPETS_DEBUG_CAPS
     DebugCapsConfig& get_debug_config() {
-        OPENVINO_ASSERT(config.m_debug_config, "Debug config is not initialized");
+        assert(config.m_debug_config && "Debug config is not initialized");
         return *config.m_debug_config;
     }
 #endif  // SNIPPETS_DEBUG_CAPS
@@ -132,7 +134,7 @@ public:
     // should have explicit Constants even if they're non-scalar (Reshape, Transpose, Broadcast)
     // This check returns True if Constant op which is input of this op should be inside Subgraph body
     static auto constant_input_should_be_inside_body(const std::shared_ptr<ov::Node>& node) -> bool;
-    static bool check_broadcast(const std::shared_ptr<const ov::Node>& node) noexcept;
+    static bool check_broadcast(const std::shared_ptr<const ov::Node>& node);
     // Return estimated unique buffer count (upper bound). It's needed for tokenization
     static auto get_estimated_buffer_count(const ov::NodeVector& ops) -> size_t;
     static auto is_domain_sensitive_op(const std::shared_ptr<ov::Node>& op) -> bool;
@@ -160,6 +162,10 @@ public:
                       const void* compile_params = nullptr);
 
     void init_config(bool, bool, bool);
+
+    std::shared_ptr<lowered::LinearIR> get_linear_ir() {
+        return m_linear_ir;
+    }
 
 private:
     std::shared_ptr<lowered::LinearIR>

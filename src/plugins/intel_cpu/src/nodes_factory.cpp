@@ -59,7 +59,6 @@
 #include "nodes/matmul.h"
 #include "nodes/matrix_nms.h"
 #include "nodes/memory.hpp"
-#include "nodes/mha.h"
 #include "nodes/multiclass_nms.hpp"
 #include "nodes/multinomial.hpp"
 #include "nodes/mvn.h"
@@ -102,6 +101,7 @@
 #include "nodes/softmax.h"
 #include "nodes/space_to_batch.h"
 #include "nodes/space_to_depth.h"
+#include "nodes/sparse_fill_empty_rows.h"
 #include "nodes/split.h"
 #include "nodes/stft.h"
 #include "nodes/strided_slice.h"
@@ -114,6 +114,8 @@
 #include "nodes/transpose.h"
 #include "nodes/unique.hpp"
 
+#include "openvino/cc/factory.h"
+#include "selective_build.h"
 #include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
@@ -206,6 +208,7 @@ NodesFactory<SrcType>::NodesFactory() : Factory("NodesFactory") {
     // INTEL_CPU_NODE(StringTensorPack, Type::StringTensorPack);
     // INTEL_CPU_NODE(StringTensorUnpack, Type::StringTensorUnpack);
     // INTEL_CPU_NODE(ShuffleChannels, Type::ShuffleChannels);
+    // INTEL_CPU_NODE(SparseFillEmptyRows, Type::SparseFillEmptyRows);
     // INTEL_CPU_NODE(TensorIterator, Type::TensorIterator);
     // INTEL_CPU_NODE(OneHot, Type::OneHot);
     // INTEL_CPU_NODE(Range, Type::Range);
@@ -237,7 +240,6 @@ NodesFactory<SrcType>::NodesFactory() : Factory("NodesFactory") {
     INTEL_CPU_NODE(Interaction, Type::Interaction);
     // INTEL_CPU_NODE(LLMMLP, Type::LLMMLP);
     // INTEL_CPU_NODE(QKVProjection, Type::QKVProjection);
-    // INTEL_CPU_NODE(MHA, Type::MHA);
     // INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
     // INTEL_CPU_NODE(RMSNorm, Type::RMS);
 #elif defined(OPENVINO_ARCH_ARM64)

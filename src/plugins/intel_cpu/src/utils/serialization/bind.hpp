@@ -9,6 +9,7 @@
 
 #include "buffer.hpp"
 #include "static_instance.hpp"
+#include "onednn/dnnl.h"
 
 
 #define DECLARE_OBJECT_TYPE_SERIALIZATION(cls_name)                                   \

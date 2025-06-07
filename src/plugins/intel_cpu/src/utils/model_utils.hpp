@@ -5,8 +5,15 @@
 #pragma once
 
 #include <cassert>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
 
 #include "config.h"
+#include "openvino/core/any.hpp"
+#include "openvino/core/except.hpp"
+#include "openvino/core/node.hpp"
 #include "transformations/rt_info/primitives_priority_attribute.hpp"
 #include "transformations/utils/utils.hpp"
 

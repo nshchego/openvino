@@ -65,7 +65,7 @@ private:
     }
 
     // Creates new output port connectors
-    static void create_expression_outputs(const ExpressionPtr& expr);
+    static void create_expression_outputs(const ExpressionPtr& expr, const std::shared_ptr<Node>& = nullptr);
     // The method verifies of input port connectors to availability of the expression as consumer and add it if missed
     static void init_expression_inputs(const ExpressionPtr& expr, const std::vector<PortConnectorPtr>& inputs);
 

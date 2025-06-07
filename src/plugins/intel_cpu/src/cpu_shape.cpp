@@ -4,7 +4,13 @@
 
 #include "cpu_shape.h"
 
-#include "utils/general_utils.h"
+#include <algorithm>
+#include <cstddef>
+#include <sstream>
+#include <string>
+
+#include "cpu_types.h"
+#include "openvino/core/except.hpp"
 #include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/vector_serializer.hpp"
 

@@ -4,11 +4,15 @@
 
 #pragma once
 
+#include <cstddef>
+#include <functional>
 #include <memory>
+#include <new>
+#include <ostream>
+#include <string>
 #include <vector>
 
-#include "cpu_shape.h"
-#include "internal_properties.hpp"
+#include "cpu_memory.h"
 #include "memory_desc/cpu_memory_desc.h"
 #include "nodes/node_config.h"
 #include "utils/serialization/buffer.hpp"
@@ -68,8 +72,8 @@ public:
     void reuse(MemoryPtr ptr);
     void validate();
 
-    const std::shared_ptr<Node> getParent() const;
-    const std::shared_ptr<Node> getChild() const;
+    std::shared_ptr<Node> getParent() const;
+    std::shared_ptr<Node> getChild() const;
 
     const IMemory& getMemory();
     MemoryPtr getMemoryPtr() const;

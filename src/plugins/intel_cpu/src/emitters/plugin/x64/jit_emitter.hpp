@@ -4,13 +4,23 @@
 
 #pragma once
 
-#include <set>
+#include <cpu/x64/xbyak/xbyak.h>
 
-// #include "openvino/core/node.hpp"
+#include <cpu/x64/cpu_isa_traits.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "cpu/x64/jit_generator.hpp"
 #include "emitters/utils.hpp"
-#include "snippets/generator.hpp"
-#include "snippets/snippets_isa.hpp"
+#include "openvino/core/node.hpp"
+#include "openvino/core/type/element_type.hpp"
+#include "snippets/emitter.hpp"
 
 #ifdef SNIPPETS_DEBUG_CAPS
 #    include "emitters/snippets/x64/verbose.hpp"

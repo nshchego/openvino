@@ -4,7 +4,14 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <type_traits>
+#include <unordered_map>
+
+#include "cpu_types.h"
 #include "memory_desc/cpu_blocked_memory_desc.h"
+#include "openvino/core/except.hpp"
 
 namespace ov::intel_cpu {
 
@@ -31,6 +38,10 @@ struct RepackedInput {
     [[nodiscard]] const CpuBlockedMemoryDescPtr& desc() const;
     [[nodiscard]] const VectorDims& in_offsets() const;
     [[nodiscard]] const VectorDims& out_offsets() const;
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 
 private:
     std::shared_ptr<const RepackedInputKernel> m_kernel{nullptr};

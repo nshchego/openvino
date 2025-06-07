@@ -4,8 +4,19 @@
 
 #pragma once
 
-#include "blocked_memory_desc.h"
+#include <oneapi/dnnl/dnnl_types.h>
+
+#include <cstddef>
+#include <memory>
+#include <oneapi/dnnl/dnnl.hpp>
+#include <string>
+
+#include "cpu_types.h"
+#include "dnnl_extension_utils.h"
 #include "dnnl_memory_desc.h"
+#include "memory_desc/blocked_memory_desc.h"
+#include "memory_desc/cpu_memory_desc.h"
+#include "openvino/core/type/element_type.hpp"
 #include "openvino/util/util.hpp"
 #include "utils/serialization/bind.hpp"
 

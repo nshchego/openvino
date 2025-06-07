@@ -654,6 +654,7 @@ int main(int argc, char* argv[]) {
             auto duration_ms = get_duration_ms_till_now(startTime);
             auto compile_model_mem_end = get_peak_memory_usage();
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
+return 0;
 
             slog::info << "Start of compilation memory usage: Peak " << compile_model_mem_start << " KB" << slog::endl;
             slog::info << "End of compilation memory usage: Peak " << compile_model_mem_end << " KB" << slog::endl;
@@ -834,6 +835,7 @@ int main(int argc, char* argv[]) {
             duration_ms = get_duration_ms_till_now(startTime);
             auto compile_model_mem_end = get_peak_memory_usage();
             slog::info << "Compile model took " << double_to_string(duration_ms) << " ms" << slog::endl;
+return 0;
 
             slog::info << "Start of compilation memory usage: Peak " << compile_model_mem_start << " KB" << slog::endl;
             slog::info << "End of compilation memory usage: Peak " << compile_model_mem_end << " KB" << slog::endl;
