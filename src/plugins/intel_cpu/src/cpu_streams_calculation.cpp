@@ -734,6 +734,7 @@ std::vector<std::vector<int>> generate_stream_info(const int streams,
     int model_prefer_threads = preferred_nthreads_per_stream;
     proc_type_table = apply_scheduling_core_type(config.schedulingCoreType, proc_type_table);
 
+    // config.enableHyperThreading = false;
     proc_type_table = apply_hyper_threading(config.enableHyperThreading,
                                             config.changedHyperThreading,
                                             ov::util::to_string(config.hintPerfMode),
@@ -778,7 +779,7 @@ std::vector<std::vector<int>> generate_stream_info(const int streams,
                                                            config.enableCpuReservation,
                                                            config.enableCpuPinning,
                                                            true,
-                                                           std::move(streams_info_table),
+                                                           streams_info_table,
                                                            {},
                                                            false};
     return proc_type_table;

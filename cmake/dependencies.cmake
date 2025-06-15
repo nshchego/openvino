@@ -28,6 +28,7 @@ if(THREADING STREQUAL "OMP")
                     SHA256 "62c68646747fb10f19b53217cb04a1e10ff93606f992e6b35eb8c31187c68fbf"
                     USE_NEW_LOCATION TRUE)
         elseif(LINUX AND X86_64 AND OPENVINO_GNU_LIBC)
+            message("DEBUG ENABLE_INTEL_OPENMP LINUX")
             RESOLVE_DEPENDENCY(INTEL_OMP
                     ARCHIVE_LIN "iomp.tgz"
                     TARGET_PATH "${TEMP}/omp"

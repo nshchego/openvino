@@ -115,11 +115,15 @@ IStreamsExecutor::Config IStreamsExecutor::Config::make_default_multi_threaded(
         return streamConfig;
     }
 
+// #if OV_THREAD == OV_THREAD_OMP
+//     int num_cores = proc_type_table[0][MAIN_CORE_PROC] + proc_type_table[0][EFFICIENT_CORE_PROC];
+// #else
     int num_cores = proc_type_table[0][ALL_PROC];
+// #endif
 
     if (proc_type_table[0][EFFICIENT_CORE_PROC] > 0 && proc_type_table[0][MAIN_CORE_PROC] > 0) {
         if (streamConfig._thread_preferred_core_type == ov::hint::SchedulingCoreType::ANY_CORE) {
-            num_cores = proc_type_table[0][ALL_PROC];
+            // num_cores = proc_type_table[0][ALL_PROC];
         } else if (streamConfig._thread_preferred_core_type == ov::hint::SchedulingCoreType::PCORE_ONLY) {
             num_cores = proc_type_table[0][MAIN_CORE_PROC];
         } else if (streamConfig._thread_preferred_core_type == ov::hint::SchedulingCoreType::ECORE_ONLY) {
@@ -149,6 +153,7 @@ IStreamsExecutor::Config IStreamsExecutor::Config::make_default_multi_threaded(
             }
         }
     }
+// printf("StreamsExecutor::Config::make_default_multi_threaded _threads_per_stream %d->%d\n", streamConfig._threads_per_stream, threads_per_stream);
     streamConfig._threads_per_stream = threads_per_stream;
     streamConfig._threads = streamConfig._threads_per_stream * streamConfig._streams;
     streamConfig.update_executor_config();
@@ -192,6 +197,7 @@ void IStreamsExecutor::Config::update_executor_config() {
     if (!streams_info_available) {
         _streams_info_table.clear();
 
+        // const auto total_num_cores = proc_type_table[0][MAIN_CORE_PROC] + proc_type_table[0][EFFICIENT_CORE_PROC];
         const auto total_num_cores = proc_type_table[0][ALL_PROC];
         const auto total_num_big_cores = proc_type_table[0][MAIN_CORE_PROC] + proc_type_table[0][HYPER_THREADING_PROC];
         const auto total_num_little_cores = proc_type_table[0][EFFICIENT_CORE_PROC];
@@ -214,10 +220,11 @@ void IStreamsExecutor::Config::update_executor_config() {
             set_config_zero_stream();
             return;
         }
-
+// auto tmp = _threads_per_stream;
         _threads_per_stream = (_threads_per_stream > 0 && _cores_limit)
                                   ? std::min(num_cores, _streams * _threads_per_stream) / _streams
                                   : 0;
+// printf("IStreamsExecutor::Config::update_executor_config _threads_per_stream %d->%d\n", tmp, _threads_per_stream);
         // _threads_per_stream = 0: not use tbb to create threads
         if (_threads_per_stream == 0) {
             _cpu_reservation = false;
@@ -290,7 +297,9 @@ void IStreamsExecutor::Config::update_executor_config() {
             _sub_streams += 1;
         }
     }
+// printf("IStreamsExecutor::Config::update_executor_config 2 _threads_per_stream %d->%d\n", _threads_per_stream, _streams_info_table[0][THREADS_PER_STREAM]);
     _threads_per_stream = _streams_info_table[0][THREADS_PER_STREAM];
+    // _threads_per_stream = 1;
     _streams = _streams > 0 ? num_streams : _streams;
 
 #ifdef ENABLE_OPENVINO_DEBUG

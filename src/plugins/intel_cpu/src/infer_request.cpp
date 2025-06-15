@@ -47,6 +47,10 @@
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
 
+#if OV_THREAD == OV_THREAD_OMP
+#    include <omp.h>
+#endif
+
 using OvString = ov::element_type_traits<ov::element::string>::value_type;
 
 namespace ov::intel_cpu {
@@ -136,6 +140,11 @@ void SyncInferRequest::infer() {
     }
 
     push_input_data(graph);
+
+#if OV_THREAD == OV_THREAD_OMP
+    omp_set_dynamic(1);
+    omp_set_nested(1);
+#endif
 
     graph.Infer(this);
 

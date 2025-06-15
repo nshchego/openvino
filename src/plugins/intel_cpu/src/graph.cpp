@@ -1365,6 +1365,7 @@ VecMemoryDescs Graph::getOutputMemoryDescriptors() const {
 }
 
 void Graph::InferStatic(SyncInferRequest* request, int numaId) {
+// printf("--CPU-- Graph::InferStatic\n");
     for (const auto& node : m_executableGraphNodes) {
         ExecuteNodeWithCatch(node, request, numaId);
     }
@@ -1633,6 +1634,7 @@ inline void Graph::ExecuteNodeWithCatch(const NodePtr& node, SyncInferRequest* r
 
 template <typename UpdateStrategy>
 void Graph::InferDynamic(SyncInferRequest* request, int numaId, UpdateStrategy&& update) {
+// printf("--CPU-- Graph::InferDynamic\n");
     size_t inferCounter = 0;
     for (auto stopIndx : m_executableSyncNodesInds) {
         std::forward<UpdateStrategy>(update)(stopIndx);
@@ -1657,6 +1659,7 @@ static int GetNumaNodeId([[maybe_unused]] const GraphContext::CPtr& context) {
 }
 
 void Graph::Infer(SyncInferRequest* request) {
+// printf("--CPU-- Graph::Infer\n");
     DEBUG_LOG("Infer graph: ", GetName(), ". Status: ", static_cast<int>(status));
     const int numaId = GetNumaNodeId(m_context);
 

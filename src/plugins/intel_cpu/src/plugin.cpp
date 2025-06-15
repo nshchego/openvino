@@ -133,7 +133,7 @@ void Plugin::get_performance_streams(Config& config, const std::shared_ptr<ov::M
 }
 
 void Plugin::calculate_streams(Config& conf, const std::shared_ptr<ov::Model>& model, bool imported) {
-    set_max_nested_levels(std::numeric_limits<int32_t>::max());
+    // set_max_nested_levels(std::numeric_limits<int32_t>::max());
     const auto model_prefer_name = std::string("MODEL_PREFER_THREADS");
     if (imported && model->has_rt_info("intel_cpu_hints_config")) {
         // load model_prefer_threads from cache
@@ -214,6 +214,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     transformations.UpToLpt();
 
     calculate_streams(conf, cloned_model);
+
+// #if OV_THREAD == OV_THREAD_OMP
+//     omp_set_dynamic(1);
+//     omp_set_nested(1);
+// #endif
 
     if (!conf.cacheEncrypt || !conf.cacheDecrypt) {
         conf.cacheEncrypt = codec_xor_str;

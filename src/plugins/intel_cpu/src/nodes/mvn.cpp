@@ -2741,8 +2741,9 @@ void MVN::MVNJitExecutor::mvn_nspc(const uint8_t* src_data,
         }
     };
 
-    auto b_threads = std::min(threads_num, N);
-    parallel_nt_static(b_threads, [&](const int ithr, const int nthr) {
+    //auto b_threads = std::min(threads_num, N);
+    //parallel_nt_static(b_threads, [&](const int ithr, const int nthr) {
+    parallel_nt_static(threads_num, [&](const int ithr, const int nthr) {
         for_1d(ithr, nthr, N, b_loop);
     });
 }
