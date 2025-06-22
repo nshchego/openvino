@@ -189,6 +189,8 @@ void parallel_nt(int nthr, const F& func) {
         func(ithr, nthr);
     });
 #elif OV_THREAD == OV_THREAD_OMP
+    if (nthr == 0)
+        nthr = parallel_get_max_threads();
     if (nthr == 1) {
         func(0, 1);
         return;
@@ -201,11 +203,11 @@ void parallel_nt(int nthr, const F& func) {
     }
 #    pragma omp parallel num_threads(nthr)
     {
-        // if (omp_get_level() > 1 || omp_get_active_level() > 1) {
-        //     printf("    OMP parallel_nt nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-        //         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-        //         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
-        // }
+// if (omp_get_level() > 1 || omp_get_active_level() > 1) {
+//     printf("    OMP parallel_nt nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+//         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+//         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
         func(parallel_get_thread_num(), parallel_get_num_threads()); }
     if (origin_dyn_val != 0) {
         omp_set_dynamic(origin_dyn_val);
@@ -217,6 +219,9 @@ void parallel_nt(int nthr, const F& func) {
 
 template <typename F>
 void parallel_nt_static(int nthr, const F& func) {
+// printf("parallel_nt_static nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+//     nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+//     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
 #if OV_THREAD == OV_THREAD_SEQ
     const bool serial = true;
 #else
@@ -248,11 +253,11 @@ void parallel_nt_static(int nthr, const F& func) {
     }
 #    pragma omp parallel num_threads(nthr)
     { 
-        // if (omp_get_level() > 1 || omp_get_active_level() > 1) {
-        //     printf("    OMP parallel_nt_static nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-        //         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-        //         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
-        // }
+// if (omp_get_level() > 1 || omp_get_active_level() > 1) {
+//     printf("    OMP parallel_nt_static nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+//         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+//         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
         func(parallel_get_thread_num(), parallel_get_num_threads()); }
     if (origin_dyn_val != 0) {
         omp_set_dynamic(origin_dyn_val);
@@ -478,6 +483,9 @@ void for_1d(const int& ithr, const int& nthr, const T0& D0, const F& func) {
 
 template <typename T0, typename F>
 void parallel_for(const T0& D0, const F& func) {
+    if (D0 == T0(0)) {
+        return;
+    }
 #if OV_THREAD == OV_THREAD_TBB
     auto work_amount = static_cast<size_t>(D0);
     int nthr = parallel_get_max_threads();
@@ -502,34 +510,29 @@ void parallel_for(const T0& D0, const F& func) {
 #elif OV_THREAD == OV_THREAD_OMP
 // Please note that this function does not guarantee execution on the same number of threads from call to call.
 // Use the parallel_nt* functions if the procedure depends on a certain number of threads.
-    auto work_amount = static_cast<int>(D0);
+    auto work_amount = static_cast<size_t>(D0);
     auto nthr = omp_get_max_threads();
     if (omp_get_level() > 0) {
         nthr /= omp_get_num_threads();
     }
-    if (nthr > work_amount) {
-        nthr = work_amount;
+    if (static_cast<size_t>(nthr) > work_amount) {
+        nthr = static_cast<int>(work_amount);
     }
 
+// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
+    // printf("OMP parallel_for wa: %d; nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     work_amount, nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
     if (nthr == 1) {
-        // printf("OMP parallel_for nthr: 1; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-        //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-        //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
-
         for_1d(0, 1, D0, func);
     } else {
-        // nthr = omp_get_max_threads() / omp_get_num_threads();
-// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
-//     printf("OMP parallel_for nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-//         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-//         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
-// }
-#        pragma omp parallel num_threads(nthr)
+#        pragma omp parallel //num_threads(nthr)
         {
 // if (omp_get_level() > 1 || omp_get_active_level() > 1) {
-//     printf("    OMP parallel_for nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-//         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-//         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+    // printf("    OMP parallel_for nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
 // }
             for_1d(parallel_get_thread_num(), parallel_get_num_threads(), D0, func);
         }
@@ -558,6 +561,9 @@ void for_2d(const int& ithr, const int& nthr, const T0& D0, const T1& D1, const 
 
 template <typename T0, typename T1, typename F>
 void parallel_for2d(const T0& D0, const T1& D1, const F& func) {
+    if (D0 == T0(0) || D1 == T1(0)) {
+        return;
+    }
 #if OV_THREAD == OV_THREAD_TBB
     auto work_amount = static_cast<size_t>(D0 * D1);
     int nthr = parallel_get_max_threads();
@@ -583,6 +589,9 @@ void parallel_for2d(const T0& D0, const T1& D1, const F& func) {
 // Please note that this function does not guarantee execution on the same number of threads from call to call.
 // Use the parallel_nt* functions if the procedure depends on a certain number of threads.
     auto work_amount = static_cast<int>(D0 * D1);
+// if (work_amount == 0) {
+//     printf("parallel_for2d wa int: %d; size_t: %lu\n", work_amount, static_cast<size_t>(D0 * D1));
+// }
     auto nthr = omp_get_max_threads();
     if (omp_get_level() > 0) {
         nthr /= omp_get_num_threads();
@@ -590,15 +599,21 @@ void parallel_for2d(const T0& D0, const T1& D1, const F& func) {
     if (nthr > work_amount) {
         nthr = work_amount;
     }
+
+// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
+    // printf("OMP parallel_for2d wa: %d; nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     work_amount, nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
     if (nthr == 1) {
         for_2d(0, 1, D0, D1, func);
     } else {
-#        pragma omp parallel num_threads(nthr)
+#        pragma omp parallel //num_threads(nthr)
         {
 // if (omp_get_level() > 1 || omp_get_active_level() > 1) {
-//     printf("    OMP parallel_for2d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-//         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-//         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+    // printf("    OMP parallel_for2d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
 // }
             for_2d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, func);
         }
@@ -648,6 +663,9 @@ void for_3d(const int& ithr, const int& nthr, const T0& D0, const T1& D1, const 
 
 template <typename T0, typename T1, typename T2, typename F>
 void parallel_for3d(const T0& D0, const T1& D1, const T2& D2, const F& func) {
+    if (D0 == T0(0) || D1 == T1(0) || D2 == T2(0)) {
+        return;
+    }
 #if OV_THREAD == OV_THREAD_TBB
     auto work_amount = static_cast<size_t>(D0 * D1 * D2);
     int nthr = parallel_get_max_threads();
@@ -681,15 +699,20 @@ void parallel_for3d(const T0& D0, const T1& D1, const T2& D2, const F& func) {
         nthr = work_amount;
     }
 
+// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
+    // printf("OMP parallel_for3d nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
     if (nthr == 1) {
         for_3d(0, 1, D0, D1, D2, func);
     } else {
-#        pragma omp parallel num_threads(nthr)
+#        pragma omp parallel //num_threads(nthr)
         { 
 // if (omp_get_level() > 1 || omp_get_active_level() > 1) {
-//     printf("    OMP parallel_for3d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
-//         omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
-//         omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+    // printf("    OMP parallel_for3d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
 // }
             for_3d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, func);
         }
@@ -740,6 +763,9 @@ void for_4d(const int& ithr, const int& nthr, const T0& D0, const T1& D1, const 
 
 template <typename T0, typename T1, typename T2, typename T3, typename F>
 void parallel_for4d(const T0& D0, const T1& D1, const T2& D2, const T3& D3, const F& func) {
+    if (D0 == T0(0) || D1 == T1(0) || D2 == T2(0) || D3 == T3(0)) {
+        return;
+    }
 #if OV_THREAD == OV_THREAD_TBB
     auto work_amount = static_cast<size_t>(D0 * D1 * D2 * D3);
     int nthr = parallel_get_max_threads();
@@ -773,11 +799,23 @@ void parallel_for4d(const T0& D0, const T1& D1, const T2& D2, const T3& D3, cons
         nthr = work_amount;
     }
 
+// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
+    // printf("OMP parallel_for4d wa: %d; nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     work_amount, nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
     if (nthr == 1) {
         for_4d(0, 1, D0, D1, D2, D3, func);
     } else {
 #        pragma omp parallel
-        { for_4d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, D3, func); }
+        { 
+// if (omp_get_level() > 1 || omp_get_active_level() > 1) {
+    // printf("    OMP parallel_for4d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
+            for_4d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, D3, func);
+        }
     }
 #elif OV_THREAD == OV_THREAD_SEQ
     for_4d(0, 1, D0, D1, D2, D3, func);
@@ -813,6 +851,9 @@ void for_5d(const int& ithr,
 
 template <typename T0, typename T1, typename T2, typename T3, typename T4, typename F>
 void parallel_for5d(const T0& D0, const T1& D1, const T2& D2, const T3& D3, const T4& D4, const F& func) {
+    if (D0 == T0(0) || D1 == T1(0) || D2 == T2(0) || D3 == T3(0) || D4 == T4(0)) {
+        return;
+    }
 #if OV_THREAD == OV_THREAD_TBB
     auto work_amount = static_cast<size_t>(D0 * D1 * D2 * D3 * D4);
     int nthr = parallel_get_max_threads();
@@ -846,11 +887,22 @@ void parallel_for5d(const T0& D0, const T1& D1, const T2& D2, const T3& D3, cons
         nthr = work_amount;
     }
 
+// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
+    // printf("OMP parallel_for5d wa: %d; nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     work_amount, nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
     if (nthr == 1) {
         for_5d(0, 1, D0, D1, D2, D3, D4, func);
     } else {
 #        pragma omp parallel
-        { for_5d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, D3, D4, func); }
+        {
+// if (omp_get_level() > 1 || omp_get_active_level() > 1) {
+    // printf("    OMP parallel_for5d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
+            for_5d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, D3, D4, func); }
     }
 #elif OV_THREAD == OV_THREAD_SEQ
     for_5d(0, 1, D0, D1, D2, D3, D4, func);
@@ -888,6 +940,9 @@ void for_6d(const int& ithr,
 
 template <typename T0, typename T1, typename T2, typename T3, typename T4, typename T5, typename F>
 void parallel_for6d(const T0& D0, const T1& D1, const T2& D2, const T3& D3, const T4& D4, const T5& D5, const F& func) {
+    if (D0 == T0(0) || D1 == T1(0) || D2 == T2(0) || D3 == T3(0) || D4 == T4(0) || D5 == T5(0)) {
+        return;
+    }
 #if OV_THREAD == OV_THREAD_TBB
     auto work_amount = static_cast<size_t>(D0 * D1 * D2 * D3 * D4 * D5);
     int nthr = parallel_get_max_threads();
@@ -921,11 +976,22 @@ void parallel_for6d(const T0& D0, const T1& D1, const T2& D2, const T3& D3, cons
         nthr = work_amount;
     }
 
+// if (omp_get_level() > 0 || omp_get_active_level() > 0) {
+    // printf("OMP parallel_for6d wa: %d; nthr: %d; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     work_amount, nthr, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
     if (nthr == 1) {
         for_6d(0, 1, D0, D1, D2, D3, D4, D5, func);
     } else {
 #        pragma omp parallel
-        { for_6d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, D3, D4, D5, func); }
+        {
+// if (omp_get_level() > 1 || omp_get_active_level() > 1) {
+    // printf("    OMP parallel_for6d nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d\n",
+    //     omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
+    //     omp_get_level(), omp_get_active_level(), omp_get_max_active_levels());
+// }
+            for_6d(parallel_get_thread_num(), parallel_get_num_threads(), D0, D1, D2, D3, D4, D5, func); }
     }
 #elif OV_THREAD == OV_THREAD_SEQ
     for_6d(0, 1, D0, D1, D2, D3, D4, D5, func);

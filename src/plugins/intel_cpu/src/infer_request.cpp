@@ -142,8 +142,8 @@ void SyncInferRequest::infer() {
     push_input_data(graph);
 
 #if OV_THREAD == OV_THREAD_OMP
-    omp_set_dynamic(1);
-    omp_set_nested(1);
+    // omp_set_dynamic(1);
+    // omp_set_nested(1);
 #endif
 
     graph.Infer(this);
