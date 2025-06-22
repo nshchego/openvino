@@ -2638,11 +2638,17 @@ void MVN::MVNJitExecutor::mvn_nspc(const uint8_t* src_data,
     const size_t W = shape5d[4];
 
     // const size_t threads_num = parallel_get_max_threads();
-    const auto max_threads = parallel_get_max_threads();
-    const auto b_threads = std::min(max_threads, int(N));
-    const auto w_threads = max_threads / b_threads;
+    const size_t max_threads = parallel_get_max_threads();
+    const size_t b_threads = std::min(max_threads, N);
+    const size_t w_threads = max_threads / b_threads;
+    const size_t aux_buffer_size = mvnAttrs.execAcrossChannels_ ? 1 : rnd_up(C, blk_size) + blk_size;
 
-    size_t aux_buffer_size = mvnAttrs.execAcrossChannels_ ? 1 : rnd_up(C, blk_size) + blk_size;
+    // std::vector<std::vector<float>> mean_buffer(N, std::vector<float>(aux_buffer_size * w_threads, 0.F));
+    // std::vector<std::vector<float>> variance_buffer;
+    // if (mvnAttrs.normalizeVariance_) {
+    //     variance_buffer.resize(N, std::vector<float>(aux_buffer_size * w_threads, 0.F));
+    // }
+
     auto b_loop = [&](size_t b) {
 // printf("    MVN::MVNJitExecutor::mvn_nspc::b_loop b: %lu; nested: %d; dynamic: %d, num_threads: %d, max_threads: %d, thread_limit: %d, level: %d; active_level: %d; max_active_level: %d; thread_num: %d; sys_tid: %lu\n",
 //     b, omp_get_nested(), omp_get_dynamic(), omp_get_num_threads(), omp_get_max_threads(), omp_get_thread_limit(),
@@ -2710,18 +2716,18 @@ void MVN::MVNJitExecutor::mvn_nspc(const uint8_t* src_data,
             float size_inv = 1.F / static_cast<float>(C * D * H * W);
             worker(true, 0);
             for (size_t i = 1; i < w_threads; i++) {
-                mean_buffer[0] += mean_buffer[i];
+                mean_ptr[0] += mean_ptr[i];
             }
-            mean_buffer[0] *= size_inv;
+            mean_ptr[0] *= size_inv;
             if (mvnAttrs.normalizeVariance_) {
                 worker(true, 1);
                 for (size_t i = 1; i < w_threads; i++) {
-                    variance_buffer[0] += variance_buffer[i];
+                    variance_ptr[0] += variance_ptr[i];
                 }
                 if (mvnAttrs.epsMode_ == INSIDE_SQRT) {
-                    variance_buffer[0] = 1.F / sqrtf(variance_buffer[0] * size_inv + mvnAttrs.epsValue_);
+                    variance_ptr[0] = 1.F / sqrtf(variance_ptr[0] * size_inv + mvnAttrs.epsValue_);
                 } else if (mvnAttrs.epsMode_ == OUTSIDE_SQRT) {
-                    variance_buffer[0] = 1.F / (sqrtf(variance_buffer[0] * size_inv) + mvnAttrs.epsValue_);
+                    variance_ptr[0] = 1.F / (sqrtf(variance_ptr[0] * size_inv) + mvnAttrs.epsValue_);
                 }
             }
             worker(true, 2);
@@ -2730,24 +2736,24 @@ void MVN::MVNJitExecutor::mvn_nspc(const uint8_t* src_data,
             worker(false, 0);
             for (size_t i = 1; i < w_threads; i++) {
                 for (size_t c = 0; c < C; c++) {
-                    mean_buffer[c] += mean_buffer[c + aux_buffer_size * i];
+                    mean_ptr[c] += mean_ptr[c + aux_buffer_size * i];
                 }
             }
             for (size_t c = 0; c < C; c++) {
-                mean_buffer[c] *= size_inv;
+                mean_ptr[c] *= size_inv;
             }
             if (mvnAttrs.normalizeVariance_) {
                 worker(false, 1);
                 for (size_t i = 1; i < w_threads; i++) {
                     for (size_t c = 0; c < C; c++) {
-                        variance_buffer[c] += variance_buffer[c + aux_buffer_size * i];
+                        variance_ptr[c] += variance_ptr[c + aux_buffer_size * i];
                     }
                 }
                 for (size_t c = 0; c < C; c++) {
                     if (mvnAttrs.epsMode_ == INSIDE_SQRT) {
-                        variance_buffer[c] = 1.F / sqrtf(variance_buffer[c] * size_inv + mvnAttrs.epsValue_);
+                        variance_ptr[c] = 1.F / sqrtf(variance_ptr[c] * size_inv + mvnAttrs.epsValue_);
                     } else if (mvnAttrs.epsMode_ == OUTSIDE_SQRT) {
-                        variance_buffer[c] = 1.F / (sqrtf(variance_buffer[c] * size_inv) + mvnAttrs.epsValue_);
+                        variance_ptr[c] = 1.F / (sqrtf(variance_ptr[c] * size_inv) + mvnAttrs.epsValue_);
                     }
                 }
             }
