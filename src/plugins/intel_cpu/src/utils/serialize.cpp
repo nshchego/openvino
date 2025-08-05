@@ -2,22 +2,152 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "serialize.hpp"
+#include "openvino/pass/serialize.hpp"
 
 #include <utility>
 
-#include "openvino/pass/serialize.hpp"
+#include "openvino/core/constant_writer.hpp"
+#include "openvino/core/rt_info/weightless_caching_attributes.hpp"
+#include "openvino/core/xml_serialize_util.hpp"
 #include "openvino/runtime/shared_buffer.hpp"
 #include "openvino/util/mmap_object.hpp"
+#include "serialize.hpp"
 
 namespace ov::intel_cpu {
+class WeightlessWriter : public ov::util::ConstantWriter {
+public:
+    explicit WeightlessWriter(ov::util::ConstantWriter& other) : ov::util::ConstantWriter(other), m_offset{} {}
+    WeightlessWriter(std::ostream& bin_file) : ov::util::ConstantWriter(bin_file), m_offset{} {}
+
+    WeightlessWriter::FilePosition write([[maybe_unused]] const char* ptr,
+                                         size_t size,
+                                         size_t& new_size,
+                                         [[maybe_unused]] bool compress_to_fp16,
+                                         [[maybe_unused]] ov::element::Type src_type,
+                                         [[maybe_unused]] bool ptr_is_temporary) override {
+        // new_size = size; // TODO will set size to 0, no data in weights (CPU specific)
+        auto offset = m_offset;
+        m_offset += size;
+        return offset;
+    }
+
+private:
+    WeightlessWriter::FilePosition m_offset;
+};
+
+class XmlSerializer : public ov::util::XmlSerializer {
+public:
+    XmlSerializer(pugi::xml_node& data,
+                  const std::string& node_type_name,
+                  ov::util::ConstantWriter& constant_write_handler,
+                  int64_t version,
+                  bool deterministic = false,
+                  bool compress_to_fp16 = false,
+                  ov::element::Type output_element_type = ov::element::dynamic,
+                  bool data_is_temporary = false,
+                  bool wl_mode = false)
+        : ov::util::XmlSerializer(data,
+                                  node_type_name,
+                                  constant_write_handler,
+                                  version,
+                                  deterministic,
+                                  compress_to_fp16,
+                                  output_element_type,
+                                  data_is_temporary),
+          m_wl_const_writer(constant_write_handler),
+          m_use_weightless_writer(false),
+          m_wl_mode(wl_mode) {}
+
+private:
+    bool append_rt_attribute(pugi::xml_node& node, const ov::RuntimeAttribute& attribute) override {
+        if (auto wl_attr = ov::as_type<const ov::WeightlessCacheAttribute>(&attribute)) {
+            const auto& type_info = attribute.get_type_info();
+            node.append_attribute("name").set_value(type_info.name);
+            node.append_attribute("version").set_value(type_info.get_version().c_str());
+            node.append_attribute("type").set_value(ov::util::get_ir_precision_name(wl_attr->original_dtype));
+            node.append_attribute("offset").set_value(wl_attr->bin_offset);
+            node.append_attribute("size").set_value(wl_attr->original_size);
+            return true;
+        } else {
+            return ov::util::XmlSerializer::append_rt_attribute(node, attribute);
+        }
+    }
+
+    bool append_node_attributes(ov::Node& node) override {
+        m_use_weightless_writer =
+            m_wl_mode && node.get_rt_info().count(ov::WeightlessCacheAttribute::get_type_info_static()) != 0;
+        auto result = ov::util::XmlSerializer::append_node_attributes(node);
+        m_use_weightless_writer = false;
+        return result;
+    }
+
+    ov::util::ConstantWriter& get_constant_write_handler() override {
+        return m_wl_mode && m_use_weightless_writer ? m_wl_const_writer
+                                                    : ov::util::XmlSerializer::get_constant_write_handler();
+    }
+
+    std::unique_ptr<ov::util::XmlSerializer> make_visitor(pugi::xml_node& data,
+                                                          const std::string& node_type_name,
+                                                          ov::util::ConstantWriter& constant_write_handler,
+                                                          int64_t version,
+                                                          bool deterministic,
+                                                          bool compress_to_fp16,
+                                                          ov::element::Type output_element_type,
+                                                          bool data_is_temporary) const override {
+        return std::make_unique<XmlSerializer>(data,
+                                               node_type_name,
+                                               constant_write_handler,
+                                               version,
+                                               deterministic,
+                                               compress_to_fp16,
+                                               output_element_type,
+                                               data_is_temporary);
+    }
+
+    WeightlessWriter m_wl_const_writer;
+    bool m_use_weightless_writer;  // Flag to indicate if we are using a weightless writer
+    bool m_wl_mode;
+};
+
+class StreamSerialize : public ov::pass::StreamSerialize {
+public:
+    StreamSerialize(std::ostream& stream,
+                    std::function<void(std::ostream&)> custom_data_serializer,
+                    ModelSerializer::CacheEncrypt cache_encrypt,
+                    ov::pass::Serialize::Version version,
+                    bool wl_mode)
+        : ov::pass::StreamSerialize(stream, std::move(custom_data_serializer), std::move(cache_encrypt), version),
+          m_weightless_mode(wl_mode) {}
+
+private:
+    std::unique_ptr<util::XmlSerializer> make_serializer(pugi::xml_node& data,
+                                                         const std::string& node_type_name,
+                                                         util::ConstantWriter& constant_write_handler,
+                                                         int64_t version,
+                                                         bool deterministic,
+                                                         bool compress_to_fp16,
+                                                         ov::element::Type output_element_type,
+                                                         bool data_is_temporary) const override {
+        return std::make_unique<XmlSerializer>(data,
+                                               node_type_name,
+                                               constant_write_handler,
+                                               version,
+                                               deterministic,
+                                               compress_to_fp16,
+                                               output_element_type,
+                                               data_is_temporary,
+                                               m_weightless_mode);
+    }
+
+    bool m_weightless_mode;
+};
 
 ////////// ModelSerializer //////////
 
-ModelSerializer::ModelSerializer(std::ostream& ostream, CacheEncrypt encrypt_fn, bool skip_weightless_constants)
+ModelSerializer::ModelSerializer(std::ostream& ostream, CacheEncrypt encrypt_fn, bool wl_mode)
     : m_ostream(ostream),
       m_cache_encrypt(std::move(encrypt_fn)),
-      m_skip_weightless_constants(skip_weightless_constants) {}
+      m_wl_mode(wl_mode) {}
 
 void ModelSerializer::operator<<(const std::shared_ptr<ov::Model>& model) {
     auto serialize_info = [&](std::ostream& stream) {
@@ -26,13 +156,12 @@ void ModelSerializer::operator<<(const std::shared_ptr<ov::Model>& model) {
         root.append_child("outputs");
         xml_doc.save(stream);
     };
-
-    ov::pass::StreamSerialize serializer(m_ostream,
-                                         serialize_info,
-                                         m_cache_encrypt,
-                                         pass::Serialize::Version::UNSPECIFIED,
-                                         m_skip_weightless_constants);
-    serializer.run_on_model(std::const_pointer_cast<ov::Model>(model->clone()));
+    StreamSerialize serializer(m_ostream,
+                               serialize_info,
+                               m_cache_encrypt,
+                               pass::Serialize::Version::UNSPECIFIED,
+                               m_wl_mode);
+    serializer.run_on_model(model);
 }
 
 ////////// ModelDeserializer //////////

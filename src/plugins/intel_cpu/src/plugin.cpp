@@ -31,12 +31,165 @@
 #endif
 
 #include "cpu/x64/cpu_isa_traits.hpp"
+#include "openvino/core/rt_info/weightless_caching_attributes.hpp"
+#include "openvino/core/type/element_iterator.hpp"
+#include "openvino/core/xml_deserialize_util.hpp"
 #include "openvino/op/convolution.hpp"
 #include "openvino/op/scaled_dot_product_attention.hpp"
+#include "openvino/util/xml_parse_utils.hpp"
 
 using namespace ov::threading;
 
 namespace ov::intel_cpu {
+
+template <class T>
+void str_to_container(const std::string& value, T& res) {
+    std::stringstream ss(value);
+    std::string field;
+    while (getline(ss, field, ',')) {
+        if (field.empty())
+            OPENVINO_THROW("Cannot get vector of parameters! \"", value, "\" is incorrect");
+        std::stringstream fs(field);
+        typename T::value_type val;
+        fs >> val;
+        res.insert(res.end(), val);
+    }
+}
+
+template <class T>
+bool getParameters(const pugi::xml_node& node, const std::string& name, std::vector<T>& value) {
+    str_to_container(ov::util::pugixml::get_str_attr(node, name.c_str()), value);
+    return true;
+}
+
+class XmlDeserializer : public ov::util::XmlDeserializer {
+public:
+    explicit XmlDeserializer(const pugi::xml_node& node,
+                             const std::shared_ptr<ov::AlignedBuffer>& weights,
+                             const std::unordered_map<std::string, ov::OpSet>& opsets,
+                             const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
+                             std::unordered_map<std::string, std::shared_ptr<ov::op::util::Variable>>& variables,
+                             size_t version)
+        : XmlDeserializer(node, weights, nullptr, opsets, extensions, variables, version) {}
+
+    explicit XmlDeserializer(const pugi::xml_node& node,
+                             const std::shared_ptr<ov::AlignedBuffer>& weights,
+                             const std::shared_ptr<ov::AlignedBuffer>& origin_weights,
+                             const std::unordered_map<std::string, ov::OpSet>& opsets,
+                             const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
+                             std::unordered_map<std::string, std::shared_ptr<ov::op::util::Variable>>& variables,
+                             size_t version)
+        : ov::util::XmlDeserializer(node, weights, opsets, extensions, variables, version),
+          m_origin_weights{origin_weights} {}
+
+protected:
+    ov::Any parse_weightless_cache_attribute(const pugi::xml_node& node) const override {
+        if (auto rt_info = node.child("rt_info")) {
+            for (const auto& child : rt_info.children()) {
+                for (const auto& attr : child.attributes()) {
+                    if (strcmp(attr.name(), "name") == 0 &&
+                        strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
+                        const auto origin_size = static_cast<size_t>(ov::util::pugixml::get_uint64_attr(child, "size"));
+                        const auto offset = static_cast<size_t>(ov::util::pugixml::get_uint64_attr(child, "offset"));
+                        const ov::element::Type original_dt(child.attribute("type").value());
+                        return {ov::WeightlessCacheAttribute{origin_size, offset, original_dt}};
+                    }
+                }
+            }
+        }
+        return {};
+    }
+
+    void set_const_numeric_buffer(ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>& adapter) override {
+        OPENVINO_ASSERT(get_weights() != nullptr || m_origin_weights != nullptr,
+                        "Empty weights data in bin file or bin file cannot be found!");
+        const auto node = get_node();
+        const auto& dn = node.child("data");
+        const auto el_type = ov::element::Type(ov::util::pugixml::get_str_attr(dn, "element_type"));
+        if (el_type == element::string) {
+            ov::util::XmlDeserializer::set_const_numeric_buffer(adapter);
+        } else {
+            ov::Shape shape;
+            {
+                std::vector<int64_t> shapev;
+                if (!getParameters<int64_t>(dn, "shape", shapev)) {
+                    return;
+                }
+                shape.assign(shapev.begin(), shapev.end());
+            }
+            // Some test case Here is an issue as after call the code below is not executed and Const buffer is not set
+            ov::Any wl_attr = parse_weightless_cache_attribute(node);
+            size_t offset = static_cast<size_t>(ov::util::pugixml::get_uint64_attr(dn, "offset"));
+            auto actual_size = static_cast<size_t>(ov::util::pugixml::get_uint64_attr(dn, "size"));
+            auto original_dtype = el_type;
+            if (wl_attr.is<ov::WeightlessCacheAttribute>()) {
+                char* data = get_weights()->get_ptr<char>() + offset;
+                auto w_size = get_weights()->size();
+                auto w_so = get_weights();
+                if (wl_attr.is<ov::WeightlessCacheAttribute>()) {
+                    const auto& wl = wl_attr.as<ov::WeightlessCacheAttribute>();
+                    actual_size = wl.original_size;
+                    offset = wl.bin_offset;
+                    original_dtype = wl.original_dtype;
+                    data = m_origin_weights->get_ptr<char>() + offset;
+                    w_size = m_origin_weights->size();
+                    w_so = m_origin_weights;
+                }
+                OPENVINO_ASSERT(w_size >= offset + actual_size, "Incorrect weights in bin file!");
+                if (original_dtype != el_type) {
+                    const auto org_tensor = ov::Tensor(original_dtype, shape, data);
+                    auto converted_weights = std::make_shared<ov::AlignedBuffer>(
+                        ov::element::get_memory_size(el_type, ov::shape_size(shape)));
+                    {
+                        auto converted_output = ov::TensorVector{{el_type, shape, converted_weights->get_ptr()}};
+                        auto convert = ov::op::v0::Convert();
+                        OPENVINO_ASSERT(convert.evaluate(converted_output, {org_tensor}), "Conversion not supported");
+                    }
+                    adapter.set(converted_weights);
+                } else {
+                    OPENVINO_ASSERT(w_size >= offset + actual_size, "Incorrect weights in bin file!");
+
+                    if (actual_size < ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3)) {
+                        const auto type = ov::util::pugixml::get_str_attr(get_node(), "type");
+                        OPENVINO_THROW("Attribute and shape size are inconsistent for ",
+                                       type,
+                                       " op!",
+                                       actual_size,
+                                       ", ",
+                                       ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3),
+                                       ", ",
+                                       ov::element::get_memory_size(el_type, ov::shape_size(shape)));
+                    }
+
+                    auto buffer =
+                        std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, actual_size, w_so);
+                    adapter.set(buffer);
+                }
+            } else {
+                ov::util::XmlDeserializer::set_const_numeric_buffer(adapter);
+            }
+        }
+    }
+
+private:
+    std::unique_ptr<ov::util::XmlDeserializer> make_visitor(
+        const pugi::xml_node& node,
+        const std::shared_ptr<ov::AlignedBuffer>& weights,
+        const std::unordered_map<std::string, ov::OpSet>& opsets,
+        const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
+        std::unordered_map<std::string, std::shared_ptr<ov::op::util::Variable>>& variables,
+        size_t version) const override {
+        return std::make_unique<XmlDeserializer>(node,
+                                                 weights,
+                                                 m_origin_weights,
+                                                 opsets,
+                                                 extensions,
+                                                 variables,
+                                                 version);
+    }
+
+    std::shared_ptr<ov::AlignedBuffer> m_origin_weights;
+};
 
 static std::string getDeviceFullName() {
     std::string brand_string;
@@ -617,10 +770,52 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     ModelDeserializer deserializer(
         model_stream,
         model_buffer,
-        [this](const std::shared_ptr<ov::AlignedBuffer>& model,
-               const std::shared_ptr<ov::AlignedBuffer>& weights,
-               const std::shared_ptr<ov::AlignedBuffer>& origin_weights) {
-            return get_core()->read_model(model, weights, origin_weights);
+        [this, is_weightless_mode = (cache_mode == ov::CacheMode::OPTIMIZE_SIZE)](
+            const std::shared_ptr<ov::AlignedBuffer>& model,
+            const std::shared_ptr<ov::AlignedBuffer>& weights,
+            const std::shared_ptr<ov::AlignedBuffer>& origin_weights) {
+            if (!is_weightless_mode) {
+                return get_core()->read_model(model, weights);
+            } else {
+                // Custom deserialization for weightless mode
+
+                pugi::xml_document xml_doc;
+                const auto root = [&] {
+                    auto res =
+                        xml_doc.load_buffer(model->get_ptr(), model->size(), pugi::parse_default, pugi::encoding_utf8);
+                    OPENVINO_ASSERT(res.status == pugi::status_ok, res.description(), " at offset ", res.offset);
+                    return xml_doc.document_element();
+                }();
+                const auto opsets = [] {
+                    std::unordered_map<std::string, ov::OpSet> opsets;
+                    for (const auto& [name, mk_opset] : ov::get_available_opsets()) {
+                        opsets[name] = mk_opset();
+                    }
+                    return opsets;
+                }();
+                const auto version = static_cast<size_t>(ov::util::pugixml::get_uint64_attr(root, "version", 0));
+
+                auto create_extensions_map =
+                    [&]() -> std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr> {
+                    std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr> exts;
+                    std::vector<ov::Extension::Ptr> m_extensions;
+                    create_extensions(m_extensions);
+                    for (const auto& ext : m_extensions) {
+                        if (auto base_ext = std::dynamic_pointer_cast<ov::BaseOpExtension>(ext))
+                            exts.insert({base_ext->get_type_info(), base_ext});
+                    }
+                    return exts;
+                }();
+
+                // std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr> extensions{};
+                std::unordered_map<std::string, std::shared_ptr<ov::op::util::Variable>> variables;
+                const auto& w = (weights != nullptr && weights->size() != 0) ? weights : origin_weights;
+                XmlDeserializer visitor(root, w, origin_weights, opsets, create_extensions_map, variables, version);
+                std::shared_ptr<ov::Model> model;
+                visitor.on_attribute("net", model);
+                model->get_rt_info()["version"] = int64_t(version);
+                return model;
+            }
         },
         decrypt,
         decript_from_string,

@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "ir_deserializer.hpp"
+#include "openvino/core/xml_deserialize_util.hpp"
 
 #include <regex>
 #include <string_view>
 
-#include "../../../core/reference/include/openvino/reference/convert.hpp"
 #include "openvino/core/descriptor_tensor.hpp"
 #include "openvino/core/meta_data.hpp"
+#include "openvino/core/op_post_process_extension.hpp"
 #include "openvino/core/rt_info/weightless_caching_attributes.hpp"
 #include "openvino/core/type.hpp"
+#include "openvino/core/type/element_iterator.hpp"
 #include "openvino/core/type/element_type_traits.hpp"
 #include "openvino/op/constant.hpp"
 #include "openvino/op/parameter.hpp"
@@ -23,13 +24,102 @@
 #include "openvino/op/util/variable.hpp"
 #include "openvino/runtime/shared_buffer.hpp"
 #include "openvino/runtime/string_aligned_buffer.hpp"
+#include "openvino/util/common_util.hpp"
 #include "openvino/util/xml_parse_utils.hpp"
-#include "rt_info_deserializer.hpp"
+// #include "rt_info_deserializer.hpp"
 #include "transformations/rt_info/attributes.hpp"
 
-using namespace ov::util;
-
+namespace ov::util {
 namespace {
+// void operator>>(const std::stringstream& in, ov::element::Type& type) {
+//     type = ov::element::Type(ov::util::trim(in.str()));
+// }
+
+bool getStrAttribute(const pugi::xml_node& node, const std::string& name, std::string& value) {
+    if (!node)
+        return false;
+
+    auto attr = node.attribute(name.c_str());
+    if (attr.empty())
+        return false;
+    value = std::string(attr.value());
+    return true;
+}
+
+template <class T>
+void str_to_container(const std::string& value, T& res) {
+    std::stringstream ss(value);
+    std::string field;
+    while (getline(ss, field, ',')) {
+        if (field.empty())
+            OPENVINO_THROW("Cannot get vector of parameters! \"", value, "\" is incorrect");
+        std::stringstream fs(field);
+        typename T::value_type val;
+        fs >> val;
+        res.insert(res.end(), val);
+    }
+}
+
+template <class T>
+bool getParameters(const pugi::xml_node& node, const std::string& name, std::vector<T>& value) {
+    std::string param;
+    if (!getStrAttribute(node, name, param))
+        return false;
+    str_to_container(param, value);
+    return true;
+}
+
+template <class T>
+T stringToType(const std::string& valStr) {
+    T ret{0};
+    std::istringstream ss(valStr);
+    if (!ss.eof()) {
+        ss >> ret;
+    }
+    return ret;
+}
+
+bool get_partial_shape_from_attribute(const pugi::xml_node& node, const std::string& name, PartialShape& value) {
+    std::string param;
+    if (!getStrAttribute(node, name, param))
+        return false;
+    value = PartialShape(param);
+    return true;
+}
+
+bool get_dimension_from_attribute(const pugi::xml_node& node, const std::string& name, Dimension& value) {
+    std::string param;
+    if (!getStrAttribute(node, name, param))
+        return false;
+    value = Dimension(param);
+    return true;
+}
+
+void str_to_set_of_strings(const std::string& value, std::set<std::string>& res) {
+    std::stringstream ss(value);
+    std::string field;
+    while (getline(ss, field, ',')) {
+        // trim leading and trailing whitespaces
+        auto strBegin = field.find_first_not_of(" ");
+        if (strBegin == std::string::npos)
+            OPENVINO_THROW("Cannot get a set of strings from \"", value, "\". Value \"", field, "\" is incorrect");
+        auto strRange = field.find_last_not_of(" ") - strBegin + 1;
+
+        res.insert(field.substr(strBegin, strRange));
+    }
+}
+
+void str_to_container(const std::string& value, std::vector<std::string>& res) {
+    std::stringstream ss(value);
+    std::string field;
+    while (getline(ss, field, ',')) {
+        field = ov::util::trim(field);
+        if (!field.empty()) {
+            res.emplace_back(field);
+        }
+    }
+}
+
 /**
  * @brief Function deserializing tensor names.
  *
@@ -67,8 +157,356 @@ std::unordered_set<std::string> deserialize_tensor_names(const std::string_view&
 }
 }  // namespace
 
-ov::XmlDeserializer::IoMap ov::XmlDeserializer::updated_io_map(const pugi::xml_node& node,
-                                                               const pugi::xml_node& body_node) {
+struct GenericLayerParams {
+    struct LayerPortData {
+        size_t portId;
+        std::vector<ov::Dimension> dims;
+        ov::element::Type_t precision;
+        std::unordered_set<std::string> names;
+    };
+    size_t layerId;
+    std::string version;
+    std::string name;
+    std::string type;
+    std::vector<LayerPortData> inputPorts;
+    std::vector<LayerPortData> outputPorts;
+
+    size_t get_real_input_port_id(size_t id) const {
+        size_t real_id = 0;
+        for (auto& it : inputPorts) {
+            if (it.portId == id) {
+                return real_id;
+            }
+            ++real_id;
+        }
+        OPENVINO_THROW("Can not find input port with id ", id, " in layer ", name);
+    }
+
+    size_t get_real_output_port_id(size_t id) const {
+        size_t real_id = 0;
+        for (auto& it : outputPorts) {
+            if (it.portId == id) {
+                return real_id;
+            }
+            ++real_id;
+        }
+        OPENVINO_THROW("Can not find output port with id ", id, " in layer ", name);
+    }
+};
+
+class MetaDataParser : public ov::MetaDataWithPugixml {
+public:
+    MetaDataParser(const std::string& name, const pugi::xml_node& meta, bool accessible_by_pugixml_node = true)
+        : m_name(name),
+          m_accessible_by_pugixml_node(accessible_by_pugixml_node) {
+        m_meta.append_copy(meta);
+        if (accessible_by_pugixml_node) {
+            m_meta_node = m_meta.child(m_name.c_str());
+        } else {
+            m_meta_node = pugi::xml_node();
+        }
+    }
+
+    operator const ov::AnyMap&() const override {
+        parse();
+        return m_parsed_map;
+    }
+
+    operator ov::AnyMap&() override {
+        parse();
+        return m_parsed_map;
+    }
+
+    const pugi::xml_node& get_pugi_node() const override {
+        if (!m_meta_node.empty() && !m_accessible_by_pugixml_node) {
+            // Meta cannot be accessed by pugixml node. Return empty node
+            m_meta_node = pugi::xml_node();
+        }
+        return m_meta_node;
+    };
+
+private:
+    bool has_attr(const pugi::xml_node& node, const std::string& name = "value") const {
+        auto attr = node.attribute(name.c_str());
+        return !attr.empty();
+    }
+
+    ov::Any parse_value(const pugi::xml_node& node) const {
+        if (has_attr(node)) {
+            return pugixml::get_str_attr(node, "value");
+        } else if (std::string(node.name()) == "unset" && has_attr(node, "unset_cli_parameters")) {
+            return pugixml::get_str_attr(node, "unset_cli_parameters");
+        } else {
+            return parse_node(node);
+        }
+    }
+
+    ov::AnyMap parse_node(const pugi::xml_node& node) const {
+        ov::AnyMap result;
+        // Old version may produce nodes like <name value="..."/>, but it may brake xml-naming convention
+        // Now it should look like <info name="..." value="..."/>.
+        // Also we keep an option to read an old XMLs where it doesn't have name attribute
+        const auto name_attr = node.attribute("name");
+        const std::string node_name = name_attr.empty() ? node.name() : name_attr.value();
+        for (const auto& data : node.children()) {
+            const auto name_attr = data.attribute("name");
+            const std::string data_name = name_attr.empty() ? data.name() : name_attr.value();
+            // WA for legacy POT config
+            if (data_name == "config" && node_name == "quantization_parameters") {
+                // Read legacy pot config
+                std::stringstream stream;
+                data.print(stream);
+                std::string str_config = stream.str();
+                str_config = std::regex_replace(str_config, std::regex("<config>"), "");
+                str_config = std::regex_replace(str_config, std::regex("</config>"), "");
+                str_config = std::regex_replace(str_config, std::regex("\n"), "");
+                str_config = std::regex_replace(str_config, std::regex("( +)"), " ");
+                result[data_name] = str_config;
+            } else {
+                result[data_name] = parse_value(data);
+            }
+        }
+        return result;
+    }
+
+    void parse() const {
+        std::call_once(m_oc, [this]() {
+            m_accessible_by_pugixml_node = false;
+            const pugi::xml_node& node = m_meta.child(m_name.c_str());
+            m_parsed_map = parse_node(node);
+        });
+    }
+
+    pugi::xml_document m_meta;
+    const std::string m_name;
+    mutable ov::AnyMap m_parsed_map;
+    mutable std::once_flag m_oc;
+    mutable std::atomic_bool m_accessible_by_pugixml_node;
+    mutable pugi::xml_node m_meta_node;
+};
+
+class RTInfoDeserializer : public ov::AttributeVisitor {
+public:
+    explicit RTInfoDeserializer(const pugi::xml_node& node) : m_node(node) {}
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::string>& value) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        value.set(val);
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<bool>& value) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        std::transform(val.begin(), val.end(), val.begin(), [](char ch) {
+            return std::tolower(static_cast<unsigned char>(ch));
+        });
+        std::set<std::string> true_names{"true", "1"};
+        std::set<std::string> false_names{"false", "0"};
+
+        bool is_true = true_names.find(val) != true_names.end();
+        bool is_false = false_names.find(val) != false_names.end();
+
+        if (!is_true && !is_false)
+            return;
+        value.set(is_true);
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        if (auto a = as_type<AttributeAdapter<std::set<std::string>>>(&adapter)) {
+            std::set<std::string> ss;
+            str_to_set_of_strings(val, ss);
+            a->set(ss);
+        } else {
+            OPENVINO_NOT_IMPLEMENTED;
+        }
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<double>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        adapter.set(stringToType<double>(val));
+    }
+    void on_adapter(const std::string& name, ov::ValueAccessor<int64_t>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        adapter.set(stringToType<int64_t>(val));
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::shared_ptr<ov::Model>>& adapter) override {
+        OPENVINO_THROW("Model type is unsupported for rt info deserialization");
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int32_t>>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        std::vector<int32_t> value;
+        str_to_container(val, value);
+        adapter.set(value);
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int64_t>>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        std::vector<int64_t> value;
+        str_to_container(val, value);
+        adapter.set(value);
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<float>>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        std::vector<float> value;
+        str_to_container(val, value);
+        adapter.set(value);
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<uint64_t>>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        std::vector<uint64_t> value;
+        str_to_container(val, value);
+        adapter.set(value);
+    }
+
+    void on_adapter(const std::string& name, ov::ValueAccessor<std::vector<std::string>>& adapter) override {
+        check_attribute_name(name);
+        std::string val;
+        if (!getStrAttribute(m_node, name, val))
+            return;
+        std::vector<std::string> value;
+        str_to_container(val, value);
+        adapter.set(value);
+    }
+
+    void check_attribute_name(const std::string& name) const {
+        OPENVINO_ASSERT(name != "name" && name != "version",
+                        "Attribute key with name: ",
+                        name,
+                        " is not allowed. Please use another name");
+    }
+
+private:
+    pugi::xml_node m_node;
+};
+
+XmlDeserializer::XmlDeserializer(const pugi::xml_node& node,
+                                 const std::shared_ptr<ov::AlignedBuffer>& weights,
+                                 const std::unordered_map<std::string, ov::OpSet>& opsets,
+                                 const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
+                                 std::unordered_map<std::string, std::shared_ptr<ov::op::util::Variable>>& variables,
+                                 size_t version)
+    : m_node(node),
+      m_weights(weights),
+      m_opsets(opsets),
+      m_extensions(extensions),
+      m_variables(variables),
+      m_version(version) {}
+
+ov::Any XmlDeserializer::parse_weightless_cache_attribute(const pugi::xml_node& node) const {
+    ov::Any wl_attr;
+    if (const auto data_node = node.child("data")) {
+        const auto size = data_node.attribute("size");
+        const auto offset = data_node.attribute("offset");
+        const auto element_type = data_node.attribute("element_type");
+        if (size && offset && element_type) {
+            wl_attr = ov::WeightlessCacheAttribute(static_cast<size_t>(pugixml::get_uint64_attr(data_node, "size")),
+                                                   static_cast<size_t>(pugixml::get_uint64_attr(data_node, "offset")),
+                                                   ov::element::Type(pugixml::get_str_attr(data_node, "element_type")));
+        }
+    }
+
+    return wl_attr;
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::string>& value) {
+    std::string val;
+    if (!getStrAttribute(m_node.child("data"), name, val))
+        return;
+    value.set(val);
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<bool>& value) {
+    std::string val;
+    if (!getStrAttribute(m_node.child("data"), name, val))
+        return;
+    std::transform(val.begin(), val.end(), val.begin(), [](char ch) {
+        return std::tolower(static_cast<unsigned char>(ch));
+    });
+    std::set<std::string> true_names{"true", "1"};
+    std::set<std::string> false_names{"false", "0"};
+
+    bool is_true = true_names.find(val) != true_names.end();
+    bool is_false = false_names.find(val) != false_names.end();
+
+    if (!is_true && !is_false)
+        return;
+    value.set(is_true);
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<double>& adapter) {
+    std::string val;
+    if (!getStrAttribute(m_node.child("data"), name, val))
+        return;
+    adapter.set(stringToType<double>(val));
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<int64_t>& adapter) {
+    std::string val;
+    if (!getStrAttribute(m_node.child("data"), name, val))
+        return;
+    adapter.set(stringToType<int64_t>(val));
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int32_t>>& adapter) {
+    std::vector<int32_t> value;
+    if (!getParameters<int32_t>(m_node.child("data"), name, value))
+        return;
+    adapter.set(value);
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::vector<int64_t>>& adapter) {
+    std::vector<int64_t> value;
+    if (!getParameters<int64_t>(m_node.child("data"), name, value))
+        return;
+    adapter.set(value);
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::vector<float>>& adapter) {
+    std::vector<float> value;
+    if (!getParameters<float>(m_node.child("data"), name, value))
+        return;
+    adapter.set(value);
+}
+
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::vector<std::string>>& adapter) {
+    std::vector<std::string> value;
+    if (!getParameters<std::string>(m_node.child("data"), name, value))
+        return;
+    adapter.set(value);
+}
+
+XmlDeserializer::IoMap XmlDeserializer::updated_io_map(const pugi::xml_node& node, const pugi::xml_node& body_node) {
     if (body_node.empty()) {
         OPENVINO_THROW("Missing body part.");
     }
@@ -90,7 +528,7 @@ ov::XmlDeserializer::IoMap ov::XmlDeserializer::updated_io_map(const pugi::xml_n
     return extend_io_map;
 }
 
-std::vector<std::shared_ptr<ov::op::util::SubGraphOp::InputDescription>> ov::XmlDeserializer::parse_input_description(
+std::vector<std::shared_ptr<ov::op::util::SubGraphOp::InputDescription>> XmlDeserializer::parse_input_description(
     const pugi::xml_node& node,
     const std::string& body_name,
     const std::string& port_map_name) {
@@ -164,9 +602,9 @@ std::vector<std::shared_ptr<ov::op::util::SubGraphOp::InputDescription>> ov::Xml
 }
 
 std::vector<std::shared_ptr<ov::op::util::MultiSubGraphOp::OutputDescription>>
-ov::XmlDeserializer::parse_output_description(const pugi::xml_node& node,
-                                              const std::string& body_name,
-                                              const std::string& port_map_name) {
+XmlDeserializer::parse_output_description(const pugi::xml_node& node,
+                                          const std::string& body_name,
+                                          const std::string& port_map_name) {
     std::vector<std::shared_ptr<ov::op::util::MultiSubGraphOp::OutputDescription>> outputs;
     auto body_node = node.child(body_name.c_str());
     const auto up_io_map = updated_io_map(node, body_node);
@@ -220,7 +658,7 @@ ov::XmlDeserializer::parse_output_description(const pugi::xml_node& node,
     return outputs;
 }
 
-ov::op::v5::Loop::SpecialBodyPorts ov::XmlDeserializer::parse_purpose_attribute(const pugi::xml_node& node) {
+ov::op::v5::Loop::SpecialBodyPorts XmlDeserializer::parse_purpose_attribute(const pugi::xml_node& node) {
     ov::op::v5::Loop::SpecialBodyPorts result = {-1, -1};
     auto body_node = node.child("body");
     const auto up_io_map = updated_io_map(node, body_node);
@@ -262,55 +700,7 @@ ov::op::v5::Loop::SpecialBodyPorts ov::XmlDeserializer::parse_purpose_attribute(
     return result;
 }
 
-namespace {
-void convert_dt(ov::element::Type to_dt, ov::element::Type from_dt, char* dst, const char* src, size_t el_num) {
-    if (from_dt == ov::element::f16 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const ov::float16*>(src), reinterpret_cast<float*>(dst), el_num);
-    } else if (from_dt == ov::element::i64 && to_dt == ov::element::i32) {
-        ov::reference::convert(reinterpret_cast<const int64_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
-    } else if (from_dt == ov::element::u64 && to_dt == ov::element::i32) {
-        ov::reference::convert(reinterpret_cast<const uint64_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
-    } else if (from_dt == ov::element::bf16 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const ov::bfloat16*>(src), reinterpret_cast<float*>(dst), el_num);
-    } else if (from_dt == ov::element::u8 && to_dt == ov::element::i32) {
-        ov::reference::convert(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
-    } else if (from_dt == ov::element::i8 && to_dt == ov::element::i32) {
-        ov::reference::convert(reinterpret_cast<const int8_t*>(src), reinterpret_cast<int32_t*>(dst), el_num);
-    } else if (from_dt == ov::element::u8 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<float*>(dst), el_num);
-    } else if (from_dt == ov::element::u8 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<ov::float16*>(dst), el_num);
-    } else if (from_dt == ov::element::i8 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const int8_t*>(src), reinterpret_cast<float*>(dst), el_num);
-    } else if (from_dt == ov::element::i8 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const int8_t*>(src), reinterpret_cast<ov::float16*>(dst), el_num);
-    } else if (from_dt == ov::element::f32 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const float*>(src), reinterpret_cast<ov::float16*>(dst), el_num);
-    } else if (from_dt == ov::element::f32 && to_dt == ov::element::bf16) {
-        ov::reference::convert(reinterpret_cast<const float*>(src), reinterpret_cast<ov::bfloat16*>(dst), el_num);
-    } else if (from_dt == ov::element::u4 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::u4>::value_type*>(src),
-                               reinterpret_cast<float*>(dst),
-                               el_num);
-    } else if (from_dt == ov::element::u4 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::u4>::value_type*>(src),
-                               reinterpret_cast<ov::float16*>(dst),
-                               el_num);
-    } else if (from_dt == ov::element::i4 && to_dt == ov::element::f32) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::i4>::value_type*>(src),
-                               reinterpret_cast<float*>(dst),
-                               el_num);
-    } else if (from_dt == ov::element::i4 && to_dt == ov::element::f16) {
-        ov::reference::convert(reinterpret_cast<const ov::element_type_traits<ov::element::i4>::value_type*>(src),
-                               reinterpret_cast<ov::float16*>(dst),
-                               el_num);
-    } else {
-        OPENVINO_THROW("Unsupported element types conversion from ", from_dt, " to ", to_dt);
-    }
-}
-}  // namespace
-
-void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) {
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<void>& adapter) {
     static const std::unordered_set<std::string> skip_names = {"input_descriptions",
                                                                "output_descriptions",
                                                                "special_body_ports",
@@ -422,85 +812,7 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
             value.copy(data, value.size());
             a->set(buffer);
         } else if (name == "value" && type == "Const") {
-            OPENVINO_ASSERT(m_weights != nullptr || m_origin_weights != nullptr,
-                            "Empty weights data in bin file or bin file cannot be found!");
-            std::vector<int64_t> shape;
-            std::string el_type_str;
-
-            size_t offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
-            size_t actual_size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
-            size_t origin_size = actual_size;  // Original blob size in the m_weights object.
-            if (!getStrAttribute(dn, "element_type", el_type_str) || !getParameters<int64_t>(dn, "shape", shape)) {
-                return;
-            }
-
-            const auto el_num = ov::shape_size(shape);
-            const auto el_type = ov::element::Type(el_type_str);
-            std::shared_ptr<ov::AlignedBuffer> weights_buf = m_weights;
-            char* data = nullptr;
-
-            // Load from the original binary file if possible.
-            if (m_origin_weights) {
-                if (auto rt_info = m_node.child("rt_info")) {
-                    bool attr_found = false;
-                    for (auto child : rt_info.children()) {
-                        for (auto attr : child.attributes()) {
-                            if (strcmp(attr.name(), "name") == 0 &&
-                                strcmp(attr.value(), ov::WeightlessCacheAttribute::get_type_info_static().name) == 0) {
-                                const ov::element::Type original_dt(child.attribute("original_dtype").value());
-                                offset = static_cast<size_t>(pugixml::get_uint64_attr(child, "bin_offset"));
-                                origin_size = static_cast<size_t>(pugixml::get_uint64_attr(child, "original_size"));
-                                actual_size = ((el_num * el_type.bitwidth() + 7) >> 3);
-                                if (m_origin_weights->size() < offset + origin_size) {
-                                    OPENVINO_THROW("Incorrect weights in bin file!");
-                                }
-
-                                if (original_dt == el_type) {
-                                    weights_buf = m_origin_weights;
-                                } else {
-                                    std::shared_ptr<char> new_buf(new char[actual_size], [](char* p) {
-                                        delete[] p;
-                                    });
-                                    data = new_buf.get();
-                                    weights_buf = std::make_shared<ov::SharedBuffer<std::shared_ptr<char>>>(data,
-                                                                                                            actual_size,
-                                                                                                            new_buf);
-                                    convert_dt(el_type,
-                                               original_dt,
-                                               data,
-                                               m_origin_weights->get_ptr<char>() + offset,
-                                               el_num);
-                                }
-
-                                attr_found = true;
-                                break;
-                            }
-                        }
-                        if (attr_found) {
-                            break;
-                        }
-                    }
-                }
-            }
-            if (data == nullptr) {
-                OPENVINO_ASSERT(weights_buf->size() >= offset + actual_size, "Incorrect weights in bin file!");
-                data = weights_buf->get_ptr<char>() + offset;
-            }
-
-            if (el_type == element::string) {
-                auto buffer =
-                    ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data,
-                                                                                                         actual_size);
-                a->set(buffer);
-            } else {
-                if (actual_size < ((el_num * el_type.bitwidth() + 7) >> 3))
-                    OPENVINO_THROW("Attribute and shape size are inconsistent for ", type, " op!");
-
-                auto buffer = std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data,
-                                                                                                     actual_size,
-                                                                                                     weights_buf);
-                a->set(buffer);
-            }
+            set_const_numeric_buffer(*a);
         }
     } else if (auto a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>>(&adapter)) {
         pugi::xml_node dn = m_node.child("data");
@@ -552,7 +864,7 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
     }
 }
 
-void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::shared_ptr<ov::Model>>& adapter) {
+void XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<std::shared_ptr<ov::Model>>& adapter) {
     std::shared_ptr<ov::Model> model;
     io_map = {};
 
@@ -570,8 +882,49 @@ void ov::XmlDeserializer::on_adapter(const std::string& name, ov::ValueAccessor<
     adapter.set(model);
 }
 
-std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_node& root,
-                                                               const std::shared_ptr<ov::AlignedBuffer>& weights) {
+void XmlDeserializer::set_const_numeric_buffer(ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>& adapter) {
+    OPENVINO_ASSERT(m_weights, "Empty weights data in bin file or bin file cannot be found!");
+    std::vector<int64_t> shape;
+    std::string el_type_str;
+    const auto& dn = m_node.child("data");
+
+    if (!getStrAttribute(dn, "element_type", el_type_str))
+        return;
+
+    if (!getParameters<int64_t>(dn, "shape", shape)) {
+        return;
+    }
+
+    const auto size = static_cast<size_t>(pugixml::get_uint64_attr(dn, "size"));
+    const auto offset = static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset"));
+    OPENVINO_ASSERT(m_weights->size() >= offset + size, "Incorrect weights in bin file!");
+
+    char* data = m_weights->get_ptr<char>() + offset;
+
+    const auto el_type = ov::element::Type(el_type_str);
+    if (el_type == element::string) {
+        auto buffer = ov::AttributeAdapter<std::shared_ptr<ov::StringAlignedBuffer>>::unpack_string_tensor(data, size);
+        adapter.set(buffer);
+    } else {
+        if (size < ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3)) {
+            const auto type = pugixml::get_str_attr(m_node, "type");
+            OPENVINO_THROW("Attribute and shape size are inconsistent for ",
+                           type,
+                           " op!",
+                           size,
+                           ", ",
+                           ((ov::shape_size(shape) * el_type.bitwidth() + 7) >> 3),
+                           ", ",
+                           ov::element::get_memory_size(el_type, ov::shape_size(shape)));
+        }
+
+        auto buffer = std::make_shared<ov::SharedBuffer<std::shared_ptr<ov::AlignedBuffer>>>(data, size, m_weights);
+        adapter.set(buffer);
+    }
+}
+
+std::shared_ptr<ov::Model> XmlDeserializer::parse_function(const pugi::xml_node& root,
+                                                           const std::shared_ptr<ov::AlignedBuffer>& weights) {
     // OV_ITT_SCOPE_CHAIN(FIRST_INFERENCE, taskChain, itt::domains::V10Reader_RT, "V10Parser", "Parse");
 
     struct FunctionNodes {
@@ -661,7 +1014,7 @@ std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_n
             inputs[realInputPortId] = input_node->output(p_output.get_real_output_port_id(e.fromPortId));
         }
 
-        auto node = create_node(inputs, p.xml, weights, m_origin_weights, p.params);
+        auto node = create_node(inputs, p.xml, weights, p.params);
         id_to_node[layer_id] = node;
 
         if (const auto& parameter_node = ov::as_type_ptr<ov::op::v0::Parameter>(node)) {
@@ -720,98 +1073,7 @@ std::shared_ptr<ov::Model> ov::XmlDeserializer::parse_function(const pugi::xml_n
     return function;
 }
 
-class MetaDataParser : public ov::MetaDataWithPugixml {
-public:
-    MetaDataParser(const std::string& name, const pugi::xml_node& meta, bool accessible_by_pugixml_node = true)
-        : m_name(name),
-          m_accessible_by_pugixml_node(accessible_by_pugixml_node) {
-        m_meta.append_copy(meta);
-        if (accessible_by_pugixml_node) {
-            m_meta_node = m_meta.child(m_name.c_str());
-        } else {
-            m_meta_node = pugi::xml_node();
-        }
-    }
-
-    operator const ov::AnyMap&() const override {
-        parse();
-        return m_parsed_map;
-    }
-
-    operator ov::AnyMap&() override {
-        parse();
-        return m_parsed_map;
-    }
-
-    const pugi::xml_node& get_pugi_node() const override {
-        if (!m_meta_node.empty() && !m_accessible_by_pugixml_node) {
-            // Meta cannot be accessed by pugixml node. Return empty node
-            m_meta_node = pugi::xml_node();
-        }
-        return m_meta_node;
-    };
-
-private:
-    bool has_attr(const pugi::xml_node& node, const std::string& name = "value") const {
-        auto attr = node.attribute(name.c_str());
-        return !attr.empty();
-    }
-
-    ov::Any parse_value(const pugi::xml_node& node) const {
-        if (has_attr(node)) {
-            return pugixml::get_str_attr(node, "value");
-        } else if (std::string(node.name()) == "unset" && has_attr(node, "unset_cli_parameters")) {
-            return pugixml::get_str_attr(node, "unset_cli_parameters");
-        } else {
-            return parse_node(node);
-        }
-    }
-
-    ov::AnyMap parse_node(const pugi::xml_node& node) const {
-        ov::AnyMap result;
-        // Old version may produce nodes like <name value="..."/>, but it may brake xml-naming convention
-        // Now it should look like <info name="..." value="..."/>.
-        // Also we keep an option to read an old XMLs where it doesn't have name attribute
-        const auto name_attr = node.attribute("name");
-        const std::string node_name = name_attr.empty() ? node.name() : name_attr.value();
-        for (const auto& data : node.children()) {
-            const auto name_attr = data.attribute("name");
-            const std::string data_name = name_attr.empty() ? data.name() : name_attr.value();
-            // WA for legacy POT config
-            if (data_name == "config" && node_name == "quantization_parameters") {
-                // Read legacy pot config
-                std::stringstream stream;
-                data.print(stream);
-                std::string str_config = stream.str();
-                str_config = std::regex_replace(str_config, std::regex("<config>"), "");
-                str_config = std::regex_replace(str_config, std::regex("</config>"), "");
-                str_config = std::regex_replace(str_config, std::regex("\n"), "");
-                str_config = std::regex_replace(str_config, std::regex("( +)"), " ");
-                result[data_name] = str_config;
-            } else {
-                result[data_name] = parse_value(data);
-            }
-        }
-        return result;
-    }
-
-    void parse() const {
-        std::call_once(m_oc, [this]() {
-            m_accessible_by_pugixml_node = false;
-            const pugi::xml_node& node = m_meta.child(m_name.c_str());
-            m_parsed_map = parse_node(node);
-        });
-    }
-
-    pugi::xml_document m_meta;
-    const std::string m_name;
-    mutable ov::AnyMap m_parsed_map;
-    mutable std::once_flag m_oc;
-    mutable std::atomic_bool m_accessible_by_pugixml_node;
-    mutable pugi::xml_node m_meta_node;
-};
-
-void ov::XmlDeserializer::read_meta_data(const std::shared_ptr<ov::Model>& model, const pugi::xml_node& meta_section) {
+void XmlDeserializer::read_meta_data(const std::shared_ptr<ov::Model>& model, const pugi::xml_node& meta_section) {
     if (meta_section.empty())
         return;
     auto& rt_info = model->get_rt_info();
@@ -833,9 +1095,9 @@ void ov::XmlDeserializer::read_meta_data(const std::shared_ptr<ov::Model>& model
     }
 }
 
-void ov::XmlDeserializer::read_legacy_meta_data(const std::shared_ptr<ov::Model>& model,
-                                                const std::unordered_set<std::string>& names,
-                                                const pugi::xml_node& root_section) {
+void XmlDeserializer::read_legacy_meta_data(const std::shared_ptr<ov::Model>& model,
+                                            const std::unordered_set<std::string>& names,
+                                            const pugi::xml_node& root_section) {
     const auto& read_meta =
         [](const std::shared_ptr<ov::Model>& model, const std::string& name, const pugi::xml_node& meta_section) {
             auto& rt_info = model->get_rt_info();
@@ -865,7 +1127,7 @@ void ov::XmlDeserializer::read_legacy_meta_data(const std::shared_ptr<ov::Model>
         read_meta(model, it, root_section.child(it.c_str()));
 }
 
-ov::GenericLayerParams ov::XmlDeserializer::parse_generic_params(const pugi::xml_node& node) {
+GenericLayerParams XmlDeserializer::parse_generic_params(const pugi::xml_node& node) {
     const auto parsePort = [](const pugi::xml_node& parentNode,
                               const GenericLayerParams& params,
                               bool input) -> GenericLayerParams::LayerPortData {
@@ -938,11 +1200,10 @@ static const std::string& translate_type_name(const std::string& name) {
     return name;
 }
 
-std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov::Output<ov::Node>>& inputs,
-                                                           const pugi::xml_node& node,
-                                                           const std::shared_ptr<ov::AlignedBuffer>& weights,
-                                                           const std::shared_ptr<ov::AlignedBuffer>& origin_weights,
-                                                           const GenericLayerParams& params) {
+std::shared_ptr<ov::Node> XmlDeserializer::create_node(const std::vector<ov::Output<ov::Node>>& inputs,
+                                                       const pugi::xml_node& node,
+                                                       const std::shared_ptr<ov::AlignedBuffer>& weights,
+                                                       const GenericLayerParams& params) {
     // Check that inputs are correctly defined
     for (size_t i = 0; i < inputs.size(); i++) {
         if (!inputs[i].get_node())
@@ -955,16 +1216,15 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
                            i,
                            "!");
     }
-
     const std::string& type_name = translate_type_name(params.type);
 
     std::shared_ptr<ov::Node> ovNode;
     ov::DiscreteTypeInfo type(type_name.c_str(), params.version.c_str());
-    auto extensionIt = m_extensions.find(type);
+    const auto extensionIt = m_extensions.find(type);
 
     if (extensionIt != m_extensions.end()) {
-        XmlDeserializer visitor(node, weights, origin_weights, m_opsets, m_extensions, m_variables, m_version);
-        ovNode = (*extensionIt->second).create(inputs, visitor).at(0).get_node_shared_ptr();
+        auto visitor = make_visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        ovNode = (*extensionIt->second).create(inputs, *visitor).at(0).get_node_shared_ptr();
     }
 
     // Find registered opset
@@ -1005,7 +1265,6 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
         }
 
         const auto& opset = opsetIt->second;
-
         ovNode = std::shared_ptr<ov::Node>(opset.create_insensitive(type_name));
         if (!ovNode) {
             OPENVINO_THROW("Opset ", params.version, " doesn't contain the operation with type: ", type_name);
@@ -1015,9 +1274,8 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
             constant->alloc_buffer_on_visit_attributes(false);
         }
         ovNode->set_arguments(inputs);
-        XmlDeserializer visitor(node, weights, origin_weights, m_opsets, m_extensions, m_variables, m_version);
-
-        if (ovNode->visit_attributes(visitor)) {
+        auto visitor = make_visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        if (ovNode->visit_attributes(*visitor)) {
             ovNode->constructor_validate_and_infer_types();
         }
 
@@ -1026,8 +1284,10 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
     }
     if (!ovNode && m_extensions.count(ov::op::util::FrameworkNode::get_type_info_static())) {
         ovNode = std::make_shared<ov::op::util::FrameworkNode>(inputs);
-        XmlDeserializer visitor(node, weights, origin_weights, m_opsets, m_extensions, m_variables, m_version);
-        ovNode->visit_attributes(visitor);
+        // XmlDeserializer visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        // ovNode->visit_attributes(visitor);
+        auto visitor = make_visitor(node, weights, m_opsets, m_extensions, m_variables, m_version);
+        ovNode->visit_attributes(*visitor);
 
         size_t index{0};
         for (const auto& output_params : params.outputPorts) {
@@ -1059,14 +1319,10 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
         if (aw_data) {
             rtInfo["alt_width"] = aw_data.value();
         }
-        const auto size = dn.attribute("size");
-        const auto offset = dn.attribute("offset");
-        const auto element_type = dn.attribute("element_type");
-        if (size && offset && element_type) {
-            rtInfo[ov::WeightlessCacheAttribute::get_type_info_static()] =
-                ov::WeightlessCacheAttribute(static_cast<size_t>(pugixml::get_uint64_attr(dn, "size")),
-                                             static_cast<size_t>(pugixml::get_uint64_attr(dn, "offset")),
-                                             ov::element::Type(pugixml::get_str_attr(dn, "element_type")));
+
+        if (auto wl_attribute = parse_weightless_cache_attribute(node); !wl_attribute.empty()) {
+            ovNode->get_rt_info().emplace(ov::WeightlessCacheAttribute::get_type_info_static(),
+                                          std::move(wl_attribute));
         }
     }
 
@@ -1148,3 +1404,8 @@ std::shared_ptr<ov::Node> ov::XmlDeserializer::create_node(const std::vector<ov:
 
     return ovNode;
 }
+
+const pugi::xml_node& XmlDeserializer::get_node() const {
+    return m_node;
+}
+}  // namespace ov::util

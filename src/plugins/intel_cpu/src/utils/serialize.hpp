@@ -16,14 +16,14 @@ class ModelSerializer {
 public:
     using CacheEncrypt = std::function<std::string(const std::string&)>;
 
-    ModelSerializer(std::ostream& ostream, CacheEncrypt encrypt_fn = {}, bool skip_weightless_constants = false);
+    ModelSerializer(std::ostream& ostream, CacheEncrypt encrypt_fn = {}, bool wl_mode = false);
 
     void operator<<(const std::shared_ptr<ov::Model>& model);
 
 private:
     std::ostream& m_ostream;
     CacheEncrypt m_cache_encrypt;
-    bool m_skip_weightless_constants;
+    bool m_wl_mode;
 };
 
 class ModelDeserializer {

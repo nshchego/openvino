@@ -6,9 +6,9 @@
 
 #include <pugixml.hpp>
 
-#include "ir_deserializer.hpp"
 #include "openvino/core/except.hpp"
 #include "openvino/core/validation_util.hpp"
+#include "openvino/core/xml_deserialize_util.hpp"
 #include "openvino/op/concat.hpp"
 #include "openvino/op/constant.hpp"
 #include "openvino/op/subtract.hpp"
@@ -203,7 +203,6 @@ namespace ir {
 
 class InputModel::InputModelIRImpl {
     std::shared_ptr<ov::AlignedBuffer> m_weights;
-    std::shared_ptr<ov::AlignedBuffer> m_origin_weights;
     std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr> m_extensions;
     std::unordered_map<std::string, ov::OpSet> m_opsets;
     pugi::xml_node m_root;
@@ -214,7 +213,7 @@ public:
     InputModelIRImpl(std::istream& model,
                      const std::shared_ptr<ov::AlignedBuffer>& weights,
                      const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
-                     const std::string& weights_path)
+                     std::string weights_path)
         : m_weights(weights),
           m_extensions(extensions),
           m_weights_path(std::move(weights_path)) {
@@ -225,11 +224,11 @@ public:
 
     InputModelIRImpl(const std::shared_ptr<ov::AlignedBuffer>& model,
                      const std::shared_ptr<ov::AlignedBuffer>& weights,
-                     const std::shared_ptr<ov::AlignedBuffer>& origin_weights,
-                     const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions)
+                     const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
+                     std::string weights_path)
         : m_weights(weights),
-          m_origin_weights(origin_weights),
-          m_extensions(extensions) {
+          m_extensions(extensions),
+          m_weights_path(std::move(weights_path)) {
         auto res = m_xml_doc.load_buffer(model->get_ptr(), model->size(), pugi::parse_default, pugi::encoding_utf8);
         OPENVINO_ASSERT(res.status == pugi::status_ok, res.description(), " at offset ", res.offset);
         init_opset();
@@ -249,15 +248,15 @@ private:
 InputModel::InputModel(std::istream& model,
                        const std::shared_ptr<ov::AlignedBuffer>& weights,
                        const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
-                       const std::string& weights_path) {
+                       std::string weights_path) {
     _impl = std::make_shared<InputModelIRImpl>(model, weights, extensions, std::move(weights_path));
 }
 
 InputModel::InputModel(const std::shared_ptr<ov::AlignedBuffer>& model,
                        const std::shared_ptr<ov::AlignedBuffer>& weights,
-                       const std::shared_ptr<ov::AlignedBuffer>& origin_weights,
-                       const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions) {
-    _impl = std::make_shared<InputModelIRImpl>(model, weights, origin_weights, extensions);
+                       const std::unordered_map<ov::DiscreteTypeInfo, ov::BaseOpExtension::Ptr>& extensions,
+                       std::string weights_path) {
+    _impl = std::make_shared<InputModelIRImpl>(model, weights, extensions, std::move(weights_path));
 }
 
 std::shared_ptr<ov::Model> InputModel::convert() {
@@ -269,7 +268,7 @@ std::shared_ptr<ov::Model> InputModel::InputModelIRImpl::convert() {
 
     // Load default opsets
     size_t version = static_cast<size_t>(ov::util::pugixml::get_uint64_attr(m_root, "version", 0));
-    ov::XmlDeserializer visitor(m_root, m_weights, m_origin_weights, m_opsets, m_extensions, variables, version);
+    ov::util::XmlDeserializer visitor(m_root, m_weights, m_opsets, m_extensions, variables, version);
     std::shared_ptr<ov::Model> model;
     visitor.on_attribute("net", model);
     model->get_rt_info()["version"] = int64_t(version);

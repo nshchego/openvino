@@ -12,8 +12,15 @@
 #include "openvino/opsets/opset.hpp"
 #include "openvino/pass/pass.hpp"
 
-namespace ov {
-namespace pass {
+namespace pugi {
+class xml_node;
+}
+
+namespace ov::util {
+class XmlSerializer;
+class ConstantWriter;
+}  // namespace ov::util
+namespace ov::pass {
 
 /**
  * @brief Serialize transformation converts ov::Model into IR files
@@ -32,21 +39,14 @@ public:
     };
     bool run_on_model(const std::shared_ptr<ov::Model>& m) override;
 
-    Serialize(std::ostream& xmlFile,
-              std::ostream& binFile,
-              Version version = Version::UNSPECIFIED,
-              bool skip_weightless_constants = false);
+    Serialize(std::ostream& xmlFile, std::ostream& binFile, Version version = Version::UNSPECIFIED);
 
-    Serialize(const std::string& xmlPath,
-              const std::string& binPath,
-              Version version = Version::UNSPECIFIED,
-              bool skip_weightless_constants = false);
+    Serialize(const std::string& xmlPath, const std::string& binPath, Version version = Version::UNSPECIFIED);
 
     Serialize(const std::filesystem::path& xmlPath,
               const std::filesystem::path& binPath,
-              Version version = Version::UNSPECIFIED,
-              bool skip_weightless_constants = false)
-        : Serialize(xmlPath.string(), binPath.string(), version, skip_weightless_constants) {}
+              Version version = Version::UNSPECIFIED)
+        : Serialize(xmlPath.string(), binPath.string(), version) {}
 
 private:
     std::ostream* m_xmlFile;
@@ -55,8 +55,6 @@ private:
     const std::string m_binPath;
     const Version m_version;
     const std::map<std::string, ov::OpSet> m_custom_opsets;
-    // If True, don't serialize weights of Constants nodes with WeightlessCache attribute.
-    bool m_skip_weightless_constants;
 };
 
 /**
@@ -83,16 +81,22 @@ public:
     StreamSerialize(std::ostream& stream,
                     const std::function<void(std::ostream&)>& custom_data_serializer = {},
                     const std::function<std::string(const std::string&)>& cache_encrypt = {},
-                    Serialize::Version version = Serialize::Version::UNSPECIFIED,
-                    bool skip_weightless_constants = false);
+                    Serialize::Version version = Serialize::Version::UNSPECIFIED);
 
 private:
+    virtual std::unique_ptr<util::XmlSerializer> make_serializer(
+        pugi::xml_node& data,
+        const std::string& node_type_name,
+        util::ConstantWriter& constant_write_handler,
+        int64_t version,
+        bool deterministic = false,
+        bool compress_to_fp16 = false,
+        ov::element::Type output_element_type = ov::element::dynamic,
+        bool data_is_temporary = false) const;
+
     std::ostream& m_stream;
     std::function<void(std::ostream&)> m_custom_data_serializer;
     std::function<std::string(const std::string&)> m_cache_encrypt;
     const Serialize::Version m_version;
-    // If True, don't serialize weights of Constants nodes with WeightlessCache attribute.
-    bool m_skip_weightless_constants;
 };
-}  // namespace pass
-}  // namespace ov
+}  // namespace ov::pass

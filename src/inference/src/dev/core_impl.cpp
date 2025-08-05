@@ -1591,9 +1591,11 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                                          : plugin.import_model(networkStream, update_config);
             });
     } catch (const HeaderException&) {
+        std::cout << "--CORE-- HeaderException\n";
         // For these exceptions just remove old cache and set that import didn't work
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
     } catch (...) {
+        std::cout << "--CORE-- Exception ...\n";
         cacheContent.cacheManager->remove_cache_entry(cacheContent.blobId);
         // TODO: temporary disabled by #54335. In future don't throw only for new 'blob_outdated' exception
         // throw;
@@ -1601,6 +1603,7 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
 
     // Fallback scenario
     if (!compiled_model) {
+        std::cout << "--CORE-- Could not load model from cache.\n";
         OPENVINO_WARN("Could not load model from cache.");
         compiled_model = compile_model_lambda();
     }
@@ -1779,10 +1782,9 @@ std::shared_ptr<ov::Model> ov::CoreImpl::read_model(const std::string& model,
 }
 
 std::shared_ptr<ov::Model> ov::CoreImpl::read_model(const std::shared_ptr<AlignedBuffer>& model,
-                                                    const std::shared_ptr<AlignedBuffer>& weights,
-                                                    const std::shared_ptr<AlignedBuffer>& origin_weights) const {
+                                                    const std::shared_ptr<AlignedBuffer>& weights) const {
     OV_ITT_SCOPE(FIRST_INFERENCE, ov::itt::domains::ReadTime, "CoreImpl::read_model from memory");
-    return ov::util::read_model(model, weights, origin_weights, get_extensions_copy());
+    return ov::util::read_model(model, weights, get_extensions_copy());
 }
 
 std::map<std::string, ov::Version> ov::CoreImpl::get_versions(const std::string& deviceName) const {

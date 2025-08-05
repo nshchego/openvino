@@ -31,10 +31,10 @@ std::string WeightlessCacheAccuracy::get_test_case_name(const ::testing::TestPar
 
 void WeightlessCacheAccuracy::SetUp() {
     std::string filePrefix = ov::test::utils::generateTestFilePrefix();
-    m_xml_path = filePrefix + ".xml";
-    m_bin_path = filePrefix + ".bin";
+    m_xml_path   = filePrefix + ".xml";
+    m_bin_path   = filePrefix + ".bin";
     m_cache_path = filePrefix + ".blob";
-    m_cache_dir = filePrefix + "_cache_dir";
+    m_cache_dir  = filePrefix + "_cache_dir";
 
     std::tie(m_use_compile_model_api, m_do_encryption, m_inference_mode, m_model_dtype, m_target_device) = GetParam();
 }
@@ -141,13 +141,13 @@ void WeightlessCacheAccuracy::run() {
 
 TEST_P(WeightlessCacheAccuracy, ReadConcatSplitAssign) {
     SKIP_IF_CURRENT_TEST_IS_DISABLED()
-    OV_ASSERT_NO_THROW(m_model = ov::test::utils::make_read_concat_split_assign({1, 1, 2, 4}, m_model_dtype));
+    OV_ASSERT_NO_THROW(m_model = ov::test::utils::make_read_concat_split_assign({2, 3, 5, 4}, m_model_dtype));
     OV_ASSERT_NO_THROW(run());
 }
 
 TEST_P(WeightlessCacheAccuracy, SingleConcatWithConstant) {
     SKIP_IF_CURRENT_TEST_IS_DISABLED()
-    OV_ASSERT_NO_THROW(m_model = ov::test::utils::make_single_concat_with_constant({1, 1, 2, 4}, m_model_dtype));
+    OV_ASSERT_NO_THROW(m_model = ov::test::utils::make_single_concat_with_constant({2, 3, 5, 4}, m_model_dtype));
     OV_ASSERT_NO_THROW(run());
 }
 
