@@ -44,6 +44,8 @@
 #include "transformations/rt_info/disable_fp16_compression.hpp"
 #include "transformations/rt_info/primitives_priority_attribute.hpp"
 
+#include "openvino/op/concat.hpp"
+
 namespace ov {
 class OstreamHashWrapperBin final : public std::streambuf {
     uint64_t m_res = 0lu;
@@ -597,6 +599,7 @@ public:
         } else if (const auto& a = ov::as_type<ov::AttributeAdapter<std::shared_ptr<ov::AlignedBuffer>>>(&adapter)) {
             if (name == "value" && translate_type_name(m_node_type_name) == "Const") {
                 const size_t size = m_skip_weightless_constants ? 0lu : a->get()->size();
+                // printf("m_skip_weightless_constants: %d; size: %lu\n", m_skip_weightless_constants ? 1 : 0, size);
                 size_t new_size = 0lu;
                 int64_t offset = m_constant_write_handler.write(static_cast<const char*>(a->get()->get_ptr()),
                                                                 size,
@@ -1061,6 +1064,15 @@ void ngfunction_2_ir(pugi::xml_node& netXml,
 
     for (const auto& n : sorted_ops) {
         ov::Node* node = n.get();
+if (node->get_type_info() == ov::op::v0::Concat::get_type_info_static()) {
+// if (node->get_friendly_name() == "Concat_20096") {
+    auto cc = ov::as_type<ov::op::v0::Concat>(node);
+    printf("--CORE-- ngfunction_2_ir %s; axis: %ld; in shapes: ", node->get_friendly_name().data(), cc->get_axis());
+    for (size_t i = 0; i < node->get_input_size(); ++i) {
+        printf("%s; ", node->get_input_partial_shape(i).to_string().data());
+    }
+    printf("\n");
+}
         int node_id{};
         {
             auto it = layer_ids.find(node);

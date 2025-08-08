@@ -38,6 +38,20 @@ void Concat::validate_and_infer_types() {
                               "Argument element types are inconsistent.");
         input_shapes.push_back(get_input_partial_shape(i));
     }
+    if (get_friendly_name() == "Concat_20096") {
+        // std::string res_str = "--CORE-- Concat::validate_and_infer_types " + get_friendly_name() +
+        //     "; axis: " + std::to_string(get_axis()) + "; in shapes: ";
+        printf("--CORE-- Concat::validate_and_infer_types %s; axis: %ld; in shapes: \n", get_friendly_name().data(), get_axis());
+        for (size_t i = 0; i < get_input_size(); ++i) {
+            auto in_ptr = get_input_node_ptr(i);
+            printf("    %s : %s\n", input_shapes[i].to_string().data(), in_ptr->get_type_name());
+            for (size_t j = 0; j < in_ptr->get_input_size(); ++j) {
+                printf("        %s : %s\n", in_ptr->get_input_partial_shape(j).to_string().data(), in_ptr->get_input_node_ptr(i)->get_type_name());
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
 
     const auto output_shapes = shape_infer(this, input_shapes);
 
