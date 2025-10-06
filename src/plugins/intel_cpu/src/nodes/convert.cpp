@@ -62,7 +62,7 @@ Convert::Convert(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     }
 
     auto convert = ov::as_type_ptr<const ov::op::v0::Convert>(op);
-    convertParams.origPrc = convert->get_destination_type();
+    m_convert_params.origPrc = convert->get_destination_type();
 }
 
 Convert::Convert(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
@@ -76,7 +76,7 @@ Convert::Convert(const Shape& shape,
                  const std::string& nodeName,
                  const GraphContext::CPtr& context)
     : Node("Convert", {shape}, {shape}, {inPrc}, {outPrc}, nodeName, context) {
-    convertParams.origPrc = outPrc;
+    m_convert_params.origPrc = outPrc;
 
     isDynamic = shape.isDynamic();
     if (isDynamicNode()) {
@@ -125,16 +125,18 @@ void Convert::initSupportedPrimitiveDescriptors() {
         canInitExternalDesc &= isSupportedDesc(*output);
     }
 
-    auto supportedPrimitiveDescriptorsBuilder = [this](NodeConfig config) {
+    auto executor_context = std::make_shared<ExecutorContext>(m_context, getImplPriority());
+
+    auto supportedPrimitiveDescriptorsBuilder = [this, executor_context](NodeConfig config) {
         MemoryDescPtr srcMemoryDesc = config.inConfs[0].getMemDesc();
         MemoryDescPtr dstMemoryDesc = config.outConfs[0].getMemDesc();
-        convertParams.srcPrc = srcMemoryDesc->getPrecision();
-        convertParams.dstPrc = dstMemoryDesc->getPrecision();
+        m_convert_params.srcPrc = srcMemoryDesc->getPrecision();
+        m_convert_params.dstPrc = dstMemoryDesc->getPrecision();
         auto factory =
-            std::make_shared<ConvertExecutorFactory>(convertParams,
+            std::make_shared<ConvertExecutorFactory>(m_convert_params,
                                                      srcMemoryDesc,
                                                      dstMemoryDesc,
-                                                     std::make_shared<ExecutorContext>(m_context, getImplPriority()));
+                                                     executor_context);
         supportedPrimitiveDescriptors.emplace_back(config, impl_desc_type::unknown, factory);
     };
 
@@ -188,13 +190,13 @@ void Convert::initSupportedPrimitiveDescriptors() {
 
 void Convert::prepareParams() {
     const auto& parentMem = getParentEdgeAt(0)->getMemory();
-    convertParams.size = parentMem.getDescWithType<BlockedMemoryDesc>()->getPaddedElementsCount();
+    m_convert_params.size = parentMem.getDescWithType<BlockedMemoryDesc>()->getPaddedElementsCount();
 
     auto* selectedPD = getSelectedPrimitiveDescriptor();
     MemoryDescPtr srcDesc = getSrcMemoryAtPort(0)->getDescPtr();
     MemoryDescPtr dstDesc = getDstMemoryAtPort(0)->getDescPtr();
     execPtr =
-        selectedPD->getExecutorFactoryAs<ConvertExecutorFactory>()->makeExecutor(convertParams, srcDesc, dstDesc, {});
+        selectedPD->getExecutorFactoryAs<ConvertExecutorFactory>()->makeExecutor(m_convert_params, srcDesc, dstDesc, {});
     selectedPD->setImplementationType(execPtr->implType());
 }
 
@@ -225,37 +227,35 @@ bool Convert::created() const {
 void Convert::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
+ob << ob.get_pos();  // TODO: remove
+
     // ob << input;
     // ob << output;
-    ob << convertParams.srcPrc;
-    ob << convertParams.origPrc;
-    ob << convertParams.dstPrc;
-    ob << convertParams.size;
-    // ob << config;
+    ob << m_convert_params;
+    
+ob << ob.get_pos();  // TODO: remove
 }
 
 void Convert::load(BinaryInputBuffer& ib) {
+validate_stream_offset(ib);  // TODO: remove
+
     // ib >> input;
     // ib >> output;
-    ib >> convertParams.srcPrc;
-    ib >> convertParams.origPrc;
-    ib >> convertParams.dstPrc;
-    ib >> convertParams.size;
-    // ib >> config;
+    ib >> m_convert_params;
 
     for (auto& desc : supportedPrimitiveDescriptors) {
-        auto& config = desc.getConfig();
-        MemoryDescPtr src_memory_desc = config.inConfs[0].getMemDesc();
-        MemoryDescPtr dst_memory_desc = config.outConfs[0].getMemDesc();
-        convertParams.srcPrc = src_memory_desc->getPrecision();
-        convertParams.dstPrc = dst_memory_desc->getPrecision();
+        const auto& config = desc.getConfig();
+        auto src_memory_desc = config.inConfs[0].getMemDesc();
+        auto dst_memory_desc = config.outConfs[0].getMemDesc();
         auto factory =
-            std::make_shared<ConvertExecutorFactory>(convertParams,
+            std::make_shared<ConvertExecutorFactory>(m_convert_params,
                                                      src_memory_desc,
                                                      dst_memory_desc,
                                                      std::make_shared<ExecutorContext>(m_context, getImplPriority()));
         desc.setExecutorFactory(factory);
     }
+
+validate_stream_offset(ib);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

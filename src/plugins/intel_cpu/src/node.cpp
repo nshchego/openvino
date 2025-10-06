@@ -259,9 +259,9 @@ bool Node::isEdgesEmpty(const std::vector<EdgeWeakPtr>& edges) {
 }
 
 void Node::createPrimitive() {
-if (m_name == "Subtract_3166") {
-    printf("TODO: Remove\n");
-}
+// if (m_name == "Subtract_3166") {
+//     printf("TODO: Remove\n");
+// }
     if (inputShapesDefined() && isExecutable()) {
         if (needPrepareParams()) {
             prepareParams();
@@ -1470,9 +1470,9 @@ void Node::initOptimalPrimitiveDescriptor() {
     if (one_of(getType(), Type::RNNCell, Type::RNNSeq)) {  // can be skipped for RNN node
         return;
     }
-    if (one_of(getType(), Type::Pooling, Type::AdaptivePooling)) {
-        printf("Node::initOptimalPrimitiveDescriptor\n");
-    }
+    // if (one_of(getType(), Type::Pooling, Type::AdaptivePooling)) {
+    //     printf("Node::initOptimalPrimitiveDescriptor\n");
+    // }
 
     auto* selected_pd = getSelectedPrimitiveDescriptor();
     CPU_NODE_ASSERT(selected_pd, "doesn't have preferable primitive descriptor.");
@@ -1828,9 +1828,9 @@ bool Node::needPrepareParams() const {
 }
 
 bool Node::inputShapesModified() const {
-if (getType() == Type::Convert) {
-    printf("--CPU-- inputShapesModified\n");
-}
+// if (getType() == Type::Convert) {
+//     printf("--CPU-- inputShapesModified\n");
+// }
     if (lastInputDims.size() != getParentEdges().size()) {
         if (lastInputDims.empty()) {
             return true;
@@ -2272,7 +2272,7 @@ void Node::resolveInPlaceDirection() {
 }
 
 void Node::save(BinaryOutputBuffer& ob) const {
-printf("--CPU-- Node::save %s:%d:%s\n", getTypeStr().data(), int(getType()), getName().data());
+// printf("--CPU-- Node::save %s:%d:%s\n", getTypeStr().data(), int(getType()), getName().data());
     ob << ob.get_pos();  // Read/Write sync position
 
     ob << m_name;
@@ -2291,9 +2291,9 @@ printf("--CPU-- Node::save %s:%d:%s\n", getTypeStr().data(), int(getType()), get
     ob << m_cur_numa_node;
     ob << ob.get_pos();  // TODO: remove
 
-if (type == Type::Transpose && m_name == "Subtract_2565_original") {
-    printf("TODO: Remove\n");
-}
+// if (type == Type::Transpose && m_name == "Subtract_2565_original") {
+//     printf("TODO: Remove\n");
+// }
     ob << supportedPrimitiveDescriptors;
     ob << ob.get_pos();  // TODO: remove
     ob << selectedPrimitiveDescriptorIndex;

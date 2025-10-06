@@ -76,7 +76,7 @@ bool SoftmaxKey::operator==(const SoftmaxKey& rhs) const {
 
 bool SoftMax::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!ov::as_type_ptr<const ov::op::v1::Softmax>(op)) {
+        if (!ov::is_type<const ov::op::v1::Softmax>(op.get())) {
             errorMessage = "Only v1 Softmax operation is supported";
             return false;
         }
@@ -92,7 +92,12 @@ SoftMax::SoftMax(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
-    axis = ov::as_type_ptr<ov::op::v1::Softmax>(op)->get_axis();
+    m_axis = ov::as_type<op::v1::Softmax>(op.get())->get_axis();
+}
+
+SoftMax::SoftMax(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void SoftMax::getSupportedDescriptors() {
@@ -177,7 +182,7 @@ void SoftMax::createDescriptor(const std::vector<MemoryDescPtr>& inputDesc,
                                                 algorithm::softmax_accurate,
                                                 in_candidate,
                                                 in_candidate,
-                                                axis,
+                                                m_axis,
                                                 *attr,
                                                 true);
 
@@ -196,7 +201,7 @@ void SoftMax::prepareParams() {
 
     auto attr = initPrimitiveAttr();
 
-    SoftmaxKey key = {inpDesc, selected_pd->getImplementationType(), axis, *attr};
+    SoftmaxKey key = {inpDesc, selected_pd->getImplementationType(), m_axis, *attr};
     auto engine = getEngine();
 
     auto builder = [&engine](const SoftmaxKey& key) -> executorPtr {
@@ -260,6 +265,18 @@ void SoftMax::execute(const dnnl::stream& strm) {
 
 void SoftMax::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
+}
+
+void SoftMax::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    ob << m_axis;
+    // ob << execPtr;
+}
+
+void SoftMax::load(BinaryInputBuffer& ib) {
+    ib >> m_axis;
+    // ib >> execPtr;
 }
 
 }  // namespace ov::intel_cpu::node

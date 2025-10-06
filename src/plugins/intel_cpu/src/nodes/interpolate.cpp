@@ -59,6 +59,7 @@
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -4533,6 +4534,46 @@ bool Interpolate::canFuse(const NodePtr& node) const {
 
 bool Interpolate::created() const {
     return getType() == Type::Interpolate;
+}
+
+void Interpolate::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+    ob << is_version11;
+    ob << interpAttrs;
+    ob << dataRank;
+    ob << hasPad;
+    ob << isAxesSpecified;
+    ob << axes;
+    ob << scales;
+    ob << isScaleConstant;
+    ob << lastScales;
+    ob << lastSizes;
+    ob << lastOutputDims;
+    ob << canUseAclExecutor;
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void Interpolate::load(BinaryInputBuffer& ib) {
+validate_stream_offset(ib); // TODO: remove
+
+    ib >> is_version11;
+    ib >> interpAttrs;
+    ib >> dataRank;
+    ib >> hasPad;
+    ib >> isAxesSpecified;
+    ib >> axes;
+    ib >> scales;
+    ib >> isScaleConstant;
+    ib >> lastScales;
+    ib >> lastSizes;
+    ib >> lastOutputDims;
+    ib >> canUseAclExecutor;
+
+validate_stream_offset(ib); // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

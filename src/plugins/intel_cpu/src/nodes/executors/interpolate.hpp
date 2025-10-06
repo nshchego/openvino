@@ -57,6 +57,10 @@ struct InterpolateAttrs {
     // 2. axis alignment [1,2] to [2,3].
     // 3. config planar layout support and treated it as channel_first layout.
     bool NCHWAsNHWC = false;
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 };
 
 inline VectorDims getPaddedInputShape(const VectorDims& srcDims,

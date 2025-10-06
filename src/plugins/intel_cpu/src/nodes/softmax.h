@@ -24,6 +24,8 @@ class SoftMax : public Node {
 public:
     SoftMax(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    SoftMax(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     void initOptimalPrimitiveDescriptor() override;
     void createDescriptor(const std::vector<MemoryDescPtr>& inputDesc,
                           const std::vector<MemoryDescPtr>& outputDesc) override;
@@ -36,10 +38,14 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     using executorPtr = std::shared_ptr<DnnlExecutorLegacy>;
     executorPtr execPtr = nullptr;
-    size_t axis = 0;
+    size_t m_axis = 0;
 };
 
 }  // namespace node

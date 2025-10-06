@@ -55,7 +55,6 @@ public:
 
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;
-    std::shared_ptr<ExecutorContext> transpose_context;
 
 private:
     TransposeExecutorPtr execPtr = nullptr;
@@ -63,7 +62,7 @@ private:
     VectorDims order;
     ov::element::Type prec;
 
-    TransposeParams transposeParams;
+    TransposeParams m_transpose_params;
 
     bool isInputOrderConst = false;
 

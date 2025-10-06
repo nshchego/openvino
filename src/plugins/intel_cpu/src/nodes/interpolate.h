@@ -111,6 +111,10 @@ public:
     inline int get_scale_id() const;
     inline int get_axis_id() const;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     bool is_version11 = true;
     InterpolateAttrs interpAttrs;

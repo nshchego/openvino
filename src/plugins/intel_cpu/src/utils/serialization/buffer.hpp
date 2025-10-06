@@ -72,6 +72,9 @@ public:
 
     virtual void write(void const* data, const std::streamsize size) {
         auto const written_size = m_stream.rdbuf()->sputn(reinterpret_cast<const char*>(data), size);
+if (written_size != size) {  // TODO: remove
+    std::cout << "BinaryOutputBuffer::write\n";
+}
         OPENVINO_ASSERT(written_size == size,
                         "[ CPU ] Failed to write " + std::to_string(size) + " bytes to stream! Wrote " +
                             std::to_string(written_size));
@@ -164,7 +167,7 @@ template <typename T>
 class Serializer<BinaryInputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void load(BinaryInputBuffer& buffer, T& object) {
-printf("-READ- T at %llu\n", buffer.get_pos());
+// printf("-READ- T at %llu\n", buffer.get_pos());
         buffer.read(std::addressof(object), sizeof(object));
     }
 };
@@ -183,7 +186,7 @@ template <typename T>
 class Serializer<BinaryInputBuffer, Data<T>> {
 public:
     static void load(BinaryInputBuffer& buffer, Data<T>& bin_data) {
-printf("-READ Data- at %llu\n", buffer.get_pos());
+// printf("-READ Data- at %llu\n", buffer.get_pos());
 // std::cout << "-READ Data-\n";
         buffer.read(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
     }

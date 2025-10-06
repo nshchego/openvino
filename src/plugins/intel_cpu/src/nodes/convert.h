@@ -74,7 +74,7 @@ public:
 private:
     MemoryDescPtr input;
     MemoryDescPtr output;
-    ConvertParams convertParams;
+    ConvertParams m_convert_params;
     std::shared_ptr<ConvertExecutor> execPtr = nullptr;
     // NodeConfig config;
 };

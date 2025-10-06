@@ -40,6 +40,7 @@
 #include "openvino/util/pp.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -53,8 +54,7 @@ bool Split::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std:
             errorMessage = "Only opset1 Split and VariadicSplit operations are supported";
             return false;
         }
-        auto axisOp = ov::as_type_ptr<ov::op::v0::Constant>(op->get_input_node_shared_ptr(1));
-        if (!axisOp) {
+        if (!ov::is_type<op::v0::Constant>(op->get_input_node_ptr(1))) {
             errorMessage = "Constant expected as the axis input.";
             return false;
         }
@@ -94,7 +94,12 @@ Split::Split(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
     if (axis >= static_cast<int64_t>(inRank)) {
         THROW_CPU_NODE_ERR("has invalid value of axis parameter: ", axis);
     }
-    this->axis = axis;
+    m_axis = axis;
+}
+
+Split::Split(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void Split::getSupportedDescriptors() {}
@@ -115,7 +120,7 @@ void Split::initSupportedPrimitiveDescriptors() {
         }
 
         for (size_t j = 0; j < dstFirstDims.size(); j++) {
-            if (j == axis) {
+            if (j == m_axis) {
                 continue;
             }
             if (!dimsEqualWeak(o_Dims[j], dstFirstDims[j])) {
@@ -188,7 +193,7 @@ void Split::initSupportedPrimitiveDescriptors() {
             // at least the plain layout can be optimized inplace.
             pdIndexesToReuse.emplace_back(supportedPrimitiveDescriptors.size() - 1);
         } else if (itr->first == LayoutType::nCsp8c || itr->first == LayoutType::nCsp16c) {
-            if (axis < 2) {
+            if (m_axis < 2) {
                 pdIndexesToReuse.emplace_back(supportedPrimitiveDescriptors.size() - 1);
             }
         }
@@ -196,14 +201,14 @@ void Split::initSupportedPrimitiveDescriptors() {
 
     // in place only makes sense when we split by dense blocks since strided tensors are not supported by most nodes.
     const auto& parentdDims = m_input_shapes[0].getDims();
-    if (parentdDims[axis] != Shape::UNDEFINED_DIM &&
+    if (parentdDims[m_axis] != Shape::UNDEFINED_DIM &&
         std::all_of(parentdDims.begin(),
-                    parentdDims.begin() + axis,
+                    parentdDims.begin() + m_axis,
                     [](size_t dim) {
                         return dim == 1;
                     }) &&
         std::all_of(m_output_shapes.begin(), m_output_shapes.end(), [OV_CAPTURE_CPY_AND_THIS](const Shape& shape) {
-            return shape.getDims()[axis] != Shape::UNDEFINED_DIM;
+            return shape.getDims()[m_axis] != Shape::UNDEFINED_DIM;
         })) {
         for (auto refPdIndex : pdIndexesToReuse) {
             auto config = supportedPrimitiveDescriptors[refPdIndex].getConfig();
@@ -216,7 +221,7 @@ void Split::initSupportedPrimitiveDescriptors() {
     }
 
     // Special nspc -> ncsp case when splitting channels
-    if (axis == 1 && (dstFirstDims.size() == 4 || dstFirstDims.size() == 5)) {
+    if (m_axis == 1 && (dstFirstDims.size() == 4 || dstFirstDims.size() == 5)) {
         NodeConfig config;
 
         config.inConfs.resize(INPUTS_NUM);
@@ -310,7 +315,7 @@ void Split::prepareParams() {
 
     if (!canUseOptimizedNspc2Ncsp) {
         const auto inDesc = srcMemPtr->getDescWithType<BlockedMemoryDesc>();
-        execPtr = std::make_shared<SplitOptimizedExecutor>(inDesc, outDescs, axis);
+        execPtr = std::make_shared<SplitOptimizedExecutor>(inDesc, outDescs, m_axis);
     }
 }
 
@@ -358,7 +363,7 @@ void Split::initOptimalPrimitiveDescriptor() {
     canUseOptimizedNspc2Ncsp = false;
     CPU_NODE_ASSERT(!config.inConfs.empty(), "Incorrect number of input configurations");
     const auto inConfDesc = config.inConfs[0].getMemDesc();
-    if (axis == 1 && one_of(inConfDesc->getShape().getRank(), 4U, 5U) && inConfDesc->hasLayoutType(LayoutType::nspc)) {
+    if (m_axis == 1 && one_of(inConfDesc->getShape().getRank(), 4U, 5U) && inConfDesc->hasLayoutType(LayoutType::nspc)) {
         canUseOptimizedNspc2Ncsp = true;
         for (const auto& outConf : config.outConfs) {
             if (!outConf.getMemDesc()->hasLayoutType(LayoutType::ncsp)) {
@@ -490,7 +495,7 @@ void Split::optimizedNspc2Ncsp(size_t MB) {
         size_t innerSize = 1;
         auto dims = getChildEdgeAt(dstMemPtrs[i].first)->getMemory().getStaticDims();
 
-        for (size_t j = axis; j < dims.size(); j++) {
+        for (size_t j = m_axis; j < dims.size(); j++) {
             innerSize *= dims[j];
         }
         const auto* srcPtr = srcData + srcMem.getDesc().getElementOffset(sIdx) * dataSize;
@@ -591,12 +596,12 @@ void Split::resolveInPlaceEdges(Edge::LOOK look) {
     const auto& config = selected_pd->getConfig();
     size_t numberOfOutputs = config.outConfs.size();
     size_t inplaceInpIndx = selected_pd->getConfig().outConfs[0].inPlace();
-    auto baseDim = m_input_shapes.front().getDims()[axis];
+    auto baseDim = m_input_shapes.front().getDims()[m_axis];
     CPU_NODE_ASSERT(baseDim != Shape::UNDEFINED_DIM, "can not use inPlace memory with splitting on dynamic dimension");
     auto baseMemBlock = getParentEdgeAt(inplaceInpIndx)->getMemory().getMemoryBlock();
     ptrdiff_t offset = 0;
     for (size_t i = 0; i < numberOfOutputs; ++i) {
-        auto partDim = m_output_shapes[i].getDims()[axis];
+        auto partDim = m_output_shapes[i].getDims()[m_axis];
         CPU_NODE_ASSERT(partDim != Shape::UNDEFINED_DIM,
                         "can not use inPlace memory with splitting on dynamic dimension");
         const auto& childEdges = getChildEdgesAtPort(i);
@@ -617,6 +622,26 @@ void Split::resolveInPlaceEdges(Edge::LOOK look) {
         }
         offset += partDim;
     }
+}
+
+void Split::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+    ob << canUseOptimizedNspc2Ncsp;
+    ob << m_axis;
+    // std::vector<std::pair<size_t, MemoryCPtr>> dstMemPtrs;
+    ob << INPUTS_NUM;
+    ob << constSplitLengths;
+    ob << splitLengths;
+}
+
+void Split::load(BinaryInputBuffer& ib) {
+    ib >> canUseOptimizedNspc2Ncsp;
+    ib >> m_axis;
+    // std::vector<std::pair<size_t, MemoryCPtr>> dstMemPtrs;
+    ib >> INPUTS_NUM;
+    ib >> constSplitLengths;
+    ib >> splitLengths;
 }
 
 }  // namespace ov::intel_cpu::node

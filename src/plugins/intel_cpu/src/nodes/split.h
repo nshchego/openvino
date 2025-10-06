@@ -27,6 +27,8 @@ class Split : public Node {
 public:
     Split(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    Split(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -47,6 +49,10 @@ public:
         execute(strm);
     }
     void resolveInPlaceEdges(Edge::LOOK look) override;
+
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
 
 private:
     struct SplitExecutor {
@@ -74,7 +80,7 @@ private:
 
     bool canUseOptimizedNspc2Ncsp = false;
 
-    size_t axis = 1;
+    size_t m_axis = 1;
     std::vector<std::pair<size_t, MemoryCPtr>> dstMemPtrs;
 
     size_t INPUTS_NUM = 2;

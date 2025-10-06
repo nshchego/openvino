@@ -24,7 +24,7 @@ template <typename BufferType>
 class Serializer<BufferType, std::string, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, std::string& str) {
-printf("-READ string-\n");
+// printf("-READ string-\n");
         std::string::size_type size;
         buffer >> size;
         str.resize(size);

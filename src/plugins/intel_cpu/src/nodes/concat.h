@@ -48,6 +48,10 @@ public:
     bool needPrepareParams() const override;
     void prepareParams() override;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& ib) override;
+
 private:
     size_t axis = 0;
     size_t reorderedAxis = 0;

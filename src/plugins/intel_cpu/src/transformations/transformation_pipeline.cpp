@@ -1533,15 +1533,15 @@ void Transformations::PostSnippets() {
 }
 
 void Transformations::Snippets() {
-    const bool useSnippets = config.snippetsMode != Config::SnippetsMode::Disable &&
-                             CPU_DEBUG_CAP_IS_TRANSFORMATION_ENABLED(config.debugCaps, Snippets);
-    if (!useSnippets) {
-        return;
-    }
+    // const bool useSnippets = config.snippetsMode != Config::SnippetsMode::Disable &&
+    //                          CPU_DEBUG_CAP_IS_TRANSFORMATION_ENABLED(config.debugCaps, Snippets);
+    // if (!useSnippets) {
+    //     return;
+    // }
 
-    CPU_DEBUG_CAP_TRANSFORMATION_SCOPE(this, Snippets);
-    MainSnippets();
-    PostSnippets();
+    // CPU_DEBUG_CAP_TRANSFORMATION_SCOPE(this, Snippets);
+    // MainSnippets();
+    // PostSnippets();
 }
 
 }  // namespace ov::intel_cpu

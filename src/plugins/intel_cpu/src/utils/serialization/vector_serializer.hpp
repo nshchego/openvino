@@ -34,7 +34,7 @@ class Serializer<BufferType, std::vector<T>, typename std::enable_if<std::is_bas
                                                                      !std::is_same<bool, T>::value>::type> {
 public:
     static void load(BufferType& buffer, std::vector<T>& vector) {
-printf("-READ vector<A>-\n");
+// printf("-READ vector<A>-\n");
         typename std::vector<T>::size_type vector_size = 0UL;
         buffer >> vector_size;
         vector.resize(vector_size);
@@ -58,7 +58,7 @@ template <typename BufferType>
 class Serializer<BufferType, std::vector<bool>, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, std::vector<bool>& vector) {
-printf("-READ vector<bool>-\n");
+// printf("-READ vector<bool>-\n");
         typename std::vector<bool>::size_type vector_size = 0UL;
         buffer >> vector_size;
         bool el;
@@ -88,7 +88,7 @@ class Serializer<BufferType, std::vector<T>, typename std::enable_if<std::is_bas
                                                                     !std::is_arithmetic<T>::value>::type> {
 public:
     static void load(BufferType& buffer, std::vector<T>& vector) {
-printf("-READ vector<NA>-\n");
+// printf("-READ vector<NA>-\n");
         typename std::vector<T>::size_type vector_size = 0UL;
         buffer >> vector_size;
         vector.resize(vector_size);
@@ -114,7 +114,7 @@ template <typename BufferType>
 class Serializer<BufferType, ov::CoordinateDiff, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, ov::CoordinateDiff& vector) {
-printf("-READ CoordinateDiff-\n");
+// printf("-READ CoordinateDiff-\n");
         typename ov::CoordinateDiff::size_type vector_size = 0UL;
         buffer >> vector_size;
         vector.resize(vector_size);
@@ -140,7 +140,7 @@ template <typename BufferType>
 class Serializer<BufferType, ov::Strides, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, ov::Strides& vector) {
-printf("-READ Strides-\n");
+// printf("-READ Strides-\n");
         typename ov::Strides::size_type vector_size = 0UL;
         buffer >> vector_size;
         vector.resize(vector_size);
@@ -166,7 +166,7 @@ template <typename BufferType>
 class Serializer<BufferType, ov::Shape, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, ov::Shape& vector) {
-printf("-READ Shape-\n");
+// printf("-READ Shape-\n");
         typename ov::Shape::size_type vector_size = 0UL;
         buffer >> vector_size;
         vector.resize(vector_size);

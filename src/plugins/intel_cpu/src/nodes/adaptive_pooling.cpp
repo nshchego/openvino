@@ -32,6 +32,8 @@
 #include "openvino/op/adaptive_max_pool.hpp"
 #include "shape_inference/custom/adaptive_pooling.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -321,9 +323,16 @@ inline void AdaptivePooling::setBinBorders(size_t* startPtr,
 
 void AdaptivePooling::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
+
+    ob << spatialDimsCount;
+    ob << spatialDimsValue;
+    ob << precision;
 }
 
 void AdaptivePooling::load(BinaryInputBuffer& ib) {
+    ib >> spatialDimsCount;
+    ib >> spatialDimsValue;
+    ib >> precision;
 }
 
 }  // namespace ov::intel_cpu::node

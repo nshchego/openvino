@@ -15,7 +15,7 @@ printf("-WRITE-\n");
     }
 
     static void load(BufferType& buffer, T& object) {
-printf("-READ-\n");
+// printf("-READ-\n");
         object.load(buffer);
     }
 };

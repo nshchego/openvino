@@ -19,6 +19,10 @@ struct ConvertParams {
     ov::element::Type origPrc;
     ov::element::Type dstPrc;
     size_t size;
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 };
 
 class ConvertExecutor : public Executor {

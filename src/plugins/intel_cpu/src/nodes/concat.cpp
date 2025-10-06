@@ -44,6 +44,9 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
+
 using namespace dnnl;
 
 namespace ov::intel_cpu::node {
@@ -61,12 +64,11 @@ bool Concat::isExecutable() const {
 
 bool Concat::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        const auto concatOp = ov::as_type_ptr<const ov::op::v0::Concat>(op);
-        if (!concatOp) {
+        if (!ov::is_type<const op::v0::Concat>(op.get())) {
             errorMessage = "Node is not an instance of the Concat operation.";
             return false;
         }
-        if (concatOp->get_output_element_type(0) == ov::element::string) {
+        if (op->get_output_element_type(0) == element::string) {
             return false;
         }
     } catch (...) {
@@ -441,7 +443,7 @@ void Concat::prepareParams() {
             auto* const srcMemDesc = srcMemPtr->getDescPtr()->as<BlockedMemoryDesc>();
             const auto& inputShape = srcMemDesc->getBlockDims();
             const auto& strides = srcMemDesc->getStrides();
-            inputStrides[i].resize(MAX_RANK_REF, 0);
+            inputStrides[i].resize(MAX_RANK_REF, 0);  // TODO: resize in initOptimalPrimitiveDescriptor. Fill out here.
             std::transform(strides.begin(), strides.end(), inputStrides[i].begin(), [&elemSize](const Dim& i) {
                 return i * elemSize;
             });
@@ -528,10 +530,12 @@ void Concat::initOptimalPrimitiveDescriptor() {
     bool isBlocked = rank != memDesc->getBlockDims().size();
     if (!isBlocked && rank <= MAX_RANK_REF) {
         canExecRef = true;
-        nelemToCopy.resize(getParentEdges().size(), 0);
-        dstOffset.resize(getParentEdges().size());
-        inputStrides.resize(getParentEdges().size());
-        srcPtrs.resize(getParentEdges().size());
+        const auto parent_edges = getParentEdges().size();
+
+        nelemToCopy.resize(parent_edges, 0);
+        dstOffset.resize(parent_edges);
+        inputStrides.resize(parent_edges);
+        srcPtrs.resize(parent_edges);
     }
     // check if selected Tensor descriptor has nspc layout and concat axis is C
     canOptimizeNspc =
@@ -789,6 +793,62 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
         parentEdge->reuse(newMem);
         offset += partDim;
     }
+}
+
+void Concat::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+    ob << axis;
+    ob << reorderedAxis;
+    ob << canBeInPlace;
+    ob << canOptimizeNspc;
+    ob << canOptimize1DCase;
+    // ob << inputStrides;
+    // ob << nelemToCopy;
+    // ob << nelemTotal;
+    // ob << dstOffset;
+    // ob << srcPtrs;
+    ob << hasOuterLoop;
+    ob << inputPrecision;
+    ob << outputPrecision;
+    ob << canExecRef;
+    ob << getParentEdges().size();  // TODO: take form base?
+    // ob << prim;
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void Concat::load(BinaryInputBuffer& ib) {
+validate_stream_offset(ib); // TODO: remove
+
+    ib >> axis;
+    ib >> reorderedAxis;
+    ib >> canBeInPlace;
+    ib >> canOptimizeNspc;
+    ib >> canOptimize1DCase;
+    // ib >> inputStrides;
+    // ib >> nelemToCopy;
+    // ib >> nelemTotal;
+    // ib >> dstOffset;
+    // ib >> srcPtrs;
+    ib >> hasOuterLoop;
+    ib >> inputPrecision;
+    ib >> outputPrecision;
+    ib >> canExecRef;
+    size_t parent_edges;
+    ib >> parent_edges;
+
+    if (canExecRef) {
+        nelemToCopy.resize(parent_edges, 0);
+        dstOffset.resize(parent_edges);
+        inputStrides.resize(parent_edges);
+        srcPtrs.resize(parent_edges);
+    }
+    // ib >> prim;
+
+validate_stream_offset(ib); // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -1524,9 +1524,9 @@ ov::SoPtr<ov::ICompiledModel> ov::CoreImpl::load_model_from_cache(
                              "Core::load_model_from_cache::ReadStreamAndImport");
                 ov::CompiledBlobHeader header;
                 try {
-printf("--CORE-- READ load_model_from_cache 0 pos: %lld\n", static_cast<int64_t>(networkStream.tellg()));
+// printf("--CORE-- READ load_model_from_cache 0 pos: %lld\n", static_cast<int64_t>(networkStream.tellg()));
                     networkStream >> header;
-printf("--CORE-- READ load_model_from_cache 1 pos: %lld\n", static_cast<int64_t>(networkStream.tellg()));
+// printf("--CORE-- READ load_model_from_cache 1 pos: %lld\n", static_cast<int64_t>(networkStream.tellg()));
                     if (header.get_file_info() != ov::ModelCache::calculate_file_info(cacheContent.modelPath)) {
                         // Original file is changed, don't use cache
                         OPENVINO_THROW("Original model file is changed");

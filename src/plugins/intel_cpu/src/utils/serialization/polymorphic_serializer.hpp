@@ -70,7 +70,7 @@ template <typename BufferType, typename T>
 class Serializer<BufferType, std::shared_ptr<T>, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void load(BufferType& buffer, std::shared_ptr<T>& ptr, dnnl::engine& engine) {
-printf("-READ shared_ptr eng-\n");
+// printf("-READ shared_ptr eng-\n");
         std::string type;
         buffer >> type;
         if (type.compare("NONE") != 0) {
@@ -82,7 +82,7 @@ printf("-READ shared_ptr eng-\n");
     }
 
     static void load(BufferType& buffer, std::shared_ptr<T>& ptr) {
-printf("-READ shared_ptr-\n");
+// printf("-READ shared_ptr-\n");
         std::string type;
         buffer >> type;
         if (type.compare("NONE") != 0) {

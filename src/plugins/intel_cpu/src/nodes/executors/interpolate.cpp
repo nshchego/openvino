@@ -18,6 +18,8 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/parallel.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace ov::intel_cpu;
 
@@ -605,4 +607,46 @@ const uint8_t* ov::intel_cpu::InterpolateExecutor::padPreprocess(const std::vect
         src_data = src_data_origin;
     }
     return src_data;
+}
+
+void InterpolateAttrs::save(BinaryOutputBuffer& ob) const {
+ob << ob.get_pos();  // TODO: remove
+
+    ob << shapeCalcMode;
+    ob << mode;
+    ob << coordTransMode;
+    ob << nearestMode;
+    ob << antialias;
+    ob << cubeCoeff;
+    ob << padBegin;
+    ob << padEnd;
+    ob << inPrc;
+    ob << outPrc;
+    ob << layout;
+    ob << dataScales;
+    ob << hasPad;
+    ob << NCHWAsNHWC;
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void InterpolateAttrs::load(BinaryInputBuffer& ib) {
+validate_stream_offset(ib); // TODO: remove
+
+    ib >> shapeCalcMode;
+    ib >> mode;
+    ib >> coordTransMode;
+    ib >> nearestMode;
+    ib >> antialias;
+    ib >> cubeCoeff;
+    ib >> padBegin;
+    ib >> padEnd;
+    ib >> inPrc;
+    ib >> outPrc;
+    ib >> layout;
+    ib >> dataScales;
+    ib >> hasPad;
+    ib >> NCHWAsNHWC;
+
+validate_stream_offset(ib); // TODO: remove
 }

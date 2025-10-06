@@ -42,6 +42,7 @@ private:
     int spatialDimsCount;
     mutable std::vector<Dim> spatialDimsValue = {};
     ov::element::Type precision = ov::element::f32;
+    
     static inline void setBinBorders(size_t* startPtr,
                                      size_t* endPtr,
                                      size_t idx,
