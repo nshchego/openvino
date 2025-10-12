@@ -4,14 +4,8 @@
 
 #include "input.h"
 
-#include <cpu/x64/xbyak/xbyak.h>
-
 #include <algorithm>
-#include <atomic>
 #include <cmath>
-#include <common/c_types_map.hpp>
-#include <common/utils.hpp>
-#include <cpu/x64/cpu_isa_traits.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -24,7 +18,6 @@
 #include <utility>
 #include <vector>
 
-#include "cpu/x64/jit_generator.hpp"
 #include "cpu_memory.h"
 #include "cpu_shape.h"
 #include "cpu_types.h"
@@ -37,7 +30,6 @@
 #include "onednn/iml_type_mapper.h"
 #include "openvino/core/except.hpp"
 #include "openvino/core/node.hpp"
-#include "openvino/core/parallel.hpp"
 #include "openvino/core/shape.hpp"
 #include "openvino/core/type.hpp"
 #include "openvino/core/type/bfloat16.hpp"
@@ -52,15 +44,28 @@
 #include "utils/general_utils.h"
 #include "utils/serialization/internal_types.hpp"
 
-using namespace dnnl;
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+#    include <xbyak/xbyak.h>
+
+#    include <atomic>
+#    include <common/c_types_map.hpp>
+#    include <common/utils.hpp>
+#    include <cpu/x64/cpu_isa_traits.hpp>
+
+#    include "cpu/x64/jit_generator.hpp"
+#    include "openvino/core/parallel.hpp"
+
 using namespace dnnl::impl::cpu::x64;
 using namespace Xbyak;
+#endif
+
+using namespace dnnl;
 
 namespace ov::intel_cpu::node {
 
 #if defined(OPENVINO_ARCH_X86_64)
 namespace {
-struct jit_has_special_value_base : public jit_generator {
+struct jit_has_special_value_base : public jit_generator_t {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_has_special_value_base)
 
     using args_t = struct {
@@ -71,7 +76,7 @@ struct jit_has_special_value_base : public jit_generator {
 
     using fn_t = void (*)(const args_t*);
 
-    jit_has_special_value_base() : jit_generator(jit_name()) {
+    jit_has_special_value_base() : jit_generator_t(jit_name()) {
         jit_ker_ = nullptr;
     }
 
@@ -85,7 +90,7 @@ protected:
     void foreach (const Xbyak::Reg64& idx,
                   size_t step,
                   const Xbyak::Reg64& end,
-                  std::function<void(const Xbyak::Reg64&)> && fn) {
+                  const std::function<void(const Xbyak::Reg64&)>& fn) {
         Label loop;
         Label exit;
 
@@ -394,7 +399,7 @@ jit_has_special_value_base::fn_t jit_has_bf16_overflows_function() {
 
 Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, PassThroughShapeInferFactory()) {
-    if (!one_of(op->get_type_info(),
+    if (none_of(op->get_type_info(),
                 op::v0::Parameter::get_type_info_static(),
                 op::v0::Constant::get_type_info_static(),
                 op::v0::Result::get_type_info_static(),
@@ -416,9 +421,9 @@ Input::Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
     }
 }
 
-Input::Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
-    : Node(ib, context, PassThroughShapeInferFactory()) {
-    load(ib);
+Input::Input(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context, PassThroughShapeInferFactory()) {
+    load(in_buf);
 }
 
 void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& shape, const element::Type& prec, bool validate_blob) {
@@ -586,9 +591,10 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
         // original weights are stored.
         (!weight_cache || m_context->getNumNumaNodes() == 1 || m_context->getCPUStreamExecutor()->get_streams_num() == 1);
 
-    m_memory_ptr = clone_is_not_needed ? std::make_shared<Memory>(getEngine(), mem_desc, src_ptr)
-                                       : std::const_pointer_cast<const IMemory>(
-                                              weight_cache ? *weight_cache->findOrCreate(blobKey(), cloneBlob) : cloneBlob());
+    m_memory_ptr = clone_is_not_needed
+                    ? std::make_shared<Memory>(getEngine(), mem_desc, src_ptr)
+                    : std::const_pointer_cast<const IMemory>(
+                          weight_cache ? MemoryPtr(*weight_cache->findOrCreate(blobKey(), cloneBlob)) : cloneBlob());
 }
 
 static std::vector<Shape> createInputShapes(const Shape& shape, const Type type) {
@@ -672,19 +678,11 @@ MemoryCPtr Input::getMemoryPtr() const {
 
 void Input::getSupportedDescriptors() {
     if (getType() == Type::Input) {
-        if (!getParentEdges().empty()) {
-            THROW_CPU_NODE_ERR("has incorrect number of input edges.");
-        }
-        if (getChildEdges().empty()) {
-            THROW_CPU_NODE_ERR("has incorrect number of output edges.");
-        }
+        CPU_NODE_ASSERT(getParentEdges().empty(), "has incorrect number of input edges.");
+        CPU_NODE_ASSERT(!getChildEdges().empty(), "has incorrect number of output edges.");
     } else if (getType() == Type::Output) {
-        if (getParentEdges().size() != 1) {
-            THROW_CPU_NODE_ERR("has incorrect number of input edges.");
-        }
-        if (!getChildEdges().empty()) {
-            THROW_CPU_NODE_ERR("has incorrect number of output edges.");
-        }
+        CPU_NODE_ASSERT(getParentEdges().size() == 1, "has incorrect number of input edges.");
+        CPU_NODE_ASSERT(getChildEdges().empty(), "has incorrect number of output edges.");
     }
 }
 
@@ -734,39 +732,37 @@ void Input::createPrimitive() {
     for (size_t i = 0; i < getChildEdges().size(); i++) {
         auto dstMemPtr = getDstMemoryAtPort(i);
         if (!dstMemPtr) {
-            THROW_CPU_NODE_ERR("has null memory object at port ",
-                               i,
-                               " to node ",
-                               getChildEdgeAt(i)->getChild()->getName(),
-                               ".");
+            CPU_NODE_THROW("has null memory object at port ",
+                           i,
+                           " to node ",
+                           getChildEdgeAt(i)->getChild()->getName(),
+                           ".");
         }
     }
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         auto srcMemPtr = getSrcMemoryAtPort(i);
         if (!srcMemPtr) {
-            THROW_CPU_NODE_ERR("has null memory object at port ",
-                               i,
-                               " from node ",
-                               getParentEdgeAt(i)->getParent()->getName(),
-                               ".");
+            CPU_NODE_THROW("has null memory object at port ",
+                           i,
+                           " from node ",
+                           getParentEdgeAt(i)->getParent()->getName(),
+                           ".");
         }
     }
 
     const NodeDesc* selected_pd = getSelectedPrimitiveDescriptor();
-    if (selected_pd == nullptr) {
-        THROW_CPU_NODE_ERR("doesn't have selected primitive descriptor.");
-    }
+    CPU_NODE_ASSERT(selected_pd, "doesn't have selected primitive descriptor.");
 }
 
 bool Input::created() const {
-    return getType() == Type::Input || getType() == Type::Output;
+    return any_of(getType(), Type::Input, Type::Output);
 }
 
 void Input::initSupportedPdDefault() {
     std::vector<PortConfigurator> inPortConfs;
     std::vector<PortConfigurator> outPortConfs;
 
-    if (getType() == Type::Input || getType() == Type::MemoryInput) {
+    if (any_of(getType(), Type::Input, Type::MemoryInput)) {
         auto precision = getOriginalOutputPrecisionAtPort(0);
 
         outPortConfs.emplace_back(LayoutType::ncsp, precision);
@@ -786,7 +782,7 @@ void Input::initSupportedPdFromMemDesc() {
     NodeConfig config;
     PortConfig portConfig(m_ext_mem_desc, BlockedMemoryDesc::FULL_MASK, m_is_in_place ? 0 : -1, false);
 
-    if (getType() == Type::Input || getType() == Type::MemoryInput) {
+    if (any_of(getType(), Type::Input, Type::MemoryInput)) {
         config.outConfs.push_back(portConfig);
     } else if (getType() == Type::Output) {
         config.inConfs.push_back(portConfig);
@@ -848,23 +844,23 @@ void Input::save(BinaryOutputBuffer& ob) const {
     }
 }
 
-void Input::load(BinaryInputBuffer& ib) {
-    ib >> m_use_parent_memory_desc_for_output;
-    ib >> m_is_in_place;
-    ib >> m_use_origin_weights;
+void Input::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_use_parent_memory_desc_for_output;
+    in_buf >> m_is_in_place;
+    in_buf >> m_use_origin_weights;
 
     if (constant == ConstantType::Const) {
         // return m_stream.rdbuf().gptr();
-        auto buff = dynamic_cast<const SharedStreamBuffer *>(ib.rdbuf());
+        auto buff = dynamic_cast<const SharedStreamBuffer*>(in_buf.rdbuf());
         CPU_NODE_ASSERT(buff, "got unexpected input buffer type.");
 
         element::Type dt;
         intel_cpu::Shape shape;
         size_t byte_size = 0lu;
 
-        ib >> dt;
-        ib >> shape;
-        ib >> byte_size;
+        in_buf >> dt;
+        in_buf >> shape;
+        in_buf >> byte_size;
 
         if (m_use_origin_weights) {
             // cloneBlobIfRequired(origin_blob, shape, origin_dt, true);
@@ -872,7 +868,7 @@ void Input::load(BinaryInputBuffer& ib) {
         } else {
             // Load from a serialized blob. No need to convert and check subnormals.
             cloneBlobIfRequired(buff->get_data(), shape, dt, false);
-            ib.seekg(byte_size, std::ios_base::cur);
+            in_buf.seekg(byte_size, std::ios_base::cur);
         }
     }
 }

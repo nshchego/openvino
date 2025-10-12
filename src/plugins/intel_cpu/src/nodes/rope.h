@@ -16,13 +16,13 @@
 #include "openvino/core/node.hpp"
 #include "ov_ops/rotary_positional_embeddings.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class RoPE : public Node {
 public:
     RoPE(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    RoPE(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {}
     bool created() const override {
@@ -57,6 +57,4 @@ private:
     std::shared_ptr<Executor> m_executor;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

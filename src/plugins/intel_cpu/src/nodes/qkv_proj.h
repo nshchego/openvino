@@ -18,13 +18,13 @@
 #if defined(OPENVINO_ARCH_X86_64)
 #endif
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class QKVProjection : public Node {
 public:
     QKVProjection(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    QKVProjection(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {}
     bool created() const override {
@@ -53,9 +53,7 @@ private:
     template <typename T>
     struct Executor;
 
-    QKVProjectionNode::Config m_config;
+    QKVProjectionNode::Config m_config = {};
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

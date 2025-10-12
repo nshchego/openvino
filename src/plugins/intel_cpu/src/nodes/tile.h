@@ -15,13 +15,13 @@
 #include "node.h"
 #include "openvino/core/node.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Tile : public Node, public TileBroadcastCommon {
 public:
     Tile(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    Tile(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -39,8 +39,8 @@ protected:
 private:
     void plainExecute(const dnnl::stream& strm);
 
-    static constexpr size_t TILE_INPUT = 0lu;
-    static constexpr size_t TILE_REPEATS = 1lu;
+    static constexpr size_t TILE_INPUT = 0LU;
+    static constexpr size_t TILE_REPEATS = 1LU;
 
     int axis = -1;
     int tiles = 0;
@@ -48,6 +48,4 @@ private:
     VectorDims originRepeats;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

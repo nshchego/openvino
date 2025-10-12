@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "buffer.hpp"
+#include <bitset>
+
+#include "buffers.hpp"
 #include "openvino/core/type/element_type.hpp"
 
 namespace ov::intel_cpu {
@@ -35,7 +37,7 @@ template <typename BufferType, typename T>
 class Serializer<BufferType, T, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value && std::is_enum_v<T>>::type> {
 public:
     static void save(BufferType& buffer, const T& enm) {
-// printf("-WRITE enum-\n");
+// printf("-WRITE enum-\n");  // TODO: remove
         buffer.write(std::addressof(enm), sizeof(enm));
     }
 };
@@ -44,8 +46,33 @@ template <typename BufferType, typename T>
 class Serializer<BufferType, T, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value && std::is_enum_v<T>>::type> {
 public:
     static void load(BufferType& buffer, T& enm) {
-// printf("-READ enum-\n");
+// printf("-READ enum-\n");  // TODO: remove
         buffer.read(std::addressof(enm), sizeof(enm));
+    }
+};
+
+
+template <typename BufferType, size_t Size>
+class Serializer<BufferType, std::bitset<Size>, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
+public:
+    static void save(BufferType& buffer, const std::bitset<Size>& bit_set) {
+// printf("-WRITE bitset-\n");  // TODO: remove
+        uint64_t val = bit_set.to_ullong();
+        buffer << val;
+    }
+};
+
+template <typename BufferType, size_t Size>
+class Serializer<BufferType, std::bitset<Size>, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
+public:
+    static void load(BufferType& buffer, std::bitset<Size>& bit_set) {
+// printf("-READ bitset-\n");  // TODO: remove
+        uint64_t val = 0U;
+        buffer >> val;
+
+        std::bitset<Size> result(val);
+        // bit_set(std::move(result));
+        bit_set = result;
     }
 };
 

@@ -18,9 +18,7 @@
 #include "oneapi/dnnl/dnnl.hpp"
 #include "openvino/core/node.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Pooling : public Node {
 public:
@@ -47,7 +45,7 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     AttrPtr initPrimitiveAttr() override;
@@ -66,7 +64,7 @@ private:
     dnnl::algorithm getPoolingAlgorithm() const;
     dnnl::pooling_forward::primitive_desc createDescriptorInternal(const dnnl::memory::desc& in_candidate,
                                                                    const dnnl::memory::desc& out_candidate,
-                                                                   const dnnl::algorithm alg);
+                                                                   dnnl::algorithm alg);
 
     AttrPtr pAttr;
 
@@ -76,6 +74,4 @@ private:
     bool useACL = false;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

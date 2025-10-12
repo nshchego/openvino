@@ -6,7 +6,7 @@
 
 #include <map>
 
-#include "buffer.hpp"
+#include "buffers.hpp"
 
 namespace ov::intel_cpu {
 

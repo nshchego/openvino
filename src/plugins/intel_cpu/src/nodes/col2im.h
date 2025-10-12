@@ -14,27 +14,25 @@
 #include "openvino/core/shape.hpp"
 #include "openvino/core/strides.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Col2Im : public Node {
 public:
     Col2Im(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    Col2Im(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    Col2Im(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
-    bool created() const override;
-    bool needPrepareParams() const override;
+    [[nodiscard]] bool created() const override;
+    [[nodiscard]] bool needPrepareParams() const override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     template <class OV_DATA_TYPE, class OV_INDEX_TYPE>
@@ -49,6 +47,4 @@ private:
     ov::Shape padsEnd;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

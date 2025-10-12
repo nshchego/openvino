@@ -36,22 +36,18 @@
 #include "nodes/experimental_detectron_topkrois.h"
 #include "nodes/extract_image_patches.h"
 #include "nodes/eye.h"
-#include "nodes/fake_quantize.h"
 #include "nodes/fullyconnected.h"
 #include "nodes/gather.h"
 #include "nodes/gather_elements.h"
 #include "nodes/gather_nd.h"
 #include "nodes/gather_tree.h"
 #include "nodes/generate_proposals.h"
-#include "nodes/grid_sample.hpp"
 #include "nodes/grn.h"
 #include "nodes/if.h"
 #include "nodes/input.h"
-#include "nodes/interaction.h"
 #include "nodes/interpolate.h"
 #include "nodes/inverse.hpp"
 #include "nodes/istft.h"
-#include "nodes/llm_mlp.h"
 #include "nodes/log_softmax.h"
 #include "nodes/lora.h"
 #include "nodes/lrn.h"
@@ -68,13 +64,11 @@
 #include "nodes/normalize.h"
 #include "nodes/one_hot.h"
 #include "nodes/pad.h"
-#include "nodes/paged_attn.h"
 #include "nodes/pooling.h"
 #include "nodes/priorbox.h"
 #include "nodes/priorbox_clustered.h"
 #include "nodes/proposal.h"
 #include "nodes/psroi_pooling.h"
-#include "nodes/qkv_proj.h"
 #include "nodes/random_uniform.hpp"
 #include "nodes/range.h"
 #include "nodes/rdft.h"
@@ -85,7 +79,6 @@
 #include "nodes/reorg_yolo.h"
 #include "nodes/reshape.h"
 #include "nodes/reverse_sequence.h"
-#include "nodes/rms_norm.h"
 #include "nodes/rnn.h"
 #include "nodes/roi_align.h"
 #include "nodes/roi_align_rotated.h"
@@ -114,9 +107,36 @@
 #include "nodes/transpose.h"
 #include "nodes/unique.hpp"
 
+#if defined(OPENVINO_ARCH_X86_64)
+#    include "nodes/fake_quantize.h"
+#    include "nodes/interaction.h"
+#    include "nodes/llm_mlp.h"
+#    include "nodes/qkv_proj.h"
+#    include "nodes/rms_norm.h"
+#endif
+
+#if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
+#    include "nodes/paged_attn.h"
+#endif
+
 #include "openvino/cc/factory.h"
 #include "selective_build.h"
 #include "utils/serialization/internal_types.hpp"
+
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+#    include "nodes/fake_quantize.h"
+#    include "nodes/grid_sample.hpp"
+#    include "nodes/interaction.h"
+#    include "nodes/llm_mlp.h"
+#    include "nodes/paged_attn.h"
+#    include "nodes/qkv_proj.h"
+#    include "nodes/rms_norm.h"
+#endif
+
+#if defined(OPENVINO_ARCH_ARM64)
+#    include "nodes/fake_quantize.h"
+#    include "nodes/paged_attn.h"
+#endif
 
 namespace ov::intel_cpu {
 
@@ -174,77 +194,78 @@ NodesFactory<SrcType>::NodesFactory() : Factory("NodesFactory") {
     INTEL_CPU_NODE(Interpolate, Type::Interpolate);
     INTEL_CPU_NODE(Inverse, Type::Inverse);
     INTEL_CPU_NODE(ISTFT, Type::ISTFT);
-    // INTEL_CPU_NODE(LogSoftmax, Type::LogSoftmax);
-    // INTEL_CPU_NODE(LoRA, Type::LoRA);
-    // INTEL_CPU_NODE(Lrn, Type::Lrn);
-    // INTEL_CPU_NODE(MatMul, Type::MatMul);
-    // INTEL_CPU_NODE(MatrixNms, Type::MatrixNms);
-    // INTEL_CPU_NODE(Multinomial, Type::Multinomial);
-    // INTEL_CPU_NODE(MVN, Type::MVN);
-    // INTEL_CPU_NODE(MemoryInput, Type::MemoryInput);
-    // INTEL_CPU_NODE(MemoryOutput, Type::MemoryOutput);
-    // INTEL_CPU_NODE(Math, Type::Math);
-    // INTEL_CPU_NODE(MultiClassNms, Type::MulticlassNms);
-    // INTEL_CPU_NODE(Ngram, Type::Ngram);
-    // INTEL_CPU_NODE(NonMaxSuppression, Type::NonMaxSuppression);
-    // INTEL_CPU_NODE(NonZero, Type::NonZero);
-    // INTEL_CPU_NODE(NormalizeL2, Type::NormalizeL2);
-    // INTEL_CPU_NODE(OneHot, Type::OneHot);
-    // INTEL_CPU_NODE(Pad, Type::Pad);
+    INTEL_CPU_NODE(LogSoftmax, Type::LogSoftmax);
+    INTEL_CPU_NODE(LoRA, Type::LoRA);
+    INTEL_CPU_NODE(Lrn, Type::Lrn);
+    INTEL_CPU_NODE(MatMul, Type::MatMul);
+    INTEL_CPU_NODE(MatrixNms, Type::MatrixNms);
+    INTEL_CPU_NODE(Multinomial, Type::Multinomial);
+    INTEL_CPU_NODE(MVN, Type::MVN);
+    INTEL_CPU_NODE(MemoryInput, Type::MemoryInput);
+    INTEL_CPU_NODE(MemoryOutput, Type::MemoryOutput);
+    INTEL_CPU_NODE(Math, Type::Math);
+    INTEL_CPU_NODE(MultiClassNms, Type::MulticlassNms);
+    INTEL_CPU_NODE(Ngram, Type::Ngram);
+    INTEL_CPU_NODE(NonMaxSuppression, Type::NonMaxSuppression);
+    INTEL_CPU_NODE(NonZero, Type::NonZero);
+    INTEL_CPU_NODE(NormalizeL2, Type::NormalizeL2);
+    INTEL_CPU_NODE(OneHot, Type::OneHot);
+    INTEL_CPU_NODE(Pad, Type::Pad);
     INTEL_CPU_NODE(Pooling, Type::Pooling);
-    // INTEL_CPU_NODE(PriorBox, Type::PriorBox);
-    // INTEL_CPU_NODE(PriorBoxClustered, Type::PriorBoxClustered);
-    // INTEL_CPU_NODE(Proposal, Type::Proposal);
-    // INTEL_CPU_NODE(PSROIPooling, Type::PSROIPooling);
-    // INTEL_CPU_NODE(RandomUniform, Type::RandomUniform);
-    // INTEL_CPU_NODE(Range, Type::Range);
-    // INTEL_CPU_NODE(RDFT, Type::RDFT);
-    // INTEL_CPU_NODE(Reduce, Type::Reduce);
-    // INTEL_CPU_NODE(RegionYolo, Type::RegionYolo);
+    INTEL_CPU_NODE(PriorBox, Type::PriorBox);
+    INTEL_CPU_NODE(PriorBoxClustered, Type::PriorBoxClustered);
+    INTEL_CPU_NODE(Proposal, Type::Proposal);
+    INTEL_CPU_NODE(PSROIPooling, Type::PSROIPooling);
+    INTEL_CPU_NODE(RandomUniform, Type::RandomUniform);
+    INTEL_CPU_NODE(Range, Type::Range);
+    INTEL_CPU_NODE(RDFT, Type::RDFT);
+    INTEL_CPU_NODE(Reduce, Type::Reduce);
+    INTEL_CPU_NODE(RegionYolo, Type::RegionYolo);
     INTEL_CPU_NODE(Reorder, Type::Reorder);
-    // INTEL_CPU_NODE(ReorgYolo, Type::ReorgYolo);
+    INTEL_CPU_NODE(ReorgYolo, Type::ReorgYolo);
     INTEL_CPU_NODE(Reshape, Type::Reshape);
-    // INTEL_CPU_NODE(ReverseSequence, Type::ReverseSequence);
-    // INTEL_CPU_NODE(RNN, Type::RNNCell);
-    // INTEL_CPU_NODE(RNN, Type::RNNSeq);
-    // INTEL_CPU_NODE(ROIPooling, Type::ROIPooling);
-    // INTEL_CPU_NODE(ROIAlign, Type::ROIAlign);
-    // INTEL_CPU_NODE(ROIAlignRotated, Type::ROIAlignRotated);
-    // INTEL_CPU_NODE(Roll, Type::Roll);
-    // INTEL_CPU_NODE(RoPE, Type::RoPE);
-    // INTEL_CPU_NODE(ScaledDotProductAttention, Type::ScaledDotProductAttention);
-    // INTEL_CPU_NODE(ScatterUpdate, Type::ScatterUpdate);
-    // INTEL_CPU_NODE(ScatterUpdate, Type::ScatterElementsUpdate);
-    // INTEL_CPU_NODE(ScatterUpdate, Type::ScatterNDUpdate);
-    // INTEL_CPU_NODE(SearchSorted, Type::SearchSorted);
-    // INTEL_CPU_NODE(SegmentMax, Type::SegmentMax);
-    // INTEL_CPU_NODE(ShapeOf, Type::ShapeOf);
-    // INTEL_CPU_NODE(ShuffleChannels, Type::ShuffleChannels);
+    INTEL_CPU_NODE(ReverseSequence, Type::ReverseSequence);
+    INTEL_CPU_NODE(RNN, Type::RNNCell);
+    INTEL_CPU_NODE(RNN, Type::RNNSeq);
+    INTEL_CPU_NODE(ROIPooling, Type::ROIPooling);
+    INTEL_CPU_NODE(ROIAlign, Type::ROIAlign);
+    INTEL_CPU_NODE(ROIAlignRotated, Type::ROIAlignRotated);
+    INTEL_CPU_NODE(Roll, Type::Roll);
+    INTEL_CPU_NODE(RoPE, Type::RoPE);
+    INTEL_CPU_NODE(ScaledDotProductAttention, Type::ScaledDotProductAttention);
+    INTEL_CPU_NODE(ScatterUpdate, Type::ScatterUpdate);
+    INTEL_CPU_NODE(ScatterUpdate, Type::ScatterElementsUpdate);
+    INTEL_CPU_NODE(ScatterUpdate, Type::ScatterNDUpdate);
+    INTEL_CPU_NODE(SearchSorted, Type::SearchSorted);
+    INTEL_CPU_NODE(SegmentMax, Type::SegmentMax);
+    INTEL_CPU_NODE(ShapeOf, Type::ShapeOf);
+    INTEL_CPU_NODE(ShuffleChannels, Type::ShuffleChannels);
     INTEL_CPU_NODE(SoftMax, Type::Softmax);
-    // INTEL_CPU_NODE(SpaceToDepth, Type::SpaceToDepth);
-    // INTEL_CPU_NODE(SpaceToBatch, Type::SpaceToBatch);
-    // INTEL_CPU_NODE(SparseFillEmptyRows, Type::SparseFillEmptyRows);
+    INTEL_CPU_NODE(SpaceToDepth, Type::SpaceToDepth);
+    INTEL_CPU_NODE(SpaceToBatch, Type::SpaceToBatch);
+    INTEL_CPU_NODE(SparseFillEmptyRows, Type::SparseFillEmptyRows);
     INTEL_CPU_NODE(Split, Type::Split);
-    // INTEL_CPU_NODE(STFT, Type::STFT);
-    // INTEL_CPU_NODE(StridedSlice, Type::StridedSlice);
-    // INTEL_CPU_NODE(StringTensorPack, Type::StringTensorPack);
-    // INTEL_CPU_NODE(StringTensorUnpack, Type::StringTensorUnpack);
+    INTEL_CPU_NODE(STFT, Type::STFT);
+    INTEL_CPU_NODE(StridedSlice, Type::StridedSlice);
+    INTEL_CPU_NODE(StringTensorPack, Type::StringTensorPack);
+    INTEL_CPU_NODE(StringTensorUnpack, Type::StringTensorUnpack);
     INTEL_CPU_NODE(Subgraph, Type::Subgraph);
-    // INTEL_CPU_NODE(TensorIterator, Type::TensorIterator);
-    // INTEL_CPU_NODE(Tile, Type::Tile);
-    // INTEL_CPU_NODE(TopK, Type::TopK);
+    INTEL_CPU_NODE(TensorIterator, Type::TensorIterator);
+    INTEL_CPU_NODE(Tile, Type::Tile);
+    INTEL_CPU_NODE(TopK, Type::TopK);
     INTEL_CPU_NODE(Transpose, Type::Transpose);
-    // INTEL_CPU_NODE(Unique, Type::Unique);
+    INTEL_CPU_NODE(Unique, Type::Unique);
 
 #if defined(OPENVINO_ARCH_X86_64)
-    INTEL_CPU_NODE(FakeQuantize, Type::FakeQuantize);
     INTEL_CPU_NODE(Interaction, Type::Interaction);
-    // INTEL_CPU_NODE(LLMMLP, Type::LLMMLP);
-    // INTEL_CPU_NODE(QKVProjection, Type::QKVProjection);
-    // INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
-    // INTEL_CPU_NODE(RMSNorm, Type::RMS);
-#elif defined(OPENVINO_ARCH_ARM64)
-    // INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
+    INTEL_CPU_NODE(LLMMLP, Type::LLMMLP);
+    INTEL_CPU_NODE(QKVProjection, Type::QKVProjection);
+    INTEL_CPU_NODE(RMSNorm, Type::RMS);
+#endif
+
+#if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
+    INTEL_CPU_NODE(FakeQuantize, Type::FakeQuantize);
+    INTEL_CPU_NODE(PagedAttention, Type::PagedAttention);
 #endif
 }
 
@@ -305,15 +326,15 @@ printf("    Try to create Reference node\n");
 }
 
 template <>
-Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& ib, const GraphContext::CPtr& context) {
+Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context) {
     Node* new_node = nullptr;
     std::string error_message;
     intel_cpu::Type node_type;
-    ib >> node_type;
+    in_buf >> node_type;
 
     try {
 // printf("--CPU-- FACTORY Stream. Try to deserialize CPU node %d\n", int(node_type));
-        std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, node_type, ib, context));
+        std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, node_type, in_buf, context));
         if (ol != nullptr && ol->created()) {
             new_node = ol.release();
         }
@@ -327,7 +348,7 @@ Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& ib, const Grap
 
     if (new_node == nullptr && node_type == Type::Reference) {
         try {
-            std::unique_ptr<Node> ol(new node::Reference(ib, context, error_message));
+            std::unique_ptr<Node> ol(new node::Reference(in_buf, context, error_message));
             if (ol != nullptr && ol->created()) {
                 new_node = ol.release();
             }

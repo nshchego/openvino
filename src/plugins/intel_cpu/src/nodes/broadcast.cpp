@@ -28,6 +28,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -37,7 +39,7 @@ bool Broadcast::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, 
             errorMessage = "Only Broadcast v1 are supported.";
             return false;
         }
-        if (!one_of(ov::as_type_ptr<const ov::op::v1::Broadcast>(op)->get_broadcast_spec().m_type,
+        if (none_of(ov::as_type_ptr<const ov::op::v1::Broadcast>(op)->get_broadcast_spec().m_type,
                     ov::op::AutoBroadcastType::NUMPY,
                     ov::op::AutoBroadcastType::EXPLICIT)) {
             errorMessage = "Only NUMPY and EXPLICIT broadcast types are supported.";
@@ -68,23 +70,21 @@ Broadcast::Broadcast(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    if (op->get_input_size() != 2 && op->get_input_size() != 3) {
-        THROW_CPU_NODE_ERR("has incorrect number of input edges: ", getParentEdges().size());
-    }
-    if (op->get_output_size() == 0) {
-        THROW_CPU_NODE_ERR("has no output edges.");
-    }
+    CPU_NODE_ASSERT(any_of(op->get_input_size(), 2U, 3U),
+                    "has incorrect number of input edges: ",
+                    getParentEdges().size());
+    CPU_NODE_ASSERT(op->get_output_size() != 0U, "has no output edges.");
 
     auto broadcastOp = ov::as_type_ptr<const ov::op::v1::Broadcast>(op);
     if (broadcastOp->get_broadcast_spec().m_type == ov::op::AutoBroadcastType::NUMPY) {
         broadcastType = NUMPY;
     } else if (broadcastOp->get_broadcast_spec().m_type == ov::op::AutoBroadcastType::EXPLICIT) {
-        if (op->get_input_size() <= AXES_MAPPING_IDX) {
-            THROW_CPU_NODE_ERR("and EXPLICIT mode must have tree input edges: ", getParentEdges().size());
-        }
+        CPU_NODE_ASSERT(op->get_input_size() > AXES_MAPPING_IDX,
+                        "and EXPLICIT mode must have tree input edges: ",
+                        getParentEdges().size());
         broadcastType = EXPLICIT;
     } else {
-        THROW_CPU_NODE_ERR("has unexpected broadcast type: ", broadcastOp->get_broadcast_spec().m_type);
+        CPU_NODE_THROW("has unexpected broadcast type: ", broadcastOp->get_broadcast_spec().m_type);
     }
 
     if (ov::is_type<ov::op::v0::Constant>(op->get_input_node_ptr(TARGET_SHAPE_IDX))) {
@@ -295,9 +295,16 @@ bool Broadcast::created() const {
 
 void Broadcast::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
+
+    ob << broadcastType;
+    ob << targetShape;
+    ob << axesMapping;
 }
 
-void Broadcast::load(BinaryInputBuffer& ib) {
+void Broadcast::load(BinaryInputBuffer& in_buf) {
+    in_buf >> broadcastType;
+    in_buf >> targetShape;
+    in_buf >> axesMapping;
 }
 
 }  // namespace ov::intel_cpu::node

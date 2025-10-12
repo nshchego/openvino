@@ -24,6 +24,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/op/log_softmax.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/general_utils.h"
 
 namespace ov::intel_cpu::node {
 
@@ -48,26 +49,26 @@ LogSoftmax::LogSoftmax(const std::shared_ptr<ov::Node>& op, const GraphContext::
     }
 
     const auto logSoftMax = ov::as_type_ptr<const ov::op::v5::LogSoftmax>(op);
-    if (logSoftMax == nullptr) {
-        THROW_CPU_NODE_ERR("is not an instance of v5 LogSoftmax.");
-    }
+    CPU_NODE_ASSERT(logSoftMax, "is not an instance of v5 LogSoftmax.");
 
-    if (m_input_shapes.size() != 1 || m_output_shapes.size() != 1) {
-        THROW_CPU_NODE_ERR("has incorrect number of input/output edges!");
-    }
+    CPU_NODE_ASSERT(all_of(1U, m_input_shapes.size(), m_output_shapes.size()), "has incorrect number of input/output edges!");
 
     auto dimsSize = getInputShapeAtPort(0).getDims().size();
     if (dimsSize == 0) {
         dimsSize += 1;
     }
-    axis = logSoftMax->get_axis();
+    axis = static_cast<int>(logSoftMax->get_axis());
     if (axis < 0) {
         axis += dimsSize;
     }
 
-    if (dimsSize < static_cast<size_t>(static_cast<size_t>(1) + axis)) {
-        THROW_CPU_NODE_ERR("has incorrect input parameters dimensions and axis number!");
-    }
+    CPU_NODE_ASSERT(dimsSize >= static_cast<size_t>(1) + axis,
+                    "has incorrect input parameters dimensions and axis number!");
+}
+
+LogSoftmax::LogSoftmax(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void LogSoftmax::initSupportedPrimitiveDescriptors() {
@@ -156,6 +157,21 @@ void LogSoftmax::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool LogSoftmax::created() const {
     return getType() == Type::LogSoftmax;
+}
+
+void LogSoftmax::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void LogSoftmax::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

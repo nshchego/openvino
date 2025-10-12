@@ -8,7 +8,6 @@
 #include <memory>
 #include <oneapi/dnnl/dnnl_common.hpp>
 #include <string>
-#include <vector>
 
 #include "graph_context.h"
 #include "node.h"
@@ -21,7 +20,7 @@ class Inverse : public Node {
 public:
     Inverse(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    Inverse(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    Inverse(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -40,15 +39,15 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     /// Inverse params
     bool m_adjoint = false;
 
     /// Shape inference
-    static constexpr size_t INPUT_PORT = 0lu;
-    static constexpr size_t OUTPUT_PORT = 0lu;
+    static constexpr size_t INPUT_PORT = 0LU;
+    static constexpr size_t OUTPUT_PORT = 0LU;
     bool m_const_input = false;
 
     /// General algorithm variables

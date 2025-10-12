@@ -5,12 +5,10 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_common.hpp>
 #include <string>
-#include <vector>
 
 #include "cpu_types.h"
 #include "edge.h"
@@ -19,38 +17,40 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/type/element_type.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Concat : public Node {
 public:
     Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    Concat(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    Concat(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
     void initOptimalPrimitiveDescriptor() override;
     void selectOptimalPrimitiveDescriptor() override;
-    bool created() const override;
+    [[nodiscard]] bool created() const override;
     void execute(const dnnl::stream& strm) override;
     void executeDynamicImpl(const dnnl::stream& strm) override {
         execute(strm);
     }
     void resolveInPlaceEdges(Edge::LOOK look) override;
 
-    ov::element::Type getRuntimePrecision() const override;
+    [[nodiscard]] ov::element::Type getRuntimePrecision() const override;
 
-    bool neverExecute() const override;
-    bool isExecutable() const override;
-    bool needPrepareParams() const override;
+    [[nodiscard]] bool neverExecute() const override;
+    [[nodiscard]] bool isExecutable() const override;
+    [[nodiscard]] bool needPrepareParams() const override;
     void prepareParams() override;
+    // TODO: Move to base Node class when more nodes support fuse convert
+    bool supportConvertFusion() const {
+        return supportFuseConvert;
+    }
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     size_t axis = 0;
@@ -59,6 +59,7 @@ private:
     bool canOptimizeNspc = false;
     bool canOptimize1DCase = false;
     void execRef();
+    void execWithFuseConvert();  // Handle FP16 to FP32 conversion
     static size_t inverseOrder(const VectorDims& order, size_t axis);
     void execNspcSpecCase();
     void exec1DCase();
@@ -71,10 +72,10 @@ private:
     ov::element::Type inputPrecision = ov::element::f32;
     ov::element::Type outputPrecision = ov::element::f32;
     bool canExecRef = false;
+    bool supportFuseConvert = true;  // support FP16 to FP32 conversion
+    bool doFuseConvert = false;      // whether to perform FP16 to FP32 conversion
     static constexpr size_t MAX_RANK_REF = 6;
     dnnl::primitive prim;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

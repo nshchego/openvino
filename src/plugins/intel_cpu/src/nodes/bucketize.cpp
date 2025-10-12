@@ -27,6 +27,8 @@
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/core/type/element_type_traits.hpp"
 #include "openvino/op/bucketize.hpp"
+#include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -51,13 +53,10 @@ Bucketize::Bucketize(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     }
 
     const auto bucketsize = ov::as_type_ptr<const ov::op::v3::Bucketize>(op);
-    if (bucketsize == nullptr) {
-        THROW_CPU_NODE_ERR("is not an instance of v3 Bucketize.");
-    }
+    CPU_NODE_ASSERT(bucketsize, "is not an instance of v3 Bucketize.");
 
-    if (getOriginalInputsNumber() != 2 || getOriginalOutputsNumber() != 1) {
-        THROW_CPU_NODE_ERR("has incorrect number of input/output edges!");
-    }
+    CPU_NODE_ASSERT(getOriginalInputsNumber() == 2 && getOriginalOutputsNumber() == 1,
+                    "has incorrect number of input/output edges!");
 
     // check one attribute
     with_right = bucketsize->get_with_right_bound();
@@ -75,17 +74,15 @@ void Bucketize::initSupportedPrimitiveDescriptors() {
 
     // check precisions for input and output tensors
     input_precision = getOriginalInputPrecisionAtPort(INPUT_TENSOR_PORT);
-    if (input_precision != ov::element::f32 && input_precision != ov::element::i32 &&
-        input_precision != ov::element::i64) {
+    if (none_of(input_precision, ov::element::f32, ov::element::i32, ov::element::i64)) {
         input_precision = ov::element::f32;
     }
     boundaries_precision = getOriginalInputPrecisionAtPort(INPUT_BINS_PORT);
-    if (boundaries_precision != ov::element::f32 && boundaries_precision != ov::element::i32 &&
-        boundaries_precision != ov::element::i64) {
+    if (none_of(boundaries_precision, ov::element::f32, ov::element::i32, ov::element::i64)) {
         boundaries_precision = ov::element::f32;
     }
     output_precision = getOriginalOutputPrecisionAtPort(OUTPUT_TENSOR_PORT);
-    if (output_precision != ov::element::i32 && output_precision != ov::element::i64) {
+    if (none_of(output_precision, ov::element::i32, ov::element::i64)) {
         output_precision = ov::element::i32;
     }
 
@@ -199,7 +196,7 @@ void Bucketize::execute([[maybe_unused]] const dnnl::stream& strm) {
                   element_type_traits<ov::element::i64>::value_type>();
         break;
     default:
-        THROW_CPU_NODE_ERR("has unsupported precision: ", precision_mask);
+        CPU_NODE_THROW("has unsupported precision: ", precision_mask);
     }
 }
 
@@ -207,28 +204,16 @@ void Bucketize::prepareParams() {
     auto inputTensorMemPtr = getSrcMemoryAtPort(INPUT_TENSOR_PORT);
     auto inputBinsMemPtr = getSrcMemoryAtPort(INPUT_BINS_PORT);
     auto dstMemPtr = getDstMemoryAtPort(0);
-    if (!dstMemPtr || !dstMemPtr->isDefined()) {
-        THROW_CPU_NODE_ERR("has destination memory undefined.");
-    }
-    if (!inputTensorMemPtr || !inputTensorMemPtr->isDefined()) {
-        THROW_CPU_NODE_ERR("has input tensor undefined.");
-    }
-    if (!inputBinsMemPtr || !inputBinsMemPtr->isDefined()) {
-        THROW_CPU_NODE_ERR("has input bins undefined.");
-    }
-    if (getSelectedPrimitiveDescriptor() == nullptr) {
-        THROW_CPU_NODE_ERR("has preferable primitive descriptors unset.");
-    }
+    CPU_NODE_ASSERT(dstMemPtr && dstMemPtr->isDefined(), "has destination memory undefined.");
+    CPU_NODE_ASSERT(inputTensorMemPtr && inputTensorMemPtr->isDefined(), "has input tensor undefined.");
+    CPU_NODE_ASSERT(inputBinsMemPtr && inputBinsMemPtr->isDefined(), "has input bins undefined.");
+    CPU_NODE_ASSERT(getSelectedPrimitiveDescriptor(), "has preferable primitive descriptors unset.");
 
     // update with_bins/num_values/num_bin_values
     auto input_tensor_dims = inputTensorMemPtr->getStaticDims();
-    if (input_tensor_dims.empty()) {
-        THROW_CPU_NODE_ERR("has incorrect dimensions of the input.");
-    }
+    CPU_NODE_ASSERT(!input_tensor_dims.empty(), "has incorrect dimensions of the input.");
     auto input_bin_dims = inputBinsMemPtr->getStaticDims();
-    if (input_bin_dims.size() != 1) {
-        THROW_CPU_NODE_ERR("has incorrect dimensions of the boundaries tensor.");
-    }
+    CPU_NODE_ASSERT(input_bin_dims.size() == 1, "has incorrect dimensions of the boundaries tensor.");
     if (input_bin_dims[0] != 0) {
         with_bins = true;
     }
@@ -278,9 +263,24 @@ bool Bucketize::created() const {
 
 void Bucketize::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
+
+    ob << num_values;
+    ob << num_bin_values;
+    ob << with_right;
+    ob << with_bins;
+    ob << input_precision;
+    ob << boundaries_precision;
+    ob << output_precision;
 }
 
-void Bucketize::load(BinaryInputBuffer& ib) {
+void Bucketize::load(BinaryInputBuffer& in_buf) {
+    in_buf >> num_values;
+    in_buf >> num_bin_values;
+    in_buf >> with_right;
+    in_buf >> with_bins;
+    in_buf >> input_precision;
+    in_buf >> boundaries_precision;
+    in_buf >> output_precision;
 }
 
 }  // namespace ov::intel_cpu::node

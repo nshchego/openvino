@@ -46,9 +46,9 @@ Inverse::Inverse(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
     m_const_input = is_type<op::v0::Constant>(op->get_input_node_ptr(INPUT_PORT));
 }
 
-Inverse::Inverse(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
-    : Node(ib, context) {
-    load(ib);
+Inverse::Inverse(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 bool Inverse::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
@@ -64,12 +64,8 @@ bool Inverse::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
 }
 
 void Inverse::getSupportedDescriptors() {
-    if (getParentEdges().size() != 1) {
-        THROW_CPU_NODE_ERR("has incorrect number of input edges.");
-    }
-    if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR("has incorrect number of output edges.");
-    }
+    CPU_NODE_ASSERT(getParentEdges().size() == 1, "has incorrect number of input edges.");
+    CPU_NODE_ASSERT(!getChildEdges().empty(), "has incorrect number of output edges.");
 }
 
 void Inverse::initSupportedPrimitiveDescriptors() {
@@ -86,11 +82,10 @@ void Inverse::initSupportedPrimitiveDescriptors() {
 void Inverse::prepareParams() {
     const auto& input_shape = getParentEdgeAt(INPUT_PORT)->getMemory().getStaticDims();
 
-    if (input_shape.size() < 2) {
-        THROW_CPU_NODE_ERR("has incompatible 'data' shape ",
-                           PartialShape(input_shape),
-                           ". Only tensors of rank at least 2 are allowed.");
-    }
+    CPU_NODE_ASSERT(input_shape.size() >= 2,
+                    "has incompatible 'data' shape ",
+                    PartialShape(input_shape),
+                    ". Only tensors of rank at least 2 are allowed.");
 
     m_side = input_shape.back();
     m_side_squared = m_side * m_side;
@@ -230,7 +225,7 @@ void Inverse::lu_solve(float* output,
 void Inverse::save(BinaryOutputBuffer& ob) const {
 }
 
-void Inverse::load(BinaryInputBuffer& ib) {
+void Inverse::load(BinaryInputBuffer& in_buf) {
 }
 
 }  // namespace ov::intel_cpu::node

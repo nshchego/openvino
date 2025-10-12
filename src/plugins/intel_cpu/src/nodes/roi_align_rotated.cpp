@@ -37,6 +37,11 @@ ROIAlignRotated::ROIAlignRotated(const std::shared_ptr<ov::Node>& op, const Grap
     clockwiseMode = roiAlign->get_clockwise_mode();
 }
 
+ROIAlignRotated::ROIAlignRotated(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void ROIAlignRotated::getSupportedDescriptors() {
     // Validation is already done in the ov::op::v15::ROIAlignRotated.
 }
@@ -98,7 +103,7 @@ void ROIAlignRotated::executeImpl() {
         clockwiseMode);
 }
 
-void ROIAlignRotated::execute(const dnnl::stream& /*strm*/) {
+void ROIAlignRotated::execute([[maybe_unused]] const dnnl::stream& strm) {
     const ov::element::Type type = getOriginalInputPrecisionAtPort(0);
     executeImpl<ov::element::f32>();
 
@@ -113,7 +118,7 @@ void ROIAlignRotated::execute(const dnnl::stream& /*strm*/) {
         CASE(f32);
         CASE(f64);
     default:
-        THROW_CPU_NODE_ERR("Unhandled data type ", type, " in execute()");
+        CPU_NODE_THROW("Unhandled data type ", type, " in execute()");
     }
 #undef CASE
 }

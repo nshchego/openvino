@@ -19,6 +19,8 @@ class SparseFillEmptyRows : public Node {
 public:
     SparseFillEmptyRows(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    SparseFillEmptyRows(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void getSupportedDescriptors() override;

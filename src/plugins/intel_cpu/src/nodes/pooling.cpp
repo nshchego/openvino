@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/primitive_attr.hpp"
 #include "common/primitive_hashing_utils.hpp"
 #include "cpu_memory.h"
 #include "cpu_types.h"
@@ -51,7 +52,12 @@
 // to access and change C pooling primitive desc internal padding field
 
 #if defined(OV_CPU_WITH_ACL)
+#    include <arm_compute/core/CoreTypes.h>
+#    include <arm_compute/core/TensorInfo.h>
+#    include <arm_compute/core/Types.h>
+
 #    include "executors/acl/acl_utils.hpp"
+#    include "nodes/executors/acl/acl_pooling.hpp"
 #    include "utils/debug_capabilities.h"
 #endif
 
@@ -124,9 +130,7 @@ dnnl::pooling_forward::primitive_desc createDescriptorHelper(const dnnl::engine&
                                                              const std::vector<ptrdiff_t>& effective_pad_end,
                                                              const std::vector<ptrdiff_t>& effective_dilation,
                                                              const dnnl::primitive_attr& attr) {
-    if (alg == dnnl::algorithm::undef) {
-        OPENVINO_THROW("Unsupported pooling type");
-    }
+    OPENVINO_ASSERT(alg != dnnl::algorithm::undef, "Unsupported pooling type");
 
     auto convert = [](std::vector<ptrdiff_t> orig_dims) {
         return memory::dims(orig_dims.begin(), orig_dims.end());
@@ -178,8 +182,9 @@ bool Pooling::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
                                        const ov::op::v8::MaxPool,
                                        const ov::op::v14::MaxPool,
                                        const ov::op::v1::AvgPool,
-                                       const ov::op::v14::AvgPool>(op)) {
-            errorMessage = "Supported ops are MaxPool-1, MaxPool-8, MaxPool-14, AvgPool-1 and AvgPool-14";
+                                       const ov::op::v14::AvgPool,
+                                       const ov::op::v16::AvgPool>(op)) {
+            errorMessage = "Supported ops are MaxPool-1, MaxPool-8, MaxPool-14, AvgPool-1 AvgPool-14 and AvgPool-16";
             return false;
         }
 #if defined(OV_CPU_WITH_ACL)
@@ -220,8 +225,8 @@ Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
         get_attributes(poolingAttrs.kernel, maxPoolOpBase->get_kernel());
         get_attributes(poolingAttrs.data_pad_begin, maxPoolOpBase->get_pads_begin());
         get_attributes(poolingAttrs.data_pad_end, maxPoolOpBase->get_pads_end());
-        poolingAttrs.auto_pad = (poolingAttrs.pad_type == ov::op::PadType::SAME_LOWER ||
-                                 poolingAttrs.pad_type == ov::op::PadType::SAME_UPPER);
+        poolingAttrs.auto_pad =
+            (any_of(poolingAttrs.pad_type, ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER));
     }
 
     if (auto maxPoolOp_v14 = ov::as_type_ptr<const ov::op::v14::MaxPool>(op)) {
@@ -236,13 +241,17 @@ Pooling::Pooling(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
         algorithm = Algorithm::PoolingAvg;
         poolingAttrs.exclude_pad = avgPoolOpBase->get_exclude_pad();
         poolingAttrs.rounding = avgPoolOpBase->get_rounding_type();
-        get_attributes(poolingAttrs.stride, avgPoolOpBase->get_strides());
         get_attributes(poolingAttrs.kernel, avgPoolOpBase->get_kernel());
+        get_attributes(poolingAttrs.stride, avgPoolOpBase->get_strides());
+        if (auto avgPoolV16 = ov::as_type_ptr<const ov::op::v16::AvgPool>(op)) {
+            get_attributes(poolingAttrs.dilation, avgPoolV16->get_dilations());
+        } else {
+            poolingAttrs.dilation.resize(poolingAttrs.kernel.size(), 1);
+        }
         get_attributes(poolingAttrs.data_pad_begin, avgPoolOpBase->get_pads_begin());
         get_attributes(poolingAttrs.data_pad_end, avgPoolOpBase->get_pads_end());
-        poolingAttrs.dilation.resize(poolingAttrs.kernel.size(), 1);
-        poolingAttrs.auto_pad = (avgPoolOpBase->get_auto_pad() == ov::op::PadType::SAME_LOWER ||
-                                 avgPoolOpBase->get_auto_pad() == ov::op::PadType::SAME_UPPER);
+        poolingAttrs.auto_pad =
+            (any_of(avgPoolOpBase->get_auto_pad(), ov::op::PadType::SAME_LOWER, ov::op::PadType::SAME_UPPER));
     }
     poolingAttrs.algorithm = algorithm;
 }
@@ -304,12 +313,8 @@ void Pooling::getSupportedDescriptors() {
         return;
     }
 
-    if (getParentEdges().size() != 1) {
-        THROW_CPU_NODE_ERR("Incorrect number of input edges");
-    }
-    if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR("Incorrect number of output edges");
-    }
+    CPU_NODE_ASSERT(getParentEdges().size() == 1, "Incorrect number of input edges");
+    CPU_NODE_ASSERT(!getChildEdges().empty(), "Incorrect number of output edges");
 
     ov::element::Type inputPrecision = getOriginalInputPrecisionAtPort(0);
     ov::element::Type outputPrecision = getOriginalOutputPrecisionAtPort(0);
@@ -372,7 +377,7 @@ void Pooling::getSupportedDescriptors() {
 
     // WA: LPT transformation has WA which allows average pooling has I8/U8 output precision instead of FP32,
     // so we explicitly set output precision as FP32
-    if (!one_of(outputPrecision, ov::element::i8, ov::element::bf16, ov::element::f16)) {
+    if (none_of(outputPrecision, ov::element::i8, ov::element::bf16, ov::element::f16)) {
         if (getAlgorithm() == Algorithm::PoolingMax) {
             // oneDNN supports only equal precisions for input and output
             outputPrecision = inputPrecision;
@@ -380,7 +385,7 @@ void Pooling::getSupportedDescriptors() {
             outputPrecision = ov::element::f32;
         }
     }
-    if (one_of(inputPrecision, ov::element::bf16, ov::element::f16)) {
+    if (any_of(inputPrecision, ov::element::bf16, ov::element::f16)) {
         outputPrecision = inputPrecision;
     }
 
@@ -391,15 +396,14 @@ void Pooling::getSupportedDescriptors() {
     auto inputDataType = DnnlExtensionUtils::ElementTypeToDataType(inputPrecision);
     auto outputDataType = DnnlExtensionUtils::ElementTypeToDataType(outputPrecision);
 
-    if ((inputRank < 3) || (inputRank > 5)) {
-        THROW_CPU_NODE_ERR("Unsupported mode. Only 3D, 4D and 5D blobs are supported as input.");
-    }
+    CPU_NODE_ASSERT((inputRank >= 3) && (inputRank <= 5),
+                    "Unsupported mode. Only 3D, 4D and 5D blobs are supported as input.");
 
     initEffectiveAttributes(inShape, MemoryDescUtils::makeDummyShape(childShape));
 
-    if (inputPrecision == ov::element::i8 || inputPrecision == ov::element::u8) {
+    if (any_of(inputPrecision, ov::element::i8, ov::element::u8)) {
         //  We have to extend i8i8_pooling_fwd_t from oneDNN to support BF16 output data type
-        if (one_of(outputDataType, memory::data_type::bf16, memory::data_type::f16)) {
+        if (any_of(outputDataType, memory::data_type::bf16, memory::data_type::f16)) {
             outputDataType = memory::data_type::f32;
         }
         // i8 layers supports only ndhwc and nhwc layouts
@@ -425,7 +429,7 @@ void Pooling::getSupportedDescriptors() {
             return std::make_pair(in_candidate, out_candidate);
         }();
         createDescriptor({in_candidate}, {out_candidate});
-    } else if ((inputRank == 3 || inputRank == 4 || inputRank == 5) && parentShape.getDims()[1] == 1) {
+    } else if ((any_of(inputRank, 3U, 4U, 5U)) && parentShape.getDims()[1] == 1) {
         // WA. We should force planar layout since it provides better performance
         auto [in_candidate, out_candidate] = [&]() {
             std::shared_ptr<DnnlBlockedMemoryDesc> in_candidate;
@@ -450,7 +454,7 @@ void Pooling::getSupportedDescriptors() {
         }();
         createDescriptor({in_candidate}, {out_candidate});
     } else {
-        if (!one_of(inputDataType, memory::data_type::bf16, memory::data_type::f16)) {
+        if (none_of(inputDataType, memory::data_type::bf16, memory::data_type::f16)) {
             inputDataType = memory::data_type::f32;
             outputDataType = memory::data_type::f32;
         }
@@ -465,9 +469,7 @@ void Pooling::getSupportedDescriptors() {
 
 void Pooling::prepareParams() {
     auto* selected_pd = getSelectedPrimitiveDescriptor();
-    if (selected_pd == nullptr) {
-        THROW_CPU_NODE_ERR("did not set preferable primitive descriptor");
-    }
+    CPU_NODE_ASSERT(selected_pd, "did not set preferable primitive descriptor");
 
     AttrPtr attr;
     if (isDynamicNode()) {
@@ -487,12 +489,8 @@ void Pooling::prepareParams() {
     if (useACL) {
         auto dstMemPtr = getDstMemoryAtPort(0);
         auto srcMemPtr = getSrcMemoryAtPort(0);
-        if (!dstMemPtr || !dstMemPtr->isDefined()) {
-            THROW_CPU_NODE_ERR("Destination memory is undefined.");
-        }
-        if (!srcMemPtr || !srcMemPtr->isDefined()) {
-            THROW_CPU_NODE_ERR("Input memory is undefined.");
-        }
+        CPU_NODE_ASSERT(dstMemPtr && dstMemPtr->isDefined(), "Destination memory is undefined.");
+        CPU_NODE_ASSERT(srcMemPtr && srcMemPtr->isDefined(), "Input memory is undefined.");
 
         std::vector<MemoryDescPtr> srcMemoryDescs;
         for (size_t i = 0; i < getOriginalInputsNumber(); i++) {
@@ -557,9 +555,7 @@ void Pooling::prepareParams() {
 
         dnnlExecPtr = result.first;
 
-        if (!dnnlExecPtr) {
-            THROW_CPU_NODE_ERR("Primitive descriptor was not found.");
-        }
+        CPU_NODE_ASSERT(dnnlExecPtr, "Primitive descriptor was not found.");
 
         auto scratchpadMem = getScratchPadMem(dnnlExecPtr->getScratchPadDesc());
         primArgs[DNNL_ARG_SCRATCHPAD] = scratchpadMem->getPrimitive();
@@ -590,7 +586,7 @@ void Pooling::execute(const dnnl::stream& strm) {
 
         execPtr->exec(srcMemory, dstMemory, postOpsArgs);
     } else {
-        THROW_CPU_NODE_ERR("doesn't have an initialized executor");
+        CPU_NODE_THROW("doesn't have an initialized executor");
     }
 }
 
@@ -817,11 +813,11 @@ void Pooling::setPostOps(dnnl::primitive_attr& attr) {
             continue;
         }
 
-        THROW_CPU_NODE_ERR("Fusing of ",
-                           NameFromType(node->getType()),
-                           " operation to ",
-                           NameFromType(this->getType()),
-                           " node is not implemented");
+        CPU_NODE_THROW("Fusing of ",
+                       NameFromType(node->getType()),
+                       " operation to ",
+                       NameFromType(this->getType()),
+                       " node is not implemented");
     }
 
     attr.set_post_ops(ops);
@@ -850,25 +846,25 @@ void Pooling::save(BinaryOutputBuffer& ob) const {
     ob << useACL;
 }
 
-void Pooling::load(BinaryInputBuffer& ib) {
-    ib >> poolingAttrs.exclude_pad;
-    ib >> poolingAttrs.auto_pad;
-    ib >> poolingAttrs.pad_type;
-    ib >> poolingAttrs.algorithm;
-    ib >> poolingAttrs.rounding;
-    ib >> poolingAttrs.stride;
-    ib >> poolingAttrs.kernel;
-    ib >> poolingAttrs.dilation;
-    ib >> poolingAttrs.data_pad_begin;
-    ib >> poolingAttrs.data_pad_end;
-    ib >> poolingAttrs.effective_pad_begin;
-    ib >> poolingAttrs.effective_pad_end;
-    ib >> poolingAttrs.effective_dilation;
+void Pooling::load(BinaryInputBuffer& in_buf) {
+    in_buf >> poolingAttrs.exclude_pad;
+    in_buf >> poolingAttrs.auto_pad;
+    in_buf >> poolingAttrs.pad_type;
+    in_buf >> poolingAttrs.algorithm;
+    in_buf >> poolingAttrs.rounding;
+    in_buf >> poolingAttrs.stride;
+    in_buf >> poolingAttrs.kernel;
+    in_buf >> poolingAttrs.dilation;
+    in_buf >> poolingAttrs.data_pad_begin;
+    in_buf >> poolingAttrs.data_pad_end;
+    in_buf >> poolingAttrs.effective_pad_begin;
+    in_buf >> poolingAttrs.effective_pad_end;
+    in_buf >> poolingAttrs.effective_dilation;
     
-    ib >> inShape;
+    in_buf >> inShape;
 
-    ib >> isNotMaxPool1;
-    ib >> useACL;
+    in_buf >> isNotMaxPool1;
+    in_buf >> useACL;
 }
 
 }  // namespace ov::intel_cpu::node

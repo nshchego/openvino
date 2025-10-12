@@ -11,6 +11,7 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/node_vector.hpp"
 #include "openvino/op/op.hpp"
+#include "utils/serialization/buffers.hpp"
 
 namespace ov::intel_cpu {
 
@@ -22,6 +23,10 @@ public:
 
     struct Config {
         std::string type;
+
+        void save(BinaryOutputBuffer& ob) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     CausalMaskPreprocessNode(const OutputVector& args, Config cfg);

@@ -37,6 +37,11 @@ SearchSorted::SearchSorted(const std::shared_ptr<ov::Node>& op, const GraphConte
     right_mode = ss_op->get_right_mode();
 }
 
+SearchSorted::SearchSorted(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool SearchSorted::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!ov::is_type<ov::op::v15::SearchSorted>(op)) {
@@ -61,7 +66,7 @@ void SearchSorted::initSupportedPrimitiveDescriptors() {
     ov::element::Type inputPrec = getOriginalInputPrecisionAtPort(0);
     ov::element::Type outputPrec = getOriginalOutputPrecisionAtPort(0);
 
-    if (!one_of(inputPrec,
+    if (none_of(inputPrec,
                 ov::element::f32,
                 ov::element::i32,
                 ov::element::bf16,
@@ -71,7 +76,7 @@ void SearchSorted::initSupportedPrimitiveDescriptors() {
         inputPrec = ov::element::f32;
     }
 
-    if (!one_of(outputPrec, ov::element::i32, ov::element::i64)) {
+    if (none_of(outputPrec, ov::element::i32, ov::element::i64)) {
         outputPrec = ov::element::i32;
     }
 

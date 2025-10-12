@@ -6,11 +6,10 @@
 
 #include <gtest/gtest.h>
 
-#include <base/ov_behavior_test_utils.hpp>
-
 #include "common/npu_test_env_cfg.hpp"
 #include "openvino/core/except.hpp"
 #include "openvino/core/version.hpp"
+#include "shared_test_classes/base/ov_behavior_test_utils.hpp"
 
 // models generation
 #include "openvino/op/abs.hpp"
@@ -84,7 +83,7 @@ public:
         APIBaseTest::SetUp();
     }
 
-    static std::string getTestCaseName(testing::TestParamInfo<BlobCompatibilityParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<BlobCompatibilityParams>& obj) {
         std::string target_device, model_name, platform, ov_release, driver;
         std::tie(target_device, model_name, platform, ov_release, driver) = obj.param;
         std::ostringstream result;

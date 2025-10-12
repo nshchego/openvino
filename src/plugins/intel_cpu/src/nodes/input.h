@@ -10,7 +10,6 @@
 #include <oneapi/dnnl/dnnl_common.hpp>
 #include <openvino/op/constant.hpp>
 #include <string>
-#include <utility>
 
 #include "cpu_memory.h"
 #include "cpu_shape.h"
@@ -18,6 +17,7 @@
 #include "graph_context.h"
 #include "memory_desc/cpu_memory_desc.h"
 #include "openvino/core/node.hpp"
+#include "openvino/core/shape.hpp"
 #include "openvino/core/type/element_type.hpp"
 
 namespace ov::intel_cpu::node {
@@ -62,7 +62,7 @@ public:
 
     Input(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, const OutputConfig& config);
 
-    Input(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    Input(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -94,7 +94,7 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 
 private:

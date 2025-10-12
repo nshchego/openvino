@@ -25,15 +25,15 @@ ob << ob.get_pos();  // TODO: remove
 ob << ob.get_pos();  // TODO: remove
 }
 
-void ConvertParams::load(BinaryInputBuffer& ib) {
-validate_stream_offset(ib);  // TODO: remove
+void ConvertParams::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
 
-    ib >> srcPrc;
-    ib >> origPrc;
-    ib >> dstPrc;
-    ib >> size;
+    in_buf >> srcPrc;
+    in_buf >> origPrc;
+    in_buf >> dstPrc;
+    in_buf >> size;
 
-validate_stream_offset(ib);  // TODO: remove
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

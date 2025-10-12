@@ -61,13 +61,14 @@ STFT::STFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
     m_is_frame_step_const = is_type<op::v0::Constant>(stft_op->get_input_node_ptr(FRAME_STEP_IDX));
 }
 
+STFT::STFT(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void STFT::getSupportedDescriptors() {
-    if (getParentEdges().size() != 4) {
-        THROW_CPU_NODE_ERR("STFT has incorrect number of input edges.");
-    }
-    if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR("STFT has incorrect number of output edges.");
-    }
+    CPU_NODE_ASSERT(getParentEdges().size() == 4, "STFT has incorrect number of input edges.");
+    CPU_NODE_ASSERT(!getChildEdges().empty(), "STFT has incorrect number of output edges.");
 }
 
 void STFT::initSupportedPrimitiveDescriptors() {
@@ -76,7 +77,7 @@ void STFT::initSupportedPrimitiveDescriptors() {
     }
 
     auto dataPrecision = getOriginalInputPrecisionAtPort(DATA_IDX);
-    if (!one_of(dataPrecision, ov::element::f32)) {
+    if (none_of(dataPrecision, ov::element::f32)) {
         dataPrecision = ov::element::f32;
     }
 
@@ -192,7 +193,8 @@ void STFT::executeDynamicImpl(const dnnl::stream& strm) {
 }
 
 bool STFT::needShapeInfer() const {
-    return !(m_is_frame_size_const && m_is_frame_step_const) || Node::needShapeInfer();
+    const bool both_const = m_is_frame_size_const && m_is_frame_step_const;
+    return !both_const || Node::needShapeInfer();
 }
 
 void STFT::createPrimitive() {

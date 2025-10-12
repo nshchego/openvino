@@ -25,6 +25,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/op/prior_box_clustered.hpp"
 #include "shape_inference/custom/priorbox_clustered.hpp"
+#include "utils/general_utils.h"
 
 namespace ov::intel_cpu::node {
 bool PriorBoxClustered::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
@@ -65,6 +66,11 @@ PriorBoxClustered::PriorBoxClustered(const std::shared_ptr<ov::Node>& op, const 
     if (variances.empty()) {
         variances.push_back(0.1F);
     }
+}
+
+PriorBoxClustered::PriorBoxClustered(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 bool PriorBoxClustered::needShapeInfer() const {
@@ -116,9 +122,9 @@ void PriorBoxClustered::execute([[maybe_unused]] const dnnl::stream& strm) {
 
     float step_w = step_widths == 0 ? step : step_widths;
     float step_h = step_heights == 0 ? step : step_heights;
-    if (step_w == 0 && step_h == 0) {
-        step_w = static_cast<float>(img_width) / layer_width;
-        step_h = static_cast<float>(img_height) / layer_height;
+    if (all_of(0, step_w, step_h)) {
+        step_w = static_cast<float>(img_width) / static_cast<float>(layer_width);
+        step_h = static_cast<float>(img_height) / static_cast<float>(layer_height);
     }
 
     auto* dst_data = getDstDataAtPortAs<float>(0);
@@ -126,17 +132,17 @@ void PriorBoxClustered::execute([[maybe_unused]] const dnnl::stream& strm) {
 
     size_t var_size = variances.size();
     parallel_for2d(layer_height, layer_width, [&](int64_t h, int64_t w) {
-        float center_x = (w + offset) * step_w;
-        float center_y = (h + offset) * step_h;
+        float center_x = (static_cast<float>(w) + offset) * step_w;
+        float center_y = (static_cast<float>(h) + offset) * step_h;
 
         for (int s = 0; s < number_of_priors; ++s) {
             float box_width = widths[s];
             float box_height = heights[s];
 
-            float xmin = (center_x - box_width / 2.0F) / img_width;
-            float ymin = (center_y - box_height / 2.0F) / img_height;
-            float xmax = (center_x + box_width / 2.0F) / img_width;
-            float ymax = (center_y + box_height / 2.0F) / img_height;
+            float xmin = (center_x - box_width / 2.0F) / static_cast<float>(img_width);
+            float ymin = (center_y - box_height / 2.0F) / static_cast<float>(img_height);
+            float xmax = (center_x + box_width / 2.0F) / static_cast<float>(img_width);
+            float ymax = (center_y + box_height / 2.0F) / static_cast<float>(img_height);
 
             if (clip) {
                 xmin = (std::min)((std::max)(xmin, 0.0F), 1.0F);

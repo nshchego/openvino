@@ -35,6 +35,11 @@ StringTensorUnpack::StringTensorUnpack(const std::shared_ptr<ov::Node>& op, cons
     }
 }
 
+StringTensorUnpack::StringTensorUnpack(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool StringTensorUnpack::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                               std::string& errorMessage) noexcept {
     try {

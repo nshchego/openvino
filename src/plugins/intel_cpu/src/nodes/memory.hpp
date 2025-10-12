@@ -40,7 +40,6 @@ public:
     using InputNodesMap = std::unordered_map<std::string, MemoryStateNode*>;
     using OutputNodesMap = std::unordered_map<std::string, MemoryNode*>;
 
-public:
     void registerOutput(MemoryOutputBase* node);
     void registerInput(MemoryInputBase* node);
     void remove(MemoryNode* node);
@@ -53,7 +52,6 @@ private:
     MemoryInputBase* getMemoryInputByName(const std::string& name);
     MemoryOutputBase* getMemoryOutputByName(const std::string& name);
 
-private:
     InputNodesMap memory_inputs;
     OutputNodesMap memory_outputs;
 };
@@ -61,12 +59,15 @@ private:
 class MemoryOutputBase : public Node, public MemoryNode {
 public:
     MemoryOutputBase(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
     MemoryOutputBase(const std::string& id,
                      const std::string& name,
                      const std::string& type,
                      const Shape& input_shape,
                      const ov::element::Type& input_prc,
                      const GraphContext::CPtr& context);
+
+    MemoryOutputBase(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     ~MemoryOutputBase() override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
@@ -96,6 +97,10 @@ public:
 
     void assignState(const MemStatePtr& newState);
 
+    // void save(BinaryOutputBuffer& ob) const override;
+
+    // void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     virtual void runStatic(dnnl::stream strm) = 0;
     virtual void runDynamic(dnnl::stream strm) = 0;
@@ -113,6 +118,9 @@ private:
 class MemoryOutput : public MemoryOutputBase {
 public:
     using MemoryOutputBase::MemoryOutputBase;
+
+    MemoryOutput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void resolveInPlaceEdges(Edge::LOOK look) override;
@@ -143,10 +151,11 @@ protected:
 
 class MemoryInputBase : public Input, public MemoryStateNode {
 public:
-    enum class mode { read_value_assign, single_read_value };
+    enum class mode : uint8_t { read_value_assign, single_read_value };
 
-public:
     MemoryInputBase(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& ctx);
+
+    MemoryInputBase(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     ~MemoryInputBase() override;
 
@@ -185,7 +194,6 @@ protected:
                     const std::optional<std::vector<ov::element::Type>>& input_prc,
                     mode mode = mode::read_value_assign);
 
-protected:
     virtual void runStatic(dnnl::stream strm) = 0;
     virtual void runDynamic(dnnl::stream strm) = 0;
     virtual void assignStateHook() = 0;
@@ -196,11 +204,9 @@ protected:
 private:
     using executeHookPtr = void (MemoryInputBase::*)();
 
-private:
     void assignState();
     void bypassAssignState();
 
-private:
     /**
      * @brief keeps reference to output sibling node
      */
@@ -212,6 +218,7 @@ private:
 class MemoryInput : public MemoryInputBase {
 public:
     MemoryInput(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& ctx);
+
     MemoryInput(const std::string& id,
                 const std::string& name,
                 const std::string& type,
@@ -222,6 +229,8 @@ public:
                 const std::optional<std::vector<ov::element::Type>>& input_prc,
                 std::shared_ptr<ov::Model> func = nullptr,
                 mode mode = mode::read_value_assign);
+
+    MemoryInput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
@@ -243,14 +252,12 @@ protected:
     void runDynamic(dnnl::stream strm) override;
 
 private:
-    void assignStateHook() override { /*pass*/
-    }
+    void assignStateHook() override { /*pass*/ }
 
     bool haveSubgraph() const {
         return body != nullptr;
     }
 
-private:
     std::shared_ptr<ov::Model> body = nullptr;
     std::unique_ptr<ov::intel_cpu::Graph> subGraph = nullptr;
     std::vector<MemoryPtr> subgraphMemoryPtrs;
@@ -303,7 +310,6 @@ private:
     void runStatic(dnnl::stream strm) override;
     void runDynamic(dnnl::stream strm) override;
 
-private:
     std::weak_ptr<ScaledDotProductAttention> m_sdpaNode;
     int m_child_port_idx = -1;
 };

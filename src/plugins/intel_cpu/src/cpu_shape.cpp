@@ -11,6 +11,7 @@
 
 #include "cpu_types.h"
 #include "openvino/core/except.hpp"
+#include "utils/general_utils.h"
 #include "utils/serialization/internal_types.hpp"
 #include "utils/serialization/vector_serializer.hpp"
 
@@ -22,7 +23,7 @@ bool Shape::isCompatible(const VectorDims& vecDims) const {
     }
 
     auto comparator = [](Dim lhs, Dim rhs) {
-        return (lhs == rhs) || (lhs == Shape::UNDEFINED_DIM);
+        return any_of(lhs, rhs, Shape::UNDEFINED_DIM);
     };
 
     if (!std::equal(getDims().begin(), getDims().end(), vecDims.begin(), comparator)) {
@@ -35,12 +36,9 @@ bool Shape::isCompatible(const VectorDims& vecDims) const {
         return false;
     }
 
-    if (!std::equal(getMinDims().begin(), getMinDims().end(), vecDims.begin(), [](Dim lhs, Dim rhs) {
-            return lhs <= rhs;
-        })) {
-        return false;
-    }
-    return true;
+    return std::equal(getMinDims().begin(), getMinDims().end(), vecDims.begin(), [](Dim lhs, Dim rhs) {
+        return lhs <= rhs;
+    });
 }
 
 std::string Shape::toString() const {
@@ -94,14 +92,14 @@ void Shape::save(BinaryOutputBuffer& ob) const {
     ob << dims;
 }
 
-void Shape::load(BinaryInputBuffer& ib) {
-    ib >> type;
+void Shape::load(BinaryInputBuffer& in_buf) {
+    in_buf >> type;
 
-    ib >> hasZeroDimensions;
+    in_buf >> hasZeroDimensions;
 
-    ib >> minDims;
-    ib >> maxDims;
-    ib >> dims;
+    in_buf >> minDims;
+    in_buf >> maxDims;
+    in_buf >> dims;
 }
 
 }  // namespace ov::intel_cpu

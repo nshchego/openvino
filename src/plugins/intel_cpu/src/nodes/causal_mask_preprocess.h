@@ -14,15 +14,13 @@
 #include "openvino/core/node.hpp"
 #include "transformations/cpu_opset/common/op/causal_mask_preprocess.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class CausalMaskPreprocess : public Node {
 public:
     CausalMaskPreprocess(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    CausalMaskPreprocess(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    CausalMaskPreprocess(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {}
     bool created() const override {
@@ -40,21 +38,24 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     struct Executor {
+        virtual ~Executor() = default;
+
         virtual void execute(const dnnl::stream& strm,
                              intel_cpu::Node* pnode,
                              const intel_cpu::CausalMaskPreprocessNode::Config& config) = 0;
-        virtual ~Executor() = default;
+
+        virtual const std::string& get_type_info() const = 0;
     };
+
     template <typename T>
     struct ExecutorCausalMaskPreprocess;
+
     intel_cpu::CausalMaskPreprocessNode::Config m_config;
     std::shared_ptr<Executor> m_executor;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

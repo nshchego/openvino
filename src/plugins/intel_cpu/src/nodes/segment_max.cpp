@@ -38,6 +38,11 @@ SegmentMax::SegmentMax(const std::shared_ptr<ov::Node>& op, const GraphContext::
     fillMode = ov::as_type_ptr<const ov::op::v16::SegmentMax>(op)->get_fill_mode();
 }
 
+SegmentMax::SegmentMax(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool SegmentMax::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
         if (!ov::is_type<ov::op::v16::SegmentMax>(op)) {

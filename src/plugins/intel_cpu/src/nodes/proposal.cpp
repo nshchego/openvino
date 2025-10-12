@@ -150,6 +150,11 @@ Proposal::Proposal(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr
     store_prob = op->get_output_size() == 2;
 }
 
+Proposal::Proposal(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Proposal::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
@@ -192,14 +197,14 @@ void Proposal::execute([[maybe_unused]] const dnnl::stream& strm) {
         const float imgHeight = imgInfoData[0];
         const float imgWidth = imgInfoData[1];
         if (!std::isnormal(imgHeight) || !std::isnormal(imgWidth) || (imgHeight < 0.F) || (imgWidth < 0.F)) {
-            THROW_CPU_NODE_ERR("image info input must have positive image height and width.");
+            CPU_NODE_THROW("image info input must have positive image height and width.");
         }
 
         // scale factor for height & width
         const float scaleHeight = imgInfoData[2];
         const float scaleWidth = imgInfoSize == 4 ? imgInfoData[3] : scaleHeight;
         if (!std::isfinite(scaleHeight) || !std::isfinite(scaleWidth) || (scaleHeight < 0.F) || (scaleWidth < 0.F)) {
-            THROW_CPU_NODE_ERR("image info input must have non negative scales.");
+            CPU_NODE_THROW("image info input must have non negative scales.");
         }
 
         ov::Extensions::Cpu::XARCH::proposal_exec(probabilitiesData,
@@ -212,7 +217,7 @@ void Proposal::execute([[maybe_unused]] const dnnl::stream& strm) {
                                                   outProbData,
                                                   conf);
     } catch (const ov::Exception& e) {
-        THROW_CPU_NODE_ERR(e.what());
+        CPU_NODE_THROW(e.what());
     }
 }
 

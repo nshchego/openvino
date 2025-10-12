@@ -5,7 +5,7 @@
 #pragma once
 
 #include <cstddef>
-#include <map>
+#include <cstdint>
 #include <memory>
 #include <oneapi/dnnl/dnnl_common.hpp>
 #include <string>
@@ -26,10 +26,9 @@
 #include "openvino/runtime/tensor.hpp"
 #include "proxy_mem_blk.h"
 #include "utils/general_utils.h"
-#include "utils/serialization/buffer.hpp"
+#include "utils/serialization/buffers.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 class SyncInferRequest;
 namespace node {
@@ -41,7 +40,7 @@ public:
     using Ptr = std::shared_ptr<Graph>;
     using OutputMemoryBlocks = std::unordered_map<std::size_t, ProxyMemoryBlockPtr>;
 
-    enum class Status {
+    enum class Status : uint8_t {
         NotReady = 0,
         Initialized = 1,
         ReadyStatic = 2,
@@ -60,7 +59,7 @@ public:
     }
 
     bool IsDynamic() const {
-        return one_of(m_status, Status::ReadyDynamic, Status::ReadyDynamicSeq);
+        return any_of(m_status, Status::ReadyDynamic, Status::ReadyDynamicSeq);
     }
 
     bool IsReady() const {
@@ -93,7 +92,7 @@ public:
                      const GraphContext::CPtr& context,
                      std::string name);
 
-    void PushInputData(const std::size_t index, const ov::SoPtr<ITensor>& input);
+    void PushInputData(const std::size_t& index, const ov::SoPtr<ITensor>& input);
     void PullOutputData(std::unordered_map<std::size_t, ov::SoPtr<ITensor>>& output);
 
     // Returns Output nodes memory descriptors
@@ -109,23 +108,27 @@ public:
         return m_name;
     }
 
-    NodePtr getInputNodeByIndex(const size_t index) {
-        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input node index '", index, "'.");
+    NodePtr getInputNodeByIndex(std::size_t index) {
+        OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input node index: ", index, ".");
+        OPENVINO_ASSERT(m_input_nodes[index], "[ CPU ] Input node with index ", index, " is empty.");
         return m_input_nodes[index];
     }
 
-    NodePtr getOutputNodeByIndex(const size_t index) {
+    NodePtr getOutputNodeByIndex(std::size_t index) {
         OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output node index '", index, "'.");
+        OPENVINO_ASSERT(m_input_nodes[index], "[ CPU ] Output node with index ", index, " is empty.");
         return m_output_nodes[index];
     }
 
-    NodeConstPtr getInputNodeByIndex(const size_t index) const {
+    NodeConstPtr getInputNodeByIndex(std::size_t index) const {
         OPENVINO_ASSERT(index < m_input_nodes.size(), "[ CPU ] Invalid input node index '", index, "'.");
+        OPENVINO_ASSERT(m_input_nodes[index], "[ CPU ] Input node with index ", index, " is empty.");
         return m_input_nodes[index];
     }
 
-    NodeConstPtr getOutputNodeByIndex(const size_t index) const {
+    NodeConstPtr getOutputNodeByIndex(std::size_t index) const {
         OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output node index '", index, "'.");
+        OPENVINO_ASSERT(m_input_nodes[index], "[ CPU ] Output node with index ", index, " is empty.");
         return m_output_nodes[index];
     }
 
@@ -252,7 +255,7 @@ public:
               const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
 
-    void Init(BinaryInputBuffer& ib,
+    void Init(BinaryInputBuffer& in_buf,
               const GraphContext::CPtr& context);
 
     /**
@@ -285,8 +288,11 @@ public:
 
     void export_graph(BinaryOutputBuffer& ob);
 
+    friend class GraphOptimizer;
+
 protected:
     void ForgetGraphData();
+
     Status m_status{Status::NotReady};
 
     // For dumping purposes. -1 - no counting, all other positive
@@ -304,7 +310,7 @@ protected:
                    const std::vector<node::Input::InputConfig>& inputConfigs = {},
                    const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
-    void deserialize_graph(BinaryInputBuffer& ib,
+    void deserialize_graph(BinaryInputBuffer& in_buf,
                            const std::vector<node::Input::InputConfig>& inputConfigs = {},
                            const std::vector<node::Input::OutputConfig>& outputConfigs = {});
 
@@ -348,9 +354,8 @@ protected:
     friend std::shared_ptr<ov::Model> dump_graph_as_ie_ngraph_net(const Graph& graph);
 
 private:
-    using event_t = void (Graph::*)(void);
+    using event_t = void (Graph::*)();
 
-private:
     void EnforceInferencePrecision();
     void EnforceBF16();
     void insertReorder(EdgePtr& edge, bool isOptimized, std::unordered_set<std::string>& uniqueLayerNames);
@@ -374,5 +379,4 @@ private:
 
 using GraphPtr = std::shared_ptr<Graph>;
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

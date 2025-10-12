@@ -4,7 +4,6 @@
 
 #include "fake_quantize.h"
 
-#include <cpu/x64/xbyak/xbyak.h>
 #include <memory_desc/cpu_memory_desc_utils.h>
 #include <oneapi/dnnl/dnnl_types.h>
 
@@ -29,7 +28,6 @@
 #include <utility>
 #include <vector>
 
-#include "cpu/x64/jit_generator.hpp"
 #include "cpu_memory.h"
 #include "cpu_types.h"
 #include "dnnl_extension_utils.h"
@@ -53,6 +51,14 @@
 #include "utils/cpu_utils.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
+
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+#    include <xbyak/xbyak.h>
+
+#    include "cpu/x64/jit_generator.hpp"
+#endif
 
 // Quantization ranges validation is switched off by default in order to avoid regressions on user side
 // #define VALIDATE_QUANTIZATION_RANGES
@@ -72,16 +78,16 @@ namespace ov::intel_cpu::node {
 #    define GET_OFF(field) offsetof(jit_quantize_call_args, field)
 
 template <cpu_isa_t isa>
-struct jit_uni_binarization_kernel : public jit_uni_quantize_kernel, public jit_generator {
+struct jit_uni_binarization_kernel : public jit_uni_quantize_kernel, public jit_generator_t {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_binarization_kernel)
 
     explicit jit_uni_binarization_kernel(const jit_quantize_params& jqp)
         : jit_uni_quantize_kernel(jqp),
-          jit_generator(jit_name()) {}
+          jit_generator_t(jit_name()) {}
 
     void create_ker() override {
-        jit_generator::create_kernel();
-        ker_ = (decltype(ker_))jit_ker();
+        jit_generator_t::create_kernel();
+        ker_ = jit_kernel_cast<decltype(ker_)>(jit_ker());
     };
 
     void generate() override {
@@ -273,16 +279,16 @@ private:
 };
 
 template <cpu_isa_t isa>
-struct jit_uni_quantization_kernel : public jit_uni_quantize_kernel, public jit_generator {
+struct jit_uni_quantization_kernel : public jit_uni_quantize_kernel, public jit_generator_t {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_quantization_kernel)
 
     explicit jit_uni_quantization_kernel(const jit_quantize_params& jqp)
         : jit_uni_quantize_kernel(jqp),
-          jit_generator(jit_name()) {}
+          jit_generator_t(jit_name()) {}
 
     void create_ker() override {
-        jit_generator::create_kernel();
-        ker_ = (decltype(ker_))jit_ker();
+        jit_generator_t::create_kernel();
+        ker_ = jit_kernel_cast<decltype(ker_)>(jit_ker());
     };
 
     void generate() override {
@@ -1086,14 +1092,15 @@ bool FakeQuantize::isSupportedOperation(const std::shared_ptr<const ov::Node>& o
                  * Long term idea: restore limitation for channel axis 1 and
                  * support fusing of unfolded FQ (see FakeQuantizeDecomposition transformation)
                  */
-                if (count_not_unit_axis > 1 || !one_of(not_unit_axis, 1U, 2U)) {
+                if (count_not_unit_axis > 1 || none_of(not_unit_axis, 1U, 2U)) {
                     errorMessage = "Supports only per-tensor and per-channel quantizations";
                     return false;
                 }
             }
         }
-        if (fq->get_auto_broadcast().m_type != ov::op::AutoBroadcastType::NONE &&
-            fq->get_auto_broadcast().m_type != ov::op::AutoBroadcastType::NUMPY) {
+        if (none_of(fq->get_auto_broadcast().m_type,
+                    ov::op::AutoBroadcastType::NONE,
+                    ov::op::AutoBroadcastType::NUMPY)) {
             errorMessage = "Doesn't support broadcast type: " + ov::as_string(fq->get_auto_broadcast().m_type);
             return false;
         }
@@ -1147,16 +1154,10 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
         const auto fq = ov::as_type_ptr<const ov::op::v0::FakeQuantize>(op);
 
         levels = fq->get_levels();
-        if (levels <= 1) {
-            THROW_CPU_NODE_ERR("supports 'levels' attribute greater than or equal to 2");
-        }
+        CPU_NODE_ASSERT(levels > 1, "supports 'levels' attribute greater than or equal to 2");
 
-        if (m_input_shapes.size() != 5) {
-            THROW_CPU_NODE_ERR("has incorrect number of input edges: ", m_input_shapes.size());
-        }
-        if (m_output_shapes.size() != 1) {
-            THROW_CPU_NODE_ERR("has incorrect number of output edges: ", m_output_shapes.size());
-        }
+        CPU_NODE_ASSERT(m_input_shapes.size() == 5, "has incorrect number of input edges: ", m_input_shapes.size());
+        CPU_NODE_ASSERT(m_output_shapes.size() == 1, "has incorrect number of output edges: ", m_output_shapes.size());
 
         auto initAxisIdx = [&](const VectorDims& inputDims) {
             size_t axisIdx = 0;
@@ -1210,9 +1211,8 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
         auto outputLowAxisSize = ov::is_scalar(olShape) ? 1 : olShape[outputLowAxis];
         auto outputHighAxisSize = ov::is_scalar(ohShape) ? 1 : ohShape[outputHighAxis];
 
-        if (axisSize != -1 && !dimsEqualWeak(axisSize, getInputShapeAtPort(0).getDims()[axis])) {
-            THROW_CPU_NODE_ERR("has different quantization axis size on 'data' and 'range' inputs");
-        }
+        CPU_NODE_ASSERT(axisSize == -1 || dimsEqualWeak(axisSize, getInputShapeAtPort(0).getDims()[axis]),
+                        "has different quantization axis size on 'data' and 'range' inputs");
 
         const auto inputLowNode = ov::as_type_ptr<const ov::op::v0::Constant>(fq->get_input_node_shared_ptr(1));
         auto inputLowData = inputLowNode->cast_vector<float>();
@@ -1230,14 +1230,14 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
 
         if (binarization) {
             for (size_t i = 0; i < outputLowAxisSize; i++) {
-                if (outputLowData[i] != 1.F && outputLowData[i] != 0.F) {
+                if (none_of(outputLowData[i], 1.F, 0.F)) {
                     binarization = false;
                     break;
                 }
             }
 
             for (size_t i = 0; i < outputHighAxisSize; i++) {
-                if (outputHighData[i] != 1.F && outputHighData[i] != 0.F) {
+                if (none_of(outputHighData[i], 1.F, 0.F)) {
                     binarization = false;
                     break;
                 }
@@ -1330,15 +1330,15 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
             broadcasted[static_cast<size_t>(FQ_add_input_type::OUTPUT_SCALE)] = outputScaleSize == 1;
             broadcasted[static_cast<size_t>(FQ_add_input_type::OUTPUT_SHIFT)] = outputShiftSize == 1;
 
-            if (everyone_is(1U,
-                            cropLowSize,
-                            cropHighSize,
-                            inputScaleSize,
-                            inputShiftSize,
-                            outputScaleSize,
-                            outputShiftSize)) {
+            if (all_of(1U,
+                       cropLowSize,
+                       cropHighSize,
+                       inputScaleSize,
+                       inputShiftSize,
+                       outputScaleSize,
+                       outputShiftSize)) {
                 broadcastingPolicy = PerTensor;
-            } else if (one_of(1U,
+            } else if (any_of(1U,
                               cropLowSize,
                               cropHighSize,
                               inputScaleSize,
@@ -1367,7 +1367,7 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
 #if defined(VALIDATE_QUANTIZATION_RANGES)
                 if ((il == ih && levels != 2) || il > ih || std::isnan(il) || std::isnan(ih) || std::isinf(il) ||
                     std::isinf(ih)) {
-                    THROW_CPU_NODE_ERR("has invalid input quantize ranges: ", "inputLow = ", il, ", inputHigh = ", ih);
+                    CPU_NODE_THROW("has invalid input quantize ranges: ", "inputLow = ", il, ", inputHigh = ", ih);
                 }
 #endif
 #ifdef FQ_DOUBLE_PRECISION
@@ -1385,7 +1385,7 @@ FakeQuantize::FakeQuantize(const std::shared_ptr<ov::Node>& op, const GraphConte
 
 #if defined(VALIDATE_QUANTIZATION_RANGES)
                 if (std::isnan(ol) || std::isnan(oh) || std::isinf(ol) || std::isinf(oh)) {
-                    THROW_CPU_NODE_ERR("has wrong output quantize ranges: ", "outputLow = ", ol, ", outputHigh = ", oh);
+                    CPU_NODE_THROW("has wrong output quantize ranges: ", "outputLow = ", ol, ", outputHigh = ", oh);
                 }
 #endif
 #ifdef FQ_DOUBLE_PRECISION
@@ -1460,7 +1460,7 @@ std::vector<LayoutType> FakeQuantize::getDataFormats() const {
     if (isBinarization()) {
         return {LayoutType::nspc};
     }
-    if (one_of(dims.size(), 4U, 5U)) {
+    if (any_of(dims.size(), 4U, 5U)) {
         if (getAxis() == 1) {
             auto blkFormat = mayiuse(cpu::x64::avx512_core) ? LayoutType::nCsp16c : LayoutType::nCsp8c;
             return {blkFormat, LayoutType::nspc, LayoutType::ncsp};
@@ -1478,43 +1478,30 @@ void FakeQuantize::init() {
         inputPrecision = getOriginalInputPrecisionAtPort(0);
         outputPrecision = getOriginalOutputPrecisionAtPort(0);
 
-        if (inputPrecision != ov::element::f32 && inputPrecision != ov::element::u8 &&
-            inputPrecision != ov::element::i8) {
+        if (none_of(inputPrecision, ov::element::f32, ov::element::u8, ov::element::i8)) {
             inputPrecision = ov::element::f32;
         }
 
-        if (outputPrecision != ov::element::f32 && outputPrecision != ov::element::u8 &&
-            outputPrecision != ov::element::i8) {
+        if (none_of(outputPrecision, ov::element::f32, ov::element::u8, ov::element::i8)) {
             outputPrecision = ov::element::f32;
         }
     }
 }
 
 void FakeQuantize::getSupportedDescriptors() {
-    if (getParentEdges().size() != 5) {
-        THROW_CPU_NODE_ERR("has incorrect number of input edges: ", getParentEdges().size());
-    }
-    if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR("has incorrect number of output edges: ", getChildEdges().size());
-    }
+    CPU_NODE_ASSERT(getParentEdges().size() == 5, "has incorrect number of input edges: ", getParentEdges().size());
+    CPU_NODE_ASSERT(!getChildEdges().empty(), "has incorrect number of output edges: ", getChildEdges().size());
 
-    if (getInputShapeAtPort(0).getRank() != getOutputShapeAtPort(0).getRank()) {
-        THROW_CPU_NODE_ERR("has different ranks for input and output tensors");
-    }
+    CPU_NODE_ASSERT(getInputShapeAtPort(0).getRank() == getOutputShapeAtPort(0).getRank(),
+                    "has different ranks for input and output tensors");
 
     if (isBinarization()) {
-        if (getInputShapeAtPort(0).getRank() != 4UL) {
-            THROW_CPU_NODE_ERR("doesn't support input/output rank != 4");
-        }
+        CPU_NODE_ASSERT(getInputShapeAtPort(0).getRank() == 4UL, "doesn't support input/output rank != 4");
     }
 
     if (getAxis() != 1) {
-        if (isBinarization()) {
-            THROW_CPU_NODE_ERR("doesn't support non per-tensor binarization for axis: ", getAxis());
-        }
-        if (getAxis() != 0) {
-            THROW_CPU_NODE_ERR("doesn't support non per-tensor quantization for axis: ", getAxis());
-        }
+        CPU_NODE_ASSERT(!isBinarization(), "doesn't support non per-tensor binarization for axis: ", getAxis());
+        CPU_NODE_ASSERT(getAxis() == 0, "doesn't support non per-tensor quantization for axis: ", getAxis());
     }
 }
 
@@ -1583,9 +1570,7 @@ void FakeQuantize::initSupportedPrimitiveDescriptors() {
 bool FakeQuantize::needPrepareParams() const {
     if (isBinarization()) {
         const auto* selectedPrimitiveDescriptor = getSelectedPrimitiveDescriptor();
-        if (!selectedPrimitiveDescriptor) {
-            THROW_CPU_NODE_ERR("doesn't have primitive descriptors.");
-        }
+        CPU_NODE_ASSERT(selectedPrimitiveDescriptor, "doesn't have primitive descriptors.");
 
         if (internalBlobMemory.empty() ||
             (selectedPrimitiveDescriptor->getImplementationType() != impl_desc_type::ref && inputShapesModified())) {
@@ -1661,9 +1646,7 @@ void FakeQuantize::prepareParams() {
 void FakeQuantize::createPrimitive() {
     Node::createPrimitive();
     auto* selectedPrimitiveDescriptor = getSelectedPrimitiveDescriptor();
-    if (!selectedPrimitiveDescriptor) {
-        THROW_CPU_NODE_ERR("doesn't have primitive descriptors.");
-    }
+    CPU_NODE_ASSERT(selectedPrimitiveDescriptor, "doesn't have primitive descriptors.");
     if (selectedPrimitiveDescriptor->getImplementationType() != impl_desc_type::ref) {
         const auto& config = getSelectedPrimitiveDescriptor()->getConfig();
 
@@ -1676,7 +1659,7 @@ void FakeQuantize::createPrimitive() {
         const auto& srcMemory = getParentEdgeAt(0)->getMemory();
         const auto& srcDesc = srcMemory.getDesc();
 
-        key.jqp.is_planar = srcDesc.hasLayoutType(LayoutType::ncsp) && one_of(srcDesc.getShape().getRank(), 3U, 4U, 5U);
+        key.jqp.is_planar = srcDesc.hasLayoutType(LayoutType::ncsp) && any_of(srcDesc.getShape().getRank(), 3U, 4U, 5U);
         key.jqp.op_type = getAlgorithm();
 
         if (isBinarization()) {
@@ -1771,7 +1754,9 @@ void FakeQuantize::executeReference() {
 
         parallel_nd(N, CB, D, H, W, [&](dim_t n, dim_t cb, dim_t d, dim_t h, dim_t w) {
             uint8_t bin_val = 0x00;
-            for (int c = cb * nbits, shift = 0; c < std::min(static_cast<dim_t>(C), (cb + 1) * nbits); c++, shift++) {
+            for (int c = static_cast<int>(cb) * nbits, shift = 0;
+                 c < std::min(static_cast<int>(C), (static_cast<int>(cb) + 1) * nbits);
+                 c++, shift++) {
                 size_t src_off = n * s_str[0] + c * s_str[1];
                 if (srcDims.size() == 4) {
                     src_off += h * s_str[2] + w * s_str[3];
@@ -1803,18 +1788,18 @@ void FakeQuantize::executeReference() {
         parallel_nd(N, C, D, H, W, [&](dim_t n, dim_t c, dim_t d, dim_t h, dim_t w) {
             size_t src_off = n * s_str[0];
             if (srcDims.size() == 5) {
-                src_off += d * s_str[2] + h * s_str[3] + w * s_str[4];
+                src_off += c * s_str[1] + d * s_str[2] + h * s_str[3] + w * s_str[4];
             } else if (srcDims.size() == 4) {
-                src_off += h * s_str[2] + w * s_str[3];
+                src_off += c * s_str[1] + h * s_str[2] + w * s_str[3];
             } else if (srcDims.size() == 3) {
-                src_off += h * s_str[2];
+                src_off += c * s_str[1] + h * s_str[2];
             } else if (srcDims.size() == 2) {
                 src_off += c * s_str[1];
             }
 
             float src_val = src[src_off];
 
-            int wei_idx = getAxis() == 0 ? n : c;
+            int wei_idx = getAxis() == 0 ? static_cast<int>(n) : static_cast<int>(c);
             float cl = broadcasted[static_cast<size_t>(FQ_add_input_type::CROP_LOW)] ? cropLow[0] : cropLow[wei_idx];
             float ch = broadcasted[static_cast<size_t>(FQ_add_input_type::CROP_HIGH)] ? cropHigh[0] : cropHigh[wei_idx];
             float isc =
@@ -1831,13 +1816,15 @@ void FakeQuantize::executeReference() {
             dst_val = roundf(dst_val);
             dst_val = dst_val * osc + osh;
 
-            size_t dst_off = n * d_str[0] + c * d_str[1];
+            size_t dst_off = n * d_str[0];
             if (dstDims.size() == 5) {
-                dst_off += d * d_str[2] + h * d_str[3] + w * d_str[4];
+                dst_off += c * d_str[1] + d * d_str[2] + h * d_str[3] + w * d_str[4];
             } else if (dstDims.size() == 4) {
-                dst_off += h * d_str[2] + w * d_str[3];
+                dst_off += c * d_str[1] + h * d_str[2] + w * d_str[3];
             } else if (dstDims.size() == 3) {
-                dst_off += h * d_str[2];
+                dst_off += c * d_str[1] + h * d_str[2];
+            } else if (dstDims.size() == 2) {
+                dst_off += c * d_str[1];
             }
 
             dst[dst_off] = dst_val;
@@ -1897,12 +1884,14 @@ void FakeQuantize::executeQuantization(const std::unique_ptr<jit_uni_quantize_ke
     const auto& srcDesc = srcMemory->getDesc();
     auto srcDims = srcDesc.getShape().getStaticDims();
 
-    bool is_blk_format = !srcDesc.hasLayoutType(LayoutType::nspc) && one_of(srcDesc.getShape().getRank(), 4U, 5U);
+    bool is_blk_format = !srcDesc.hasLayoutType(LayoutType::nspc) && any_of(srcDesc.getShape().getRank(), 4U, 5U);
     int blk_size = 1;
-    if (!(srcDesc.hasLayoutType(LayoutType::ncsp) && one_of(srcDesc.getShape().getRank(), 3U, 4U, 5U)) &&
-        mayiuse(cpu::x64::avx512_core)) {
+    const bool has_ncsp_layout = srcDesc.hasLayoutType(LayoutType::ncsp);
+    const bool has_valid_rank = any_of(srcDesc.getShape().getRank(), 3U, 4U, 5U);
+    const bool is_ncsp_with_valid_rank = has_ncsp_layout && has_valid_rank;
+    if (!is_ncsp_with_valid_rank && mayiuse(cpu::x64::avx512_core)) {
         blk_size = 16;
-    } else if (!(srcDesc.hasLayoutType(LayoutType::ncsp) && one_of(srcDesc.getShape().getRank(), 3U, 4U, 5U))) {
+    } else if (!is_ncsp_with_valid_rank) {
         blk_size = 8;
     }
 
@@ -1917,7 +1906,7 @@ void FakeQuantize::executeQuantization(const std::unique_ptr<jit_uni_quantize_ke
         s_str[1] /= blk_size;
     }
 
-    if (srcDesc.hasLayoutType(LayoutType::nspc) && one_of(srcDesc.getShape().getRank(), 4U, 5U)) {
+    if (srcDesc.hasLayoutType(LayoutType::nspc) && any_of(srcDesc.getShape().getRank(), 4U, 5U)) {
         size_t tmp = s_str[s_str.size() - 1];
         for (int i = s_str.size() - 1; i > 1; i--) {
             s_str[i] = s_str[i - 1];
@@ -1945,7 +1934,7 @@ void FakeQuantize::executeQuantization(const std::unique_ptr<jit_uni_quantize_ke
         parallel_nd(N, CB, D, [&](dim_t n, dim_t cb, [[maybe_unused]] dim_t d) {
             auto arg = jit_quantize_call_args();
 
-            int c = cb * blk_size;
+            int c = static_cast<int>(cb) * blk_size;
 
             size_t data_off = n * s_str[0] + c * s_str[1];
 
@@ -1976,11 +1965,11 @@ void FakeQuantize::executeQuantization(const std::unique_ptr<jit_uni_quantize_ke
         parallel_nd(N, CB, D, B, [&](dim_t n, dim_t cb, dim_t d, dim_t b) {
             auto arg = jit_quantize_call_args();
 
-            const int c = cb * blk_size;
-            const int h = b * batch_size / W;
-            const int w = b * batch_size % W;
+            const int c = static_cast<int>(cb) * blk_size;
+            const int h = static_cast<int>(b) * batch_size / W;
+            const int w = static_cast<int>(b) * batch_size % W;
 
-            const size_t data_off = srcDims.size() == 3 || srcDims.size() == 4
+            const size_t data_off = any_of(srcDims.size(), 3U, 4U)
                                         ? n * s_str[0] + c * s_str[1] + h * s_str[2] + w
                                         : n * s_str[0] + c * s_str[1] + d * s_str[2] + h * s_str[3] + w;
 
@@ -2011,12 +2000,12 @@ void FakeQuantize::executeQuantization(const std::unique_ptr<jit_uni_quantize_ke
         parallel_nd_legacy(N, CB, D, H, [&](dim_t n, dim_t cb, dim_t d, dim_t h) {
             auto arg = jit_quantize_call_args();
 
-            int c = cb * blk_size;
+            int c = static_cast<int>(cb) * blk_size;
 
             size_t data_off = 0;
             if (srcDims.size() == 2) {
                 data_off = n * s_str[0] + c * s_str[1];
-            } else if (srcDims.size() == 3 || srcDims.size() == 4) {
+            } else if (any_of(srcDims.size(), 3U, 4U)) {
                 data_off = n * s_str[0] + c * s_str[1] + h * s_str[2];
             } else {
                 data_off = n * s_str[0] + c * s_str[1] + d * s_str[2] + h * s_str[3];
@@ -2166,7 +2155,7 @@ void FakeQuantize::appendPostOpsImpl(dnnl::post_ops& ops, const VectorDims& post
 
     if (getAlgorithm() == Algorithm::FQBinarization) {
         ops.append_binarization(dnnl::algorithm::binarization_depthwise,
-                                (const float*)binarizationThresholds.data(),
+                                static_cast<const float*>(binarizationThresholds.data()),
                                 reinterpret_cast<const float*>(binarizationOutputMask.data()));
     } else {
         dnnl::algorithm alg = getAlgorithm() == Algorithm::FQQuantization
@@ -2237,7 +2226,7 @@ void FakeQuantize::appendPostOps(dnnl::post_ops& ops,
 static float roundHalfToEven(float f) {
     const float RHAFZ = std::round(f);  // r is round-half-away-from-zero
     const float d = RHAFZ - f;          // f + d -> RHAFZ
-    if ((d != 0.5F) && (d != -0.5F)) {
+    if (none_of(d, 0.5F, -0.5F)) {
         return RHAFZ;
     }
 
@@ -2267,12 +2256,12 @@ void FakeQuantize::updateOptimizedFormula(bool do_rounding) {
                           outputScale.size(),
                           outputShift.size()});
 
-    CPU_NODE_ASSERT(inputScale.size() == 1 || inputScale.size() == OC, "inputScale.size() == ", inputScale.size());
-    CPU_NODE_ASSERT(inputShift.size() == 1 || inputShift.size() == OC, "inputShift.size() == ", inputShift.size());
-    CPU_NODE_ASSERT(cropLow.size() == 1 || cropLow.size() == OC, "cropLow.size() == ", cropLow.size());
-    CPU_NODE_ASSERT(cropHigh.size() == 1 || cropHigh.size() == OC, "cropHigh.size() == ", cropHigh.size());
-    CPU_NODE_ASSERT(outputScale.size() == 1 || outputScale.size() == OC, "outputScale.size() == ", outputScale.size());
-    CPU_NODE_ASSERT(outputShift.size() == 1 || outputShift.size() == OC, "outputShift.size() == ", outputShift.size());
+    CPU_NODE_ASSERT(any_of(inputScale.size(), 1U, OC), "inputScale.size() == ", inputScale.size());
+    CPU_NODE_ASSERT(any_of(inputShift.size(), 1U, OC), "inputShift.size() == ", inputShift.size());
+    CPU_NODE_ASSERT(any_of(cropLow.size(), 1U, OC), "cropLow.size() == ", cropLow.size());
+    CPU_NODE_ASSERT(any_of(cropHigh.size(), 1U, OC), "cropHigh.size() == ", cropHigh.size());
+    CPU_NODE_ASSERT(any_of(outputScale.size(), 1U, OC), "outputScale.size() == ", outputScale.size());
+    CPU_NODE_ASSERT(any_of(outputShift.size(), 1U, OC), "outputShift.size() == ", outputShift.size());
 
     // WA: a per-Tensor input shift may little drift away randomly
     //     from it's orginal value when FQ was fused with any
@@ -2364,7 +2353,7 @@ void FakeQuantize::updateOptimizedFormula(bool do_rounding) {
     }
 
     // we can save an additional eltwise linear for negligible shift
-    if (f.ish.size() == 1 && f.clo.size() == 1 && f.chi.size() == 1) {
+    if (all_of(1U, f.ish.size(), f.clo.size(), f.chi.size())) {
         auto range = (f.chi[0] - f.clo[0]);
         if (abs(f.ish[0]) < range * 0.00001F) {
             f.ish[0] = 0.0F;
@@ -2453,7 +2442,7 @@ bool FakeQuantize::appendAttrPostOps(DnnlPostOpsComposerLegacy& dnnlpoc,
     return true;
 }
 
-FakeQuantize::FakeQuantizeJitExecutor::FakeQuantizeJitExecutor(const jit_quantize_params& _jqp) {
+FakeQuantize::FakeQuantizeJitExecutor::FakeQuantizeJitExecutor([[maybe_unused]] const jit_quantize_params& _jqp) {
 #if defined(OPENVINO_ARCH_X86_64)
     bool isBinarization = _jqp.op_type == Algorithm::FQBinarization;
     if (mayiuse(cpu::x64::avx512_core)) {
@@ -2484,10 +2473,7 @@ FakeQuantize::FakeQuantizeJitExecutor::FakeQuantizeJitExecutor(const jit_quantiz
 }
 
 void FakeQuantize::FakeQuantizeJitExecutor::exec(const FakeQuantize& node) {
-    if (!pKernel) {
-        OPENVINO_THROW("Can't execute, kernel for fake quantize node is not compiled");
-    }
-
+    OPENVINO_ASSERT(pKernel, "Can't execute, kernel for fake quantize node is not compiled");
     if (pKernel->jqp_.op_type == Algorithm::FQBinarization) {
         node.executeBinarization(pKernel);
     } else {
@@ -2497,6 +2483,132 @@ void FakeQuantize::FakeQuantizeJitExecutor::exec(const FakeQuantize& node) {
 
 bool FakeQuantize::created() const {
     return getType() == Type::FakeQuantize;
+}
+
+void FakeQuantize::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+    ob << levels;
+    ob << binarization;
+    ob << binarizationThresholds;
+    ob << binarizationOutputMask;
+    ob << cropLow;
+    ob << cropHigh;
+    ob << inputScale;
+    ob << inputShift;
+    ob << outputScale;
+    ob << outputShift;
+    ob << optimizedFormula;
+    ob << quantizationData;
+    ob << quantizationDataSize;
+    // ob << quantizationMemory;
+
+    ob << cropLowSize;
+    ob << cropHighSize;
+    ob << inputScaleSize;
+    ob << inputShiftSize;
+    ob << outputScaleSize;
+    ob << outputShiftSize;
+
+    ob << broadcasted;
+
+    ob << fqScales;
+
+    ob << parameterVersion;
+    ob << postOpDataVersion;
+    ob << legacyPostOpDataVersion;
+
+    ob << isInputLowBroadcasted;
+    ob << isInputHighBroadcasted;
+    ob << isOutputLowBroadcasted;
+    ob << isOutputHighBroadcasted;
+
+    ob << currentAxisSize;
+    ob << axis;
+
+    ob << inputPrecision;
+    ob << outputPrecision;
+
+    ob << broadcastingPolicy;
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void FakeQuantize::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+    in_buf >> levels;
+    in_buf >> binarization;
+    in_buf >> binarizationThresholds;
+    in_buf >> binarizationOutputMask;
+    in_buf >> cropLow;
+    in_buf >> cropHigh;
+    in_buf >> inputScale;
+    in_buf >> inputShift;
+    in_buf >> outputScale;
+    in_buf >> outputShift;
+    in_buf >> optimizedFormula;
+    in_buf >> quantizationData;
+    in_buf >> quantizationDataSize;
+    // in_buf >> quantizationMemory;
+
+    in_buf >> cropLowSize;
+    in_buf >> cropHighSize;
+    in_buf >> inputScaleSize;
+    in_buf >> inputShiftSize;
+    in_buf >> outputScaleSize;
+    in_buf >> outputShiftSize;
+
+    in_buf >> broadcasted;
+
+    in_buf >> fqScales;
+
+    in_buf >> parameterVersion;
+    in_buf >> postOpDataVersion;
+    in_buf >> legacyPostOpDataVersion;
+
+    in_buf >> isInputLowBroadcasted;
+    in_buf >> isInputHighBroadcasted;
+    in_buf >> isOutputLowBroadcasted;
+    in_buf >> isOutputHighBroadcasted;
+
+    in_buf >> currentAxisSize;
+    in_buf >> axis;
+
+    in_buf >> inputPrecision;
+    in_buf >> outputPrecision;
+
+    in_buf >> broadcastingPolicy;
+
+validate_stream_offset(in_buf);  // TODO: remove
+}
+
+void FakeQuantize::OptimizedFormula::save(BinaryOutputBuffer& ob) const {
+ob << ob.get_pos();  // TODO: remove
+
+    ob << isc;
+    ob << ish;
+    ob << osc;
+    ob << osh;
+    ob << clo;
+    ob << chi;
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void FakeQuantize::OptimizedFormula::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+    in_buf >> isc;
+    in_buf >> ish;
+    in_buf >> osc;
+    in_buf >> osh;
+    in_buf >> clo;
+    in_buf >> chi;
+
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

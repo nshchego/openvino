@@ -24,15 +24,13 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/type/element_type.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Deconvolution : public Node {
 public:
     Deconvolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    Deconvolution(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    Deconvolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -75,7 +73,7 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 
 protected:
@@ -107,8 +105,8 @@ private:
     size_t IC = 0;
     size_t OC = 0;
     std::vector<int32_t> lastOutputSpatialDims;
-    VectorDims dnnlCompatibleWeiDims{};
-    VectorDims expectedBiasDims{};
+    VectorDims dnnlCompatibleWeiDims;
+    VectorDims expectedBiasDims;
 
     bool useACL = false;
     DeconvAttrs deconvAttrs;
@@ -136,6 +134,4 @@ private:
     bool isConstOutShape = false;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

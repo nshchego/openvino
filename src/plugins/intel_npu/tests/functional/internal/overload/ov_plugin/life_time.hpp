@@ -6,7 +6,9 @@
 
 #include "behavior/ov_plugin/life_time.hpp"
 #include "common/npu_test_env_cfg.hpp"
+#include "common/utils.hpp"
 #include "common_test_utils/subgraph_builders/conv_pool_relu.hpp"
+#include "intel_npu/utils/zero/zero_init.hpp"
 #include "openvino/runtime/make_tensor.hpp"
 
 using CompilationParams = std::tuple<std::string,  // Device name
@@ -24,7 +26,7 @@ protected:
     std::shared_ptr<ov::Model> function;
 
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<CompilationParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<CompilationParams>& obj) {
         std::string target_device;
         ov::AnyMap configuration;
         std::tie(target_device, configuration) = obj.param;
@@ -163,7 +165,7 @@ protected:
     std::shared_ptr<ov::Model> function;
 
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<CompilationParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<CompilationParams>& obj) {
         std::string target_device;
         ov::AnyMap configuration;
         std::tie(target_device, configuration) = obj.param;
@@ -224,7 +226,7 @@ TEST_P(OVHoldersTestOnImportedNetworkNPU, CreateRequestWithCoreRemoved) {
     auto request = compiled_model.create_infer_request();
 }
 
-TEST_P(OVHoldersTestOnImportedNetworkNPU, CanInferAfterCompiledBlobPropTensorIsDestroyed) {
+TEST_P(OVHoldersTestOnImportedNetworkNPU, CanInferAfterTensorIsDestroyed) {
     ov::Core core = createCoreWithTemplate();
 
     for (size_t i = 0; i < 2; ++i) {
@@ -235,24 +237,32 @@ TEST_P(OVHoldersTestOnImportedNetworkNPU, CanInferAfterCompiledBlobPropTensorIsD
         {
             std::stringstream sstream;
             core.compile_model(function, target_device, configuration).export_model(sstream);
-            auto strSO = std::make_shared<std::string>(sstream.str());
-            auto tensor = ov::Tensor(ov::element::u8, ov::Shape{strSO->size()}, strSO->data());
-            auto impl = ov::get_tensor_impl(tensor);
-            impl._so = strSO;
-            tensor = ov::make_tensor(impl);
-            configuration.emplace(ov::hint::compiled_blob(tensor));
-            compiled_model = core.import_model(sstream, target_device, configuration);
-            configuration.erase(ov::hint::compiled_blob.name());  // cleanup
+
+            const std::string& str = sstream.str();
+            size_t size = str.size();
+            ov::test::utils::DefaultAllocatorNotAligned default_allocator_not_aligned;
+            auto tensor = ov::Tensor(ov::element::u8, ov::Shape{size}, default_allocator_not_aligned);
+            std::memcpy(tensor.data(), str.data(), size);
+
+            compiled_model = core.import_model(tensor, target_device, configuration);
         }
 
         // check if the shared object (strSO destroyed above) persists in compiled_model
-        std::ostringstream sstream;
-        ov::InferRequest inferRequest;
-        OV_ASSERT_NO_THROW(compiled_model.export_model(sstream));
-        EXPECT_TRUE(sstream.tellp() > 0);
-        OV_ASSERT_NO_THROW(inferRequest = compiled_model.create_infer_request());
-        compiled_model = {};  // dtor of compiled model won't affect created infer request
-        OV_ASSERT_NO_THROW(inferRequest.infer());
+        {
+            std::ostringstream sstream;
+            ov::InferRequest infer_request;
+            if (i == 0 && std::make_shared<::intel_npu::ZeroInitStructsHolder>()->getGraphDdiTable().version() >=
+                              ZE_MAKE_VERSION(1, 8)) {  // older drivers will own the blob and not deallocate
+                ASSERT_THROW(compiled_model.export_model(sstream), ov::Exception);  // model was imported, not compiled
+            } else {
+                OV_ASSERT_NO_THROW(
+                    compiled_model.export_model(sstream));  // weights load deferred, blob still accessible
+                EXPECT_TRUE(sstream.tellp() > 0);
+            }
+            OV_ASSERT_NO_THROW(infer_request = compiled_model.create_infer_request());
+            compiled_model = {};  // dtor of compiled model won't affect created infer request
+            OV_ASSERT_NO_THROW(infer_request.infer());
+        }
     }
     configuration.erase(ov::intel_npu::defer_weights_load.name());  // cleanup
 }

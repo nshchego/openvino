@@ -20,8 +20,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "utils/serialization/bind.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 class DnnlMemoryDesc;
 
@@ -34,12 +33,12 @@ public:
 
     MemoryDescPtr clone() const override;
 
-    MemoryDescPtr cloneWithNewPrecision(const ov::element::Type prec) const override;
+    MemoryDescPtr cloneWithNewPrecision(ov::element::Type prec) const override;
 
     bool isCompatible(const MemoryDesc& rhs) const override;
     bool isCompatible(const DnnlMemoryDesc& rhs) const;
 
-    bool hasLayoutType(LayoutType layoutType) const override {
+    bool hasLayoutType([[maybe_unused]] LayoutType layoutType) const override {
         return false;
     }
 
@@ -47,7 +46,7 @@ public:
 
     size_t getMaxMemSize() const override;
 
-    virtual bool isSame(dnnl::memory::format_tag fmt) const {
+    virtual bool isSame([[maybe_unused]] dnnl::memory::format_tag fmt) const {
         return false;
     }
 
@@ -67,7 +66,7 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     DnnlMemoryDesc() {}
@@ -94,5 +93,4 @@ private:
     friend DnnlMemoryDescPtr DnnlExtensionUtils::makeDescriptor(const_dnnl_memory_desc_t desc);
 };
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

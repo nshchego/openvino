@@ -12,25 +12,23 @@
 #include "node.h"
 #include "openvino/core/node.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class ExperimentalDetectronTopKROIs : public Node {
 public:
     ExperimentalDetectronTopKROIs(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    ExperimentalDetectronTopKROIs(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    ExperimentalDetectronTopKROIs(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
-    void getSupportedDescriptors() override{};
+    void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
-    bool created() const override;
+    [[nodiscard]] bool created() const override;
 
-    bool needShapeInfer() const override {
+    [[nodiscard]] bool needShapeInfer() const override {
         return false;
     };
-    bool needPrepareParams() const override {
+    [[nodiscard]] bool needPrepareParams() const override {
         return false;
     };
     void executeDynamicImpl(const dnnl::stream& strm) override {
@@ -53,6 +51,4 @@ private:
     int max_rois_num_;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

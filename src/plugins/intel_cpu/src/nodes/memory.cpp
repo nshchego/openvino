@@ -140,7 +140,7 @@ private:
 bool MemoryOutputBase::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                             std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(),
+        if (none_of(op->get_type_info(),
                     ov::op::v3::Assign::get_type_info_static(),
                     ov::op::v6::Assign::get_type_info_static())) {
             errorMessage = "Node is not an instance of Assign from the operation set v3 or v6.";
@@ -179,6 +179,11 @@ MemoryOutputBase::MemoryOutputBase(const std::string& id,
     if (created()) {
         context->getMemoryStatesRegister()->registerOutput(this);
     }
+}
+
+MemoryOutputBase::MemoryOutputBase(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context), MemoryNode(in_buf) {
+    // load(in_buf);
 }
 
 MemoryOutputBase::~MemoryOutputBase() {
@@ -292,6 +297,11 @@ bool MemoryOutput::isSupportedOperation(const std::shared_ptr<const ov::Node>& o
     return MemoryOutputBase::isSupportedOperation(op, errorMessage);
 }
 
+MemoryOutput::MemoryOutput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : MemoryOutputBase(in_buf, context) {
+    // load(in_buf);
+}
+
 void MemoryOutput::resolveInPlaceEdges(Edge::LOOK look) {
     if (!(look & Edge::LOOK_DOWN)) {
         Node::resolveInPlaceEdges(look);
@@ -304,7 +314,7 @@ void MemoryOutput::resolveInPlaceEdges(Edge::LOOK look) {
 
     auto parentEdge = getParentEdgeAt(0);  // always only one parent edge
 
-    CPU_NODE_ASSERT(one_of(parentEdge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
+    CPU_NODE_ASSERT(any_of(parentEdge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
                     " Unexpected inplace resolve call to an allocated edge: ",
                     *parentEdge);
 
@@ -387,7 +397,7 @@ void MemoryOutputStub::resolveInPlaceEdges(Edge::LOOK look) {
 
     auto parentEdge = getParentEdgeAt(0);  // always only one parent edge
 
-    CPU_NODE_ASSERT(one_of(parentEdge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
+    CPU_NODE_ASSERT(any_of(parentEdge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
                     " Unexpected inplace resolve call to an allocated edge: ",
                     *parentEdge);
 
@@ -404,7 +414,7 @@ void MemoryOutputStub::assignExtMemory(const MemoryPtr& mem, const MemoryDescPtr
 bool MemoryInputBase::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                            std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(),
+        if (none_of(op->get_type_info(),
                     ov::op::v3::ReadValue::get_type_info_static(),
                     ov::op::v6::ReadValue::get_type_info_static(),
                     ov::intel_cpu::ReadValueWithSubgraph::get_type_info_static())) {
@@ -470,8 +480,13 @@ MemoryInputBase::MemoryInputBase(const std::string& id,
     } else if (mode::single_read_value == mode) {
         executeHook = &MemoryInputBase::bypassAssignState;
     } else {
-        THROW_CPU_NODE_ERR("Unexpected MemoryInput mode");
+        CPU_NODE_THROW("Unexpected MemoryInput mode");
     }
+}
+
+MemoryInputBase::MemoryInputBase(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Input(in_buf, context), MemoryStateNode(in_buf) {
+    // load(in_buf);
 }
 
 MemoryInputBase::~MemoryInputBase() {
@@ -614,7 +629,7 @@ MemoryInput::MemoryInput(const std::shared_ptr<ov::Node>& op, const GraphContext
     auto rvWithSubgraph = ov::as_type_ptr<ov::intel_cpu::ReadValueWithSubgraph>(op);
     if (rvWithSubgraph) {
         body = rvWithSubgraph->get_function();
-        subGraph = make_unique<ov::intel_cpu::Graph>();
+        subGraph = std::make_unique<ov::intel_cpu::Graph>();
         if (isDynamic) {
             shapeInference = InternalDynShapeInferFactory().makeShapeInfer();
         }
@@ -634,11 +649,16 @@ MemoryInput::MemoryInput(const std::string& id,
     : MemoryInputBase::MemoryInputBase(id, name, type, output_shape, output_prc, context, input_shape, input_prc, mode),
       body(std::move(func)) {
     if (haveSubgraph()) {
-        subGraph = make_unique<ov::intel_cpu::Graph>();
+        subGraph = std::make_unique<ov::intel_cpu::Graph>();
         if (isDynamic) {
             shapeInference = InternalDynShapeInferFactory().makeShapeInfer();
         }
     }
+}
+
+MemoryInput::MemoryInput(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : MemoryInputBase(in_buf, context) {
+    // load(in_buf);
 }
 
 bool MemoryInput::needInitGraphProcessing() const {
@@ -901,7 +921,7 @@ void MemoryInput::resolveInPlaceEdges(Edge::LOOK look) {
     memBlock = std::make_shared<ProxyMemoryBlock>();
 
     for (auto&& edge : getChildEdgesAtPort(0)) {  // always only one child port
-        CPU_NODE_ASSERT(one_of(edge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
+        CPU_NODE_ASSERT(any_of(edge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
                         "Unexpected inplace resolve call to an allocated edge: ",
                         *edge);
 
@@ -1049,7 +1069,7 @@ void MemoryInputSDPA::resolveInPlaceEdges(Edge::LOOK look) {
     } else {
         auto memDesc = getBaseMemDescAtOutputPort(0);
         for (auto&& edge : getChildEdgesAtPort(0)) {  // always only one child port
-            CPU_NODE_ASSERT(one_of(edge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
+            CPU_NODE_ASSERT(any_of(edge->getStatus(), Edge::Status::Uninitialized, Edge::Status::NotAllocated),
                             " Unexpected inplace resolve call to an allocated edge: ",
                             *edge);
 
@@ -1143,5 +1163,20 @@ bool MemoryInputSingle::isSupportedOperation(const std::shared_ptr<const ov::Nod
                                              std::string& errorMessage) noexcept {
     return MemoryInput::isSupportedOperation(op, errorMessage);
 }
+
+// void MatrixNms::save(BinaryOutputBuffer& ob) const {
+//     Node::save(ob);
+
+// ob << ob.get_pos();  // TODO: remove
+
+
+// ob << ob.get_pos();  // TODO: remove
+// }
+
+// void MatrixNms::load(BinaryInputBuffer& in_buf) {
+// validate_stream_offset(in_buf);  // TODO: remove
+
+// validate_stream_offset(in_buf);  // TODO: remove
+// }
 
 }  // namespace ov::intel_cpu::node

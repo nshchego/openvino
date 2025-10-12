@@ -26,12 +26,11 @@
 #include "sub_memory_manager.hpp"
 #include "weights_cache.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 class CompiledModel : public ov::ICompiledModel {
 public:
-    typedef std::shared_ptr<CompiledModel> Ptr;
+    using Ptr = std::shared_ptr<CompiledModel>;
 
     struct GraphGuard : public Graph {
         std::mutex _mutex;
@@ -41,14 +40,13 @@ public:
         };
     };
 
-public:
     CompiledModel(const std::shared_ptr<ov::Model>& model,
                   const std::shared_ptr<const ov::IPlugin>& plugin,
                   Config cfg,
-                  const bool loaded_from_cache,
+                  bool loaded_from_cache,
                   std::shared_ptr<SubMemoryManager> sub_memory_manager = nullptr);
 
-    CompiledModel(BinaryInputBuffer& ib,
+    CompiledModel(BinaryInputBuffer& in_buf,
                   const std::shared_ptr<const ov::IPlugin>& plugin,
                   //const RemoteContextImpl::Ptr& context,
                   const Config& config,
@@ -64,7 +62,7 @@ public:
 
     ov::Any get_property(const std::string& name) const override;
 
-    void set_property(const ov::AnyMap& properties) override {
+    void set_property([[maybe_unused]] const ov::AnyMap& properties) override {
         OPENVINO_THROW_NOT_IMPLEMENTED("It's not possible to set property of an already compiled model. "
                                        "Set property to Core::compile_model during compilation");
     };
@@ -130,7 +128,7 @@ private:
 // the CompiledModel internal structures
 class CompiledModelHolder {
 public:
-    CompiledModelHolder(std::shared_ptr<const CompiledModel> compiled_model)
+    explicit CompiledModelHolder(std::shared_ptr<const CompiledModel> compiled_model)
         : m_compiled_model(std::move(compiled_model)) {
         OPENVINO_ASSERT(!m_compiled_model->m_graphs.empty(),
                         "No graph was found in the compiled model: ",
@@ -151,7 +149,7 @@ public:
     CompiledModelHolder(CompiledModelHolder&&) = default;
     CompiledModelHolder& operator=(CompiledModelHolder&&) = default;
 
-    const Graph& graph() const {
+    [[nodiscard]] const Graph& graph() const {
         return *m_graph;
     }
 
@@ -162,15 +160,15 @@ public:
         return lock;
     }
 
-    std::string name() const {
+    [[nodiscard]] std::string name() const {
         return m_compiled_model->name();
     }
 
-    std::shared_ptr<const ov::ICompiledModel> compiled_model() const {
+    [[nodiscard]] std::shared_ptr<const ov::ICompiledModel> compiled_model() const {
         return m_compiled_model;
     }
 
-    int id() const {
+    [[nodiscard]] int id() const {
         return m_id;
     }
 
@@ -180,5 +178,4 @@ private:
     int m_id;
 };
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

@@ -56,7 +56,7 @@ bool Math::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
             return false;
         }
 
-        if (one_of(op->get_type_info(),
+        if (any_of(op->get_type_info(),
                    ov::op::v0::HardSigmoid::get_type_info_static(),
                    ov::op::v0::Selu::get_type_info_static())) {
             auto firstConst = ov::as_type_ptr<ov::op::v0::Constant>(op->get_input_node_shared_ptr(1));
@@ -80,6 +80,11 @@ Math::Math(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
     }
 
     getInitializers()[op->get_type_info()](op, *this);
+}
+
+Math::Math(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void Math::initSupportedPrimitiveDescriptors() {
@@ -226,7 +231,7 @@ void Math::execute([[maybe_unused]] const dnnl::stream& strm) {
         });
         break;
     default:
-        THROW_CPU_NODE_ERR("Incorrect Reduce layer type");
+        CPU_NODE_THROW("Incorrect Reduce layer type");
     }
 }
 
@@ -323,6 +328,21 @@ Math::getInitializers() {
                  node.algorithm = Algorithm::MathAtanh;
              }}};
     return initializers;
+}
+
+void Math::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void Math::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

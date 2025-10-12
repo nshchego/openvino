@@ -65,9 +65,9 @@ std::string BlockedMemoryDesc::serializeFormat() const {
     }
 
     for (size_t i = 0; i < shape.getRank(); ++i) {
-        char nextLetter = startLetter + order[i];
+        auto nextLetter = static_cast<char>(startLetter + order[i]);
         if (blockedAxis.count(i)) {
-            nextLetter = toupper(nextLetter);
+            nextLetter = static_cast<char>(toupper(nextLetter));
         }
         result << nextLetter;
     }
@@ -92,16 +92,16 @@ void BlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
     ob << ob.get_pos();  // TODO: remove
 }
 
-void BlockedMemoryDesc::load(BinaryInputBuffer& ib) {
-    MemoryDesc::load(ib);
-    validate_stream_offset(ib);  // TODO: remove
+void BlockedMemoryDesc::load(BinaryInputBuffer& in_buf) {
+    MemoryDesc::load(in_buf);
+    validate_stream_offset(in_buf);  // TODO: remove
 
-    ib >> blockedDims;
-    ib >> strides;
-    ib >> order;
-    ib >> m_offset_padding_to_data;
+    in_buf >> blockedDims;
+    in_buf >> strides;
+    in_buf >> order;
+    in_buf >> m_offset_padding_to_data;
 
-    validate_stream_offset(ib);  // TODO: remove
+    validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

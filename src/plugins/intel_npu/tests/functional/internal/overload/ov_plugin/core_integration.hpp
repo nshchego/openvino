@@ -6,7 +6,7 @@
 
 #include <filesystem>
 
-#include "base/ov_behavior_test_utils.hpp"
+#include "shared_test_classes/base/ov_behavior_test_utils.hpp"
 #include "behavior/ov_plugin/properties_tests.hpp"
 #include "common/functions.h"
 #include "common/npu_test_env_cfg.hpp"
@@ -46,7 +46,7 @@ protected:
     std::shared_ptr<ov::Model> function;
 
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<CompilationParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<CompilationParams>& obj) {
         std::string target_device;
         ov::AnyMap configuration;
         std::tie(target_device, configuration) = obj.param;

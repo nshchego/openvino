@@ -12,21 +12,21 @@
 #include "node.h"
 #include "openvino/core/node.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class StringTensorPack : public Node {
 public:
     StringTensorPack(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
+    StringTensorPack(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
+
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
-    bool isExecutable() const override;
+    [[nodiscard]] bool isExecutable() const override;
     void execute(const dnnl::stream& strm) override;
-    bool created() const override;
-    bool needPrepareParams() const override;
+    [[nodiscard]] bool created() const override;
+    [[nodiscard]] bool needPrepareParams() const override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
 private:
@@ -37,6 +37,4 @@ private:
     struct StringTensorPackExecute;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

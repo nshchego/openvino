@@ -143,8 +143,8 @@ void TransposeParams::save(BinaryOutputBuffer& ob) const {
     ob << permuteParams;
 }
 
-void TransposeParams::load(BinaryInputBuffer& ib) {
-    ib >> permuteParams;
+void TransposeParams::load(BinaryInputBuffer& in_buf) {
+    in_buf >> permuteParams;
 }
 
 }  // namespace ov::intel_cpu

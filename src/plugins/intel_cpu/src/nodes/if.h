@@ -8,11 +8,9 @@
 #include <node.h>
 
 #include <cstddef>
-#include <deque>
 #include <memory>
 #include <oneapi/dnnl/dnnl_common.hpp>
 #include <string>
-#include <vector>
 
 #include "allocation_context.hpp"
 #include "cpu_memory.h"
@@ -21,15 +19,13 @@
 #include "openvino/core/node.hpp"
 #include "openvino/op/if.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class If : public Node {
 public:
     If(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    If(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    If(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
     void initSupportedPrimitiveDescriptors() override;
@@ -56,10 +52,10 @@ protected:
     }
 
 private:
-    void prepareBeforeMappers(const bool isThen, const dnnl::engine& eng);
-    void prepareAfterMappers(const bool isThen, const dnnl::engine& eng);
+    void prepareBeforeMappers(bool isThen, const dnnl::engine& eng);
+    void prepareAfterMappers(bool isThen, const dnnl::engine& eng);
 
-    static std::deque<MemoryPtr> getToMemories(const Node* node, const size_t port);
+    static std::deque<MemoryPtr> getToMemories(const Node* node, size_t port);
 
     struct PortMap {
         int from; /**< Index of external/internal out data */
@@ -79,7 +75,7 @@ private:
         std::deque<MemoryPtr> dstMemPtrs;
         std::deque<MemoryDescPtr> originalDstMemDescs;
 
-        ptrdiff_t size;
+        ptrdiff_t size = 0;
     };
 
     Graph m_thenGraph;
@@ -95,6 +91,4 @@ private:
     std::shared_ptr<ov::op::v8::If> m_op;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

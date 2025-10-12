@@ -54,6 +54,11 @@ LoRA::LoRA(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
     m_body = loraModel->get_function();
 }
 
+LoRA::LoRA(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void LoRA::selectOptimalPrimitiveDescriptor() {
     // for the input configuration, just always use the parent configuration
     std::vector<PortConfig> inConfs;
@@ -141,7 +146,7 @@ void LoRA::createPrimitive() {
     m_graph.Activate();
 }
 
-void LoRA::execute(const dnnl::stream& /*strm*/) {
+void LoRA::execute([[maybe_unused]] const dnnl::stream& strm) {
     m_graph.Infer();
 }
 
@@ -154,6 +159,21 @@ void LoRA::prepareParams() {
         // since the external and internal descriptors are compatible, we may pass the descriptor
         subgraphMemoryPtrs[i]->redefineDesc(getSrcMemoryAtPort(i)->getDescPtr());
     }
+}
+
+void LoRA::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void LoRA::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -14,41 +14,39 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/type/element_type.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Bucketize : public Node {
 public:
     Bucketize(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    Bucketize(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    Bucketize(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
-    void getSupportedDescriptors() override{};
+    void getSupportedDescriptors() override {};
     void initSupportedPrimitiveDescriptors() override;
     void execute(const dnnl::stream& strm) override;
-    bool created() const override;
+    [[nodiscard]] bool created() const override;
     void executeDynamicImpl(const dnnl::stream& strm) override {
         execute(strm);
     }
 
     void prepareParams() override;
 
-    bool neverExecute() const override;
-    bool isExecutable() const override;
+    [[nodiscard]] bool neverExecute() const override;
+    [[nodiscard]] bool isExecutable() const override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     template <typename T, typename T_BOUNDARIES, typename T_IND>
     void bucketize();
 
-    const size_t INPUT_TENSOR_PORT = 0;
-    const size_t INPUT_BINS_PORT = 1;
-    const size_t OUTPUT_TENSOR_PORT = 0;
+    static constexpr size_t INPUT_TENSOR_PORT = 0LU;
+    static constexpr size_t INPUT_BINS_PORT = 1LU;
+    static constexpr size_t OUTPUT_TENSOR_PORT = 0LU;
 
     size_t num_values = 0;
     size_t num_bin_values = 0;
@@ -60,6 +58,4 @@ private:
     ov::element::Type output_precision;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

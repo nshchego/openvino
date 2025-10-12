@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "../buffer.hpp"
+#include "../buffers.hpp"
 #include "openvino/core/type/element_type.hpp"
 #include "snippets/lowered/linear_ir.hpp"
 

@@ -11,7 +11,6 @@
 #include <string>
 #include <vector>
 
-#include "cpu/x64/cpu_isa_traits.hpp"
 #include "cpu_memory.h"
 #include "graph_context.h"
 #include "kernels/x64/rope_kernel.hpp"
@@ -30,6 +29,10 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/plain_tensor.hpp"
 
+#if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
+#    include "cpu/x64/cpu_isa_traits.hpp"
+#endif
+
 using namespace ov::intel_cpu::kernel;
 
 namespace ov::intel_cpu::node {
@@ -43,6 +46,11 @@ RoPE::RoPE(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
 
     const auto node = ov::as_type_ptr<const op::internal::RoPE>(op);
     m_config = node->get_config();
+}
+
+RoPE::RoPE(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 static std::shared_ptr<kernel::JitKernelBase> createJitKernel([[maybe_unused]] const jit_rotary_compile_params& param,
@@ -91,11 +99,7 @@ static void execJitKernel([[maybe_unused]] const std::shared_ptr<kernel::JitKern
                           [[maybe_unused]] const float* sin) {
 #if defined(OPENVINO_ARCH_X86_64)
 
-    jit_rotary_call_args call_args;
-    call_args.src = src;
-    call_args.cos = cos;
-    call_args.sin = sin;
-    call_args.dst = dst;
+    jit_rotary_call_args call_args{src, cos, sin, dst};
     (*ker)(&call_args);
 
 #endif  // OPENVINO_ARCH_X86_64
@@ -106,7 +110,7 @@ struct RoPE::RoPEExecutorRotateHalf : public RoPE::Executor {
     const op::internal::RoPE::Config& m_config;
     std::shared_ptr<kernel::JitKernelBase> m_rotaryKernel;
 
-    RoPEExecutorRotateHalf(const op::internal::RoPE::Config& config) : m_config(config) {
+    explicit RoPEExecutorRotateHalf(const op::internal::RoPE::Config& config) : m_config(config) {
         jit_rotary_compile_params jcp;
         jcp.src_prc = precision_of<T>::value;
         jcp.dst_prc = precision_of<T>::value;
@@ -188,7 +192,7 @@ struct RoPE::RoPEExecutorInterleaved : public RoPE::Executor {
     const op::internal::RoPE::Config& m_config;
     std::shared_ptr<kernel::JitKernelBase> m_rotaryKernel;
 
-    RoPEExecutorInterleaved(const op::internal::RoPE::Config& config) : m_config(config) {
+    explicit RoPEExecutorInterleaved(const op::internal::RoPE::Config& config) : m_config(config) {
         jit_rotary_compile_params jcp;
         jcp.src_prc = precision_of<T>::value;
         jcp.dst_prc = precision_of<T>::value;
@@ -238,7 +242,7 @@ struct RoPE::RoPEExecutorChatGLM : public RoPE::Executor {
     const op::internal::RoPE::Config& m_config;
     std::shared_ptr<kernel::JitKernelBase> m_rotaryKernel;
 
-    RoPEExecutorChatGLM(const op::internal::RoPE::Config& config) : m_config(config) {
+    explicit RoPEExecutorChatGLM(const op::internal::RoPE::Config& config) : m_config(config) {
         jit_rotary_compile_params jcp;
         jcp.src_prc = precision_of<T>::value;
         jcp.dst_prc = precision_of<T>::value;
@@ -328,7 +332,7 @@ struct RoPE::RoPEExecutorQwen : public RoPE::Executor {
     const op::internal::RoPE::Config& m_config;
     std::shared_ptr<kernel::JitKernelBase> m_rotaryKernel;
 
-    RoPEExecutorQwen(const op::internal::RoPE::Config& config) : m_config(config) {
+    explicit RoPEExecutorQwen(const op::internal::RoPE::Config& config) : m_config(config) {
         jit_rotary_compile_params jcp;
         jcp.src_prc = precision_of<T>::value;
         jcp.dst_prc = precision_of<T>::value;

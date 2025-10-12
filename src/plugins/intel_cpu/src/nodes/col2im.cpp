@@ -135,7 +135,7 @@ void Col2Im::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 }
 
-void Col2Im::load(BinaryInputBuffer& ib) {
+void Col2Im::load(BinaryInputBuffer& in_buf) {
 }
 
 }  // namespace ov::intel_cpu::node

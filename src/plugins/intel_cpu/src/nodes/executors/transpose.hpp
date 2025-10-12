@@ -18,7 +18,7 @@ struct TransposeParams {
     PermuteParams permuteParams;
     
     void save(BinaryOutputBuffer& ob) const;
-    void load(BinaryInputBuffer& ib);
+    void load(BinaryInputBuffer& in_buf);
 };
 
 class TransposeExecutor : public Executor {
@@ -44,7 +44,7 @@ public:
     [[nodiscard]] virtual bool isSupported(const TransposeParams& transposeParams,
                                            const std::vector<MemoryDescPtr>& srcDescs,
                                            const std::vector<MemoryDescPtr>& dstDescs) const = 0;
-    [[nodiscard]] virtual TransposeExecutorPtr makeExecutor(const ExecutorContext::CPtr context) const = 0;
+    [[nodiscard]] virtual TransposeExecutorPtr makeExecutor(ExecutorContext::CPtr context) const = 0;
 };
 
 using TransposeExecutorBuilderPtr = std::shared_ptr<TransposeExecutorBuilder>;

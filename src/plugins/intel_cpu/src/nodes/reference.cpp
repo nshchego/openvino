@@ -32,7 +32,7 @@ namespace ov::intel_cpu::node {
 
 Reference::Reference(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context, std::string errorMessage)
     : Node(op, context, NgraphShapeInferFactory(op)),
-      m_ov_node(op),
+      m_ov_core_node(op),
       additionalErrorMessage(std::move(errorMessage)) {
     if (!op->has_evaluate()) {
         OPENVINO_THROW_NOT_IMPLEMENTED(
@@ -59,13 +59,13 @@ void Reference::initSupportedPrimitiveDescriptors() {
     std::vector<PortConfigurator> inputConfigurators;
     inputConfigurators.reserve(m_input_shapes.size());
     for (size_t i = 0; i < m_input_shapes.size(); i++) {
-        inputConfigurators.emplace_back(LayoutType::ncsp, m_ov_node->get_input_element_type(i), m_input_shapes[i]);
+        inputConfigurators.emplace_back(LayoutType::ncsp, m_ov_core_node->get_input_element_type(i), m_input_shapes[i]);
     }
 
     std::vector<PortConfigurator> outputConfigurators;
     outputConfigurators.reserve(m_input_shapes.size());
     for (size_t i = 0; i < m_output_shapes.size(); i++) {
-        outputConfigurators.emplace_back(LayoutType::ncsp, m_ov_node->get_output_element_type(i), m_output_shapes[i]);
+        outputConfigurators.emplace_back(LayoutType::ncsp, m_ov_core_node->get_output_element_type(i), m_output_shapes[i]);
     }
 
     addSupportedPrimDesc(inputConfigurators, outputConfigurators, impl_desc_type::ref);
@@ -78,8 +78,8 @@ void Reference::createPrimitive() {
 void Reference::execute([[maybe_unused]] const dnnl::stream& strm) {
     auto inputs = prepareInputs();
     auto outputs = prepareOutputs();
-    if (!m_ov_node->evaluate(outputs, inputs)) {
-        THROW_CPU_NODE_ERR("evaluation failed for core operation: ", std::string(m_ov_node->get_type_name()));
+    if (!m_ov_core_node->evaluate(outputs, inputs)) {
+        CPU_NODE_THROW("evaluation failed for core operation: ", std::string(m_ov_core_node->get_type_name()));
     }
 }
 
@@ -103,16 +103,16 @@ void Reference::executeDynamicImpl(const dnnl::stream& strm) {
         for (size_t i = 0; i < m_output_shapes.size(); ++i) {
             auto mem_desc = getBaseMemDescAtOutputPort(i);
             if (mem_desc->isDefined()) {
-                outputs.emplace_back(m_ov_node->get_output_element_type(i), mem_desc->getShape().getStaticDims());
+                outputs.emplace_back(m_ov_core_node->get_output_element_type(i), mem_desc->getShape().getStaticDims());
             } else {
-                outputs.emplace_back(m_ov_node->get_output_element_type(i), ov::Shape{0});
+                outputs.emplace_back(m_ov_core_node->get_output_element_type(i), ov::Shape{0});
             }
         }
     } else {
-        THROW_CPU_NODE_ERR("got unexpected shape infer result status during the inference.");
+        CPU_NODE_THROW("got unexpected shape infer result status during the inference.");
     }
-    if (!m_ov_node->evaluate(outputs, inputs)) {
-        THROW_CPU_NODE_ERR("evaluation failed for core operation: ", std::string(m_ov_node->get_type_name()));
+    if (!m_ov_core_node->evaluate(outputs, inputs)) {
+        CPU_NODE_THROW("evaluation failed for core operation: ", std::string(m_ov_core_node->get_type_name()));
     }
     if (ShapeInferStatus::skip == result.status) {
         std::vector<VectorDims> newOutputDims;
@@ -125,9 +125,8 @@ void Reference::executeDynamicImpl(const dnnl::stream& strm) {
             auto memory = getDstMemoryAtPort(i);
             auto& tensor = outputs[i];
             if (memory->getSize() != tensor.get_byte_size()) {
-                THROW_CPU_NODE_ERR(
-                    "output tensor data size mismatch occurred during the inference on output port number ",
-                    i);
+                CPU_NODE_THROW("output tensor data size mismatch occurred during the inference on output port number ",
+                               i);
             }
             if (tensor.get_element_type() == element::string) {
                 auto* srcPtr = tensor.data<StringMemory::OvString>();
@@ -154,17 +153,17 @@ ov::TensorVector Reference::prepareInputs() const {
     ov::TensorVector inputs;
     for (size_t i = 0LU; i < m_input_shapes.size(); i++) {
         void* srcDataPtr = getSrcDataAtPort(i);
-        ov::Shape shape = m_ov_node->get_input_partial_shape(i).rank().get_length() == 0
+        ov::Shape shape = m_ov_core_node->get_input_partial_shape(i).rank().get_length() == 0
                               ? ov::Shape{}
                               : getParentEdgeAt(i)->getMemory().getStaticDims();
 
         if (std::any_of(shape.begin(), shape.end(), [](const size_t dim) {
                 return dim == 0LU;
             })) {
-            inputs.emplace_back(m_ov_node->get_input_element_type(i), shape);
+            inputs.emplace_back(m_ov_core_node->get_input_element_type(i), shape);
         } else {
             CPU_NODE_ASSERT(srcDataPtr, "has empty input data on port ", i);
-            inputs.emplace_back(m_ov_node->get_input_element_type(i), shape, srcDataPtr);
+            inputs.emplace_back(m_ov_core_node->get_input_element_type(i), shape, srcDataPtr);
         }
     }
     return inputs;
@@ -174,17 +173,17 @@ ov::TensorVector Reference::prepareOutputs() const {
     ov::TensorVector outputs;
     for (size_t i = 0LU; i < m_output_shapes.size(); i++) {
         void* dstDataPtr = getDstDataAtPort(i);
-        ov::Shape shape = m_ov_node->get_output_partial_shape(i).rank().get_length() == 0
+        ov::Shape shape = m_ov_core_node->get_output_partial_shape(i).rank().get_length() == 0
                               ? ov::Shape{}
                               : getChildEdgeAt(i)->getMemory().getStaticDims();
 
         if (std::any_of(shape.begin(), shape.end(), [](const size_t dim) {
                 return dim == 0LU;
             })) {
-            outputs.emplace_back(m_ov_node->get_output_element_type(i), shape);
+            outputs.emplace_back(m_ov_core_node->get_output_element_type(i), shape);
         } else {
             CPU_NODE_ASSERT(dstDataPtr, "has empty output data on port ", i);
-            outputs.emplace_back(m_ov_node->get_output_element_type(i), shape, dstDataPtr);
+            outputs.emplace_back(m_ov_core_node->get_output_element_type(i), shape, dstDataPtr);
         }
     }
     return outputs;
@@ -195,17 +194,17 @@ void Reference::save(BinaryOutputBuffer& ob) const {
 
     ob << hasOutputShapeDataDependency;
     
-    ob << m_ov_node->get_element_type();
-    ob << m_ov_node->get_friendly_name();
+    ob << m_ov_core_node->get_element_type();
+    ob << m_ov_core_node->get_friendly_name();
 }
 
-void Reference::load(BinaryInputBuffer& ib) {
-    ib >> hasOutputShapeDataDependency;
+void Reference::load(BinaryInputBuffer& in_buf) {
+    in_buf >> hasOutputShapeDataDependency;
 
     element::Type dt;
     std::string friendly_name;
-    ib >> dt;
-    ib >> friendly_name;
+    in_buf >> dt;
+    in_buf >> friendly_name;
 }
 
 }  // namespace ov::intel_cpu::node

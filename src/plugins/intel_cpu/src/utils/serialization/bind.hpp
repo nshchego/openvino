@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <functional>
 
-#include "buffer.hpp"
+#include "buffers.hpp"
 #include "static_instance.hpp"
 #include "onednn/dnnl.h"
 

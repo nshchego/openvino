@@ -16,9 +16,9 @@ void PortDescGeneric::save(BinaryOutputBuffer& ob) const {
     // ob << ob.get_pos();  // TODO: remove
 }
 
-void PortDescGeneric::load(BinaryInputBuffer& ib) {
-    ib >> m_mem_desc;
-    // validate_stream_offset(ib);  // TODO: Remove
+void PortDescGeneric::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_mem_desc;
+    // validate_stream_offset(in_buf);  // TODO: Remove
 }
 
 void PortDescBlocked::save(BinaryOutputBuffer& ob) const {
@@ -29,13 +29,13 @@ void PortDescBlocked::save(BinaryOutputBuffer& ob) const {
     ob << ob.get_pos();  // TODO: remove
 }
 
-void PortDescBlocked::load(BinaryInputBuffer& ib) {
-    ib >> m_mem_desc;
-    validate_stream_offset(ib);  // TODO: Remove
+void PortDescBlocked::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_mem_desc;
+    validate_stream_offset(in_buf);  // TODO: Remove
     uint32_t tmp = 0U;
-    ib >> tmp;
+    in_buf >> tmp;
     m_cmp_mask = CmpMask(tmp);
-    validate_stream_offset(ib);  // TODO: Remove
+    validate_stream_offset(in_buf);  // TODO: Remove
 }
 
 void PortConfig::save(BinaryOutputBuffer& ob) const {
@@ -47,13 +47,13 @@ void PortConfig::save(BinaryOutputBuffer& ob) const {
     ob << ob.get_pos();  // TODO: remove
 }
 
-void PortConfig::load(BinaryInputBuffer& ib) {
-    ib >> m_in_place_port;
-    validate_stream_offset(ib);  // TODO: Remove
-    ib >> m_constant;
-    validate_stream_offset(ib);  // TODO: Remove
-    ib >> m_port_desc;
-    validate_stream_offset(ib);  // TODO: Remove
+void PortConfig::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_in_place_port;
+    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf >> m_constant;
+    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf >> m_port_desc;
+    validate_stream_offset(in_buf);  // TODO: Remove
 }
 
 void NodeConfig::save(BinaryOutputBuffer& ob) const {
@@ -63,11 +63,11 @@ void NodeConfig::save(BinaryOutputBuffer& ob) const {
     ob << ob.get_pos();  // TODO: remove
 }
 
-void NodeConfig::load(BinaryInputBuffer& ib) {
-    ib >> inConfs;
-    validate_stream_offset(ib);  // TODO: Remove
-    ib >> outConfs;
-    validate_stream_offset(ib);  // TODO: Remove
+void NodeConfig::load(BinaryInputBuffer& in_buf) {
+    in_buf >> inConfs;
+    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf >> outConfs;
+    validate_stream_offset(in_buf);  // TODO: Remove
 }
 
 }  // namespace ov::intel_cpu

@@ -65,6 +65,11 @@ Tile::Tile(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
     }
 }
 
+Tile::Tile(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Tile::getSupportedDescriptors() {
     const auto& vec_to_string = [](const std::vector<size_t>& vec) -> std::string {
         std::string result = "[";
@@ -77,37 +82,37 @@ void Tile::getSupportedDescriptors() {
         return result;
     };
     if (getParentEdges().size() != 2) {
-        THROW_CPU_NODE_ERR("has incorrect number of input edges. "
-                           "Expected: 2, Actual: ",
-                           getParentEdges().size());
+        CPU_NODE_THROW("has incorrect number of input edges. "
+                       "Expected: 2, Actual: ",
+                       getParentEdges().size());
     }
     if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR("has no output edges.");
+        CPU_NODE_THROW("has no output edges.");
     }
     const auto& dstDims0 = getOutputShapeAtPort(0).getDims();
     for (size_t i = 1LU; i < m_output_shapes.size(); i++) {
         const auto& dstDims = getOutputShapeAtPort(i).getDims();
         if (dstDims.size() != dstDims0.size()) {
-            THROW_CPU_NODE_ERR("has output edges 0 and ",
-                               i,
-                               " with different ranks: ",
-                               dstDims0.size(),
-                               " and ",
-                               dstDims.size());
+            CPU_NODE_THROW("has output edges 0 and ",
+                           i,
+                           " with different ranks: ",
+                           dstDims0.size(),
+                           " and ",
+                           dstDims.size());
         }
         for (size_t j = 0; j < dstDims0.size(); j++) {
             if (dstDims0[j] != dstDims[j]) {
-                THROW_CPU_NODE_ERR("has output edges 0 and ",
-                                   i,
-                                   " with different dims: ",
-                                   vec_to_string(dstDims0),
-                                   " and ",
-                                   vec_to_string(dstDims));
+                CPU_NODE_THROW("has output edges 0 and ",
+                               i,
+                               " with different dims: ",
+                               vec_to_string(dstDims0),
+                               " and ",
+                               vec_to_string(dstDims));
             }
         }
     }
     if (constMap[TILE_REPEATS] && getInputShapeAtPort(TILE_INPUT).getRank() > getOutputShapeAtPort(0).getRank()) {
-        THROW_CPU_NODE_ERR(
+        CPU_NODE_THROW(
             " has incorrect input/output data shape rank. Input shape rank cannot be more than output shape rank. "
             "Actual input shape size: ",
             getInputShapeAtPort(TILE_INPUT).getRank(),

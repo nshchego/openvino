@@ -8,7 +8,7 @@
 #include <common_test_utils/test_assertions.hpp>
 #include <sstream>
 
-#include "base/ov_behavior_test_utils.hpp"
+#include "shared_test_classes/base/ov_behavior_test_utils.hpp"
 #include "intel_npu/config/options.hpp"
 #include "intel_npu/npu_private_properties.hpp"
 #include "intel_npu/utils/zero/zero_init.hpp"
@@ -46,7 +46,7 @@ typedef std::tuple<std::shared_ptr<ov::Model>,  // Model
 class OVCompileAndInferRequest : public testing::WithParamInterface<CompileAndInferRequestParams>,
                                  public OVInferRequestTestBase {
 public:
-    static std::string getTestCaseName(testing::TestParamInfo<CompileAndInferRequestParams> obj) {
+    static std::string getTestCaseName(const testing::TestParamInfo<CompileAndInferRequestParams>& obj) {
         std::shared_ptr<ov::Model> model;
         std::string targetDevice;
         ov::AnyMap configuration;

@@ -18,6 +18,7 @@
 #include "graph.h"
 #include "graph_context.h"
 #include "infer_request.h"
+#include "internal_properties.hpp"
 #include "low_precision/low_precision.hpp"
 #include "openvino/core/any.hpp"
 #include "openvino/core/except.hpp"
@@ -34,6 +35,7 @@
 #include "openvino/runtime/threading/itask_executor.hpp"
 #include "sub_memory_manager.hpp"
 #include "utils/debug_capabilities.h"
+#include "utils/general_utils.h"
 #include "utils/memory_stats_dump.hpp"
 #include "utils/model_utils.hpp"
 #include "utils/serialization/internal_types.hpp"
@@ -41,6 +43,9 @@
 #include "utils/serialization/string_serializer.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
+#    include <arm_compute/runtime/IScheduler.h>
+#    include <arm_compute/runtime/Scheduler.h>
+
 #    include "nodes/executors/acl/acl_ie_scheduler.hpp"
 #endif
 
@@ -72,9 +77,7 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
       m_outputs(ov::ICompiledModel::outputs()) {
     m_mutex = std::make_shared<std::mutex>();
     const auto& core = m_plugin->get_core();
-    if (!core) {
-        OPENVINO_THROW("Unable to get API version. Core is unavailable");
-    }
+    OPENVINO_ASSERT(core, "Unable to get API version. Core is unavailable");
 
     m_is_function_quantized = ov::pass::low_precision::LowPrecision::isFunctionQuantized(m_model);
 
@@ -106,7 +109,7 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
         set_callback_executor(m_callback_executor);
     }
 
-    m_optimized_single_stream = (executor_config.get_streams() == 1 && executor_config.get_threads() == 1);
+    m_optimized_single_stream = all_of(1, executor_config.get_streams(), executor_config.get_threads());
 
     int streams = std::max(1, executor_config.get_streams());
     std::vector<Task> tasks;
@@ -164,12 +167,12 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
     }
 }
 
-CompiledModel::CompiledModel(BinaryInputBuffer& ib,
+CompiledModel::CompiledModel(BinaryInputBuffer& in_buf,
                              const std::shared_ptr<const ov::IPlugin>& plugin,
                              const Config& config,
                              const bool loaded_from_cache)
     : ov::ICompiledModel::ICompiledModel(nullptr, plugin),
-      m_model_buffer(&ib),
+      m_model_buffer(&in_buf),
       m_plugin(plugin),
       m_cfg(config),
       m_loaded_from_cache(loaded_from_cache) {
@@ -178,34 +181,34 @@ CompiledModel::CompiledModel(BinaryInputBuffer& ib,
     m_mutex = std::make_shared<std::mutex>();
 
 printf("--CPU-- CompiledModel::CompiledModel READ\n");
-    validate_stream_offset(ib);
+    validate_stream_offset(in_buf);
     
-    ib >> m_name;
-    ib >> m_cfg.modelPreferThreads;
-    ib >> m_is_function_quantized;
+    in_buf >> m_name;
+    in_buf >> m_cfg.modelPreferThreads;
+    in_buf >> m_is_function_quantized;
 
     // m_cfg.applyRtInfo(ib);
     // m_cfg.readProperties(new_config, model_type);
 
     size_t counter;
 
-    ib >> counter;
-    validate_stream_offset(ib);
+    in_buf >> counter;
+    validate_stream_offset(in_buf);
     for (size_t idx = 0lu; idx < counter; idx++) {
         std::string param_name;
         element::Type param_element_type;
         PartialShape param_shape;
 
-        ib >> param_element_type;
-        ib >> param_shape;
-        ib >> param_name;
+        in_buf >> param_element_type;
+        in_buf >> param_shape;
+        in_buf >> param_name;
 
         std::unordered_set<std::string> param_names;
         size_t num_names;
-        ib >> num_names;
+        in_buf >> num_names;
         for (size_t i = 0lu; i < num_names; ++i) {
             std::string name;
-            ib >> name;
+            in_buf >> name;
             param_names.emplace(name);
         }
 
@@ -217,25 +220,25 @@ printf("--CPU-- CompiledModel::CompiledModel READ\n");
         m_inputs.push_back(new_param->output(0));
     }
 
-    ib >> counter;
-    validate_stream_offset(ib);
+    in_buf >> counter;
+    validate_stream_offset(in_buf);
     for (size_t idx = 0lu; idx < counter; idx++) {
         element::Type fake_element_type;
         PartialShape fake_shape;
         std::string fake_name;
         std::string param_name;
 
-        ib >> fake_element_type;
-        ib >> fake_shape;
-        ib >> fake_name;
-        ib >> param_name;
+        in_buf >> fake_element_type;
+        in_buf >> fake_shape;
+        in_buf >> fake_name;
+        in_buf >> param_name;
 
         std::unordered_set<std::string> param_names;
         size_t num_names;
-        ib >> num_names;
+        in_buf >> num_names;
         for (size_t i = 0; i < num_names; ++i) {
             std::string name;
-            ib >> name;
+            in_buf >> name;
             param_names.emplace(name);
         }
 
@@ -330,7 +333,7 @@ printf("--CPU-- CompiledModel::CompiledModel READ\n");
                                                                     std::move(sub_streams_table),
                                                                     sub_cfg.streamsRankTable[i]};
             m_sub_compiled_models.push_back(
-                std::make_shared<CompiledModel>(ib, plugin, sub_cfg, loaded_from_cache));
+                std::make_shared<CompiledModel>(in_buf, plugin, sub_cfg, loaded_from_cache));
         }
     }
 }
@@ -403,7 +406,8 @@ CompiledModel::GraphGuard::Lock CompiledModel::get_graph() const {
 }
 
 std::shared_ptr<ov::ISyncInferRequest> CompiledModel::create_sync_infer_request() const {
-    return std::make_shared<SyncInferRequest>(std::static_pointer_cast<const CompiledModel>(shared_from_this()));
+    return std::make_shared<SyncInferRequest>(
+        CompiledModelHolder(std::static_pointer_cast<const CompiledModel>(shared_from_this())));
 }
 
 std::shared_ptr<ov::IAsyncInferRequest> CompiledModel::create_infer_request() const {
@@ -426,17 +430,13 @@ std::shared_ptr<ov::IAsyncInferRequest> CompiledModel::create_infer_request() co
 }
 
 std::shared_ptr<const ov::Model> CompiledModel::get_runtime_model() const {
-    if (m_graphs.empty()) {
-        OPENVINO_THROW("No graph was found");
-    }
+    OPENVINO_ASSERT(!m_graphs.empty(), "No graph was found");
 
     return get_graph()._graph.dump();
 }
 
 ov::Any CompiledModel::get_property(const std::string& name) const {
-    if (m_graphs.empty()) {
-        OPENVINO_THROW("No graph was found");
-    }
+    OPENVINO_ASSERT(!m_graphs.empty(), "No graph was found");
 
     if (name == ov::loaded_from_cache) {
         return m_loaded_from_cache;
@@ -478,6 +478,7 @@ ov::Any CompiledModel::get_property(const std::string& name) const {
             RO_property(ov::intel_cpu::denormals_optimization.name()),
             RO_property(ov::log::level.name()),
             RO_property(ov::intel_cpu::sparse_weights_decompression_rate.name()),
+            RO_property(ov::intel_cpu::enable_tensor_parallel.name()),
             RO_property(ov::hint::dynamic_quantization_group_size.name()),
             RO_property(ov::hint::kv_cache_precision.name()),
             RO_property(ov::key_cache_precision.name()),
@@ -490,8 +491,7 @@ ov::Any CompiledModel::get_property(const std::string& name) const {
     }
 
     if (name == ov::model_name) {
-        // @todo Does not seem ok to 'dump()' the whole graph everytime in order to get a name
-        const std::string modelName = graph.dump()->get_friendly_name();
+        std::string modelName = graph.GetName();
         return decltype(ov::model_name)::value_type(modelName);
     }
     if (name == ov::optimal_number_of_infer_requests) {
@@ -557,6 +557,10 @@ ov::Any CompiledModel::get_property(const std::string& name) const {
     if (name == ov::intel_cpu::sparse_weights_decompression_rate) {
         return static_cast<decltype(ov::intel_cpu::sparse_weights_decompression_rate)::value_type>(
             config.fcSparseWeiDecompressionRate);
+    }
+    if (name == ov::intel_cpu::enable_tensor_parallel) {
+        const auto& enable_tensor_parallel = config.enableTensorParallel;
+        return enable_tensor_parallel;
     }
     if (name == ov::hint::dynamic_quantization_group_size) {
         return static_cast<decltype(ov::hint::dynamic_quantization_group_size)::value_type>(

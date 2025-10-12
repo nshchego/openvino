@@ -65,19 +65,15 @@ ISTFT::ISTFT(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
     m_normalized = istft_op->get_normalized();
 }
 
-ISTFT::ISTFT(BinaryInputBuffer& ib, const GraphContext::CPtr& context)
-    : Node(ib, context) {
-    load(ib);
+ISTFT::ISTFT(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
 }
 
 void ISTFT::getSupportedDescriptors() {
     const auto input_size = getParentEdges().size();
-    if (input_size < 4 || input_size > 5) {
-        THROW_CPU_NODE_ERR("ISTFT has incorrect number of input edges.");
-    }
-    if (getChildEdges().empty()) {
-        THROW_CPU_NODE_ERR("ISTFT has incorrect number of output edges.");
-    }
+    CPU_NODE_ASSERT(input_size >= 4 && input_size <= 5, "ISTFT has incorrect number of input edges.");
+    CPU_NODE_ASSERT(!getChildEdges().empty(), "ISTFT has incorrect number of output edges.");
 }
 
 void ISTFT::initSupportedPrimitiveDescriptors() {
@@ -86,7 +82,7 @@ void ISTFT::initSupportedPrimitiveDescriptors() {
     }
 
     auto dataPrecision = getOriginalInputPrecisionAtPort(DATA_IDX);
-    if (!one_of(dataPrecision, ov::element::f32)) {
+    if (none_of(dataPrecision, ov::element::f32)) {
         dataPrecision = ov::element::f32;
     }
 
@@ -276,7 +272,7 @@ void ISTFT::executeDynamicImpl(const dnnl::stream& strm) {
 
 bool ISTFT::needShapeInfer() const {
     return (m_has_signal_length_input && !m_is_signal_length_const) ||
-           (!m_has_signal_length_input && !(m_is_frame_size_const && m_is_frame_step_const)) || Node::needShapeInfer();
+           (!m_has_signal_length_input && (!m_is_frame_size_const || !m_is_frame_step_const)) || Node::needShapeInfer();
 }
 
 void ISTFT::createPrimitive() {
@@ -294,9 +290,33 @@ void ISTFT::createPrimitive() {
 }
 
 void ISTFT::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+    ob << m_center;
+    ob << m_normalized;
+    // ob << rdft_executor;
+    ob << m_is_frame_size_const;
+    ob << m_is_frame_step_const;
+    ob << m_is_signal_length_const;
+    ob << m_has_signal_length_input;
+
+ob << ob.get_pos();  // TODO: remove
 }
 
-void ISTFT::load(BinaryInputBuffer& ib) {
+void ISTFT::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+    in_buf >> m_center;
+    in_buf >> m_normalized;
+    // in_buf >> rdft_executor;
+    in_buf >> m_is_frame_size_const;
+    in_buf >> m_is_frame_step_const;
+    in_buf >> m_is_signal_length_const;
+    in_buf >> m_has_signal_length_input;
+
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

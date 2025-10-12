@@ -21,13 +21,12 @@
 #include "onednn/iml_type_mapper.h"
 #include "openvino/core/node.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class Reorder : public Node {
 public:
     Reorder(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
     Reorder(const MemoryDesc& input,
             const MemoryDesc& output,
             const std::string& name,
@@ -79,7 +78,7 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     dnnl::reorder::primitive prim;
@@ -103,6 +102,4 @@ private:
     TransposeExecutorPtr transposeExecutor;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

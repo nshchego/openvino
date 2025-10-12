@@ -15,13 +15,13 @@
 #include "openvino/core/node.hpp"
 #include "transformations/cpu_opset/x64/op/llm_mlp.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class LLMMLP : public Node {
 public:
     LLMMLP(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    LLMMLP(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override {}
     bool created() const override {
@@ -40,6 +40,10 @@ public:
                                      std::string& errorMessage,
                                      uint64_t fcDynamicQuantizationGroupSize = 0) noexcept;
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     struct ExecutorBase {
         virtual void execute() = 0;
@@ -48,9 +52,7 @@ private:
     std::shared_ptr<ExecutorBase> m_executor;
     template <typename T>
     struct Executor;
-    LLMMLPNode::Config m_mlp_config;
+    LLMMLPNode::Config m_mlp_config{};
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

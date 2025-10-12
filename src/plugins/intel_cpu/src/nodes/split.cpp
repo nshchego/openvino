@@ -48,7 +48,7 @@ namespace ov::intel_cpu::node {
 
 bool Split::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
-        if (!one_of(op->get_type_info(),
+        if (none_of(op->get_type_info(),
                     ov::op::v1::Split::get_type_info_static(),
                     ov::op::v1::VariadicSplit::get_type_info_static())) {
             errorMessage = "Only opset1 Split and VariadicSplit operations are supported";
@@ -92,7 +92,7 @@ Split::Split(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
         axis += inRank;
     }
     if (axis >= static_cast<int64_t>(inRank)) {
-        THROW_CPU_NODE_ERR("has invalid value of axis parameter: ", axis);
+        CPU_NODE_THROW("has invalid value of axis parameter: ", axis);
     }
     m_axis = axis;
 }
@@ -116,7 +116,7 @@ void Split::initSupportedPrimitiveDescriptors() {
     for (const auto& outputShape : m_output_shapes) {
         const auto& o_Dims = outputShape.getDims();
         if (dstFirstDims.size() != o_Dims.size()) {
-            THROW_CPU_NODE_ERR("only supports output blobs with equal number of dimensions");
+            CPU_NODE_THROW("only supports output blobs with equal number of dimensions");
         }
 
         for (size_t j = 0; j < dstFirstDims.size(); j++) {
@@ -124,7 +124,7 @@ void Split::initSupportedPrimitiveDescriptors() {
                 continue;
             }
             if (!dimsEqualWeak(o_Dims[j], dstFirstDims[j])) {
-                THROW_CPU_NODE_ERR("has incorrect output dimensions");
+                CPU_NODE_THROW("has incorrect output dimensions");
             }
         }
     }
@@ -192,7 +192,7 @@ void Split::initSupportedPrimitiveDescriptors() {
         if (itr->first == LayoutType::ncsp) {
             // at least the plain layout can be optimized inplace.
             pdIndexesToReuse.emplace_back(supportedPrimitiveDescriptors.size() - 1);
-        } else if (itr->first == LayoutType::nCsp8c || itr->first == LayoutType::nCsp16c) {
+        } else if (any_of(itr->first, LayoutType::nCsp8c, LayoutType::nCsp16c)) {
             if (m_axis < 2) {
                 pdIndexesToReuse.emplace_back(supportedPrimitiveDescriptors.size() - 1);
             }
@@ -221,7 +221,7 @@ void Split::initSupportedPrimitiveDescriptors() {
     }
 
     // Special nspc -> ncsp case when splitting channels
-    if (m_axis == 1 && (dstFirstDims.size() == 4 || dstFirstDims.size() == 5)) {
+    if (m_axis == 1 && (any_of(dstFirstDims.size(), 4U, 5U))) {
         NodeConfig config;
 
         config.inConfs.resize(INPUTS_NUM);
@@ -283,9 +283,7 @@ void Split::createPrimitive() {
 
 void Split::prepareParams() {
     const auto& srcMemPtr = getSrcMemoryAtPort(0);
-    if (!srcMemPtr || !srcMemPtr->isDefined()) {
-        THROW_CPU_NODE_ERR("has undefined input memory");
-    }
+    CPU_NODE_ASSERT(srcMemPtr && srcMemPtr->isDefined(), "has undefined input memory");
 
     if (!constSplitLengths) {
         const auto& splitLengthsPtr = getSrcMemoryAtPort(2);
@@ -298,9 +296,7 @@ void Split::prepareParams() {
     std::vector<BlockedMemoryDescCPtr> outDescs;
     for (size_t port = 0; port < m_output_shapes.size(); ++port) {
         const auto& outMemPtr = this->getDstMemoryAtPort(port);
-        if (!outMemPtr || !outMemPtr->isDefined()) {
-            THROW_CPU_NODE_ERR("has undefined destination memory");
-        }
+        CPU_NODE_ASSERT(outMemPtr && outMemPtr->isDefined(), "has undefined destination memory");
 
         if (outMemPtr->getShape().hasZeroDims()) {
             continue;
@@ -332,9 +328,7 @@ void Split::execute([[maybe_unused]] const dnnl::stream& strm) {
         return;
     }
 
-    if (dstMemPtrs.empty()) {
-        THROW_CPU_NODE_ERR("Output data pointers have not been initialized.");
-    }
+    CPU_NODE_ASSERT(!dstMemPtrs.empty(), "Output data pointers have not been initialized.");
 
     const auto& srcMem = getParentEdgeAt(0)->getMemory();
 
@@ -344,7 +338,7 @@ void Split::execute([[maybe_unused]] const dnnl::stream& strm) {
     }
 
     auto* srcData = srcMem.getDataAs<uint8_t>();
-    CPU_NODE_ASSERT(execPtr != nullptr, "Split executor is not initialized");
+    CPU_NODE_ASSERT(execPtr, "Split executor is not initialized");
     execPtr->exec(srcData, getRawDstMemPtrs());
 }
 
@@ -355,15 +349,13 @@ bool Split::created() const {
 void Split::initOptimalPrimitiveDescriptor() {
     Node::initOptimalPrimitiveDescriptor();
     auto* selected_pd = getSelectedPrimitiveDescriptor();
-    if (selected_pd == nullptr) {
-        THROW_CPU_NODE_ERR("Preferable primitive descriptor is not set.");
-    }
+    CPU_NODE_ASSERT(selected_pd, "Preferable primitive descriptor is not set.");
 
     auto config = selected_pd->getConfig();
     canUseOptimizedNspc2Ncsp = false;
     CPU_NODE_ASSERT(!config.inConfs.empty(), "Incorrect number of input configurations");
     const auto inConfDesc = config.inConfs[0].getMemDesc();
-    if (m_axis == 1 && one_of(inConfDesc->getShape().getRank(), 4U, 5U) && inConfDesc->hasLayoutType(LayoutType::nspc)) {
+    if (m_axis == 1 && any_of(inConfDesc->getShape().getRank(), 4U, 5U) && inConfDesc->hasLayoutType(LayoutType::nspc)) {
         canUseOptimizedNspc2Ncsp = true;
         for (const auto& outConf : config.outConfs) {
             if (!outConf.getMemDesc()->hasLayoutType(LayoutType::ncsp)) {
@@ -521,9 +513,7 @@ std::vector<uint8_t*> Split::getRawDstMemPtrs() const {
     std::vector<uint8_t*> result(dstMemPtrs.size());
     for (size_t i = 0; i < dstMemPtrs.size(); ++i) {
         result[i] = dstMemPtrs[i].second->getDataAs<uint8_t>();
-        if (!result[i]) {
-            THROW_CPU_NODE_ERR("can't get child edge indx ", dstMemPtrs[i].first, " data.");
-        }
+        CPU_NODE_ASSERT(result[i], "can't get child edge indx ", dstMemPtrs[i].first, " data.");
     }
     return result;
 }
@@ -540,9 +530,8 @@ Split::SplitOptimizedExecutor::SplitOptimizedExecutor(const BlockedMemoryDescCPt
             break;
         }
     }
-    if (std::numeric_limits<unsigned>::max() == axisOrderPos) {
-        OPENVINO_THROW("Can't create split executor, because can't find the axis in the input tensor order list");
-    }
+    OPENVINO_ASSERT(std::numeric_limits<unsigned>::max() != axisOrderPos,
+                    "Can't create split executor, because can't find the axis in the input tensor order list");
 
     const auto outputPortsCount = outDescs.size();
 
@@ -590,9 +579,7 @@ void Split::resolveInPlaceEdges(Edge::LOOK look) {
         return;
     }
     auto* selected_pd = getSelectedPrimitiveDescriptor();
-    if (selected_pd == nullptr) {
-        THROW_CPU_NODE_ERR("Preferable primitive descriptor is not set.");
-    }
+    CPU_NODE_ASSERT(selected_pd, "Preferable primitive descriptor is not set.");
     const auto& config = selected_pd->getConfig();
     size_t numberOfOutputs = config.outConfs.size();
     size_t inplaceInpIndx = selected_pd->getConfig().outConfs[0].inPlace();
@@ -635,13 +622,13 @@ void Split::save(BinaryOutputBuffer& ob) const {
     ob << splitLengths;
 }
 
-void Split::load(BinaryInputBuffer& ib) {
-    ib >> canUseOptimizedNspc2Ncsp;
-    ib >> m_axis;
+void Split::load(BinaryInputBuffer& in_buf) {
+    in_buf >> canUseOptimizedNspc2Ncsp;
+    in_buf >> m_axis;
     // std::vector<std::pair<size_t, MemoryCPtr>> dstMemPtrs;
-    ib >> INPUTS_NUM;
-    ib >> constSplitLengths;
-    ib >> splitLengths;
+    in_buf >> INPUTS_NUM;
+    in_buf >> constSplitLengths;
+    in_buf >> splitLengths;
 }
 
 }  // namespace ov::intel_cpu::node

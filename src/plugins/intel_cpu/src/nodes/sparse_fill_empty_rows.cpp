@@ -37,6 +37,11 @@ SparseFillEmptyRows::SparseFillEmptyRows(const std::shared_ptr<ov::Node>& op, co
     }
 }
 
+SparseFillEmptyRows::SparseFillEmptyRows(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 bool SparseFillEmptyRows::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                                std::string& errorMessage) noexcept {
     try {

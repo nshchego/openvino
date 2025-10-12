@@ -193,17 +193,7 @@ bool Convolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
 }
 
 Convolution::Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
-    : Node(op, context, ConvolutionShapeInferFactory(op)),
-      withSum(false),
-      withDWConv(false),
-      dw_conv_oc(0),
-      dw_conv_ih(0),
-      dw_conv_iw(0),
-      dw_conv_in_dt(memory::data_type::undef),
-      groupNum(1LU),
-      IC(1),
-      groupIC(1),
-      groupOC(1) {
+    : Node(op, context, ConvolutionShapeInferFactory(op)) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
@@ -273,7 +263,7 @@ Convolution::Convolution(const std::shared_ptr<ov::Node>& op, const GraphContext
     // Only apply this heuristic logic on FP32 IR. IC=1 ,OC=1 would disable brgconv on avx2.
     const bool isAvx2FP32 = !dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx512_core) &&
                             dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx2) && !context->isGraphQuantized();
-    useJitPlanar = ((IC == 1 && groupOC * groupNum == 1) && isAvx2FP32);
+    useJitPlanar = ((all_of(1U, IC, groupOC * groupNum)) && isAvx2FP32);
 }
 
 Convolution::Convolution(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
@@ -293,7 +283,7 @@ bool Convolution::canBeExecutedInInt8() const {
         weightsDataType = memory::data_type::s8;
     }
 
-    return one_of(inputDataType, memory::data_type::u8, memory::data_type::s8) &&
+    return any_of(inputDataType, memory::data_type::u8, memory::data_type::s8) &&
            weightsDataType == memory::data_type::s8;
 }
 
@@ -444,6 +434,13 @@ std::tuple<ov::element::Type, ov::element::Type> Convolution::getDstAndSumPrecis
         }
     };
 
+// ACL requires dst precision matches src precision for int8
+#if defined(OPENVINO_ARCH_ARM) || defined(OPENVINO_ARCH_ARM64)
+    if (canBeExecutedInInt8()) {
+        return {getOriginalInputPrecisionAtPort(0), ov::element::dynamic};
+    }
+#endif
+
     auto dstType = getOriginalOutputPrecisionAtPort(0);
 
     // make sure dst type is equal to the output type of the last fused node
@@ -474,7 +471,7 @@ std::tuple<ov::element::Type, ov::element::Type> Convolution::getDstAndSumPrecis
                 return {ov::element::f32, ov::element::f32};
             }
 
-            if (one_of(dstType, ov::element::f32, ov::element::bf16, ov::element::f16)) {
+            if (any_of(dstType, ov::element::f32, ov::element::bf16, ov::element::f16)) {
                 return {dstType, dstType};
             }
 
@@ -493,7 +490,7 @@ void Convolution::initSupportedPrimitiveDescriptors() {
 
     m_attrs.isGraphQuantized = m_context->isGraphQuantized();
     m_attrs.fcSemantic = false;
-    m_attrs.nonConstantWeights = !getParentEdgeAt(WEIGHTS)->getParent()->isConstant();
+    m_attrs.constantWeights = getParentEdgeAt(WEIGHTS)->getParent()->isConstant();
     m_attrs.weightsNonTransposed = false;
     m_attrs.dqScales = getDQScales();
 
@@ -528,12 +525,12 @@ void Convolution::initSupportedPrimitiveDescriptors() {
         for (const auto& desc : nodeDescriptors) {
             if (auto it = m_atoi.find(desc.first); it != m_atoi.end()) {
                 const auto& inputDesc = desc.second;
-                nodeConfig.inConfs[it->second] = {inputDesc, getBlockedMask(inputDesc, m_attrs.isGrouped)};
+                nodeConfig.inConfs[it->second] = PortConfig(inputDesc, getBlockedMask(inputDesc, m_attrs.isGrouped));
             }
         }
 
         for (size_t i = 3; i < srcDescs.size(); i++) {
-            nodeConfig.inConfs[i] = srcDescs[i];
+            nodeConfig.inConfs[i] = PortConfig(srcDescs[i]);
         }
 
         const int inPlaceOutPort = withSum ? static_cast<int>(getParentEdges().size()) - 1 : -1;
@@ -582,8 +579,9 @@ static MemoryPtr memoryViewToVector(const std::vector<T>& vec, const dnnl::engin
 
 bool Convolution::canFuse(const NodePtr& node) const {
 #if defined(OV_CPU_WITH_ACL)
-    if (!fusedWith.empty())
+    if (!fusedWith.empty()) {
         return false;
+    }
 #endif
     return canFuseSimpleOperation(node);
 }
@@ -869,7 +867,7 @@ void Convolution::save(BinaryOutputBuffer& ob) const {
     ob << m_attrs.isGrouped;
     ob << m_attrs.isGraphQuantized;
     ob << m_attrs.fcSemantic;
-    ob << m_attrs.nonConstantWeights;
+    // ob << m_attrs.nonConstantWeights;
     ob << m_attrs.inputZeroPointsType;
     ob << m_attrs.dqScales;
     // ob << m_attrs.postOps;
@@ -901,49 +899,49 @@ void Convolution::save(BinaryOutputBuffer& ob) const {
     ob << useJitPlanar;
 }
 
-void Convolution::load(BinaryInputBuffer& ib) {
-    ib >> m_atoi;
+void Convolution::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_atoi;
 
-    ib >> m_attrs.stride;
-    ib >> m_attrs.dilation;
-    ib >> m_attrs.paddingL;
-    ib >> m_attrs.paddingR;
-    ib >> m_attrs.autoPadding;
-    ib >> m_attrs.withBias;
-    ib >> m_attrs.weightsNonTransposed;
-    ib >> m_attrs.isGrouped;
-    ib >> m_attrs.isGraphQuantized;
-    ib >> m_attrs.fcSemantic;
-    ib >> m_attrs.nonConstantWeights;
-    ib >> m_attrs.inputZeroPointsType;
-    ib >> m_attrs.dqScales;
-    // ib >> m_attrs.postOps;
+    in_buf >> m_attrs.stride;
+    in_buf >> m_attrs.dilation;
+    in_buf >> m_attrs.paddingL;
+    in_buf >> m_attrs.paddingR;
+    in_buf >> m_attrs.autoPadding;
+    in_buf >> m_attrs.withBias;
+    in_buf >> m_attrs.weightsNonTransposed;
+    in_buf >> m_attrs.isGrouped;
+    in_buf >> m_attrs.isGraphQuantized;
+    in_buf >> m_attrs.fcSemantic;
+    // in_buf >> m_attrs.nonConstantWeights;
+    in_buf >> m_attrs.inputZeroPointsType;
+    in_buf >> m_attrs.dqScales;
+    // in_buf >> m_attrs.postOps;
 
-    // ib >> m_memory;
-    // ib >> m_factory;
-    // ib >> m_executor;
-    // ib >> fallbackExecutor;
+    // in_buf >> m_memory;
+    // in_buf >> m_factory;
+    // in_buf >> m_executor;
+    // in_buf >> fallbackExecutor;
 
-    ib >> withSum;
-    ib >> withDWConv;
-    ib >> withSumBroadcast;
+    in_buf >> withSum;
+    in_buf >> withDWConv;
+    in_buf >> withSumBroadcast;
 
-    ib >> dw_conv_oc;
-    ib >> dw_conv_ih;
-    ib >> dw_conv_iw;
-    ib >> dw_conv_kernel;
-    ib >> dw_conv_strides;
-    ib >> dw_conv_in_dt;
+    in_buf >> dw_conv_oc;
+    in_buf >> dw_conv_ih;
+    in_buf >> dw_conv_iw;
+    in_buf >> dw_conv_kernel;
+    in_buf >> dw_conv_strides;
+    in_buf >> dw_conv_in_dt;
 
-    ib >> groupNum;
-    ib >> IC;
-    ib >> groupIC;
-    ib >> groupOC;
+    in_buf >> groupNum;
+    in_buf >> IC;
+    in_buf >> groupIC;
+    in_buf >> groupOC;
 
-    // ib >> subgraph;
-    // ib >> fusedConstNodes;
+    // in_buf >> subgraph;
+    // in_buf >> fusedConstNodes;
 
-    ib >> useJitPlanar;
+    in_buf >> useJitPlanar;
 
     const auto [dst_type, sum_type] = getDstAndSumPrecision();
     m_attrs.postOps = getPostOps(fusedWith, sum_type);

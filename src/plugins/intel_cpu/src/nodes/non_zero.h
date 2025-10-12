@@ -6,23 +6,22 @@
 
 #include <node.h>
 
-#include <cstddef>
 #include <memory>
 #include <oneapi/dnnl/dnnl_common.hpp>
 #include <string>
-#include <vector>
 
 #include "dnnl_extension_utils.h"
 #include "graph_context.h"
 #include "openvino/core/node.hpp"
+#include "openvino/core/shape.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 class NonZero : public Node {
 public:
     NonZero(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
+
+    NonZero(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
     void getSupportedDescriptors() override;
     void initSupportedPrimitiveDescriptors() override;
@@ -44,6 +43,10 @@ public:
         return true;
     }
 
+    void save(BinaryOutputBuffer& ob) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     int threadsCount = 1;
     template <typename inputType>
@@ -54,6 +57,4 @@ private:
     std::vector<size_t> getNonZeroElementsCount(const T* src, const Shape& inShape);
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

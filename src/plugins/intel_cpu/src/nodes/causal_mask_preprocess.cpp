@@ -110,6 +110,8 @@ struct CausalMaskPreprocess::ExecutorCausalMaskPreprocess : public CausalMaskPre
         });
         DEBUG_LOG("CausalMaskPreprocess::execute  dst=", t_dst);
     }
+
+    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::node::CausalMaskPreprocess::ExecutorCausalMaskPreprocess<T>)
 };
 
 CausalMaskPreprocess::CausalMaskPreprocess(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
@@ -147,24 +149,22 @@ void CausalMaskPreprocess::initSupportedPrimitiveDescriptors() {
         return;
     }
 
+    CPU_NODE_ASSERT(m_config.type == "CausalMaskPreprocess", "has unsupported type: ", m_config.type);
+
     std::vector<ov::element::Type> iprecs = getOriginalInputPrecisions();
     std::vector<ov::element::Type> oprecs = getOriginalOutputPrecisions();
 
-    // precision preferences
-    if (m_config.type == "CausalMaskPreprocess") {
-        if (oprecs[0] == ov::element::bf16) {
-            m_executor = std::make_shared<ExecutorCausalMaskPreprocess<ov::bfloat16>>();
-        } else {
-            // fallback to default precision
-            m_executor = std::make_shared<ExecutorCausalMaskPreprocess<float>>();
-            oprecs[0] = ov::element::f32;
-        }
-        // all input precisions must be int32
-        for (auto& prec : iprecs) {
-            prec = ov::element::i32;
-        }
+    // Precision preferences
+    if (oprecs[0] == ov::element::bf16) {
+        m_executor = std::make_shared<ExecutorCausalMaskPreprocess<ov::bfloat16>>();
     } else {
-        THROW_CPU_NODE_ERR("type not supported : " + m_config.type);
+        // Fallback to default precision
+        m_executor = std::make_shared<ExecutorCausalMaskPreprocess<float>>();
+        oprecs[0] = ov::element::f32;
+    }
+    // All input precisions must be int32
+    for (auto& prec : iprecs) {
+        prec = ov::element::i32;
     }
 
     std::vector<PortConfigurator> inPortConfigs;
@@ -186,9 +186,18 @@ void CausalMaskPreprocess::execute(const dnnl::stream& strm) {
 
 void CausalMaskPreprocess::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
+
+    ob << m_config;
 }
 
-void CausalMaskPreprocess::load(BinaryInputBuffer& ib) {
+void CausalMaskPreprocess::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_config;
+
+    if (getOriginalOutputPrecisions()[0] == element::bf16) {
+        m_executor = std::make_shared<ExecutorCausalMaskPreprocess<ov::bfloat16>>();
+    } else {
+        m_executor = std::make_shared<ExecutorCausalMaskPreprocess<float>>();
+    }
 }
 
 }  // namespace ov::intel_cpu::node

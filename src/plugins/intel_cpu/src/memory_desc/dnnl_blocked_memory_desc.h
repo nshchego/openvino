@@ -20,8 +20,7 @@
 #include "openvino/util/util.hpp"
 #include "utils/serialization/bind.hpp"
 
-namespace ov {
-namespace intel_cpu {
+namespace ov::intel_cpu {
 
 class CpuBlockedMemoryDesc;
 
@@ -73,7 +72,7 @@ public:
 
     size_t getPaddedElementsCount() const override;
 
-    MemoryDescPtr cloneWithNewPrecision(const ov::element::Type prec) const override;
+    MemoryDescPtr cloneWithNewPrecision(ov::element::Type prec) const override;
 
     using DnnlMemoryDesc::getPrecision;
     using DnnlMemoryDesc::setPrecision;
@@ -82,7 +81,7 @@ public:
 
     void save(BinaryOutputBuffer& ob) const override;
 
-    void load(BinaryInputBuffer& ib) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     DnnlBlockedMemoryDesc(ov::element::Type prc,
@@ -132,5 +131,4 @@ OPENVINO_DISABLE_WARNING_MSVC_END(4250)
 using DnnlBlockedMemoryDescPtr = std::shared_ptr<DnnlBlockedMemoryDesc>;
 using DnnlBlockedMemoryDescCPtr = std::shared_ptr<const DnnlBlockedMemoryDesc>;
 
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu

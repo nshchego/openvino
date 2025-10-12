@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "buffer.hpp"
+#include "buffers.hpp"
 #include "snippets\lowered\expression.hpp"
 
 namespace ov::intel_cpu {

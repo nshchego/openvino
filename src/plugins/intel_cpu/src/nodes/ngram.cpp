@@ -28,6 +28,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "shape_inference/custom/ngram.hpp"
 #include "transformations/cpu_opset/common/op/ngram.hpp"
+#include "utils/general_utils.h"
 
 namespace ov::intel_cpu::node {
 
@@ -66,13 +67,18 @@ Ngram::Ngram(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
     }
 }
 
+Ngram::Ngram(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+    : Node(in_buf, context) {
+    load(in_buf);
+}
+
 void Ngram::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty()) {
         return;
     }
 
     idcesPrecision = getOriginalInputPrecisionAtPort(1);
-    if (idcesPrecision != ov::element::i32 && idcesPrecision != ov::element::i64) {
+    if (none_of(idcesPrecision, ov::element::i32, ov::element::i64)) {
         idcesPrecision = ov::element::i32;
     }
 
@@ -124,7 +130,7 @@ void Ngram::execute([[maybe_unused]] const dnnl::stream& strm) {
     } else if (idcesPrecision == ov::element::i64) {
         batchLenghts = computeBatchLenghts<std::int64_t>();
     } else {
-        THROW_CPU_NODE_ERR("Unsupported indices precision: ", idcesPrecision);
+        CPU_NODE_THROW("Unsupported indices precision: ", idcesPrecision);
     }
 
     /* The following procedure applied to each batch:
@@ -163,6 +169,21 @@ void Ngram::executeDynamicImpl(const dnnl::stream& strm) {
 
 bool Ngram::created() const {
     return getType() == Type::Ngram;
+}
+
+void Ngram::save(BinaryOutputBuffer& ob) const {
+    Node::save(ob);
+
+ob << ob.get_pos();  // TODO: remove
+
+
+ob << ob.get_pos();  // TODO: remove
+}
+
+void Ngram::load(BinaryInputBuffer& in_buf) {
+validate_stream_offset(in_buf);  // TODO: remove
+
+validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

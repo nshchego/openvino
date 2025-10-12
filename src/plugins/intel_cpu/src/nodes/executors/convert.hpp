@@ -18,11 +18,11 @@ struct ConvertParams {
     ov::element::Type srcPrc;
     ov::element::Type origPrc;
     ov::element::Type dstPrc;
-    size_t size;
+    size_t size = 0UL;
 
     void save(BinaryOutputBuffer& ob) const;
 
-    void load(BinaryInputBuffer& ib);
+    void load(BinaryInputBuffer& in_buf);
 };
 
 class ConvertExecutor : public Executor {
@@ -47,7 +47,7 @@ public:
     [[nodiscard]] virtual bool isSupported(const ConvertParams& convertParams,
                                            const MemoryDescPtr& srcDesc,
                                            const MemoryDescPtr& dstDesc) const = 0;
-    [[nodiscard]] virtual ConvertExecutorPtr makeExecutor(const ExecutorContext::CPtr context) const = 0;
+    [[nodiscard]] virtual ConvertExecutorPtr makeExecutor(ExecutorContext::CPtr context) const = 0;
 };
 
 using ConvertExecutorBuilderPtr = std::shared_ptr<ConvertExecutorBuilder>;

@@ -26,9 +26,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "sub_memory_manager.hpp"
 
-namespace ov {
-namespace intel_cpu {
-namespace node {
+namespace ov::intel_cpu::node {
 
 // tensor parallel config
 struct FCTensorParallelConfig {
@@ -48,9 +46,9 @@ class FullyConnected : public Node {
 public:
     FullyConnected(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context);
 
-    FullyConnected(BinaryInputBuffer& ib, const GraphContext::CPtr& context);
+    FullyConnected(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context);
 
-    void getSupportedDescriptors() override{};
+    void getSupportedDescriptors() override {};
     void execute(const dnnl::stream& strm) override;
     bool created() const override;
 
@@ -65,7 +63,7 @@ public:
     const std::vector<impl_desc_type>& getDefaultImplPriority() override;
 
     size_t descInputNumbers() override {
-        return static_cast<size_t>(getOriginalInputsNumber());
+        return getOriginalInputsNumber();
     }
 
     void initSupportedPrimitiveDescriptors() override;
@@ -135,6 +133,4 @@ private:
     FCTensorParallelConfig tp_cfg;
 };
 
-}  // namespace node
-}  // namespace intel_cpu
-}  // namespace ov
+}  // namespace ov::intel_cpu::node

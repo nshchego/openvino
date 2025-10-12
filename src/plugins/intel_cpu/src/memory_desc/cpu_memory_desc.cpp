@@ -19,16 +19,16 @@ void MemoryDesc::save(BinaryOutputBuffer& ob) const {
     ob << ob.get_pos();  // TODO: remove
 }
 
-void MemoryDesc::load(BinaryInputBuffer& ib) {
-    validate_stream_offset(ib);  // TODO: remove
+void MemoryDesc::load(BinaryInputBuffer& in_buf) {
+    validate_stream_offset(in_buf);  // TODO: remove
 
-    ib >> type;
-    validate_stream_offset(ib);  // TODO: remove
-    ib >> shape;
-    validate_stream_offset(ib);  // TODO: remove
-    ib >> status;
+    in_buf >> type;
+    validate_stream_offset(in_buf);  // TODO: remove
+    in_buf >> shape;
+    validate_stream_offset(in_buf);  // TODO: remove
+    in_buf >> status;
 
-    validate_stream_offset(ib);  // TODO: remove
+    validate_stream_offset(in_buf);  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu
