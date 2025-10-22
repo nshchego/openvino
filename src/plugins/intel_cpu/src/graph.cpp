@@ -311,7 +311,7 @@ void Graph::deserialize_graph(BinaryInputBuffer& in_buf,
                               const std::vector<node::Input::OutputConfig>& output_configs) {
 // printf("--CPU-- Graph::deserialize_graph\n");
 
-    validate_stream_offset(in_buf);
+    in_buf.check_position();
 
     in_buf >> m_name;
     in_buf >> m_status;
@@ -2290,8 +2290,8 @@ void Graph::ForgetGraphData() {
 }
 
 void Graph::export_graph(BinaryOutputBuffer& ob) {
-// printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_pos());
-    ob << ob.get_pos();  // Read/Write sync position
+// printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_position());
+    ob.dump_position();  // Read/Write sync position
 
     ob << m_name;
     ob << m_status;

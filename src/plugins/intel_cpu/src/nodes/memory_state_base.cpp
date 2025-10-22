@@ -27,14 +27,14 @@ MemoryNode::MemoryNode(BinaryInputBuffer& in_buf) {
 // void MemoryNode::save(BinaryOutputBuffer& ob) const {
 //     Node::save(ob);
 
-// ob << ob.get_pos();  // TODO: remove
+// ob.dump_position();  // TODO: remove
 
 
-// ob << ob.get_pos();  // TODO: remove
+// ob.dump_position();  // TODO: remove
 // }
 
 // void MemoryNode::load(BinaryInputBuffer& in_buf) {
-// validate_stream_offset(in_buf);  // TODO: remove
+// in_buf.check_position();  // TODO: remove
 
-// validate_stream_offset(in_buf);  // TODO: remove
+// in_buf.check_position();  // TODO: remove
 // }

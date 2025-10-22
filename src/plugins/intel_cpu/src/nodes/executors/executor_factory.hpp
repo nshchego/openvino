@@ -38,6 +38,7 @@ public:
         : m_attrs(std::move(attrs)),
           m_context(std::move(context)),
           m_suitableImplementations(filter(m_attrs, descriptors, memoryFormatFilter, implementationPriority)) {
+        printf("[CPU] ExecutorFactory ctr type name: %s\n", typeid(*this).name());
         OPENVINO_ASSERT(!m_suitableImplementations.empty(), "No suitable implementations found");
     }
 

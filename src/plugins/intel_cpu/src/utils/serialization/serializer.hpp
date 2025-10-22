@@ -5,12 +5,12 @@
 #pragma once
 
 namespace ov::intel_cpu {
-    
+
 template <typename BufferType, typename T, typename Enable = void>
 class Serializer {
 public:
     static void save(BufferType& buffer, const T& object) {
-printf("-WRITE-\n");
+// printf("-WRITE-\n");
         object.save(buffer);
     }
 

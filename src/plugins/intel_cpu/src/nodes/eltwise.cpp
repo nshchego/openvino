@@ -1160,33 +1160,55 @@ bool Eltwise::canFuseConvert(const NodePtr& convertNode) {
 void Eltwise::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 
     ob << m_attrs;
     ob << m_depthwiseData;
     ob << m_depthwiseDataSize;
 
-    // ob << m_factory;
+    ob << m_factory;
     // ob << m_executor;
     // ob << m_memory;
     // ob << m_depthwiseMemory;
 
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 }
 
 void Eltwise::load(BinaryInputBuffer& in_buf) {
-    validate_stream_offset(in_buf);  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
     in_buf >> m_attrs;
     in_buf >> m_depthwiseData;
     in_buf >> m_depthwiseDataSize;
 
-    // in_buf >> m_factory;
+    in_buf >> m_factory;
     // in_buf >> m_executor;
     // in_buf >> m_memory;
     // in_buf >> m_depthwiseMemory;
 
-    validate_stream_offset(in_buf);  // TODO: remove
+    //MemoryDescArgs descs;
+    //for (size_t i = 0; i < srcDescs.size(); i++) {
+    //    descs[ARG_SRC + i] = srcDescs[i];
+    //}
+    //descs[ARG_DST] = dstDesc;
+
+    //for (auto& desc : supportedPrimitiveDescriptors) {
+    //    const auto& config = desc.getConfig();
+    //    auto src_memory_desc = config.inConfs[0].getMemDesc();
+    //    // auto dst_memory_desc = config.outConfs[0].getMemDesc();
+    //    // auto factory =
+    //    //     std::make_shared<ConvertExecutorFactory>(m_convert_params,
+    //    //                                              src_memory_desc,
+    //    //                                              dst_memory_desc,
+    //    //                                              std::make_shared<ExecutorContext>(m_context, getImplPriority()));
+    //    // desc.setExecutorFactory(factory);
+    //    descs[ARG_DST] = config.outConfs[0].getMemDesc();
+    //}
+
+    //auto execution_context = std::make_shared<ExecutorContext>(m_context, getImplPriority());
+    //m_factory = std::make_shared<ExecutorFactory<EltwiseAttrs>>(m_attrs, execution_context, descs, memoryFormatFilter);
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

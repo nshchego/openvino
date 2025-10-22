@@ -2227,7 +2227,7 @@ void Node::resolveInPlaceDirection() {
 
 void Node::save(BinaryOutputBuffer& ob) const {
 // printf("--CPU-- Node::save %s:%d:%s\n", getTypeStr().data(), int(getType()), getName().data());
-    ob << ob.get_pos();  // Read/Write sync position
+    ob.dump_position();  // Read/Write sync position
 
     ob << m_name;
     ob << type;
@@ -2243,22 +2243,22 @@ void Node::save(BinaryOutputBuffer& ob) const {
     ob << m_fusing_port;
 
     ob << m_cur_numa_node;
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 
 // if (type == Type::Transpose && m_name == "Subtract_2565_original") {
 //     printf("TODO: Remove\n");
 // }
     ob << supportedPrimitiveDescriptors;
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
     ob << selectedPrimitiveDescriptorIndex;
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
     // ob << primitivesPriority;
     ob << customImplPriorities;
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 
     ob << originalLayers;
     //ob << parallelDomain;
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 
     // ob << internalBlobDesc;
     // ob << internalBlobMemory;
@@ -2284,20 +2284,20 @@ void Node::save(BinaryOutputBuffer& ob) const {
     // ob << scratchpadMem;
 
     ob << DQScales;
-    
+
     ob << fusedWith.size();
     for (const auto& n : fusedWith) {
         ob << n->getType();
         ob << *n;
     }
-    
-    ob << ob.get_pos();
+
+    ob.dump_position();
 }
 
 void Node::load(BinaryInputBuffer& in_buf) {
 // printf("--CPU-- Node::load\n");
 
-    validate_stream_offset(in_buf);
+    in_buf.check_position();
 
     in_buf >> m_name;
     in_buf >> type;
@@ -2313,22 +2313,22 @@ void Node::load(BinaryInputBuffer& in_buf) {
     in_buf >> m_fusing_port;
 
     in_buf >> m_cur_numa_node;
-    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf.check_position();  // TODO: Remove
 
     in_buf >> supportedPrimitiveDescriptors;
 // if (type == Type::Transpose && m_name == "Subtract_2565_original") {
 //     printf("TODO: Remove\n");
 // }
-    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf.check_position();  // TODO: Remove
     in_buf >> selectedPrimitiveDescriptorIndex;
-    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf.check_position();  // TODO: Remove
     // in_buf >> primitivesPriority;
     in_buf >> customImplPriorities;
-    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf.check_position();  // TODO: Remove
 
     in_buf >> originalLayers;
     //in_buf >> parallelDomain;
-    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf.check_position();  // TODO: Remove
 
     // in_buf >> internalBlobDesc;
     // in_buf >> internalBlobMemory;
@@ -2362,18 +2362,18 @@ void Node::load(BinaryInputBuffer& in_buf) {
         fusedWith.emplace_back(NodePtr(NodesFactory<BinaryInputBuffer&>::factory().create(in_buf, m_context)));
     }
 
-    validate_stream_offset(in_buf);
+    in_buf.check_position();
 }
 
 void NodeDesc::save(BinaryOutputBuffer& ob) const {
     ob << m_config;
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
     ob << m_implementation_type;
 }
 
 void NodeDesc::load(BinaryInputBuffer& in_buf) {
     in_buf >> m_config;
-    validate_stream_offset(in_buf);  // TODO: Remove
+    in_buf.check_position();  // TODO: Remove
     in_buf >> m_implementation_type;
 }
 

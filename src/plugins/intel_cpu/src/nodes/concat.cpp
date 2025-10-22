@@ -914,7 +914,7 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
 void Concat::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     ob << axis;
     ob << reorderedAxis;
@@ -927,11 +927,11 @@ ob << ob.get_pos();  // TODO: remove
     ob << canExecRef;
     ob << getParentEdges().size();  // TODO: take form base?
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void Concat::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
     in_buf >> axis;
     in_buf >> reorderedAxis;
@@ -952,7 +952,7 @@ validate_stream_offset(in_buf);  // TODO: remove
         srcPtrs.resize(parent_edges);
     }
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

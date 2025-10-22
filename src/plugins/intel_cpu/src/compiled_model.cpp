@@ -181,7 +181,7 @@ CompiledModel::CompiledModel(BinaryInputBuffer& in_buf,
     m_mutex = std::make_shared<std::mutex>();
 
 printf("--CPU-- CompiledModel::CompiledModel READ\n");
-    validate_stream_offset(in_buf);
+    in_buf.check_position();
     
     in_buf >> m_name;
     in_buf >> m_cfg.modelPreferThreads;
@@ -193,7 +193,7 @@ printf("--CPU-- CompiledModel::CompiledModel READ\n");
     size_t counter;
 
     in_buf >> counter;
-    validate_stream_offset(in_buf);
+    in_buf.check_position();
     for (size_t idx = 0lu; idx < counter; idx++) {
         std::string param_name;
         element::Type param_element_type;
@@ -221,7 +221,7 @@ printf("--CPU-- CompiledModel::CompiledModel READ\n");
     }
 
     in_buf >> counter;
-    validate_stream_offset(in_buf);
+    in_buf.check_position();
     for (size_t idx = 0lu; idx < counter; idx++) {
         element::Type fake_element_type;
         PartialShape fake_shape;
@@ -593,7 +593,7 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
     BinaryOutputBuffer model_buff(model_stream);
 
     model_buff << getModelType(m_model);
-    model_buff << model_buff.get_pos();
+    model_buff.dump_position();
 
     model_buff << m_name;
     model_buff << m_cfg.modelPreferThreads;
@@ -603,7 +603,7 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
     const auto& params = inputs();
     model_buff << params.size();
 
-    model_buff << model_buff.get_pos();  // TODO:: remove
+    model_buff.dump_position();  // TODO: remove
 
     for (const auto& param : params) {
         model_buff << param.get_element_type();
@@ -618,7 +618,7 @@ void CompiledModel::export_model(std::ostream& model_stream) const {
     // Outputs
     const auto& results = outputs();
     model_buff << results.size();
-    model_buff << model_buff.get_pos(); // TODO:: remove
+    model_buff.dump_position(); // TODO: remove
 
     for (const auto& param : results) {
         model_buff << param.get_element_type();

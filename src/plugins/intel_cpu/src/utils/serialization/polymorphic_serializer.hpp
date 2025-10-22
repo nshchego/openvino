@@ -56,9 +56,12 @@ template <typename BufferType, typename T>
 class Serializer<BufferType, std::shared_ptr<T>, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void save(BufferType& buffer, const std::shared_ptr<T>& ptr) {
-printf("-WRITE shared_ptr-\n");
-        const std::string& type = ptr->get_type_info();
-        buffer << type;
+// printf("-WRITE shared_ptr- '%s'\n", typeid(*(ptr.get())).name());
+        // const char* type = typeid(*(ptr.get())).name();
+        // buffer << type;
+        // if (strcmp(type, "NONE") != 0) {
+        const std::string type(typeid(*(ptr.get())).name());
+        // const std::string& type = ptr->get_type_info();  // TODO: replace with char*
         if (type.compare("NONE") != 0) {
             const auto save_func = SaverStorage<BufferType>::instance().get_save_function(type);
             save_func(buffer, ptr.get());

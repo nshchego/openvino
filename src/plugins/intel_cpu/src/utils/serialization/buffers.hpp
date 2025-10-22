@@ -8,6 +8,7 @@
 
 #include "helpers.hpp"
 #include "openvino/core/except.hpp"
+#include "openvino/runtime/tensor.hpp"
 #include "serializer.hpp"
 
 namespace ov::intel_cpu {
@@ -16,6 +17,8 @@ template <typename BufferType>
 class Buffer {
 public:
     Buffer(BufferType* const buffer) : buffer(buffer) {}
+
+    virtual ~Buffer() {}
 
     template <typename ... Types>
     inline BufferType& operator()(Types&& ... args) {
@@ -65,12 +68,9 @@ private:
 
 class BinaryOutputBuffer : public OutputBuffer<BinaryOutputBuffer> {
 public:
-    BinaryOutputBuffer(std::ostream& stream)
-    : OutputBuffer<BinaryOutputBuffer>(this), m_stream(stream), m_impl_params(nullptr), m_strm(nullptr) {}
+    BinaryOutputBuffer(std::ostream& stream);
 
-    virtual ~BinaryOutputBuffer() = default;
-
-    virtual void write(void const* data, const std::streamsize size) {
+    virtual void write(const void* data, const std::streamsize size) {
         auto const written_size = m_stream.rdbuf()->sputn(reinterpret_cast<const char*>(data), size);
 if (written_size != size) {  // TODO: remove
     std::cout << "BinaryOutputBuffer::write\n";
@@ -82,22 +82,25 @@ if (written_size != size) {  // TODO: remove
 
     virtual void flush() {}
 
-    void set_kernel_impl_params(void* impl_params) { m_impl_params = impl_params; }
+    // void set_kernel_impl_params(void* impl_params) { m_impl_params = impl_params; }
 
-    void* get_kernel_impl_params() const { return m_impl_params; }
+    // void* get_kernel_impl_params() const { return m_impl_params; }
 
-    void set_stream(void* strm) { m_strm = strm; }
+    // void set_stream(void* strm) { m_strm = strm; }
 
-    void* get_stream() const { return m_strm; }
+    // void* get_stream() const { return m_strm; }
 
-    size_t get_pos() {
+    size_t get_position() {
         return m_stream.tellp();
     }
+
+    void dump_position();
 
 private:
     std::ostream& m_stream;
     void* m_impl_params;
-    void* m_strm;
+    void* m_strm;  // TODO: remove?
+    size_t m_header_offset;
 };
 
 template <typename BufferType>
@@ -121,39 +124,97 @@ private:
     }
 
     // dnnl::engine& m_engine;
+    // SrcType& m_source;
 };
 
 class BinaryInputBuffer : public InputBuffer<BinaryInputBuffer> {
 public:
-    BinaryInputBuffer(std::istream& stream);
+    BinaryInputBuffer(std::streampos header_offset = 0);
+
+    // BinaryInputBuffer(SrcType& stream);
+
+    // BinaryInputBuffer(std::istream& stream);
+
+    // BinaryInputBuffer(ov::Tensor& stream);
 
     // BinaryInputBuffer(std::istream& stream, dnnl::engine& engine)
     // : InputBuffer<BinaryInputBuffer>(this, engine), m_stream(stream), m_impl_params(nullptr) {}
 
-    virtual ~BinaryInputBuffer() = default;
-
     virtual void read(void* const data, std::streamsize size);
+
+    virtual void read(const void*& data, std::streamsize size);
 
     // void set_kernel_impl_params(void* impl_params) { m_impl_params = impl_params; }
 
     // void* get_kernel_impl_params() const { return m_impl_params; }
 
-    size_t get_pos() const;
+    virtual size_t get_position() const = 0;
 
-    const std::streambuf* rdbuf();
+    virtual void check_position();
 
-    std::istream& seekg(std::istream::off_type offset, std::ios_base::seekdir way);
+    // virtual const std::streambuf* rdbuf() = 0;
+    virtual const void* get_data() = 0;
+
+    // virtual std::istream& seekg(std::istream::off_type offset, std::ios_base::seekdir way) = 0;
+    virtual void seekg(std::istream::off_type offset, std::ios_base::seekdir way = std::ios_base::cur) = 0;
+
+protected:
+    std::streampos m_header_offset;
+
+private:
+    // std::istream& m_stream;
+    // void* m_impl_params;
+};
+
+class StreamInputBuffer : public BinaryInputBuffer {
+public:
+    StreamInputBuffer(std::istream& stream, std::streampos header_offset = 0);
+
+    void read(void* const data, std::streamsize size) override;
+
+    size_t get_position() const override;
+
+    // void check_position();
+
+    // const std::streambuf* rdbuf() override;
+    const void* get_data();
+
+    // std::istream& seekg(std::istream::off_type offset, std::ios_base::seekdir way);
+    void seekg(std::istream::off_type offset, std::ios_base::seekdir way = std::ios_base::cur) override;
 
 private:
     std::istream& m_stream;
-    void* m_impl_params;
+};
+
+class TensorInputBuffer : public BinaryInputBuffer {
+public:
+    TensorInputBuffer(const ov::Tensor& model_tensor, std::streampos header_offset = 0);
+
+    void read(void* const data, std::streamsize size) override;
+
+    void read(const void*& data, std::streamsize size) override;
+
+    size_t get_position() const override;
+
+    // void check_position();
+
+    // const std::streambuf* rdbuf() override;
+    const void* get_data();
+
+    // std::istream& seekg(std::istream::off_type offset, std::ios_base::seekdir way);
+    void seekg(std::istream::off_type offset, std::ios_base::seekdir way = std::ios_base::cur) override;
+
+private:
+    const ov::Tensor& m_model_tensor;
+    const uint8_t* m_data = nullptr;
+    size_t m_offset = 0UL;
 };
 
 template <typename T>
 class Serializer<BinaryOutputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void save(BinaryOutputBuffer& buffer, const T& object) {
-printf("-WRITE- T at %llu\n", buffer.get_pos());
+// printf("-WRITE- T at %llu\n", buffer.get_position());
         buffer.write(std::addressof(object), sizeof(object));
     }
 };
@@ -162,7 +223,7 @@ template <typename T>
 class Serializer<BinaryInputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void load(BinaryInputBuffer& buffer, T& object) {
-// printf("-READ- T at %llu\n", buffer.get_pos());
+// printf("-READ- T at %llu\n", buffer.get_position());
         buffer.read(std::addressof(object), sizeof(object));
     }
 };
@@ -171,9 +232,8 @@ template <typename T>
 class Serializer<BinaryOutputBuffer, Data<T>> {
 public:
     static void save(BinaryOutputBuffer& buffer, const Data<T>& bin_data) {
-printf("-WRITE Data- at %llu\n", buffer.get_pos());
-// std::cout << "-WRITE Data-\n";
-        buffer.write(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
+// printf("-WRITE Data- at %llu\n", buffer.get_position());
+        buffer.write(bin_data.m_data, static_cast<std::streamsize>(bin_data.m_number_of_bytes));
     }
 };
 
@@ -181,27 +241,26 @@ template <typename T>
 class Serializer<BinaryInputBuffer, Data<T>> {
 public:
     static void load(BinaryInputBuffer& buffer, Data<T>& bin_data) {
-// printf("-READ Data- at %llu\n", buffer.get_pos());
-// std::cout << "-READ Data-\n";
-        buffer.read(bin_data.data, static_cast<std::streamsize>(bin_data.number_of_bytes));
+// printf("-READ Data- at %llu\n", buffer.get_position());
+        buffer.read(bin_data.m_data, static_cast<std::streamsize>(bin_data.m_number_of_bytes));
     }
 };
 
-inline void validate_stream_offset(BinaryInputBuffer& in_buf) {
-    const auto act_pos = in_buf.get_pos();
-    size_t exp_pos = 0lu;
-    in_buf >> exp_pos;
+// inline void validate_stream_offset(BinaryInputBuffer& in_buf) {
+//     const auto act_pos = in_buf.get_position();
+//     size_t exp_pos = 0lu;
+//     in_buf >> exp_pos;
 
-if (exp_pos != act_pos) {
-    printf("[ ERROR ] Invalid input stream position. Expected: %llu; Actual: %llu\n",
-            exp_pos, act_pos);
-}
-    OPENVINO_ASSERT(exp_pos == act_pos,
-                    "Invalid input stream position. Expected: ",
-                    exp_pos,
-                    "; Actual: ",
-                    act_pos);
-}
+// if (exp_pos != act_pos) {  // TODO: remove
+//     printf("[ ERROR ] Invalid input stream position. Expected: %llu; Actual: %llu\n",
+//             exp_pos, act_pos);
+// }
+//     OPENVINO_ASSERT(exp_pos == act_pos,
+//                     "Invalid input stream position. Expected: ",
+//                     exp_pos,
+//                     "; Actual: ",
+//                     act_pos);
+// }
 
 }  // namespace ov::intel_cpu
 

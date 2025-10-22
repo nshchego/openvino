@@ -2488,7 +2488,7 @@ bool FakeQuantize::created() const {
 void FakeQuantize::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     ob << levels;
     ob << binarization;
@@ -2533,11 +2533,11 @@ ob << ob.get_pos();  // TODO: remove
 
     ob << broadcastingPolicy;
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void FakeQuantize::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
     in_buf >> levels;
     in_buf >> binarization;
@@ -2582,11 +2582,11 @@ validate_stream_offset(in_buf);  // TODO: remove
 
     in_buf >> broadcastingPolicy;
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 void FakeQuantize::OptimizedFormula::save(BinaryOutputBuffer& ob) const {
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     ob << isc;
     ob << ish;
@@ -2595,11 +2595,11 @@ ob << ob.get_pos();  // TODO: remove
     ob << clo;
     ob << chi;
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void FakeQuantize::OptimizedFormula::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
     in_buf >> isc;
     in_buf >> ish;
@@ -2608,7 +2608,7 @@ validate_stream_offset(in_buf);  // TODO: remove
     in_buf >> clo;
     in_buf >> chi;
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

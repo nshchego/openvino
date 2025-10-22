@@ -15,25 +15,25 @@ ConvertExecutor::ConvertExecutor(ov::intel_cpu::ExecutorContext::CPtr context)
     : convertContext(std::move(context)) {}
 
 void ConvertParams::save(BinaryOutputBuffer& ob) const {
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     ob << srcPrc;
     ob << origPrc;
     ob << dstPrc;
     ob << size;
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void ConvertParams::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
     in_buf >> srcPrc;
     in_buf >> origPrc;
     in_buf >> dstPrc;
     in_buf >> size;
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

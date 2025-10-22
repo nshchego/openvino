@@ -851,8 +851,8 @@ void Input::load(BinaryInputBuffer& in_buf) {
 
     if (constant == ConstantType::Const) {
         // return m_stream.rdbuf().gptr();
-        auto buff = dynamic_cast<const SharedStreamBuffer*>(in_buf.rdbuf());
-        CPU_NODE_ASSERT(buff, "got unexpected input buffer type.");
+        //auto buff = dynamic_cast<const SharedStreamBuffer*>(in_buf.rdbuf());
+        //CPU_NODE_ASSERT(buff, "got unexpected input buffer type.");
 
         element::Type dt;
         intel_cpu::Shape shape;
@@ -867,7 +867,7 @@ void Input::load(BinaryInputBuffer& in_buf) {
             // convert
         } else {
             // Load from a serialized blob. No need to convert and check subnormals.
-            cloneBlobIfRequired(buff->get_data(), shape, dt, false);
+            cloneBlobIfRequired(in_buf.get_data(), shape, dt, false);
             in_buf.seekg(byte_size, std::ios_base::cur);
         }
     }

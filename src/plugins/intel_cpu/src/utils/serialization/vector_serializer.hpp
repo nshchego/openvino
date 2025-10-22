@@ -22,7 +22,7 @@ class Serializer<BufferType, std::vector<T>, typename std::enable_if<std::is_bas
                                                                     !std::is_same<bool, T>::value>::type> {
 public:
     static void save(BufferType& buffer, const std::vector<T>& vector) {
-printf("-WRITE vector<A>-\n");
+// printf("-WRITE vector<A>-\n");
         buffer << vector.size(); //static_cast<uint64_t>()
         buffer << make_data(vector.data(), static_cast<uint64_t>(vector.size() * sizeof(T)));
     }
@@ -46,7 +46,7 @@ template <typename BufferType>
 class Serializer<BufferType, std::vector<bool>, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void save(BufferType& buffer, const std::vector<bool>& vector) {
-printf("-WRITE vector<bool>-\n");
+// printf("-WRITE vector<bool>-\n");
         buffer << vector.size();
         for (const bool el : vector) {
             buffer << el;
@@ -75,7 +75,7 @@ class Serializer<BufferType, std::vector<T>, typename std::enable_if<std::is_bas
                                                                     !std::is_arithmetic<T>::value>::type> {
 public:
     static void save(BufferType& buffer, const std::vector<T>& vector) {
-printf("-WRITE vector<NA>-\n");
+// printf("-WRITE vector<NA>-\n");
         buffer << vector.size();
         for (const auto& el : vector) {
             buffer << el;
@@ -102,7 +102,7 @@ template <typename BufferType>
 class Serializer<BufferType, ov::CoordinateDiff, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void save(BufferType& buffer, const ov::CoordinateDiff& vector) {
-printf("-WRITE CoordinateDiff-\n");
+// printf("-WRITE CoordinateDiff-\n");
         buffer << vector.size();
         for (const auto& el : vector) {
             buffer << el;
@@ -128,7 +128,7 @@ template <typename BufferType>
 class Serializer<BufferType, ov::Strides, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void save(BufferType& buffer, const ov::Strides& vector) {
-printf("-WRITE Strides-\n");
+// printf("-WRITE Strides-\n");
         buffer << vector.size();
         for (const auto& el : vector) {
             buffer << el;
@@ -154,7 +154,7 @@ template <typename BufferType>
 class Serializer<BufferType, ov::Shape, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
 public:
     static void save(BufferType& buffer, const ov::Shape& vector) {
-printf("-WRITE Shape-\n");
+// printf("-WRITE Shape-\n");
         buffer << vector.size();
         for (const auto& el : vector) {
             buffer << el;

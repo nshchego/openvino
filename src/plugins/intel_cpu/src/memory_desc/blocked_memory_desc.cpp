@@ -82,26 +82,26 @@ std::string BlockedMemoryDesc::serializeFormat() const {
 
 void BlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
     MemoryDesc::save(ob);
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 
     ob << blockedDims;
     ob << strides;
     ob << order;
     ob << m_offset_padding_to_data;
 
-    ob << ob.get_pos();  // TODO: remove
+    ob.dump_position();  // TODO: remove
 }
 
 void BlockedMemoryDesc::load(BinaryInputBuffer& in_buf) {
     MemoryDesc::load(in_buf);
-    validate_stream_offset(in_buf);  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
     in_buf >> blockedDims;
     in_buf >> strides;
     in_buf >> order;
     in_buf >> m_offset_padding_to_data;
 
-    validate_stream_offset(in_buf);  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

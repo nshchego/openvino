@@ -704,6 +704,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
         // decript_from_string = true;
     }
 
+    // InputBuffer<BinaryInputBuffer>* ibb;
     auto new_config = config;
     // std::shared_ptr<ov::AlignedBuffer> model_buffer;
     // if (auto blob_it = new_config.find(ov::hint::compiled_blob.name()); blob_it != new_config.end()) {
@@ -725,17 +726,19 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
 
     // std::shared_ptr<ov::Model> model;
     // deserializer >> model;
-    std::shared_ptr<BinaryInputBuffer> ib_ptr = std::make_shared<BinaryInputBuffer>(model_stream);
+    // std::shared_ptr<BinaryInputBuffer> ib_ptr = std::make_shared<BinaryInputBuffer>(model_stream);
         // encryption_enabled ? std::make_unique<EncryptedBinaryInputBuffer>(model,
         //                                                                          context_impl->get_engine(),
         //                                                                          encryption_callbacks.decrypt)
         //                    : std::make_unique<BinaryInputBuffer>(model, context_impl->get_engine());
-    auto& ib = *ib_ptr;
+    // auto& in_buf = *ib_ptr;
+    // ibb = ib_ptr.get();
+    StreamInputBuffer in_buf(model_stream, model_stream.tellg());
 
     Config conf = engConfig;
     Config::ModelType model_type;
-    ib >> model_type;
-    // conf.applyRtInfo(ib);
+    in_buf >> model_type;
+    // conf.applyRtInfo(in_buf);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
     const auto& it = new_config.find(ov::loaded_from_cache.name());
     bool loaded_from_cache = false;
@@ -745,7 +748,7 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
     }
     conf.readProperties(new_config, model_type);
 
-    auto compiled_model = std::make_shared<CompiledModel>(ib, shared_from_this(), conf, loaded_from_cache);
+    auto compiled_model = std::make_shared<CompiledModel>(in_buf, shared_from_this(), conf, loaded_from_cache);
     return compiled_model;
 }
 
@@ -761,20 +764,39 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& model
         decript_from_string = true;
     }
 
-    std::shared_ptr<ov::AlignedBuffer> model_buffer =
-        std::make_shared<ov::SharedBuffer<ov::Tensor>>(reinterpret_cast<char*>(model_tensor.data()),
-                                                       model_tensor.get_byte_size(),
-                                                       model_tensor);
+    // std::shared_ptr<ov::AlignedBuffer> model_buffer =
+    //     std::make_shared<ov::SharedBuffer<ov::Tensor>>(reinterpret_cast<char*>(model_tensor.data()),
+    //                                                    model_tensor.get_byte_size(),
+    //                                                    model_tensor);
 
-    ModelDeserializer deserializer(
-        model_buffer,
-        [this](const std::shared_ptr<ov::AlignedBuffer>& model, const std::shared_ptr<ov::AlignedBuffer>& weights) {
-            return get_core()->read_model(model, weights);
-        },
-        decrypt,
-        decript_from_string);
+    // ModelDeserializer deserializer(
+    //     model_buffer,
+    //     [this](const std::shared_ptr<ov::AlignedBuffer>& model, const std::shared_ptr<ov::AlignedBuffer>& weights) {
+    //         return get_core()->read_model(model, weights);
+    //     },
+    //     decrypt,
+    //     decript_from_string);
 
-    return deserialize_model(deserializer, config);
+    // return deserialize_model(deserializer, config);
+    
+    TensorInputBuffer in_buf(model_tensor);
+    auto new_config = config;
+
+    Config conf = engConfig;
+    Config::ModelType model_type;
+    in_buf >> model_type;
+    // conf.applyRtInfo(in_buf);
+    // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
+    const auto& it = new_config.find(ov::loaded_from_cache.name());
+    bool loaded_from_cache = false;
+    if (it != new_config.end()) {
+        loaded_from_cache = it->second.as<bool>();
+        new_config.erase(it);
+    }
+    conf.readProperties(new_config, model_type);
+
+    auto compiled_model = std::make_shared<CompiledModel>(in_buf, shared_from_this(), conf, loaded_from_cache);
+    return compiled_model;
 }
 
 std::shared_ptr<ov::ICompiledModel> Plugin::deserialize_model(ModelDeserializer& deserializer,

@@ -609,7 +609,7 @@ const uint8_t* ov::intel_cpu::InterpolateExecutor::padPreprocess(const std::vect
 }
 
 void InterpolateAttrs::save(BinaryOutputBuffer& ob) const {
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     ob << shapeCalcMode;
     ob << mode;
@@ -626,11 +626,11 @@ ob << ob.get_pos();  // TODO: remove
     ob << hasPad;
     ob << NCHWAsNHWC;
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void InterpolateAttrs::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf); // TODO: remove
+in_buf.check_position(); // TODO: remove
 
     in_buf >> shapeCalcMode;
     in_buf >> mode;
@@ -647,5 +647,5 @@ validate_stream_offset(in_buf); // TODO: remove
     in_buf >> hasPad;
     in_buf >> NCHWAsNHWC;
 
-validate_stream_offset(in_buf); // TODO: remove
+in_buf.check_position(); // TODO: remove
 }

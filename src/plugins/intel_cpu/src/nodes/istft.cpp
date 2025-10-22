@@ -292,7 +292,7 @@ void ISTFT::createPrimitive() {
 void ISTFT::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     ob << m_center;
     ob << m_normalized;
@@ -302,11 +302,11 @@ ob << ob.get_pos();  // TODO: remove
     ob << m_is_signal_length_const;
     ob << m_has_signal_length_input;
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void ISTFT::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
     in_buf >> m_center;
     in_buf >> m_normalized;
@@ -316,7 +316,7 @@ validate_stream_offset(in_buf);  // TODO: remove
     in_buf >> m_is_signal_length_const;
     in_buf >> m_has_signal_length_input;
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

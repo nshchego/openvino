@@ -323,16 +323,16 @@ bool MatMul::isExecutable() const {
 void MatMul::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void MatMul::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

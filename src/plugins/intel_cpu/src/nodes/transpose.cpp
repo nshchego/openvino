@@ -295,7 +295,7 @@ bool Transpose::created() const {
 void Transpose::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 
     // ob << prim;
     ob << order;
@@ -305,11 +305,11 @@ ob << ob.get_pos();  // TODO: remove
     ob << performAsReorder;
     ob << isOptimized;
 
-ob << ob.get_pos();  // TODO: remove
+ob.dump_position();  // TODO: remove
 }
 
 void Transpose::load(BinaryInputBuffer& in_buf) {
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 
     // in_buf >> prim;
     in_buf >> order;
@@ -346,7 +346,7 @@ validate_stream_offset(in_buf);  // TODO: remove
         desc.setExecutorFactory(factory);
     }
 
-validate_stream_offset(in_buf);  // TODO: remove
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node
