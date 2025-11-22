@@ -23,6 +23,8 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/visibility.hpp"
 #include "weights_cache.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -53,57 +55,71 @@ public:
     using CPtr = std::shared_ptr<const ExecutorContext>;
 
     ExecutorContext(const GraphContext::CPtr& graphContext,
-                    std::vector<impl_desc_type> implPriorities,
-                    std::shared_ptr<std::unordered_map<std::string, MemoryPtr>> privateWeighCache = nullptr)
-        : runtimeCache(graphContext->getParamsCache()),
-          scratchPads(graphContext->getScratchPads()),
-          weightsCache(graphContext->getWeightsCache()),
-          engine(graphContext->getEngine()),
-          implPriorities(std::move(implPriorities)),
-          privateWeighCache(std::move(privateWeighCache)),
-          numNumaNodes(graphContext->getNumNumaNodes()) {
+                    std::vector<impl_desc_type> impl_priorities,
+                    std::shared_ptr<std::unordered_map<std::string, MemoryPtr>> private_weight_cache = nullptr)
+        : m_runtime_cache(graphContext->getParamsCache()),
+          m_scratch_pads(graphContext->getScratchPads()),
+          m_weights_cache(graphContext->getWeightsCache()),
+          m_engine(graphContext->getEngine()),
+          m_impl_priorities(std::move(impl_priorities)),
+          m_private_weight_cache(std::move(private_weight_cache)),
+          m_num_numa_nodes(graphContext->getNumNumaNodes()) {
         auto cpuStreamsExecutor = graphContext->getCPUStreamExecutor();
-        curNumaNodeId = std::max(0, cpuStreamsExecutor ? cpuStreamsExecutor->get_numa_node_id() : curNumaNodeId);
+        m_cur_numa_node_id = std::max(0, cpuStreamsExecutor ? cpuStreamsExecutor->get_numa_node_id() : m_cur_numa_node_id);
+    }
+
+    ExecutorContext(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
+        : m_runtime_cache(context->getParamsCache()),
+          m_scratch_pads(context->getScratchPads()),
+          m_weights_cache(context->getWeightsCache()),
+          m_engine(context->getEngine()) {
+        load(in_buf);
     }
 
     [[nodiscard]] MultiCachePtr getRuntimeCache() const {
-        auto runtimeCachePtr = runtimeCache.lock();
+        auto runtimeCachePtr = m_runtime_cache.lock();
         assert(runtimeCachePtr);
         return runtimeCachePtr;
     }
 
     [[nodiscard]] DnnlScratchPadPtr getScratchPad() const {
-        return scratchPads[curNumaNodeId];
+        return m_scratch_pads[m_cur_numa_node_id];
     }
 
     [[nodiscard]] std::shared_ptr<std::unordered_map<std::string, MemoryPtr>> getPrivateWeightCache() const {
-        return privateWeighCache;
+        return m_private_weight_cache;
     }
 
     [[nodiscard]] const dnnl::engine& getEngine() const {
-        return engine;
+        return m_engine;
     }
 
     [[nodiscard]] const std::vector<impl_desc_type>& getImplPriorities() const {
-        return implPriorities;
+        return m_impl_priorities;
     }
 
     [[nodiscard]] WeightsSharing::Ptr getWeightsCache() const {
-        return weightsCache;
+        return m_weights_cache;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::ExecutorContext)
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 
 private:
     // weak_ptr is required to avoid cycle dependencies with MultiCache
     // since ExecutorContext is stored in Executor itself
-    MultiCacheWeakPtr runtimeCache;
-    std::vector<DnnlScratchPadPtr> scratchPads;
-    WeightsSharing::Ptr weightsCache;
-    const dnnl::engine& engine;
-    std::vector<impl_desc_type> implPriorities;
+    MultiCacheWeakPtr m_runtime_cache;
+    std::vector<DnnlScratchPadPtr> m_scratch_pads;
+    WeightsSharing::Ptr m_weights_cache;
+    const dnnl::engine& m_engine;
+    std::vector<impl_desc_type> m_impl_priorities;
     // @todo remove after global cache is used exclusevly
-    std::shared_ptr<std::unordered_map<std::string, MemoryPtr>> privateWeighCache;
-    int numNumaNodes;
-    int curNumaNodeId = -1;
+    std::shared_ptr<std::unordered_map<std::string, MemoryPtr>> m_private_weight_cache;
+    int m_num_numa_nodes;
+    int m_cur_numa_node_id = -1;
 };
 
 class ExecutorFactoryLegacy {

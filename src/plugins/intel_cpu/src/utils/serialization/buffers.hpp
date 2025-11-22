@@ -10,6 +10,7 @@
 #include "openvino/core/except.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "serializer.hpp"
+#include "openvino/runtime/aligned_buffer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -41,7 +42,7 @@ private:
     }
 
     template <typename T>
-    inline void process(T&& object){
+    inline void process(T&& object) {
         buffer->process(std::forward<T>(object));
     }
 };
@@ -108,6 +109,7 @@ class InputBuffer : public Buffer<BufferType> {
     friend class Buffer<BufferType>;
 public:
     InputBuffer(BufferType* const buffer) : Buffer<BufferType>(buffer) {}
+    //InputBuffer(BufferType* const buffer, const GraphContext::Ptr& context) : Buffer<BufferType>(buffer), m_context(context) {}
     // InputBuffer(BufferType* const buffer, dnnl::engine& engine) : Buffer<BufferType>(buffer), m_engine(engine) {}
 
     template <typename T>
@@ -116,6 +118,17 @@ public:
         return Buffer<BufferType>::getBuffer();
     }
 
+    // template <typename T, typename ... Types>
+    // inline T operator()(Types&& ... args) {
+    //     return process(std::forward<Types>(args)...);
+    // }
+
+    template <typename ... Types>
+    inline void operator()(Types&& ... args) {
+        process(std::forward<Types>(args)...);
+    }
+
+    // GraphContext::Ptr get_context() { return m_context; }
     // dnnl::engine& get_engine() { return m_engine; }
 private:
     template <typename T>
@@ -123,6 +136,19 @@ private:
         Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::buffer, object);
     }
 
+    // template <typename T, typename ... OtherTypes>
+    // inline T process(OtherTypes&& ... args) {
+    //     Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::buffer, std::forward<OtherTypes>(args)...);
+    // }
+
+    template <typename T, typename ... OtherTypes>
+    inline void process(T&& object, OtherTypes&& ... args) {
+        Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::buffer,
+                                                                              std::forward<T>(object),
+                                                                              std::forward<OtherTypes>(args)...);
+    }
+
+    //GraphContext::Ptr m_context;
     // dnnl::engine& m_engine;
     // SrcType& m_source;
 };
@@ -205,7 +231,10 @@ public:
     void seekg(std::istream::off_type offset, std::ios_base::seekdir way = std::ios_base::cur) override;
 
 private:
-    const ov::Tensor& m_model_tensor;
+    // This buffer is necessary in order to avoid memory object deletoin.
+    // TODO: story this shared_ptr in ov::intel_cpu::Input nodes? It allows to keep memory while node exists. 
+    std::shared_ptr<ov::AlignedBuffer> m_buffer;
+    // const ov::Tensor& m_model_tensor;
     const uint8_t* m_data = nullptr;
     size_t m_offset = 0UL;
 };
@@ -263,6 +292,10 @@ public:
 // }
 
 }  // namespace ov::intel_cpu
+
+// #define BIND_IN_OUT_BUFFERS(cls_name)                    \
+//     BIND_TO_BUFFER(BinaryOutputBuffer, cls_name)         \
+//     BIND_TO_BUFFER(BinaryInputBuffer, cls_name)
 
 #define BIND_BINARY_BUFFER_WITH_TYPE(cls_name)                   \
             namespace ov::intel_cpu {                            \

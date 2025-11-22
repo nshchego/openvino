@@ -69,7 +69,7 @@ public:
         return clone();
     }
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::EmptyMemoryDesc)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::EmptyMemoryDesc)
 
     void save(BinaryOutputBuffer& ob) const override {}
 

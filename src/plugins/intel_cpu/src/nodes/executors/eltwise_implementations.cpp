@@ -449,12 +449,12 @@ const std::vector<ExecutorImplementation<EltwiseAttrs>>& getImplementations() {
     return eltwiseImplementations;
 }
 
-void EltwiseData::save(BinaryOutputBuffer& ob) const {
-    ob << algo;
-    ob << alpha;
-    ob << beta;
-    ob << gamma;
-    ob << onednnAlgorithm;
+void EltwiseData::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << algo;
+    out_buf << alpha;
+    out_buf << beta;
+    out_buf << gamma;
+    out_buf << onednnAlgorithm;
 }
 
 void EltwiseData::load(BinaryInputBuffer& ib) {
@@ -465,30 +465,42 @@ void EltwiseData::load(BinaryInputBuffer& ib) {
     ib >> onednnAlgorithm;
 }
 
-void EltwiseAttrs::save(BinaryOutputBuffer& ob) const {
-    ob << broadcastingPolicy;
-    ob << data;
-    ob << fusedEltwiseData;
-    ob << opsList;
-    // ob << postOps;
-    ob << scales;
-    ob << shifts;
-    ob << specialConvolutionAddFusing;
-    ob << start_offset_in;
-    ob << start_offset_out;
+void EltwiseAttrs::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << broadcastingPolicy;
+    out_buf << data;
+    out_buf << fusedEltwiseData;
+    out_buf.dump_position();  // TODO: remove
+    out_buf << opsList;
+    out_buf.dump_position();  // TODO: remove
+    // out_buf << postOps;
+    out_buf << scales;
+    out_buf << shifts;
+    out_buf << specialConvolutionAddFusing;
+    out_buf << start_offset_in;
+    out_buf << start_offset_out;
+    
+    out_buf.dump_position();  // TODO: remove
 }
 
-void EltwiseAttrs::load(BinaryInputBuffer& ib) {
-    ib >> broadcastingPolicy;
-    ib >> data;
-    ib >> fusedEltwiseData;
-    ib >> opsList;
-    // ib >> postOps;
-    ib >> scales;
-    ib >> shifts;
-    ib >> specialConvolutionAddFusing;
-    ib >> start_offset_in;
-    ib >> start_offset_out;
+void EltwiseAttrs::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: Remove
+
+    in_buf >> broadcastingPolicy;
+    in_buf >> data;
+    in_buf >> fusedEltwiseData;
+    in_buf.check_position();  // TODO: Remove
+    in_buf >> opsList;
+    in_buf.check_position();  // TODO: Remove
+    // in_buf >> postOps;
+    in_buf >> scales;
+    in_buf >> shifts;
+    in_buf >> specialConvolutionAddFusing;
+    in_buf >> start_offset_in;
+    in_buf >> start_offset_out;
+    
+    in_buf.check_position();  // TODO: Remove
 }
 
 // clang-format on

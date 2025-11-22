@@ -213,6 +213,9 @@ Constant::Constant(const Tensor& tensor)
       m_data{std::make_shared<SharedBuffer<Tensor>>(const_cast<char*>(static_cast<const char*>(tensor.data())),
                                                     tensor.get_byte_size(),
                                                     tensor)} {
+    if (get_friendly_name() == "Gather_2682") {
+        printf("--CORE-- Constant ctr 1 %s\n", get_friendly_name().data());
+    }
     constructor_validate_and_infer_types();
 }
 
@@ -257,6 +260,9 @@ Constant::Constant(bool memset_allocation, const element::Type& type, const Shap
 void Constant::allocate_buffer(bool memset_allocation) {
     // memset_allocation flag is to switch on initialization of objects in memory for element::string type
     // and set memory to zero for numeric element types
+    if (get_friendly_name() == "Gather_2682") {
+        printf("--CORE-- Constant::allocate_buffer %s\n", get_friendly_name().data());
+    }
     const auto byte_size = ov::util::get_memory_size_safe(m_element_type, m_shape);
     OPENVINO_ASSERT(byte_size, "Cannot allocate memory for type: ", m_element_type, " and shape: ", m_shape);
     if (m_element_type == ov::element::string) {
@@ -332,6 +338,9 @@ Constant::Constant(const Constant& other)
       m_all_elements_bitwise_identical{other.m_all_elements_bitwise_identical.load()},
       m_all_elements_bitwise_identical_checked{other.m_all_elements_bitwise_identical_checked.load()},
       m_alloc_buffer_on_visit_attributes{other.m_alloc_buffer_on_visit_attributes} {
+    if (get_friendly_name() == "Gather_2682") {
+        printf("--CORE-- Constant ctr 2 %s\n", get_friendly_name().data());
+    }
     constructor_validate_and_infer_types();
 }
 
@@ -342,6 +351,9 @@ Constant::Constant(const Constant& other, const Shape& new_shape)
       m_data{other.m_data},
       m_all_elements_bitwise_identical{other.m_all_elements_bitwise_identical.load()},
       m_all_elements_bitwise_identical_checked{other.m_all_elements_bitwise_identical_checked.load()} {
+    if (get_friendly_name() == "Gather_2682") {
+        printf("--CORE-- Constant ctr 3 %s\n", get_friendly_name().data());
+    }
     const auto new_size = shape_size(new_shape);
     const auto other_size = shape_size(other.m_shape);
     OPENVINO_ASSERT(other_size == new_size, "ov::Shape size ", new_size, " is not equal to ", other_size);
@@ -355,7 +367,10 @@ Constant::Constant(const element::Type& type, const Shape& shape, const void* da
           // Note: const_cast used to store pointer only
           std::make_shared<ov::SharedBuffer<std::shared_ptr<void>>>(reinterpret_cast<char*>(const_cast<void*>(data)),
                                                                     ov::util::get_memory_size(type, shape_size(shape)),
-                                                                    so)) {}
+                                                                    so)) {
+    if (get_friendly_name() == "Gather_2682") {
+        printf("--CORE-- Constant ctr 4 %s\n", get_friendly_name().data());
+    }}
 
 Constant::~Constant() = default;
 

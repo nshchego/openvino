@@ -1730,6 +1730,7 @@ inline void Graph::ExecuteNode(const NodePtr& node, SyncInferRequest* request, i
         request->throw_if_canceled();
     }
 
+    printf("--CPU-- Graph::ExecuteNode '%s'\n", node->getName().data());
     node->execute(m_stream, numaId);
 }
 

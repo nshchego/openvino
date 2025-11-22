@@ -94,7 +94,7 @@ public:
 
     MemoryDescPtr cloneWithNewPrecision(ov::element::Type prec) const override;
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::CpuBlockedMemoryDesc)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::CpuBlockedMemoryDesc)
 
     void save(BinaryOutputBuffer& ob) const override;
 

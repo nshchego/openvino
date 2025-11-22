@@ -77,7 +77,7 @@ public:
     using DnnlMemoryDesc::getPrecision;
     using DnnlMemoryDesc::setPrecision;
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::DnnlBlockedMemoryDesc)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::DnnlBlockedMemoryDesc)
 
     void save(BinaryOutputBuffer& ob) const override;
 

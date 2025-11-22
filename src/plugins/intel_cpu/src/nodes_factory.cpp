@@ -145,6 +145,7 @@ namespace ov::intel_cpu {
 template <typename SrcType>
 NodesFactory<SrcType>::NodesFactory() : Factory("NodesFactory") {
     using namespace node;
+
     INTEL_CPU_NODE(AdaptivePooling, Type::AdaptivePooling);
     INTEL_CPU_NODE(BatchToSpace, Type::BatchToSpace);
     INTEL_CPU_NODE(BinaryConvolution, Type::BinaryConvolution);
@@ -333,7 +334,7 @@ Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& in_buf, const 
     in_buf >> node_type;
 
     try {
-// printf("--CPU-- FACTORY Stream. Try to deserialize CPU node %d\n", int(node_type));
+        //printf("--CPU-- FACTORY Stream. Try to deserialize CPU node '%s'/%d\n", NameFromType(node_type).data(), int(node_type));
         std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, node_type, in_buf, context));
         if (ol != nullptr && ol->created()) {
             new_node = ol.release();

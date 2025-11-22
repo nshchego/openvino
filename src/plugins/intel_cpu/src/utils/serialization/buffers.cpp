@@ -137,8 +137,12 @@ void StreamInputBuffer::seekg(std::istream::off_type offset, std::ios_base::seek
 ////////// TensorInputBuffer //////////
 
 TensorInputBuffer::TensorInputBuffer(const ov::Tensor& model_tensor, std::streampos header_offset)
-    : BinaryInputBuffer(header_offset), m_model_tensor(model_tensor) {
-    m_data = static_cast<const uint8_t *>(m_model_tensor.data());
+    : BinaryInputBuffer(header_offset) {
+    // : BinaryInputBuffer(header_offset), m_model_tensor(model_tensor) {
+    m_buffer = std::make_shared<ov::SharedBuffer<ov::Tensor>>(reinterpret_cast<char *>(model_tensor.data()),
+                                                              model_tensor.get_byte_size(),
+                                                              model_tensor);
+    m_data = reinterpret_cast<const uint8_t *>(model_tensor.data());
 }
 
 void TensorInputBuffer::read(void* const data, std::streamsize size) {

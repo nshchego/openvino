@@ -168,7 +168,9 @@ EltwiseJitExecutor::EltwiseJitExecutor(const Key& key)
         fullWorkAmount *= dim;
     }
 
-    m_threadsNum = static_cast<size_t>(parallel_get_max_threads());
+    // TODO: Check. Only one thread is available here without cache and 32 with loading from cache.
+    m_threadsNum = 1;
+    //m_threadsNum = static_cast<size_t>(parallel_get_max_threads());
     static constexpr size_t minimalJitWorkAmount = 256;
     size_t currentJitWorkAmount = jep.dims[jep.dims.size() - 1];
     int collapsedDims = 0;
@@ -337,9 +339,18 @@ void EltwiseJitExecutor::exec(const jit_eltwise_call_args_ptrs& args_ptrs, const
             (*m_kernel)(&args_ptrs, &args);
         };
 
-        parallel_nt_static(m_threadsNum, [&](const int ithr, const int nthr) {
-            for_5d(ithr, nthr, dims_out[0], dims_out[1], dims_out[2], dims_out[3], dims_out[4], d6_loop);
-        });
+        if (dims_out == VectorDims{1, 1, 1, 3, 224, 224}) {
+            for (size_t i3 = 0; i3 < 3; i3++) {
+                for (size_t i4 = 0; i4 < 224; i4++) {
+                    printf("  %zu, %zu\n", i3, i4);
+                    d6_loop(0, 0, 0, i3, i4);
+                }
+            }
+        } else {
+            parallel_nt_static(m_threadsNum, [&](const int ithr, const int nthr) {
+                for_5d(ithr, nthr, dims_out[0], dims_out[1], dims_out[2], dims_out[3], dims_out[4], d6_loop);
+            });
+        }
     } else {
         // Execute Optimized Generic
         if (m_kernel->jep_.use_runtime_ptrs) {

@@ -733,11 +733,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model_str
         //                    : std::make_unique<BinaryInputBuffer>(model, context_impl->get_engine());
     // auto& in_buf = *ib_ptr;
     // ibb = ib_ptr.get();
-    StreamInputBuffer in_buf(model_stream, model_stream.tellg());
+    auto in_buf = std::make_shared<StreamInputBuffer>(model_stream, model_stream.tellg());
 
     Config conf = engConfig;
     Config::ModelType model_type;
-    in_buf >> model_type;
+    *in_buf >> model_type;
     // conf.applyRtInfo(in_buf);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
     const auto& it = new_config.find(ov::loaded_from_cache.name());
@@ -778,13 +778,14 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(const ov::Tensor& model
     //     decript_from_string);
 
     // return deserialize_model(deserializer, config);
-    
-    TensorInputBuffer in_buf(model_tensor);
+
+    auto in_buf = std::make_shared<TensorInputBuffer>(model_tensor);
+    // TensorInputBuffer in_buf(model_tensor);
     auto new_config = config;
 
     Config conf = engConfig;
     Config::ModelType model_type;
-    in_buf >> model_type;
+    *in_buf >> model_type;
     // conf.applyRtInfo(in_buf);
     // check ov::loaded_from_cache property and erase it to avoid exception in readProperties.
     const auto& it = new_config.find(ov::loaded_from_cache.name());

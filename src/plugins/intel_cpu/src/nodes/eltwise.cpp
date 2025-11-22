@@ -110,7 +110,11 @@
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
 #include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
 #include "utils/serialization/vector_serializer.hpp"
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory<ov::intel_cpu::EltwiseAttrs>)
 
 namespace ov::intel_cpu::node {
 
@@ -842,6 +846,9 @@ void Eltwise::createPrimitive() {
     }
     m_memory[ARG_DST] = getDstMemoryAtPort(0);
 
+    if (getName() == "Subtract_3509") {
+        printf("--CPU-- Eltwise::createPrimitive '%s'\n", getName().data());
+    }
     m_executor = m_factory->make(m_memory);
     getSelectedPrimitiveDescriptor()->setImplementationType(m_executor->implType());
 
@@ -1166,7 +1173,12 @@ void Eltwise::save(BinaryOutputBuffer& ob) const {
     ob << m_depthwiseData;
     ob << m_depthwiseDataSize;
 
-    ob << m_factory;
+    // if (m_factory) {  // Fused nodes does not have initialized Factory
+        // ob << true;
+        ob << m_factory;
+    // } else {
+    //     ob << ;
+    // }
     // ob << m_executor;
     // ob << m_memory;
     // ob << m_depthwiseMemory;
@@ -1181,7 +1193,8 @@ void Eltwise::load(BinaryInputBuffer& in_buf) {
     in_buf >> m_depthwiseData;
     in_buf >> m_depthwiseDataSize;
 
-    in_buf >> m_factory;
+    in_buf(m_factory, m_context);
+    // in_buf >> m_factory;
     // in_buf >> m_executor;
     // in_buf >> m_memory;
     // in_buf >> m_depthwiseMemory;
@@ -1209,6 +1222,6 @@ void Eltwise::load(BinaryInputBuffer& in_buf) {
     //m_factory = std::make_shared<ExecutorFactory<EltwiseAttrs>>(m_attrs, execution_context, descs, memoryFormatFilter);
 
     in_buf.check_position();  // TODO: remove
-}
 
 }  // namespace ov::intel_cpu::node
+}

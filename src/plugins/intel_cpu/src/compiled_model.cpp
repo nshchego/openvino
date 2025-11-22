@@ -167,12 +167,12 @@ CompiledModel::CompiledModel(const std::shared_ptr<ov::Model>& model,
     }
 }
 
-CompiledModel::CompiledModel(BinaryInputBuffer& in_buf,
+CompiledModel::CompiledModel(const std::shared_ptr<BinaryInputBuffer>& model_buffer,
                              const std::shared_ptr<const ov::IPlugin>& plugin,
                              const Config& config,
                              const bool loaded_from_cache)
     : ov::ICompiledModel::ICompiledModel(nullptr, plugin),
-      m_model_buffer(&in_buf),
+      m_model_buffer(model_buffer),
       m_plugin(plugin),
       m_cfg(config),
       m_loaded_from_cache(loaded_from_cache) {
@@ -181,8 +181,10 @@ CompiledModel::CompiledModel(BinaryInputBuffer& in_buf,
     m_mutex = std::make_shared<std::mutex>();
 
 printf("--CPU-- CompiledModel::CompiledModel READ\n");
+    auto& in_buf = *model_buffer;
+
     in_buf.check_position();
-    
+
     in_buf >> m_name;
     in_buf >> m_cfg.modelPreferThreads;
     in_buf >> m_is_function_quantized;
@@ -333,7 +335,7 @@ printf("--CPU-- CompiledModel::CompiledModel READ\n");
                                                                     std::move(sub_streams_table),
                                                                     sub_cfg.streamsRankTable[i]};
             m_sub_compiled_models.push_back(
-                std::make_shared<CompiledModel>(in_buf, plugin, sub_cfg, loaded_from_cache));
+                std::make_shared<CompiledModel>(m_model_buffer, plugin, sub_cfg, loaded_from_cache));
         }
     }
 }

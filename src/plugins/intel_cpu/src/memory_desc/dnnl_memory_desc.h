@@ -62,7 +62,7 @@ public:
 
     size_t getOffsetPadding() const override;
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::DnnlMemoryDesc)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::DnnlMemoryDesc)
 
     void save(BinaryOutputBuffer& ob) const override;
 

@@ -82,6 +82,8 @@ public:
 
     std::string serializeFormat() const override;
 
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::BlockedMemoryDesc)
+
     void save(BinaryOutputBuffer& ob) const override;
 
     void load(BinaryInputBuffer& in_buf) override;

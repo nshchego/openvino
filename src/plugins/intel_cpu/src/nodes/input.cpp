@@ -591,6 +591,9 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
         // original weights are stored.
         (!weight_cache || m_context->getNumNumaNodes() == 1 || m_context->getCPUStreamExecutor()->get_streams_num() == 1);
 
+    if (getName() == "Constant_3552") {
+        printf("--CPU-- Input::cloneBlobIfRequired '%s'; val: %f\n", getName().data(), static_cast<const float*>(src_ptr)[0]);
+    }
     m_memory_ptr = clone_is_not_needed
                     ? std::make_shared<Memory>(getEngine(), mem_desc, src_ptr)
                     : std::const_pointer_cast<const IMemory>(
@@ -826,10 +829,12 @@ void Input::resolveInPlaceEdges(Edge::LOOK look) {
 
 void Input::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
+    ob.dump_position();  // TODO: remove
 
     ob << m_use_parent_memory_desc_for_output;
     ob << m_is_in_place;
     ob << m_use_origin_weights;
+    ob.dump_position();  // TODO: remove
 
     if (constant == ConstantType::Const) {
         CPU_NODE_ASSERT(m_memory_ptr, "has uninitialized memory.");
@@ -837,17 +842,21 @@ void Input::save(BinaryOutputBuffer& ob) const {
         ob << m_memory_ptr->getPrecision();
         ob << m_memory_ptr->getShape();
         ob << m_memory_ptr->getSize();
-        
+        ob.dump_position();  // TODO: remove
+
         if (!m_use_origin_weights) {
             ob.write(m_memory_ptr->getData(), m_memory_ptr->getSize());
         }
     }
+    ob.dump_position();  // TODO: remove
 }
 
 void Input::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
     in_buf >> m_use_parent_memory_desc_for_output;
     in_buf >> m_is_in_place;
     in_buf >> m_use_origin_weights;
+    in_buf.check_position();  // TODO: remove
 
     if (constant == ConstantType::Const) {
         // return m_stream.rdbuf().gptr();
@@ -861,6 +870,7 @@ void Input::load(BinaryInputBuffer& in_buf) {
         in_buf >> dt;
         in_buf >> shape;
         in_buf >> byte_size;
+        in_buf.check_position();  // TODO: remove
 
         if (m_use_origin_weights) {
             // cloneBlobIfRequired(origin_blob, shape, origin_dt, true);
@@ -871,6 +881,11 @@ void Input::load(BinaryInputBuffer& in_buf) {
             in_buf.seekg(byte_size, std::ios_base::cur);
         }
     }
+    if (getName() == "Constant_3552") {
+        auto src_ptr = m_memory_ptr->getData();
+        printf("--CPU-- Input::load '%s'; val: %f\n", getName().data(), static_cast<const float*>(src_ptr)[0]);
+    }
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

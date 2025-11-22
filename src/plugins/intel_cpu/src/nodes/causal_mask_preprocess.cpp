@@ -111,7 +111,7 @@ struct CausalMaskPreprocess::ExecutorCausalMaskPreprocess : public CausalMaskPre
         DEBUG_LOG("CausalMaskPreprocess::execute  dst=", t_dst);
     }
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::node::CausalMaskPreprocess::ExecutorCausalMaskPreprocess<T>)
+     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::CausalMaskPreprocess::ExecutorCausalMaskPreprocess<T>)
 };
 
 CausalMaskPreprocess::CausalMaskPreprocess(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)

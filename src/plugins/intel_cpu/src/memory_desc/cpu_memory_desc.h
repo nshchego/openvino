@@ -17,6 +17,7 @@
 #include "cpu_types.h"
 #include "openvino/core/except.hpp"
 #include "openvino/core/type/element_type.hpp"
+#include "utils/serialization/bind.hpp"
 
 /**
  * @brief
@@ -166,7 +167,7 @@ public:
 
     static constexpr size_t UNDEFINED_SIZE = std::numeric_limits<size_t>::max();
 
-    virtual const std::string& get_type_info() const = 0;
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::MemoryDesc)
 
     virtual void save(BinaryOutputBuffer& ob) const;
 

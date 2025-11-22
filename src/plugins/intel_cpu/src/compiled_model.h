@@ -46,7 +46,7 @@ public:
                   bool loaded_from_cache,
                   std::shared_ptr<SubMemoryManager> sub_memory_manager = nullptr);
 
-    CompiledModel(BinaryInputBuffer& in_buf,
+    CompiledModel(const std::shared_ptr<BinaryInputBuffer>& model_buffer,
                   const std::shared_ptr<const ov::IPlugin>& plugin,
                   //const RemoteContextImpl::Ptr& context,
                   const Config& config,
@@ -86,7 +86,7 @@ private:
     friend class CompiledModelHolder;
 
     const std::shared_ptr<ov::Model> m_model;
-    BinaryInputBuffer* m_model_buffer;
+    std::shared_ptr<BinaryInputBuffer> m_model_buffer;
     const std::shared_ptr<const ov::IPlugin> m_plugin;
     std::shared_ptr<ov::threading::ITaskExecutor> m_task_executor = nullptr;      //!< Holds a task executor
     std::shared_ptr<ov::threading::ITaskExecutor> m_callback_executor = nullptr;  //!< Holds a callback executor

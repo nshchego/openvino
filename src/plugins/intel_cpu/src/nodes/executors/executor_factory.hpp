@@ -37,9 +37,18 @@ public:
                     const std::string& implementationPriority = {})
         : m_attrs(std::move(attrs)),
           m_context(std::move(context)),
-          m_suitableImplementations(filter(m_attrs, descriptors, memoryFormatFilter, implementationPriority)) {
-        printf("[CPU] ExecutorFactory ctr type name: %s\n", typeid(*this).name());
-        OPENVINO_ASSERT(!m_suitableImplementations.empty(), "No suitable implementations found");
+          m_suitable_implementations(filter(m_attrs, descriptors, memoryFormatFilter, implementationPriority)) {
+        printf("[CPU] ExecutorFactory ctr 1 type name: %s\n", typeid(*this).name());
+        OPENVINO_ASSERT(!m_suitable_implementations.empty(), "No suitable implementations found");
+    }
+
+    ExecutorFactory(BinaryInputBuffer& in_buf, const GraphContext::CPtr& graph_context) {
+        printf("[CPU] ExecutorFactory ctr 2 type name: %s\n", typeid(*this).name());
+        in_buf.check_position();  // TODO: Remove
+        in_buf(m_context, graph_context);
+        // m_context = std::make_shared<ExecutorContext>(in_buf, context);
+        load(in_buf);
+        OPENVINO_ASSERT(!m_suitable_implementations.empty(), "[CPU] No suitable executor implementation found.");
     }
 
     /**
@@ -68,8 +77,8 @@ public:
         };
 
         std::vector<MemoryDescArgs> memoryDescArgs;
-        memoryDescArgs.reserve(m_suitableImplementations.size());
-        for (const auto& impl : m_suitableImplementations) {
+        memoryDescArgs.reserve(m_suitable_implementations.size());
+        for (const auto& impl : m_suitable_implementations) {
             memoryDescArgs.emplace_back(getProperMemoryDescArgs(impl, config));
         }
 
@@ -100,7 +109,7 @@ public:
         };
 
         // Filter out implementations that still require changes in configuration
-        for (const auto& impl : m_suitableImplementations) {
+        for (const auto& impl : m_suitable_implementations) {
             auto config = createConfig(memory, m_attrs);
 
             if (!acceptsConfig(impl, config)) {
@@ -131,6 +140,45 @@ public:
                                                          m_context,
                                                          implementations,
                                                          initVariableExecutor);
+    }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::ExecutorFactory<Attrs>)
+
+    void save(BinaryOutputBuffer& out_buf) const {
+        out_buf.dump_position();  // TODO: remove
+        out_buf << m_context;
+        out_buf.dump_position();  // TODO: remove
+        out_buf << m_attrs;
+        out_buf << m_suitable_implementations.size();
+        out_buf.dump_position();  // TODO: remove
+        for (const auto& impl : m_suitable_implementations) {
+            out_buf << std::string(impl.get().name());  // TODO: replace to char*
+        }
+        out_buf.dump_position();  // TODO: remove
+    }
+
+    void load(BinaryInputBuffer& in_buf) {
+        size_t impl_size = 0UL;
+        //const char* impl_name;
+        std::string impl_name;
+
+        in_buf.check_position();  // TODO: Remove
+        in_buf >> m_attrs;
+        in_buf >> impl_size;
+        in_buf.check_position();  // TODO: Remove
+
+        const auto& implementations = getImplementations<Attrs>();
+        for (size_t i = 0UL; i < impl_size; i++) {
+            in_buf >> impl_name;
+            for (const auto& impl : implementations) {
+                // if (strcmp(impl_name, impl.name())) {
+                if (impl_name.compare(impl.name()) == 0) {
+                    m_suitable_implementations.push_back(std::ref(impl));
+                    break;
+                }
+            }
+        }
+        in_buf.check_position();  // TODO: Remove
     }
 
 private:
@@ -196,7 +244,7 @@ private:
 
     Attrs m_attrs;
     ExecutorContext::CPtr m_context;
-    std::vector<ExecutorImplementationRef> m_suitableImplementations;
+    std::vector<ExecutorImplementationRef> m_suitable_implementations;
 };
 
 template <typename Attrs>
@@ -204,5 +252,7 @@ using ExecutorFactoryPtr = std::shared_ptr<ExecutorFactory<Attrs>>;
 
 template <typename Attrs>
 using ExecutorFactoryCPtr = std::shared_ptr<const ExecutorFactory<Attrs>>;
+
+// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory);
 
 }  // namespace ov::intel_cpu

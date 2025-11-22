@@ -172,9 +172,9 @@ public:
         return outputConfigs[portIdx].hasZeroDims();
     }
 
-    void save(BinaryOutputBuffer& ob) const;
+    virtual void save(BinaryOutputBuffer& ob) const;
 
-    void load(BinaryInputBuffer& in_buf);
+    virtual void load(BinaryInputBuffer& in_buf);
 
 private:
     NodeConfig m_config;

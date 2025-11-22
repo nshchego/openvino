@@ -29,7 +29,7 @@ public:
     }
     [[nodiscard]] virtual MemoryDescPtr getMemDesc() const = 0;
 
-    virtual const std::string& get_type_info() const = 0;
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::PortDescBase)
 
     virtual void save(BinaryOutputBuffer& ob) const = 0;
 
@@ -71,7 +71,7 @@ public:
         return m_mem_desc;
     }
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::PortDescGeneric)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::PortDescGeneric)
 
     void save(BinaryOutputBuffer& ob) const override;
 
@@ -103,7 +103,7 @@ public:
         return m_mem_desc;
     }
 
-    DECLARE_OBJECT_TYPE_SERIALIZATION(ov::intel_cpu::PortDescBlocked)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::PortDescBlocked)
 
     void save(BinaryOutputBuffer& ob) const override;
 
