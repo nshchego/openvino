@@ -23,8 +23,6 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/visibility.hpp"
 #include "weights_cache.hpp"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -72,9 +70,12 @@ public:
         : m_runtime_cache(context->getParamsCache()),
           m_scratch_pads(context->getScratchPads()),
           m_weights_cache(context->getWeightsCache()),
-          m_engine(context->getEngine()) {
+          m_engine(context->getEngine()),
+          m_private_weight_cache(std::make_shared<std::unordered_map<std::string, MemoryPtr>>()) {  // TODO: Pass from node?
         load(in_buf);
     }
+
+    // ~ExecutorContext() = default;
 
     [[nodiscard]] MultiCachePtr getRuntimeCache() const {
         auto runtimeCachePtr = m_runtime_cache.lock();

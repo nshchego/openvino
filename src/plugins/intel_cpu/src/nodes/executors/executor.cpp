@@ -3,6 +3,8 @@
 //
 
 #include "executor.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #include <string>
 

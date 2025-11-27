@@ -274,12 +274,12 @@ NodesFactory<SrcType>::NodesFactory() : Factory("NodesFactory") {
 
 template <>
 Node* NodesFactory<const std::shared_ptr<ov::Node>&>::create(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context) {
-printf("--CPU-- NodesFactory::create '%s':'%s'\n", op->get_type_name(), op->get_friendly_name().data());
+// printf("--CPU-- NodesFactory::create '%s':'%s'\n", op->get_type_name(), op->get_friendly_name().data());
     Node* new_node = nullptr;
     std::string error_message;
 
     try {
-printf("--CPU-- FACTORY ov::Node. Try to create CPU node %s\n", op->get_type_name());
+// printf("--CPU-- FACTORY ov::Node. Try to create CPU node %s\n", op->get_type_name());
         std::unique_ptr<Node> ol(createNodeIfRegistered(intel_cpu, TypeFromName(op->get_type_name()), op, context));
         if (ol != nullptr && ol->created()) {
             new_node = ol.release();
@@ -294,7 +294,7 @@ printf("--CPU-- FACTORY ov::Node. Try to create CPU node %s\n", op->get_type_nam
 
     if (new_node == nullptr) {
         try {
-printf("    Try to create Reference node\n");
+// printf("    Try to create Reference node\n");
             std::unique_ptr<Node> ol(new node::Reference(op, context, error_message));
             if (ol != nullptr && ol->created()) {
                 new_node = ol.release();
@@ -331,7 +331,9 @@ Node* NodesFactory<BinaryInputBuffer&>::create(BinaryInputBuffer& in_buf, const 
     Node* new_node = nullptr;
     std::string error_message;
     intel_cpu::Type node_type;
+    in_buf.check_position();  // TODO: remove
     in_buf >> node_type;
+    // printf("--CPU-- NodesFactory<BinaryInputBuffer&>::create '%s':%d\n", NameFromType(node_type).data(), int(node_type));
 
     try {
         //printf("--CPU-- FACTORY Stream. Try to deserialize CPU node '%s'/%d\n", NameFromType(node_type).data(), int(node_type));

@@ -180,7 +180,7 @@ CompiledModel::CompiledModel(const std::shared_ptr<BinaryInputBuffer>& model_buf
 
     m_mutex = std::make_shared<std::mutex>();
 
-printf("--CPU-- CompiledModel::CompiledModel READ\n");
+// printf("--CPU-- CompiledModel::CompiledModel READ\n");
     auto& in_buf = *model_buffer;
 
     in_buf.check_position();

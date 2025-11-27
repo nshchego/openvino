@@ -43,6 +43,8 @@
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <cpu/x64/cpu_isa_traits.hpp>
@@ -1036,6 +1038,152 @@ bool Gather::canFuse(const NodePtr& node) const {
     }
     return any_of(node->getOriginalInputPrecisionAtPort(0), element::f16, element::bf16) &&
            node->getOriginalOutputPrecisionAtPort(0) == ov::element::f32;
+}
+
+void Gather::threadExecParams::save(BinaryOutputBuffer& out_buf) const {
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << specIdxInBytes;
+    out_buf << permIdxMask;
+    out_buf << srcBeforeAxisDiff;
+    out_buf << idxBatchSumInBytes;
+    out_buf << dataBeforeAxisSumInBytes;
+
+    out_buf << afterAxIdxInBytes;
+    out_buf << specIdxDiff;
+    out_buf << beforeAxPermMask;
+    out_buf << afterAxPermMask;
+    out_buf << betweenBatchAndAxisIter;
+    out_buf << specIdxAndAfterAxIterB;
+
+    out_buf << workAmount;
+    out_buf << dstStart;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void Gather::threadExecParams::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> specIdxInBytes;
+    in_buf >> permIdxMask;
+    in_buf >> srcBeforeAxisDiff;
+    in_buf >> idxBatchSumInBytes;
+    in_buf >> dataBeforeAxisSumInBytes;
+
+    in_buf >> afterAxIdxInBytes;
+    in_buf >> specIdxDiff;
+    in_buf >> beforeAxPermMask;
+    in_buf >> afterAxPermMask;
+    in_buf >> betweenBatchAndAxisIter;
+    in_buf >> specIdxAndAfterAxIterB;
+
+    in_buf >> workAmount;
+    in_buf >> dstStart;
+
+in_buf.check_position();  // TODO: remove
+}
+
+void Gather::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << canOptimize1DCase;
+    out_buf << compressed;
+    out_buf << isDataShapeStat;
+    out_buf << isIdxShapeStat;
+    out_buf << isAxisInputConst;
+    out_buf << reverseIndexing;
+    
+    out_buf << dataPrecision;
+    out_buf << outPrecision;
+    out_buf << dataTypeSize;
+    out_buf << outTypeSize;
+
+    out_buf << axis;
+    out_buf << axisDim;
+    out_buf << batchDims;
+    out_buf << dataSrcRank;
+    out_buf << specIndicesSize;
+    out_buf << beforeBatchSize;
+    out_buf << beforeAxisSize;
+    out_buf << betweenBatchAndAxisSize;
+    out_buf << afterAxisSize;
+    out_buf << afterAxisSizeInBytes;
+    out_buf << afterAxisSizeInBytesOut;
+    out_buf << axisAndAfterAxisSizeInBytes;
+    out_buf << axisAndAfterAxisSize;
+    out_buf << srcAfterBatchSizeInBytes;
+    out_buf << srcAfterBatchSize;
+    out_buf << specIdxAndAfterAxSizeB;
+    out_buf << specIdxAndAfterAxSizeBOut;
+    out_buf << specIdxAndAfterAxSize;
+    out_buf << totalWork;
+
+    out_buf << execParamsPerThread;
+    out_buf << constIndices;
+
+    out_buf << have_zp;
+    out_buf << have_scalar_zp;
+    out_buf << have_scalar_scale;
+    out_buf << zp_group_size;
+    out_buf << scale_group_size;
+    out_buf << m_threads_num;
+
+    // std::shared_ptr<jitGatherKernelBase> jitKernel;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void Gather::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> canOptimize1DCase;
+    in_buf >> compressed;
+    in_buf >> isDataShapeStat;
+    in_buf >> isIdxShapeStat;
+    in_buf >> isAxisInputConst;
+    in_buf >> reverseIndexing;
+    
+    in_buf >> dataPrecision;
+    in_buf >> outPrecision;
+    in_buf >> dataTypeSize;
+    in_buf >> outTypeSize;
+
+    in_buf >> axis;
+    in_buf >> axisDim;
+    in_buf >> batchDims;
+    in_buf >> dataSrcRank;
+    in_buf >> specIndicesSize;
+    in_buf >> beforeBatchSize;
+    in_buf >> beforeAxisSize;
+    in_buf >> betweenBatchAndAxisSize;
+    in_buf >> afterAxisSize;
+    in_buf >> afterAxisSizeInBytes;
+    in_buf >> afterAxisSizeInBytesOut;
+    in_buf >> axisAndAfterAxisSizeInBytes;
+    in_buf >> axisAndAfterAxisSize;
+    in_buf >> srcAfterBatchSizeInBytes;
+    in_buf >> srcAfterBatchSize;
+    in_buf >> specIdxAndAfterAxSizeB;
+    in_buf >> specIdxAndAfterAxSizeBOut;
+    in_buf >> specIdxAndAfterAxSize;
+    in_buf >> totalWork;
+
+    in_buf >> execParamsPerThread;
+    in_buf >> constIndices;
+
+    in_buf >> have_zp;
+    in_buf >> have_scalar_zp;
+    in_buf >> have_scalar_scale;
+    in_buf >> zp_group_size;
+    in_buf >> scale_group_size;
+    in_buf >> m_threads_num;
+
+    // std::shared_ptr<jitGatherKernelBase> jitKernel;
+
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

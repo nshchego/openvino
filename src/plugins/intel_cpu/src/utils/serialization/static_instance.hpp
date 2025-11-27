@@ -23,15 +23,15 @@ public:
 private:
     static T& instantiate() {
         static T singleton;
-        (void)instance;
+        (void)m_instance;
         return singleton;
     }
 
-    static const T& instance;
+    static const T& m_instance;
 };
 
 template <typename T>
-const T& StaticInstance<T, typename std::enable_if<std::is_default_constructible<T>::value>::type>::instance = StaticInstance<T>::instantiate();
+const T& StaticInstance<T, typename std::enable_if<std::is_default_constructible<T>::value>::type>::m_instance = StaticInstance<T>::instantiate();
 
 template <typename T>
 class StaticInstance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type> {
@@ -42,14 +42,14 @@ public:
 
 private:
     static T& instantiate() {
-        (void)instance;
+        (void)m_instance;
         return T::instance();
     }
 
-    static const T& instance;
+    static const T& m_instance;
 };
 
 template <typename T>
-const T& StaticInstance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type>::instance = StaticInstance<T>::instantiate();
+const T& StaticInstance<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type>::m_instance = StaticInstance<T>::instantiate();
 
 }  // namespace ov::intel_cpu

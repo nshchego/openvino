@@ -33,6 +33,7 @@ MemoryPtr prepareWeightsMemory(const DnnlMemoryDescPtr& srcWeightDesc,
                                const bool needShiftSignedToUnsigned) {
     const auto privateWeightCache = context->getPrivateWeightCache();
     OPENVINO_ASSERT(privateWeightCache, "privateWeightCache is nullptr");
+    // printf("--CPU-- prepareWeightsMemory privateWeightCache size: %lu\n", privateWeightCache->size());
 
     return prepareWeightsMemory(srcWeightDesc,
                                 dstWeightDesc,

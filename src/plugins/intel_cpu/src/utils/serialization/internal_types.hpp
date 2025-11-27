@@ -38,9 +38,9 @@ class Serializer<BufferType, T, typename std::enable_if<std::is_base_of<OutputBu
 public:
     static void save(BufferType& buffer, const T& enm) {
 // printf("-WRITE enum-\n");  // TODO: remove
-if (sizeof(T) > 1UL) {
-    printf("-WRITE enum- size: %llu\n", sizeof(T));  // TODO: Move enums to uint8 if possible.
-}
+// if (sizeof(T) > 1UL) {
+//     printf("-WRITE enum- size: %llu\n", sizeof(T));  // TODO: Move enums to uint8 if possible.
+// }
         buffer.write(std::addressof(enm), sizeof(enm));
     }
 };

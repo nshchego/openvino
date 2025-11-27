@@ -28,6 +28,10 @@ struct MatMulAttrs {
 
     // Post-operations for fused operations
     PostOps postOps;
+
+    void save(BinaryOutputBuffer& ob) const;
+
+    void load(BinaryInputBuffer& ib);
 };
 
 using MatMulConfig = executor::Config<MatMulAttrs>;

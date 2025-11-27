@@ -53,6 +53,10 @@ public:
 
         uint64_t workAmount = 0;
         uint64_t dstStart = 0;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     template <typename OUT_TYPE, typename IN_TYPE>
@@ -62,6 +66,10 @@ public:
     template <typename OUT_TYPE, int8_t get4Bit(const uint8_t&, bool)>
     void execCompressed4Bit();
     bool canFuse(const NodePtr& node) const override;
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;

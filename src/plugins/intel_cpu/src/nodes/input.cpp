@@ -827,28 +827,28 @@ void Input::resolveInPlaceEdges(Edge::LOOK look) {
     }
 }
 
-void Input::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
-    ob.dump_position();  // TODO: remove
+void Input::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+    out_buf.dump_position();  // TODO: remove
 
-    ob << m_use_parent_memory_desc_for_output;
-    ob << m_is_in_place;
-    ob << m_use_origin_weights;
-    ob.dump_position();  // TODO: remove
+    out_buf << m_use_parent_memory_desc_for_output;
+    out_buf << m_is_in_place;
+    out_buf << m_use_origin_weights;
+    out_buf.dump_position();  // TODO: remove
 
     if (constant == ConstantType::Const) {
         CPU_NODE_ASSERT(m_memory_ptr, "has uninitialized memory.");
 
-        ob << m_memory_ptr->getPrecision();
-        ob << m_memory_ptr->getShape();
-        ob << m_memory_ptr->getSize();
-        ob.dump_position();  // TODO: remove
+        out_buf << m_memory_ptr->getPrecision();
+        out_buf << m_memory_ptr->getShape();
+        out_buf << m_memory_ptr->getSize();
+        out_buf.dump_position();  // TODO: remove
 
         if (!m_use_origin_weights) {
-            ob.write(m_memory_ptr->getData(), m_memory_ptr->getSize());
+            out_buf.write(m_memory_ptr->getData(), m_memory_ptr->getSize());
         }
     }
-    ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Input::load(BinaryInputBuffer& in_buf) {
@@ -881,10 +881,10 @@ void Input::load(BinaryInputBuffer& in_buf) {
             in_buf.seekg(byte_size, std::ios_base::cur);
         }
     }
-    if (getName() == "Constant_3552") {
-        auto src_ptr = m_memory_ptr->getData();
-        printf("--CPU-- Input::load '%s'; val: %f\n", getName().data(), static_cast<const float*>(src_ptr)[0]);
-    }
+    // if (getName() == "Constant_3552") {
+    //     auto src_ptr = m_memory_ptr->getData();
+    //     printf("--CPU-- Input::load '%s'; val: %f\n", getName().data(), static_cast<const float*>(src_ptr)[0]);
+    // }
     in_buf.check_position();  // TODO: remove
 }
 

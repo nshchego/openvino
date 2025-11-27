@@ -306,7 +306,7 @@ void EltwiseStatefulExecutor::execute(const MemoryArgs& memory) {
             args_ptrs.src_ptr[i] = mem->getDataAs<const uint8_t>() + m_srcOffsets[i];
         }
     }
-    printf("--CPU-- EltwiseStatefulExecutor::execute %f\n", static_cast<const float*>(args_ptrs.src_ptr[1])[0]);
+    // printf("--CPU-- EltwiseStatefulExecutor::execute %f\n", static_cast<const float*>(args_ptrs.src_ptr[1])[0]);
 
     args_ptrs.post_op_data = m_fqDataPtrs.data();
 

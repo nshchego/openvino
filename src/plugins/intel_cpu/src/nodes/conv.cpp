@@ -60,6 +60,11 @@
 
 using namespace dnnl;
 
+const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::ConvAttrs>::get_type_info_s() {
+    static const std::string type_name("ov::intel_cpu::ExecutorFactory<ov::intel_cpu::ConvAttrs>");
+    return type_name;
+}
+
 namespace ov::intel_cpu::node {
 
 class Convolution::FusedSubgraph {

@@ -281,11 +281,22 @@ bool BatchToSpace::created() const {
     return getType() == Type::BatchToSpace;
 }
 
-// void BatchToSpace::save(BinaryOutputBuffer& ob) const {
-//     Node::save(ob);
-// }
+void BatchToSpace::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-// void BatchToSpace::load(BinaryInputBuffer& in_buf) {
-// }
+    out_buf.dump_position();  // TODO: remove
+
+    // out_buf << lastSecondInputValues;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void BatchToSpace::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    // in_buf >> lastSecondInputValues;
+
+    in_buf.check_position();  // TODO: remove
+}
 
 }  // namespace ov::intel_cpu::node

@@ -28,6 +28,7 @@
 #include "openvino/op/unsqueeze.hpp"
 #include "shape_inference/custom/reshape.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -78,6 +79,7 @@ Reshape::Reshape(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
 
 Reshape::Reshape(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
+    load(in_buf);
 }
 
 bool Reshape::needShapeInfer() const {
@@ -177,6 +179,24 @@ bool Reshape::isExecutable() const {
 
 bool Reshape::created() const {
     return getType() == Type::Reshape;
+}
+
+void Reshape::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    // out_buf << lastSecondInputValues;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Reshape::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    // in_buf >> lastSecondInputValues;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

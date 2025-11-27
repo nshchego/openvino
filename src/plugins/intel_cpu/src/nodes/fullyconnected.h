@@ -40,6 +40,10 @@ struct FCTensorParallelConfig {
     MemoryPtr cached_scale = nullptr;
     MemoryPtr cached_zeropoint = nullptr;
     MemoryPtr cached_dst = nullptr;
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 };
 
 class FullyConnected : public Node {
@@ -95,6 +99,10 @@ public:
 
     void fuseDecompressionMultiply(const MemoryCPtr& memory);
     void fuseDecompressionSubtract(const MemoryCPtr& memory);
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     void toNumaNodeImpl(int numaID) override;

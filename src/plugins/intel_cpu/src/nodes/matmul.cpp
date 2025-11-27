@@ -38,6 +38,15 @@
 #include "shape_inference/custom/matmul.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory<ov::intel_cpu::MatMulAttrs>)
+const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::MatMulAttrs>::get_type_info_s() {
+    static const std::string type_name("ov::intel_cpu::ExecutorFactory<ov::intel_cpu::MatMulAttrs>");
+    return type_name;
+}
 
 namespace ov::intel_cpu::node {
 
@@ -320,19 +329,30 @@ bool MatMul::isExecutable() const {
     return !hasEmptyOutputTensors();
 }
 
-void MatMul::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void MatMul::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << m_attrs;
+    out_buf << m_factory;
+    // out_buf << m_executor;
+    // out_buf << m_memory;
+    out_buf << m_atoi;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void MatMul::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> m_attrs;
+    in_buf(m_factory, m_context);
+    // in_buf >> m_executor;
+    // in_buf >> m_memory;
+    in_buf >> m_atoi;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

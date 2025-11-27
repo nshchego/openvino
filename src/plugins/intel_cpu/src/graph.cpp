@@ -1730,7 +1730,7 @@ inline void Graph::ExecuteNode(const NodePtr& node, SyncInferRequest* request, i
         request->throw_if_canceled();
     }
 
-    printf("--CPU-- Graph::ExecuteNode '%s'\n", node->getName().data());
+    // printf("--CPU-- Graph::ExecuteNode '%s'\n", node->getName().data());
     node->execute(m_stream, numaId);
 }
 
@@ -2290,24 +2290,29 @@ void Graph::ForgetGraphData() {
     m_executableSyncNodesInds.clear();
 }
 
-void Graph::export_graph(BinaryOutputBuffer& ob) {
-// printf("--CPU-- Graph::export_graph pos: %llu\n", ob.get_position());
-    ob.dump_position();  // Read/Write sync position
+void Graph::export_graph(BinaryOutputBuffer& out_buf) {
+// printf("--CPU-- Graph::export_graph pos: %llu\n", out_buf.get_position());
+    out_buf.dump_position();  // Read/Write sync position
 
-    ob << m_name;
-    ob << m_status;
-    ob << m_graph_has_dynamic_input;
+    out_buf << m_name;
+    out_buf << m_status;
+    out_buf << m_graph_has_dynamic_input;
 
     // Serialize all nodes
     {
-        ob << graphNodes.size();
+        out_buf << graphNodes.size();
         // std::map<int, std::vector<int>> fused_nodes;
         std::map<int, std::vector<int>> merged_nodes;
         size_t node_idx = 0lu;
 
         for (const auto& n : graphNodes) {
-            ob << n->getType();
-            ob << *n;
+            // if (int(n->getType()) == 161) {
+                printf("--CPU-- Graph::export_graph serialize node '%s' : '%s' : %d\n",
+                    n->getName().data(), NameFromType(n->getType()).data(), int(n->getType()));
+            // }
+            out_buf.dump_position();  // TODO: remove
+            out_buf << n->getType();
+            out_buf << *n;
 
             // if (auto fused_size = n->getFusedWith().size()) {
             //     fused_nodes[node_idx].reserve(fused_size);
@@ -2336,33 +2341,33 @@ void Graph::export_graph(BinaryOutputBuffer& ob) {
             node_idx++;
         }
 
-        // ob << fused_nodes;
-        ob << merged_nodes;
+        // out_buf << fused_nodes;
+        out_buf << merged_nodes;
     }
 
     // Serialize input nodes indices
-    ob << m_input_nodes.size();
+    out_buf << m_input_nodes.size();
     for (const auto& input : m_input_nodes) {
         for (size_t idx = 0lu; idx < graphNodes.size(); idx++) {
             if (input == graphNodes[idx]) {
-                ob << idx;
+                out_buf << idx;
                 break;
             }
         }
     }
     // Serialize output nodes indices
-    ob << m_output_nodes.size();
+    out_buf << m_output_nodes.size();
     for (const auto& output : m_output_nodes) {
         for (size_t idx = 0lu; idx < graphNodes.size(); idx++) {
             if (output == graphNodes[idx]) {
-                ob << idx;
+                out_buf << idx;
                 break;
             }
         }
     }
 
     // Serialize Edges info
-    ob << m_graph_edges.size();
+    out_buf << m_graph_edges.size();
     for (const auto& edge : m_graph_edges) {
         int parent_idx = -1, child_idx = -1;
         auto parent = edge->getParent();
@@ -2378,16 +2383,16 @@ void Graph::export_graph(BinaryOutputBuffer& ob) {
                 break;
             }
         }
-        ob << parent_idx;
-        ob << child_idx;
-        ob << edge->getInputNum();
-        ob << edge->getOutputNum();
+        out_buf << parent_idx;
+        out_buf << child_idx;
+        out_buf << edge->getInputNum();
+        out_buf << edge->getOutputNum();
     }
 
-    // ob << m_outputNodesMemBlocks;
+    // out_buf << m_outputNodesMemBlocks;
 
-    // ob << m_executableGraphNodes;
-    // ob << m_executableSyncNodesInds;
+    // out_buf << m_executableGraphNodes;
+    // out_buf << m_executableSyncNodesInds;
 
 
 
@@ -2399,28 +2404,28 @@ void Graph::export_graph(BinaryOutputBuffer& ob) {
     // } catch (ov::AssertFailure &) {
     //     need_onednn_engine = false;
     // }
-    // ob << need_onednn_engine;
+    // out_buf << need_onednn_engine;
 
-    // ob << m_input_layouts;
-    // ob << primitiveIDs;
-    // ob << inputPrimitiveIDs;
-    // ob << prevPrimitiveIDs;
-    // ob << profilingIDs;
+    // out_buf << m_input_layouts;
+    // out_buf << primitiveIDs;
+    // out_buf << inputPrimitiveIDs;
+    // out_buf << prevPrimitiveIDs;
+    // out_buf << profilingIDs;
     // {
-    //     ob << perfMap.size();
+    //     out_buf << perfMap.size();
     //     for (auto& perf_item : perfMap) {
-    //         ob << perf_item.first;
-    //         ob << perf_item.second.second.layerType;
-    //         ob << cldnn::make_data(&perf_item.second.second.status, sizeof(ov::ProfilingInfo::Status));
-    //         ob << perf_item.second.second.isCPU;
-    //         ob << perf_item.second.second.parentPrimitive;
+    //         out_buf << perf_item.first;
+    //         out_buf << perf_item.second.second.layerType;
+    //         out_buf << cldnn::make_data(&perf_item.second.second.status, sizeof(ov::ProfilingInfo::Status));
+    //         out_buf << perf_item.second.second.isCPU;
+    //         out_buf << perf_item.second.second.parentPrimitive;
     //     }
     // }
-    // OstreamAttributeVisitor<cldnn::BinaryOutputBuffer> visitor(ob);
+    // OstreamAttributeVisitor<cldnn::BinaryOutputBuffer> visitor(out_buf);
     // m_config.visit_attributes(visitor);
 
-    // ob.set_stream(m_network->get_stream_ptr().get());
-    // m_network->get_program()->save(ob);
+    // out_buf.set_stream(m_network->get_stream_ptr().get());
+    // m_network->get_program()->save(out_buf);
 }
 
 }  // namespace ov::intel_cpu

@@ -76,7 +76,7 @@ Node::Node(const std::shared_ptr<ov::Node>& op, GraphContext::CPtr ctx, const Sh
       typeStr(op->get_type_name()),
       type(TypeFromName(op->get_type_name())),
       profiling(op->get_friendly_name()) {
-printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
+// printf("--CPU-- Node_1 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
     for (size_t i = 0; i < op->get_input_size(); i++) {
         const auto& shape = op->get_input_partial_shape(i);
         OPENVINO_ASSERT(!shape.rank().is_dynamic(),
@@ -203,7 +203,7 @@ Node::Node(const std::string& type,
       typeStr(type),
       type(TypeFromName(type)),
       profiling(name) {
-printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), typeStr.data(), m_name.data());
+// printf("--CPU-- Node_2 '%s' : '%s' : '%s'\n", NameFromType(this->type).data(), typeStr.data(), m_name.data());
     parentEdges.reserve(m_input_shapes.size());
     childEdges.reserve(m_output_shapes.size());
 }
@@ -214,7 +214,7 @@ Node::Node(BinaryInputBuffer& in_buf, const GraphContext::CPtr& ctx, const Shape
       profiling("tmp"),
       m_model_from_cache(true) {
     load(in_buf);
-printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
+// printf("--CPU-- Node_3 '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
 }
 
 Node::Node(BinaryInputBuffer& in_buf, const GraphContext::CPtr& ctx)
@@ -224,7 +224,7 @@ Node::Node(BinaryInputBuffer& in_buf, const GraphContext::CPtr& ctx)
       m_model_from_cache(true) {
     load(in_buf);
     // profiling.execute->strA;
-printf("--CPU-- Node_4 Created '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
+// printf("--CPU-- Node_4 Created '%s' : '%s' : '%s'\n", NameFromType(type).data(), typeStr.data(), m_name.data());
 }
 
 void Node::addEdge(const EdgePtr& edge) {
@@ -2225,73 +2225,77 @@ void Node::resolveInPlaceDirection() {
     }
 }
 
-void Node::save(BinaryOutputBuffer& ob) const {
+void Node::save(BinaryOutputBuffer& out_buf) const {
 // printf("--CPU-- Node::save %s:%d:%s\n", getTypeStr().data(), int(getType()), getName().data());
-    ob.dump_position();  // Read/Write sync position
+    out_buf.dump_position();  // Read/Write sync position
 
-    ob << m_name;
-    ob << type;
-    ob << typeStr;
-    ob << isDynamic;
-    ob << algorithm;
-    ob << inplace;
-    ob << constant;
+    out_buf << m_name;
+    out_buf << type;
+    out_buf << typeStr;
+    out_buf << isDynamic;
+    out_buf << algorithm;
+    out_buf << inplace;
+    out_buf << constant;
 
-    ob << m_input_shapes;
-    ob << m_output_shapes;
+    out_buf << m_input_shapes;
+    out_buf << m_output_shapes;
 
-    ob << m_fusing_port;
+    out_buf << m_fusing_port;
 
-    ob << m_cur_numa_node;
-    ob.dump_position();  // TODO: remove
+    out_buf << m_cur_numa_node;
+    out_buf.dump_position();  // TODO: remove
 
 // if (type == Type::Transpose && m_name == "Subtract_2565_original") {
 //     printf("TODO: Remove\n");
 // }
-    ob << supportedPrimitiveDescriptors;
-    ob.dump_position();  // TODO: remove
-    ob << selectedPrimitiveDescriptorIndex;
-    ob.dump_position();  // TODO: remove
-    // ob << primitivesPriority;
-    ob << customImplPriorities;
-    ob.dump_position();  // TODO: remove
+    out_buf << supportedPrimitiveDescriptors;
+    out_buf.dump_position();  // TODO: remove
+    out_buf << selectedPrimitiveDescriptorIndex;
+    out_buf.dump_position();  // TODO: remove
+    // out_buf << primitivesPriority;
+    out_buf << customImplPriorities;
+    out_buf.dump_position();  // TODO: remove
 
-    ob << originalLayers;
-    //ob << parallelDomain;
-    ob.dump_position();  // TODO: remove
+    out_buf << originalLayers;
+    //out_buf << parallelDomain;
+    out_buf.dump_position();  // TODO: remove
 
-    // ob << internalBlobDesc;
-    // ob << internalBlobMemory;
-    // ob << internalBlobs;
-    // ob << primArgs;
-    // ob << postOpsArgs;
-    // ob << descs;
+    // out_buf << internalBlobDesc;
+    // out_buf << internalBlobMemory;
+    // out_buf << internalBlobs;
+    // out_buf << primArgs;
+    // out_buf << postOpsArgs;
+    // out_buf << descs;
 
-    // ob << lastInputDims;  // Skip to call prepareParams()
+    // out_buf << lastInputDims;  // Skip to call prepareParams()
 
-    // ob << shapeInference;
+    // out_buf << shapeInference;
 
-    ob << originalInputPrecisions;
-    ob << originalOutputPrecisions;
-    ob << keepOriginalPrecision;
-    ob << enforceBF16evenForGraphTail;
+    out_buf << originalInputPrecisions;
+    out_buf << originalOutputPrecisions;
+    out_buf << keepOriginalPrecision;
+    out_buf << enforceBF16evenForGraphTail;
 
-    ob << execIndex;
+    out_buf << execIndex;
 
-    // ob << perfCounter;
-    // ob << profiling;
+    // out_buf << perfCounter;
+    // out_buf << profiling;
 
-    // ob << scratchpadMem;
+    // out_buf << scratchpadMem;
 
-    ob << DQScales;
+    out_buf << DQScales;
 
-    ob << fusedWith.size();
+    out_buf << fusedWith.size();
+    out_buf.dump_position();
     for (const auto& n : fusedWith) {
-        ob << n->getType();
-        ob << *n;
+        // printf("--CPU--Node::save serialize fusedWith '%s' : '%s' : %d\n",
+            // n->getName().data(), NameFromType(n->getType()).data(), int(n->getType()));
+        out_buf.dump_position();  // TODO: remove
+        out_buf << n->getType();
+        out_buf << *n;
     }
 
-    ob.dump_position();
+    out_buf.dump_position();
 }
 
 void Node::load(BinaryInputBuffer& in_buf) {
@@ -2357,6 +2361,7 @@ void Node::load(BinaryInputBuffer& in_buf) {
 
     size_t nodes_num;
     in_buf >> nodes_num;
+    in_buf.check_position();  // TODO: remove
     fusedWith.reserve(nodes_num);
     for (size_t i = 0lu; i < nodes_num; i++) {
         fusedWith.emplace_back(NodePtr(NodesFactory<BinaryInputBuffer&>::factory().create(in_buf, m_context)));
@@ -2365,10 +2370,10 @@ void Node::load(BinaryInputBuffer& in_buf) {
     in_buf.check_position();
 }
 
-void NodeDesc::save(BinaryOutputBuffer& ob) const {
-    ob << m_config;
-    ob.dump_position();  // TODO: remove
-    ob << m_implementation_type;
+void NodeDesc::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_config;
+    out_buf.dump_position();  // TODO: remove
+    out_buf << m_implementation_type;
 }
 
 void NodeDesc::load(BinaryInputBuffer& in_buf) {

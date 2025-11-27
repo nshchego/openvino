@@ -38,18 +38,20 @@ public:
         : m_attrs(std::move(attrs)),
           m_context(std::move(context)),
           m_suitable_implementations(filter(m_attrs, descriptors, memoryFormatFilter, implementationPriority)) {
-        printf("[CPU] ExecutorFactory ctr 1 type name: %s\n", typeid(*this).name());
+        // printf("--CPU-- ExecutorFactory ctr 1 type name: %s\n", typeid(*this).name());
         OPENVINO_ASSERT(!m_suitable_implementations.empty(), "No suitable implementations found");
     }
 
     ExecutorFactory(BinaryInputBuffer& in_buf, const GraphContext::CPtr& graph_context) {
-        printf("[CPU] ExecutorFactory ctr 2 type name: %s\n", typeid(*this).name());
+        // printf("--CPU-- ExecutorFactory ctr 2 type name: %s\n", typeid(*this).name());
         in_buf.check_position();  // TODO: Remove
         in_buf(m_context, graph_context);
         // m_context = std::make_shared<ExecutorContext>(in_buf, context);
         load(in_buf);
         OPENVINO_ASSERT(!m_suitable_implementations.empty(), "[CPU] No suitable executor implementation found.");
     }
+
+    // ~ExecutorFactory() = default;
 
     /**
      * @brief Retrieves the proper memory descriptors based on the provided memory descriptors.
@@ -142,7 +144,10 @@ public:
                                                          initVariableExecutor);
     }
 
-    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::ExecutorFactory<Attrs>)
+    // DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::ExecutorFactory<Attrs>)
+    static const std::string& get_type_info_s();
+
+    virtual const std::string& get_type_info() const { return get_type_info_s(); }
 
     void save(BinaryOutputBuffer& out_buf) const {
         out_buf.dump_position();  // TODO: remove
@@ -152,7 +157,7 @@ public:
         out_buf << m_suitable_implementations.size();
         out_buf.dump_position();  // TODO: remove
         for (const auto& impl : m_suitable_implementations) {
-            out_buf << std::string(impl.get().name());  // TODO: replace to char*
+           out_buf << std::string(impl.get().name());  // TODO: replace to char*
         }
         out_buf.dump_position();  // TODO: remove
     }

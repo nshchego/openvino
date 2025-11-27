@@ -51,6 +51,9 @@
 #include "transformations/utils/utils.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
 #if defined(OV_CPU_WITH_KLEIDIAI)
 #    include "openvino/core/shape.hpp"
 #    include "utils/precision_support.h"
@@ -58,6 +61,12 @@
 
 using namespace dnnl;
 using namespace ov::element;
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory<ov::intel_cpu::FCAttrs>)
+const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::FCAttrs>::get_type_info_s() {
+    static const std::string type_name("ov::intel_cpu::ExecutorFactory<ov::intel_cpu::FCAttrs>");
+    return type_name;
+}
 
 namespace ov::intel_cpu::node {
 
@@ -728,6 +737,68 @@ ov::element::Type FullyConnected::getRuntimePrecision() const {
     }
 
     return getMaxPrecision(srcTypes);
+}
+
+void FCTensorParallelConfig::save(BinaryOutputBuffer& out_buf) const {
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << w_rank;
+    out_buf << w_size;
+    out_buf << id;
+    out_buf << enable_tensor_parallel;
+    // out_buf << sub_memory;
+    // out_buf << cached_splited_weight;
+    // out_buf << cached_splited_bias;
+    // out_buf << cached_scale;
+    // out_buf << cached_zeropoint;
+    // out_buf << cached_dst;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void FCTensorParallelConfig::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> w_rank;
+    in_buf >> w_size;
+    in_buf >> id;
+    in_buf >> enable_tensor_parallel;
+    // in_buf >> sub_memory;
+    // in_buf >> cached_splited_weight;
+    // in_buf >> cached_splited_bias;
+    // in_buf >> cached_scale;
+    // in_buf >> cached_zeropoint;
+    // in_buf >> cached_dst;
+
+in_buf.check_position();  // TODO: remove
+}
+
+void FullyConnected::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_atoi;
+    out_buf << attrs;
+    // out_buf << memory;
+    out_buf << factory;
+    // out_buf << executor;
+    out_buf << tp_cfg;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void FullyConnected::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_atoi;
+    in_buf >> attrs;
+    // in_buf >> memory;
+    in_buf(factory, m_context);
+    // in_buf >> executor;
+    in_buf >> tp_cfg;
+
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

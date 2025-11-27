@@ -115,6 +115,10 @@
 #include "utils/serialization/vector_serializer.hpp"
 
 BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory<ov::intel_cpu::EltwiseAttrs>)
+const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::EltwiseAttrs>::get_type_info_s() {
+    static const std::string type_name("ov::intel_cpu::ExecutorFactory<ov::intel_cpu::EltwiseAttrs>");
+    return type_name;
+}
 
 namespace ov::intel_cpu::node {
 
@@ -846,9 +850,9 @@ void Eltwise::createPrimitive() {
     }
     m_memory[ARG_DST] = getDstMemoryAtPort(0);
 
-    if (getName() == "Subtract_3509") {
-        printf("--CPU-- Eltwise::createPrimitive '%s'\n", getName().data());
-    }
+    // if (getName() == "Subtract_3509") {
+    //     printf("--CPU-- Eltwise::createPrimitive '%s'\n", getName().data());
+    // }
     m_executor = m_factory->make(m_memory);
     getSelectedPrimitiveDescriptor()->setImplementationType(m_executor->implType());
 
@@ -1163,7 +1167,6 @@ bool Eltwise::canFuseConvert(const NodePtr& convertNode) {
                                         {convertNode->getOriginalOutputPrecisionAtPort(0)});
 }
 
-
 void Eltwise::save(BinaryOutputBuffer& ob) const {
     Node::save(ob);
 
@@ -1223,5 +1226,6 @@ void Eltwise::load(BinaryInputBuffer& in_buf) {
 
     in_buf.check_position();  // TODO: remove
 
-}  // namespace ov::intel_cpu::node
 }
+
+}  // namespace ov::intel_cpu::node

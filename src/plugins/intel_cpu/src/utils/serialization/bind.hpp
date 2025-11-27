@@ -20,7 +20,7 @@
 #define DECLARE_SERIALIZATION_OBJECT_MEMBERS(cls_name)                                  \
     static const std::string& get_type_info_s() {                                       \
         static const std::string type_name(#cls_name);                                  \
-        printf("[CPU] TYPE: '%s'\n", type_name.data()); /* TODO: remove */ \
+        /*printf("[CPU] TYPE: '%s'\n", type_name.data()); /* TODO: remove */ \
         return type_name;                                                               \
     }                                                                                   \
     virtual const std::string& get_type_info() const { return get_type_info_s(); }
@@ -28,7 +28,7 @@
 #define DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(cls_name)                         \
     static const std::string& get_type_info_s() {                                       \
         static const std::string type_name = #cls_name;                                 \
-        printf("[CPU] TYPE: '%s'\n", type_name.data()); /* TODO: remove */ \
+        /*printf("[CPU] TYPE: '%s'\n", type_name.data()); /* TODO: remove */ \
         return type_name;                                                               \
     }                                                                                   \
     const std::string& get_type_info() const override { return get_type_info_s(); }
@@ -88,12 +88,12 @@ struct LoaderStorage {
     }
 
     const FuncType& get_load_function(const std::string& type) {
-        printf("LoaderStorage::get_load_function type: '%s'\n", type.data());
+        // printf("LoaderStorage::get_load_function type: '%s'\n", type.data());
         return m_functions_map.at(type);
     }
 
     void set_load_function(const ValueType& pair) {
-        m_functions_map.insert(pair);
+        m_functions_map.insert(pair);  // TODO: Actually there is a one fn for different Keys. Change key to args list?
     }
 
 private:
