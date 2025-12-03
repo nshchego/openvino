@@ -59,6 +59,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -3872,6 +3874,168 @@ bool Reduce::canFuse(const NodePtr& node) const {
 
 bool Reduce::created() const {
     return getType() == Type::Reduce;
+}
+
+void Reduce::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << blk_size;
+    out_buf << jit_beyond_5D;
+    out_buf << jit_mode;
+    out_buf << keep_dims;
+    out_buf << round_to_zero;
+    out_buf << is_hybrid_layout;
+    out_buf << compile_post_kernel;
+    out_buf << apply_post_kernel;
+    out_buf << apply_division;
+    out_buf << fuse_low_precision;
+    out_buf << support_split;
+    out_buf << precision_change;
+    out_buf << ReduceAll_opt;
+    out_buf << ReduceDH_opt;
+    out_buf << ReduceCDW_opt;
+    out_buf << use_aux_kernel;
+    out_buf << set_use_aux_kernel;
+    out_buf << empty_input;
+    out_buf << ReduceN;
+    out_buf << ReduceC;
+    out_buf << ReduceD;
+    out_buf << ReduceH;
+    out_buf << ReduceW;
+    out_buf << IB;
+    out_buf << IC;
+    out_buf << ID;
+    out_buf << IH;
+    out_buf << IW;
+    out_buf << OB;
+    out_buf << OC;
+    out_buf << OD;
+    out_buf << OH;
+    out_buf << OW;
+    out_buf << PD;
+    out_buf << PH;
+    out_buf << PW;
+    out_buf << src_data_size;
+    out_buf << dst_data_size;
+    out_buf << prc_data_size;
+    out_buf << intermediate_data_size;
+    out_buf << tmp_data_size;
+    out_buf << dst_size;
+    out_buf << prc_size;
+    out_buf << intermediate_size;
+    out_buf << tmp_size;
+    out_buf << reduce_stride;
+    // out_buf << tmp_ptr = nullptr;
+    out_buf << layout;
+    out_buf << input_prec;
+    out_buf << output_prec;
+    out_buf << intermediate_prec;
+    out_buf << tmp_prec;
+    out_buf << src_dims;
+    out_buf << process_dst_dims;
+    out_buf << axes_for_reduction;
+    out_buf << raw_axes;
+    out_buf << intermediate_buf;
+
+    // jit_reduce_config_params jcp{};  // TODO: serialize jit_reduce_config_params
+    // jit_reduce_config_params aux_jcp{};
+
+    // dnnl::primitive_attr attr;
+
+    // out_buf << postOpsDataPtrs;
+
+    // out_buf << prc_mem;
+    out_buf << vec_reduceDH_prc;
+    out_buf << vec_reduceCDW_prc;
+
+    // std::shared_ptr<jit_uni_reduce_kernel> reduce_kernel;
+    // std::shared_ptr<jit_uni_reduce_kernel> reduce_aux_kernel;
+    // std::shared_ptr<jit_uni_reduce_kernel> reduce_tmp_kernel;
+    // std::shared_ptr<jit_uni_reduce_post_kernel> reduce_post_kernel;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void Reduce::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> blk_size;
+    in_buf >> jit_beyond_5D;
+    in_buf >> jit_mode;
+    in_buf >> keep_dims;
+    in_buf >> round_to_zero;
+    in_buf >> is_hybrid_layout;
+    in_buf >> compile_post_kernel;
+    in_buf >> apply_post_kernel;
+    in_buf >> apply_division;
+    in_buf >> fuse_low_precision;
+    in_buf >> support_split;
+    in_buf >> precision_change;
+    in_buf >> ReduceAll_opt;
+    in_buf >> ReduceDH_opt;
+    in_buf >> ReduceCDW_opt;
+    in_buf >> use_aux_kernel;
+    in_buf >> set_use_aux_kernel;
+    in_buf >> empty_input;
+    in_buf >> ReduceN;
+    in_buf >> ReduceC;
+    in_buf >> ReduceD;
+    in_buf >> ReduceH;
+    in_buf >> ReduceW;
+    in_buf >> IB;
+    in_buf >> IC;
+    in_buf >> ID;
+    in_buf >> IH;
+    in_buf >> IW;
+    in_buf >> OB;
+    in_buf >> OC;
+    in_buf >> OD;
+    in_buf >> OH;
+    in_buf >> OW;
+    in_buf >> PD;
+    in_buf >> PH;
+    in_buf >> PW;
+    in_buf >> src_data_size;
+    in_buf >> dst_data_size;
+    in_buf >> prc_data_size;
+    in_buf >> intermediate_data_size;
+    in_buf >> tmp_data_size;
+    in_buf >> dst_size;
+    in_buf >> prc_size;
+    in_buf >> intermediate_size;
+    in_buf >> tmp_size;
+    in_buf >> reduce_stride;
+    // in_buf >> tmp_ptr = nullptr;
+    in_buf >> layout;
+    in_buf >> input_prec;
+    in_buf >> output_prec;
+    in_buf >> intermediate_prec;
+    in_buf >> tmp_prec;
+    in_buf >> src_dims;
+    in_buf >> process_dst_dims;
+    in_buf >> axes_for_reduction;
+    in_buf >> raw_axes;
+    in_buf >> intermediate_buf;
+
+    // jit_reduce_config_params jcp{};  // TODO: serialize jit_reduce_config_params
+    // jit_reduce_config_params aux_jcp{};
+
+    // dnnl::primitive_attr attr;
+
+    // in_buf >> postOpsDataPtrs;
+
+    // in_buf >> prc_mem;
+    in_buf >> vec_reduceDH_prc;
+    in_buf >> vec_reduceCDW_prc;
+
+    // std::shared_ptr<jit_uni_reduce_kernel> reduce_kernel;
+    // std::shared_ptr<jit_uni_reduce_kernel> reduce_aux_kernel;
+    // std::shared_ptr<jit_uni_reduce_kernel> reduce_tmp_kernel;
+    // std::shared_ptr<jit_uni_reduce_post_kernel> reduce_post_kernel;
+
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

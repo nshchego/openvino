@@ -902,4 +902,36 @@ void StridedSlice::StridedSliceCommonExecutor::exec(const std::vector<MemoryCPtr
     }
 }
 
+void StridedSlice::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << isStrideSpecified;
+    out_buf << isAxesSpecified;
+
+    for (size_t i = 0UL; i < 6; i++) {
+        out_buf << isConstantInput[i];
+    }
+    out_buf << shapeHasDataDependency;
+    out_buf << hasConstAttrInputs;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void StridedSlice::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> isStrideSpecified;
+    in_buf >> isAxesSpecified;
+
+    for (size_t i = 0UL; i < 6; i++) {
+        in_buf >> isConstantInput[i];
+    }
+    in_buf >> shapeHasDataDependency;
+    in_buf >> hasConstAttrInputs;
+
+in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

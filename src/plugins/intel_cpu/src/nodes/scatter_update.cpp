@@ -40,6 +40,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 using namespace dnnl;
 
@@ -1131,6 +1132,45 @@ void ScatterUpdate::scatterNDUpdate(const MemoryPtr& mem_data,
 
 bool ScatterUpdate::created() const {
     return any_of(getType(), Type::ScatterUpdate, Type::ScatterElementsUpdate, Type::ScatterNDUpdate);
+}
+
+void ScatterUpdate::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << scatterUpdateMode;
+    out_buf << reduction_type;
+    out_buf << use_init_val;
+    out_buf << axisRelaxed;
+    out_buf << dataSize;
+    out_buf << indicesSize;
+    out_buf << axisSize;
+    out_buf << dataPrec;
+    out_buf << indicesPrec;
+    out_buf << axisPrec;
+    out_buf << isUpdateScalar;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ScatterUpdate::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> scatterUpdateMode;
+    in_buf >> reduction_type;
+    in_buf >> use_init_val;
+    in_buf >> axisRelaxed;
+    in_buf >> dataSize;
+    in_buf >> indicesSize;
+    in_buf >> axisSize;
+    in_buf >> dataPrec;
+    in_buf >> indicesPrec;
+    in_buf >> axisPrec;
+    in_buf >> isUpdateScalar;
+
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

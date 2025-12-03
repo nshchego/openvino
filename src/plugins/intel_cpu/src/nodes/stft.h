@@ -35,6 +35,10 @@ public:
         return false;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     [[nodiscard]] bool needShapeInfer() const override;
 

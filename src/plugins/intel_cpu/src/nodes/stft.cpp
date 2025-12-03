@@ -211,4 +211,26 @@ void STFT::createPrimitive() {
     Node::createPrimitive();
 }
 
+void STFT::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_transpose_frames;
+    out_buf << m_is_frame_size_const;
+    out_buf << m_is_frame_step_const;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void STFT::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_transpose_frames;
+    in_buf >> m_is_frame_size_const;
+    in_buf >> m_is_frame_step_const;
+
+in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

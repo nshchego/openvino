@@ -102,6 +102,10 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     void topk_process(const uint8_t* in_ptr, uint8_t* out_ptr, uint8_t* out_idx_ptr);
     void topk_ref(const float* in_ptr, float* out_ptr, int32_t* dst_idx);
@@ -130,9 +134,9 @@ private:
     bool stable = false;
     bool mode_max = false;
     int axis = 0;
-    static const size_t TOPK_DATA = 0;
-    static const size_t TOPK_K = 1;
-    static const size_t TOPK_INDEX = 1;
+    static constexpr size_t TOPK_DATA = 0;
+    static constexpr size_t TOPK_K = 1;
+    static constexpr size_t TOPK_INDEX = 1;
     size_t O = 0, A = 0, I = 0;
     size_t blk_size = 0;
     size_t data_size = 0;

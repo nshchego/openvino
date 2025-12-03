@@ -243,4 +243,22 @@ bool RMSNorm::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, st
     return true;
 }
 
+void RMSNorm::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_eps;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void RMSNorm::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_eps;
+
+in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

@@ -49,7 +49,7 @@ ShapeOf::ShapeOf(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& 
 
 ShapeOf::ShapeOf(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
-    load(in_buf);
+    // load(in_buf);
 }
 
 void ShapeOf::getSupportedDescriptors() {

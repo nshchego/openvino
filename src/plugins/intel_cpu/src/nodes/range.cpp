@@ -67,7 +67,7 @@ Range::Range(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& cont
 
 Range::Range(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
-    load(in_buf);
+    // load(in_buf);
 }
 
 void Range::initSupportedPrimitiveDescriptors() {

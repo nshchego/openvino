@@ -71,6 +71,10 @@ public:
         size_t UPDATES_ID = 1;
     } attrs;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     bool needPrepareParams() const override;
     void prepareParams() override;

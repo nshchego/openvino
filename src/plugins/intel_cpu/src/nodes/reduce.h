@@ -126,6 +126,10 @@ public:
     bool isExecutable() const override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     void reduce_type(const uint8_t* in_ptr, uint8_t* out_ptr);
     void reduce_PLN(const uint8_t* in_ptr, uint8_t* out_ptr);
@@ -162,8 +166,8 @@ private:
     bool canApplyJIT(const ov::element::Type& input_prec, const ov::element::Type& output_prec) const;
 
     size_t blk_size = 0;
-    static const size_t REDUCE_DATA = 0;
-    static const size_t REDUCE_INDEXES = 1;
+    static constexpr size_t REDUCE_DATA = 0;
+    static constexpr size_t REDUCE_INDEXES = 1;
     bool jit_beyond_5D = false;
     bool jit_mode = true;
     bool keep_dims = true;

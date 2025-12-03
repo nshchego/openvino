@@ -123,6 +123,10 @@ public:
                          const MemoryPtr& mem_updates,
                          const scatter_reductions::ReduceNone& kernel);
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     void scatterUpdate(uint8_t* indicesPtr, uint8_t* updatePtr, int axis, uint8_t* dstDataPtr);
     void scatterNDUpdate(const MemoryPtr& dstMemPtr, const MemoryPtr& indicesMemPtr, const MemoryPtr& updateMemPtr);

@@ -40,6 +40,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -2568,6 +2570,84 @@ inline int TopK::count(const VectorDims& dims, size_t start_ind) {
 
 bool TopK::created() const {
     return getType() == Type::TopK;
+}
+
+void TopK::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << topk_innermost;
+    out_buf << jit_mode;
+    out_buf << sort_index;
+    out_buf << stable;
+    out_buf << mode_max;
+    out_buf << axis;
+    out_buf << O;
+    out_buf << A;
+    out_buf << I;
+    out_buf << blk_size;
+    out_buf << data_size;
+    out_buf << axis_dim;
+    out_buf << top_k;
+    out_buf << dim;
+    out_buf << before_num;
+    out_buf << bubble_inplace;
+    out_buf << preset_params_done;
+
+    out_buf << src_dims;
+    out_buf << dst_dims;
+    out_buf << layout;
+    out_buf << algorithm;
+
+    out_buf << vec_bitonic_idx;
+    out_buf << vec_bitonic_k_idx;
+
+    out_buf << vec_idx_seq;
+    out_buf << vec_idx_block;
+
+    out_buf << vec_process_ptr;
+    out_buf << vec_process_idx_ptr;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void TopK::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> topk_innermost;
+    in_buf >> jit_mode;
+    in_buf >> sort_index;
+    in_buf >> stable;
+    in_buf >> mode_max;
+    in_buf >> axis;
+    in_buf >> O;
+    in_buf >> A;
+    in_buf >> I;
+    in_buf >> blk_size;
+    in_buf >> data_size;
+    in_buf >> axis_dim;
+    in_buf >> top_k;
+    in_buf >> dim;
+    in_buf >> before_num;
+    in_buf >> bubble_inplace;
+    in_buf >> preset_params_done;
+
+    in_buf >> src_dims;
+    in_buf >> dst_dims;
+    in_buf >> layout;
+    in_buf >> algorithm;
+
+    in_buf >> vec_bitonic_idx;
+    in_buf >> vec_bitonic_k_idx;
+
+    in_buf >> vec_idx_seq;
+    in_buf >> vec_idx_block;
+
+    in_buf >> vec_process_ptr;
+    in_buf >> vec_process_idx_ptr;
+
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

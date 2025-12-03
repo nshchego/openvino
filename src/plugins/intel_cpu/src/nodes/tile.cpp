@@ -25,6 +25,7 @@
 #include "openvino/op/tile.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -244,6 +245,30 @@ void Tile::plainExecute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool Tile::created() const {
     return getType() == Type::Tile;
+}
+
+void Tile::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+out_buf.dump_position();  // TODO: remove
+
+    out_buf << axis;
+    out_buf << tiles;
+    out_buf << noTiling;
+    out_buf << originRepeats;
+
+out_buf.dump_position();  // TODO: remove
+}
+
+void Tile::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position();  // TODO: remove
+
+    in_buf >> axis;
+    in_buf >> tiles;
+    in_buf >> noTiling;
+    in_buf >> originRepeats;
+
+in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

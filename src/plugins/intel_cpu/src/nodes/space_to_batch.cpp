@@ -26,6 +26,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/core/type/element_type_traits.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -290,6 +291,26 @@ void SpaceToBatch::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool SpaceToBatch::created() const {
     return getType() == Type::SpaceToBatch;
+}
+
+void SpaceToBatch::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << blockShapeIn;
+    out_buf << padsBeginIn;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void SpaceToBatch::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> blockShapeIn;
+    in_buf >> padsBeginIn;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

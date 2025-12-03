@@ -37,6 +37,10 @@ public:
     void createPrimitive() override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     struct Executor {
         virtual void execute(const std::vector<MemoryPtr>& inputs, MemoryPtr output) = 0;
