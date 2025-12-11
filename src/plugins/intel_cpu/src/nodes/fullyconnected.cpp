@@ -776,7 +776,7 @@ in_buf.check_position();  // TODO: remove
 void FullyConnected::save(BinaryOutputBuffer& out_buf) const {
     Node::save(out_buf);
 
-out_buf.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
     out_buf << m_atoi;
     out_buf << attrs;
@@ -785,11 +785,11 @@ out_buf.dump_position();  // TODO: remove
     // out_buf << executor;
     out_buf << tp_cfg;
 
-out_buf.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void FullyConnected::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
     in_buf >> m_atoi;
     in_buf >> attrs;
@@ -798,7 +798,7 @@ in_buf.check_position();  // TODO: remove
     // in_buf >> executor;
     in_buf >> tp_cfg;
 
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -40,4 +40,28 @@ Result FCShapeInfer::infer(const std::vector<std::reference_wrapper<const Vector
 
     return {{std::move(outputShape)}, ShapeInferStatus::success};
 }
+
+void FCShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << out_rank;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void FCShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> out_rank;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node
+
+// auto& loader = LoaderStorage<BinaryInputBuffer, std::function<void(BinaryInputBuffer&, std::unique_ptr<void, VoidDeleter<void>>&)>>::instance();
+// auto load_fn = [](BinaryInputBuffer& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
+//     auto derived_ptr = std::unique_ptr<FCShapeInfer>(new FCShapeInfer(buffer));
+//     dst_ptr.reset(derived_ptr.release());
+// }
+// loader.set_load_function({FCShapeInfer::get_type_info_s(), load_fn});

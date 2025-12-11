@@ -16,6 +16,7 @@
 #include "openvino/op/transpose.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_status.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -39,6 +40,29 @@ Result TransposeShapeInfer::infer(const std::vector<std::reference_wrapper<const
     }
     return {{m_outputShape}, ShapeInferStatus::success};
 }
+
+void TransposeShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    // out_buf << m_out_rank;
+    // out_buf << m_axes_vec;
+    out_buf << m_outputShape;
+    // out_buf << m_needReverse;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void TransposeShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    // in_buf >> m_out_rank;
+    // in_buf >> m_axes_vec;
+    in_buf >> m_outputShape;
+    // in_buf >> m_needReverse;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 ShapeInferPtr TransposeShapeInferFactory::makeShapeInfer() const {
     if (const auto order = ov::as_type_ptr<const ov::op::v0::Constant>(
             m_op->get_input_node_shared_ptr(ov::op::v1::Transpose::ORDER))) {
@@ -48,3 +72,10 @@ ShapeInferPtr TransposeShapeInferFactory::makeShapeInfer() const {
     return std::make_shared<TransposeDynShapeInfer>();
 }
 }  // namespace ov::intel_cpu::node
+
+// auto& loader = LoaderStorage<BinaryInputBuffer, std::function<void(BinaryInputBuffer&, std::unique_ptr<void, VoidDeleter<void>>&)>>::instance();
+// auto load_fn = [](BinaryInputBuffer& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
+//     auto derived_ptr = std::unique_ptr<FCShapeInfer>(new FCShapeInfer(buffer));
+//     dst_ptr.reset(derived_ptr.release());
+// }
+// loader.set_load_function({FCShapeInfer::get_type_info_s(), load_fn});

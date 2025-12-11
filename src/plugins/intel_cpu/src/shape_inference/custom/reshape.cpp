@@ -83,6 +83,22 @@ Result ReshapeShapeInfer::infer(const std::vector<std::reference_wrapper<const V
     return {{std::move(outputShape)}, ShapeInferStatus::success};
 }
 
+void ReshapeShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_specialZero;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ReshapeShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_specialZero;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 Result SqueezeShapeInfer::infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                                 const std::unordered_map<size_t, MemoryPtr>& data_dependency) {
     static constexpr size_t SQUEEZE_SRC = 0;

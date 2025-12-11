@@ -61,3 +61,5 @@ Result EltwiseShapeInfer::infer(const std::vector<std::reference_wrapper<const V
 }
 
 }  // namespace ov::intel_cpu::node
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::node::EltwiseShapeInfer)

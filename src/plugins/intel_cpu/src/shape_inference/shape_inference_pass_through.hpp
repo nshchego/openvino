@@ -34,6 +34,12 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return EMPTY_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferPassThrough)
+
+    void save(BinaryOutputBuffer& out_buf) const override {};
+
+    void load(BinaryInputBuffer& in_buf) override {};
 };
 
 class PassThroughShapeInferFactory final : public ShapeInferFactory {

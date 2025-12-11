@@ -20,13 +20,22 @@ using Result = IShapeInfer::Result;
 
 class FCShapeInfer : public ShapeInferEmptyPads {
 public:
+    FCShapeInfer() = default;
+
     explicit FCShapeInfer(size_t outPut_rank) : out_rank(outPut_rank) {}
+
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                  const std::unordered_map<size_t, MemoryPtr>& data_dependency) override;
 
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return EMPTY_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::FCShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     size_t out_rank = 0;

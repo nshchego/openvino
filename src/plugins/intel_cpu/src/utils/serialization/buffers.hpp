@@ -17,22 +17,22 @@ namespace ov::intel_cpu {
 template <typename BufferType>
 class Buffer {
 public:
-    Buffer(BufferType* const buffer) : buffer(buffer) {}
+    Buffer(BufferType* const buffer) : m_buffer(buffer) {}
 
     virtual ~Buffer() {}
 
     template <typename ... Types>
     inline BufferType& operator()(Types&& ... args) {
         process(std::forward<Types>(args)...);
-        return *buffer;
+        return *m_buffer;
     }
 
 protected:
-    inline BufferType& getBuffer() {
-        return *buffer;
+    inline BufferType& get_buffer() {
+        return *m_buffer;
     }
 
-    BufferType* const buffer;
+    BufferType* const m_buffer;
 
 private:
     template <typename T, typename ... OtherTypes>
@@ -43,7 +43,7 @@ private:
 
     template <typename T>
     inline void process(T&& object) {
-        buffer->process(std::forward<T>(object));
+        m_buffer->process(std::forward<T>(object));
     }
 };
 
@@ -57,12 +57,12 @@ public:
     template <typename T>
     inline BufferType& operator<<(T&& arg) {
         process(std::forward<T>(arg));
-        return Buffer<BufferType>::getBuffer();
+        return Buffer<BufferType>::get_buffer();
     }
 private:
     template <typename T>
     inline void process(T&& object) {
-        Serializer<BufferType, typename std::remove_const<typename std::remove_reference<T>::type>::type>::save(*Buffer<BufferType>::buffer, object);
+        Serializer<BufferType, typename std::remove_const<typename std::remove_reference<T>::type>::type>::save(*Buffer<BufferType>::m_buffer, object);
     }
 };
 
@@ -115,7 +115,7 @@ public:
     template <typename T>
     inline BufferType& operator>>(T&& arg) {
         process(std::forward<T>(arg));
-        return Buffer<BufferType>::getBuffer();
+        return Buffer<BufferType>::get_buffer();
     }
 
     // template <typename T, typename ... Types>
@@ -133,7 +133,7 @@ public:
 private:
     template <typename T>
     inline void process(T&& object) {
-        Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::buffer, object);
+        Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::m_buffer, object);
     }
 
     // template <typename T, typename ... OtherTypes>
@@ -143,7 +143,7 @@ private:
 
     template <typename T, typename ... OtherTypes>
     inline void process(T&& object, OtherTypes&& ... args) {
-        Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::buffer,
+        Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::m_buffer,
                                                                               std::forward<T>(object),
                                                                               std::forward<OtherTypes>(args)...);
     }
@@ -252,6 +252,11 @@ template <typename T>
 class Serializer<BinaryInputBuffer, T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 public:
     static void load(BinaryInputBuffer& buffer, T& object) {
+// printf("-READ- T at %llu\n", buffer.get_position());
+        buffer.read(std::addressof(object), sizeof(object));
+    }
+
+    static void load(BinaryInputBuffer& buffer, const T& object) {
 // printf("-READ- T at %llu\n", buffer.get_position());
         buffer.read(std::addressof(object), sizeof(object));
     }

@@ -36,6 +36,7 @@
 #include "openvino/op/strided_slice.hpp"
 #include "shape_inference/custom/strided_slice.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -905,8 +906,9 @@ void StridedSlice::StridedSliceCommonExecutor::exec(const std::vector<MemoryCPtr
 void StridedSlice::save(BinaryOutputBuffer& out_buf) const {
     Node::save(out_buf);
 
-out_buf.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << attrs;
     out_buf << isStrideSpecified;
     out_buf << isAxesSpecified;
 
@@ -916,12 +918,13 @@ out_buf.dump_position();  // TODO: remove
     out_buf << shapeHasDataDependency;
     out_buf << hasConstAttrInputs;
 
-out_buf.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void StridedSlice::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
+    in_buf >> attrs;
     in_buf >> isStrideSpecified;
     in_buf >> isAxesSpecified;
 
@@ -931,7 +934,79 @@ in_buf.check_position();  // TODO: remove
     in_buf >> shapeHasDataDependency;
     in_buf >> hasConstAttrInputs;
 
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
+}
+
+void StridedSlice::StridedSliceAttributes::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << begin;
+    out_buf << end;
+    out_buf << stride;
+    out_buf << axes;
+
+    out_buf << beginMask;
+    out_buf << endMask;
+    out_buf << ellipsisMask;
+    out_buf << newAxisMask;
+    out_buf << shrinkAxisMask;
+
+    out_buf << beginDims;
+    out_buf << endDims;
+    out_buf << strideDims;
+    out_buf << axesDims;
+
+    out_buf << equalDims;
+    out_buf << dataSize;
+    out_buf << ellipsisMaskCounter;
+    out_buf << isStridedSliceOp;
+    out_buf << isSliceScatterOp;
+    out_buf << ellipsisPos1;
+    out_buf << hasConstInputs;
+    out_buf << DATA_ID;
+    out_buf << BEGIN_ID;
+    out_buf << END_ID;
+    out_buf << STRIDE_ID;
+    out_buf << AXES_ID;
+    out_buf << UPDATES_ID;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void StridedSlice::StridedSliceAttributes::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> begin;
+    in_buf >> end;
+    in_buf >> stride;
+    in_buf >> axes;
+
+    in_buf >> beginMask;
+    in_buf >> endMask;
+    in_buf >> ellipsisMask;
+    in_buf >> newAxisMask;
+    in_buf >> shrinkAxisMask;
+
+    in_buf >> beginDims;
+    in_buf >> endDims;
+    in_buf >> strideDims;
+    in_buf >> axesDims;
+
+    in_buf >> equalDims;
+    in_buf >> dataSize;
+    in_buf >> ellipsisMaskCounter;
+    in_buf >> isStridedSliceOp;
+    in_buf >> isSliceScatterOp;
+    in_buf >> ellipsisPos1;
+    in_buf >> hasConstInputs;
+    in_buf >> DATA_ID;
+    in_buf >> BEGIN_ID;
+    in_buf >> END_ID;
+    in_buf >> STRIDE_ID;
+    in_buf >> AXES_ID;
+    in_buf >> UPDATES_ID;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

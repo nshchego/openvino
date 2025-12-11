@@ -31,11 +31,15 @@ public:
         return EMPTY_PORT_MASK;
     }
 
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::TransposeDynShapeInfer)
+
 private:
 };
 
 class TransposeShapeInfer : public ShapeInferEmptyPads {
 public:
+    TransposeShapeInfer() = default;
+
     TransposeShapeInfer(const size_t& out_rank, const std::vector<size_t>& axes_vec);
 
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
@@ -45,11 +49,17 @@ public:
         return EMPTY_PORT_MASK;
     }
 
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::TransposeShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
-    const size_t m_out_rank;
-    const std::vector<size_t> m_axes_vec;
-    VectorDims m_outputShape;
-    const bool m_needReverse;
+    const size_t m_out_rank = 0;
+    const std::vector<size_t> m_axes_vec = {};
+    VectorDims m_outputShape = {};
+    const bool m_needReverse = true;
 };
 
 class TransposeShapeInferFactory : public ShapeInferFactory {

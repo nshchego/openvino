@@ -63,12 +63,16 @@ public:
         bool isSliceScatterOp = false;
         int ellipsisPos1 = -1;
         bool hasConstInputs = false;
-        size_t DATA_ID = 0;
-        size_t BEGIN_ID = 1;
-        size_t END_ID = 2;
-        size_t STRIDE_ID = 3;
-        size_t AXES_ID = 4;
-        size_t UPDATES_ID = 1;
+        size_t DATA_ID = 0UL;
+        size_t BEGIN_ID = 1UL;
+        size_t END_ID = 2UL;
+        size_t STRIDE_ID = 3UL;
+        size_t AXES_ID = 4UL;
+        size_t UPDATES_ID = 1UL;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     } attrs;
 
     void save(BinaryOutputBuffer& out_buf) const override;

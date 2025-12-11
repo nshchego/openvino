@@ -61,7 +61,7 @@ struct SaverStorage {
         return it->second;
     }
 
-    void set_save_function(const ValueType& pair) {
+    void set_save_function(const ValueType& pair) {  // TODO: static
         m_functions_map.insert(pair);
     }
 
@@ -70,8 +70,12 @@ private:
     SaverStorage(const SaverStorage&) = delete;
     void operator=(const SaverStorage&) = delete;
 
-    std::unordered_map<std::string, SaveFunction> m_functions_map;
+    std::unordered_map<std::string, SaveFunction> m_functions_map;  // TODO: static
 };
+// #define ...
+// SomeWrapper{
+//     SaverStorage<BufferType>::set_save_function(pair);
+// }
 
 template <typename T>
 struct VoidDeleter {
@@ -188,7 +192,7 @@ public:
 
 private:
     BufferBinder() {
-        // dif<BufferType>::instance().set_load_function(
+        // def<BufferType>::instance().set_load_function(  // TODO: it should for default ctr only. Remove.
         //         {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
         //     std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T());
         //     derived_ptr->load(buffer);
@@ -218,6 +222,7 @@ private:
         dif<BufferType>::instance().set_load_function(
             {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::CPtr& context) {
             std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T(buffer, context));
+            // auto derived_ptr = std::unique_ptr<T>(new T(buffer, context));
             dst_ptr.reset(derived_ptr.release());
         }});
     }

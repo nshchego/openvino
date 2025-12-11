@@ -32,6 +32,8 @@ public:
                                                           const ov::ITensorAccessor& tensor_accessor) = 0;
 
     virtual const std::vector<int64_t>& get_input_ranks() = 0;
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::IStaticShapeInfer)
 };
 
 std::shared_ptr<IStaticShapeInfer> make_shape_inference(std::shared_ptr<ov::Node> op);

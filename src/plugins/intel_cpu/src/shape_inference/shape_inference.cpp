@@ -10,10 +10,12 @@
 #include <memory>
 #include <openvino/core/node.hpp>
 #include <optional>
+#include <typeinfo>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <typeinfo>
 
 // @todo try to get rid of supression
 // NOLINTBEGIN(misc-include-cleaner)
@@ -268,6 +270,8 @@
 #include "unsqueeze_shape_inference.hpp"
 #include "utils.hpp"
 #include "utils/bit_util.hpp"
+#include "utils/serialization/bind.hpp"
+// #include "utils/serialization/buffers.hpp"
 #include "variadic_split_shape_inference.hpp"
 // NOLINTEND(misc-include-cleaner)
 
@@ -280,6 +284,8 @@ namespace ov::intel_cpu {
 class ShapeInferBase : public IStaticShapeInfer {
 public:
     using iface_type = IStaticShapeInfer;
+
+    ShapeInferBase() = default;
 
     explicit ShapeInferBase(std::shared_ptr<ov::Node> node) : m_node{std::move(node)} {
         static_assert(std::is_same_v<int64_t, Dimension::value_type>, "Rank type not match to input_ranks type.");
@@ -329,6 +335,8 @@ public:
         return EMPTY_PORT_MASK;
     }
 
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferBase)
+
 protected:
     std::vector<int64_t> m_input_ranks;
     std::shared_ptr<ov::Node> m_node;
@@ -354,6 +362,8 @@ public:
                                                   [[maybe_unused]] const ov::ITensorAccessor& acc) override {
         return {op::copy_shape_infer(m_node.get(), input_shapes)};
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferCopy)
 };
 
 /**
@@ -367,6 +377,8 @@ public:
                                                   [[maybe_unused]] const ov::ITensorAccessor& acc) override {
         return {op::eltwise_shape_infer(m_node.get(), input_shapes)};
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferEltwise)
 };
 
 /**
@@ -413,12 +425,16 @@ public:
         // For fallback return full port mask to try get data for all node's inputs
         return FULL_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferFallback)
 };
 
 template <class TOp, IShapeInfer::port_mask_t MASK>
 class ShapeInferTA : public ShapeInferBase {
 public:
     using ShapeInferBase::ShapeInferBase;
+
+    ShapeInferTA() = default;
 
     std::optional<std::vector<StaticShape>> infer(const std::vector<StaticShapeRef>& input_shapes,
                                                   const ov::ITensorAccessor& tensor_accessor) override {
@@ -428,6 +444,16 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return MASK;
     }
+
+    // DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferTA)
+
+    static const std::string& get_type_info_s() {
+        static const std::string type_name =
+            std::string("ov::intel_cpu::ShapeInferTA<") + typeid(TOp).name() + "_" + std::to_string(MASK) + ">";
+        return type_name;
+    }
+
+    const std::string& get_type_info() const override { return get_type_info_s(); }
 };
 
 /**
@@ -442,10 +468,22 @@ class ShapeInferTA<TOp, EMPTY_PORT_MASK> : public ShapeInferBase {
 public:
     using ShapeInferBase::ShapeInferBase;
 
+    ShapeInferTA() = default;
+
     std::optional<std::vector<StaticShape>> infer(const std::vector<StaticShapeRef>& input_shapes,
                                                   [[maybe_unused]] const ov::ITensorAccessor& acc) override {
         return {shape_infer(static_cast<TOp*>(m_node.get()), input_shapes)};
     }
+
+    // DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferTA)
+
+    static const std::string& get_type_info_s() {
+        static const std::string type_name =
+            std::string("ov::intel_cpu::ShapeInferTA<") + typeid(TOp).name() + "_" + std::to_string(EMPTY_PORT_MASK) + ">";
+        return type_name;
+    }
+
+    const std::string& get_type_info() const override { return get_type_info_s(); }
 };
 
 /** @brief Base shape inference object implementing the IStaticShapeInfer with padding support. */
@@ -460,6 +498,8 @@ public:
     const ov::CoordinateDiff& get_pads_end() override {
         return m_pads_end;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferPaddingBase)
 
 protected:
     ov::CoordinateDiff m_pads_begin, m_pads_end;
@@ -774,3 +814,54 @@ std::shared_ptr<IStaticShapeInfer> make_shape_inference(std::shared_ptr<ov::Node
 }
 
 }  // namespace ov::intel_cpu
+
+// template class ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>)
+
+//  TODO: redo with macros
+// namespace ov::intel_cpu {
+//     template <>
+//     class BindCreator<ov::intel_cpu::BinaryOutputBuffer, ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>> {
+//     private:
+//         static const InstanceCreator<ov::intel_cpu::BinaryOutputBuffer, ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>>& m_creator;
+//     };
+//     const InstanceCreator<BinaryOutputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>& BindCreator<BinaryOutputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>::m_creator =
+//         StaticInstance<InstanceCreator<BinaryOutputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>>::get_instance().instantiate();
+
+//     template <>
+//     class BindCreator<ov::intel_cpu::BinaryInputBuffer, ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>> {
+//     private:
+//         static const InstanceCreator<ov::intel_cpu::BinaryInputBuffer, ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>>& m_creator;
+//     };
+//     const InstanceCreator<BinaryInputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>& BindCreator<BinaryInputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>::m_creator =
+//         StaticInstance<InstanceCreator<BinaryInputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>>::get_instance().instantiate();
+// }  // namespace ov::intel_cpu
+
+using ShapeInferTA_Broadcast_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Broadcast_6)
+
+using ShapeInferTA_Split_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Split, 6U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Split_6)
+
+using ShapeInferTA_VariadicSplit_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::VariadicSplit, 6U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_VariadicSplit_6)
+
+using ShapeInferTA_Concat_0 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Concat, 0U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Concat_0)
+
+using ShapeInferTA_Slice_30 = ov::intel_cpu::ShapeInferTA<ov::op::v8::Slice, 30U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Slice_30)
+
+using ShapeInferTA_Tile_2 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Tile, 2U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Tile_2)
+
+using ShapeInferTA_TopK_2 = ov::intel_cpu::ShapeInferTA<ov::op::v11::TopK, 2U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_TopK_2)
+
+using ShapeInferTA_ScatterElementsUpdate_8 = ov::intel_cpu::ShapeInferTA<ov::op::v3::ScatterElementsUpdate, 8U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ScatterElementsUpdate_8)
+
+using ShapeInferTA_ReduceSum_2 = ov::intel_cpu::ShapeInferTA<ov::op::v1::ReduceSum, 2U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ReduceSum_2)
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferCopy)

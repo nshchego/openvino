@@ -23,6 +23,8 @@ using Result = IShapeInfer::Result;
 
 class GatherShapeInfer : public ShapeInferEmptyPads {
 public:
+    GatherShapeInfer() = default;
+
     GatherShapeInfer(bool isAxisInputConst, bool isIndicesScalar, int axis, int batchDims)
         : m_isAxisInputConst(isAxisInputConst),
           m_isIndicesScalar(isIndicesScalar),
@@ -34,6 +36,12 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return PortMask(2);
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::GatherShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     bool m_isAxisInputConst = false;

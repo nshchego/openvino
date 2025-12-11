@@ -208,6 +208,7 @@ Node::Node(const std::string& type,
     childEdges.reserve(m_output_shapes.size());
 }
 
+//  TODO: remove?
 Node::Node(BinaryInputBuffer& in_buf, const GraphContext::CPtr& ctx, const ShapeInferFactory& shapeInferFactory)
     : m_context(ctx),
       engine(m_context->getEngine()),
@@ -2269,7 +2270,7 @@ void Node::save(BinaryOutputBuffer& out_buf) const {
 
     // out_buf << lastInputDims;  // Skip to call prepareParams()
 
-    // out_buf << shapeInference;
+    out_buf << shapeInference;
 
     out_buf << originalInputPrecisions;
     out_buf << originalOutputPrecisions;
@@ -2343,7 +2344,7 @@ void Node::load(BinaryInputBuffer& in_buf) {
 
     // in_buf >> lastInputDims; // Skip to call prepareParams()
 
-    // in_buf >> shapeInference;
+    in_buf >> shapeInference;
 
     in_buf >> originalInputPrecisions;
     in_buf >> originalOutputPrecisions;

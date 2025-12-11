@@ -22,12 +22,20 @@ namespace ov::intel_cpu::node {
 using Result = IShapeInfer::Result;
 class ReshapeShapeInfer : public ShapeInferEmptyPads {
 public:
+    ReshapeShapeInfer() = default;
+
     explicit ReshapeShapeInfer(bool specialZero) : m_specialZero(specialZero) {}
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                  const std::unordered_map<size_t, MemoryPtr>& data_dependency) override;
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return PortMask(1);
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::ReshapeShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     bool m_specialZero;
@@ -41,6 +49,8 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return PortMask(1);
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::SqueezeShapeInfer)
 };
 
 class UnsqueezeShapeInfer : public ShapeInferEmptyPads {
@@ -51,6 +61,8 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return PortMask(1);
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::UnsqueezeShapeInfer)
 };
 
 class ReshapeShapeInferFactory : public ShapeInferFactory {

@@ -32,6 +32,8 @@ public:
         ShapeInferStatus status;
     };
 
+    IShapeInfer() = default;
+
     virtual ~IShapeInfer() = default;
 
     /**
@@ -63,6 +65,12 @@ public:
      * @return port_mask_t a bit mask where each bit corresponds to an input port number.
      */
     [[nodiscard]] virtual port_mask_t get_port_mask() const = 0;
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::IShapeInfer)
+
+    virtual void save(BinaryOutputBuffer& out_buf) const {};  // TODO make = 0;
+
+    virtual void load(BinaryInputBuffer& in_buf) {};  // TODO make = 0;
 };
 
 /**
@@ -72,12 +80,20 @@ public:
  */
 class ShapeInferEmptyPads : public IShapeInfer {
 public:
+    ShapeInferEmptyPads() = default;
+
     const ov::CoordinateDiff& get_pads_begin() override final {
         return m_emptyVec;
     }
     const ov::CoordinateDiff& get_pads_end() override final {
         return m_emptyVec;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferEmptyPads)
+
+    // void save(BinaryOutputBuffer& out_buf) const override;
+
+    // void load(BinaryInputBuffer& in_buf) override;
 
 private:
     static const ov::CoordinateDiff m_emptyVec;
@@ -93,6 +109,8 @@ class ShapeInferFactory {
 public:
     virtual ~ShapeInferFactory() = default;
     [[nodiscard]] virtual ShapeInferPtr makeShapeInfer() const = 0;
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::ShapeInferFactory)
 };
 
 /**

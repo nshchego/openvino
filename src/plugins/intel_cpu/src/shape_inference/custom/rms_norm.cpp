@@ -30,6 +30,8 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return EMPTY_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::RMSNormShapeInfer)
 };
 
 ShapeInferPtr RMSNormShapeInferFactory::makeShapeInfer() const {
@@ -37,3 +39,5 @@ ShapeInferPtr RMSNormShapeInferFactory::makeShapeInfer() const {
 }
 
 }  // namespace ov::intel_cpu::node
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::node::RMSNormShapeInfer)
