@@ -45,8 +45,6 @@ public:
     void load(BinaryInputBuffer& in_buf) override;
 
 private:
-    using in_type = element_type_traits<ov::element::i32>::value_type;
-
     struct OneHotContext {
         OneHot* nodePtr;
         size_t prefix_size;

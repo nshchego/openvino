@@ -27,6 +27,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/op/experimental_detectron_roi_feature.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 namespace {
@@ -393,6 +394,34 @@ void ExperimentalDetectronROIFeatureExtractor::execute([[maybe_unused]] const dn
 
 bool ExperimentalDetectronROIFeatureExtractor::created() const {
     return getType() == Type::ExperimentalDetectronROIFeatureExtractor;
+}
+
+void ExperimentalDetectronROIFeatureExtractor::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << output_dim_;
+    out_buf << pooled_height_;
+    out_buf << pooled_width_;
+    out_buf << pyramid_scales_;
+    out_buf << sampling_ratio_;
+    out_buf << aligned_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ExperimentalDetectronROIFeatureExtractor::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> output_dim_;
+    in_buf >> pooled_height_;
+    in_buf >> pooled_width_;
+    in_buf >> pyramid_scales_;
+    in_buf >> sampling_ratio_;
+    in_buf >> aligned_;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

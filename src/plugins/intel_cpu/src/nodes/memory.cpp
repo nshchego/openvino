@@ -48,6 +48,7 @@
 #include "shape_inference/shape_inference_pass_through.hpp"
 #include "transformations/cpu_opset/common/op/read_value_with_subgraph.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 using namespace dnnl;
 
@@ -183,7 +184,11 @@ MemoryOutputBase::MemoryOutputBase(const std::string& id,
 
 MemoryOutputBase::MemoryOutputBase(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context), MemoryNode(in_buf) {
-    // load(in_buf);
+    load(in_buf);
+
+    if (created()) {
+        context->getMemoryStatesRegister()->registerOutput(this);
+    }
 }
 
 MemoryOutputBase::~MemoryOutputBase() {
@@ -438,7 +443,7 @@ MemoryInputBase::MemoryInputBase(const std::shared_ptr<ov::Node>& op, const Grap
     if (created()) {
         m_context->getMemoryStatesRegister()->registerInput(this);
     }
-    executeHook = &MemoryInputBase::assignState;
+    m_execute_hook = &MemoryInputBase::assignState;
 }
 
 MemoryInputBase::MemoryInputBase(const std::string& id,
@@ -476,9 +481,9 @@ MemoryInputBase::MemoryInputBase(const std::string& id,
     constant = ConstantType::StrictNoConst;
 
     if (mode::read_value_assign == mode) {
-        executeHook = &MemoryInputBase::assignState;
+        m_execute_hook = &MemoryInputBase::assignState;
     } else if (mode::single_read_value == mode) {
-        executeHook = &MemoryInputBase::bypassAssignState;
+        m_execute_hook = &MemoryInputBase::bypassAssignState;
     } else {
         CPU_NODE_THROW("Unexpected MemoryInput mode");
     }
@@ -486,7 +491,11 @@ MemoryInputBase::MemoryInputBase(const std::string& id,
 
 MemoryInputBase::MemoryInputBase(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Input(in_buf, context), MemoryStateNode(in_buf) {
-    // load(in_buf);
+    load(in_buf);
+
+    if (created()) {
+        m_context->getMemoryStatesRegister()->registerInput(this);
+    }
 }
 
 MemoryInputBase::~MemoryInputBase() {
@@ -605,14 +614,14 @@ void MemoryInputBase::assignState(MemStatePtr newState) {
 }
 
 void MemoryInputBase::execute(const dnnl::stream& strm) {
-    assert(executeHook && "executeHook is not initialized!");
-    (this->*executeHook)();
+    assert(m_execute_hook && "Execution Hook is not initialized!");
+    (this->*m_execute_hook)();
     runStatic(strm);
 }
 
 void MemoryInputBase::executeDynamicImpl(const dnnl::stream& strm) {
-    assert(executeHook && "executeHook is not initialized!");
-    (this->*executeHook)();
+    assert(m_execute_hook && "Execution Hook is not initialized!");
+    (this->*m_execute_hook)();
     runDynamic(strm);
 }
 
@@ -1164,19 +1173,70 @@ bool MemoryInputSingle::isSupportedOperation(const std::shared_ptr<const ov::Nod
     return MemoryInput::isSupportedOperation(op, errorMessage);
 }
 
-// void MatrixNms::save(BinaryOutputBuffer& ob) const {
-//     Node::save(ob);
+void MemoryOutputBase::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+    MemoryNode::save(out_buf);
 
-// ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    // if (m_execute_hook == &MemoryInputBase::assignState) {
+    //     out_buf << mode::read_value_assign;
+    // } else if (m_execute_hook == &MemoryInputBase::bypassAssignState) {
+    //     out_buf << mode::single_read_value;
+    // } else {
+    //     CPU_NODE_THROW("has unexpected MemoryInput mode.");
+    // }
 
-// ob.dump_position();  // TODO: remove
-// }
+    out_buf.dump_position();  // TODO: remove
+}
 
-// void MatrixNms::load(BinaryInputBuffer& in_buf) {
-// in_buf.check_position();  // TODO: remove
+void MemoryOutputBase::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
 
-// in_buf.check_position();  // TODO: remove
-// }
+    // MemoryInputBase::mode mode;
+    // in_buf >> mode;
+    // if (mode::read_value_assign == mode) {
+    //     m_execute_hook = &MemoryInputBase::assignState;
+    // } else if (mode::single_read_value == mode) {
+    //     m_execute_hook = &MemoryInputBase::bypassAssignState;
+    // } else {
+    //     CPU_NODE_THROW("deserialized unexpected MemoryInput mode.");
+    // }
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void MemoryInputBase::save(BinaryOutputBuffer& out_buf) const {
+    Input::save(out_buf);
+    MemoryNode::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    if (m_execute_hook == &MemoryInputBase::assignState) {
+        out_buf << mode::read_value_assign;
+    } else if (m_execute_hook == &MemoryInputBase::bypassAssignState) {
+        out_buf << mode::single_read_value;
+    } else {
+        CPU_NODE_THROW("has unexpected MemoryInput mode.");
+    }
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void MemoryInputBase::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    MemoryInputBase::mode mode;
+    in_buf >> mode;
+    if (mode::read_value_assign == mode) {
+        m_execute_hook = &MemoryInputBase::assignState;
+    } else if (mode::single_read_value == mode) {
+        m_execute_hook = &MemoryInputBase::bypassAssignState;
+    } else {
+        CPU_NODE_THROW("deserialized unexpected MemoryInput mode.");
+    }
+
+    in_buf.check_position();  // TODO: remove
+}
 
 }  // namespace ov::intel_cpu::node

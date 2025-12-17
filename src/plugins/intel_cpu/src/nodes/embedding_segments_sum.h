@@ -32,6 +32,10 @@ public:
     [[nodiscard]] bool isExecutable() const override;
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     void prepareParams() override;
     [[nodiscard]] bool needShapeInfer() const override;

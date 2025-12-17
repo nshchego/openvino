@@ -114,4 +114,28 @@ bool ExperimentalDetectronPriorGridGenerator::needPrepareParams() const {
     return false;
 }
 
+void ExperimentalDetectronPriorGridGenerator::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << grid_w_;
+    out_buf << grid_h_;
+    out_buf << stride_w_;
+    out_buf << stride_h_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ExperimentalDetectronPriorGridGenerator::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> grid_w_;
+    in_buf >> grid_h_;
+    in_buf >> stride_w_;
+    in_buf >> stride_h_;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

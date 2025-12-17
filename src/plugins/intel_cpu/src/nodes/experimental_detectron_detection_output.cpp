@@ -27,6 +27,7 @@
 #include "openvino/core/type.hpp"
 #include "openvino/core/type/element_type.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -403,6 +404,38 @@ void ExperimentalDetectronDetectionOutput::execute([[maybe_unused]] const dnnl::
 
 bool ExperimentalDetectronDetectionOutput::created() const {
     return getType() == Type::ExperimentalDetectronDetectionOutput;
+}
+
+void ExperimentalDetectronDetectionOutput::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << score_threshold_;
+    out_buf << nms_threshold_;
+    out_buf << max_delta_log_wh_;
+    out_buf << classes_num_;
+    out_buf << max_detections_per_class_;
+    out_buf << max_detections_per_image_;
+    out_buf << class_agnostic_box_regression_;
+    out_buf << deltas_weights_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ExperimentalDetectronDetectionOutput::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> score_threshold_;
+    in_buf >> nms_threshold_;
+    in_buf >> max_delta_log_wh_;
+    in_buf >> classes_num_;
+    in_buf >> max_detections_per_class_;
+    in_buf >> max_detections_per_image_;
+    in_buf >> class_agnostic_box_regression_;
+    in_buf >> deltas_weights_;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

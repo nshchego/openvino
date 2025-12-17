@@ -560,6 +560,9 @@ void ov::CoreImpl::register_compile_time_plugins() {
     const decltype(::get_compiled_plugins_registry())& plugins = get_compiled_plugins_registry();
     for (const auto& plugin : plugins) {
         const auto& deviceName = plugin.first;
+        // if (deviceName == "GPU") {
+        //     continue;
+        // }
         if (deviceName.find('.') != std::string::npos) {
             OPENVINO_THROW("Device name must not contain dot '.' symbol");
         }

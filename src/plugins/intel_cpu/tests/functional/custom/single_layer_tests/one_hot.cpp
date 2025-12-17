@@ -18,7 +18,7 @@ namespace test {
 using oneHotCPUTestParams =
     std::tuple<InputShape,                               // Input shape
                int,                                      // axis to extend
-               OHMode,  // mode
+               OHMode,                                   // mode
                std::pair<utils::InputLayerType, bool>,   // secondary input type && need to generate depth
                size_t,                                   // depth
                float,                                    // on_value

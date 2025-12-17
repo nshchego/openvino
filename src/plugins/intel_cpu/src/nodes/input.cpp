@@ -438,7 +438,7 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
     bool has_subnormals = false;
     bool has_bf16_overflows = false;
 
-    if (validate_blob) {
+    if (validate_blob) {  // TODO: use m_model_from_cache instead?
         bool needFlushDenormalsToZero = true;
         if (m_context->getConfig().DAZOn) {
             // DAZ has been set, processor automatically converts all denormal source operands
@@ -591,9 +591,9 @@ void Input::cloneBlobIfRequired(const void* src_ptr, const intel_cpu::Shape& sha
         // original weights are stored.
         (!weight_cache || m_context->getNumNumaNodes() == 1 || m_context->getCPUStreamExecutor()->get_streams_num() == 1);
 
-    if (getName() == "Constant_3552") {
-        printf("--CPU-- Input::cloneBlobIfRequired '%s'; val: %f\n", getName().data(), static_cast<const float*>(src_ptr)[0]);
-    }
+    // if (getName() == "Constant_3552") {  // TODO: remove
+    //     printf("--CPU-- Input::cloneBlobIfRequired '%s'; val: %f\n", getName().data(), static_cast<const float*>(src_ptr)[0]);
+    // }
     m_memory_ptr = clone_is_not_needed
                     ? std::make_shared<Memory>(getEngine(), mem_desc, src_ptr)
                     : std::const_pointer_cast<const IMemory>(

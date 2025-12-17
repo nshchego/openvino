@@ -28,6 +28,7 @@
 #include "openvino/op/constant.hpp"
 #include "openvino/op/inverse.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -222,10 +223,32 @@ void Inverse::lu_solve(float* output,
     });
 }
 
-void Inverse::save(BinaryOutputBuffer& ob) const {
+void Inverse::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_adjoint;
+    out_buf << m_const_input;
+    out_buf << m_input_precision;
+    out_buf << m_side;
+    out_buf << m_side_squared;
+    out_buf << m_batches_count;
+
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Inverse::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_adjoint;
+    in_buf >> m_const_input;
+    in_buf >> m_input_precision;
+    in_buf >> m_side;
+    in_buf >> m_side_squared;
+    in_buf >> m_batches_count;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

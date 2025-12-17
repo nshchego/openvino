@@ -38,6 +38,8 @@
 #include "openvino/op/idft.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::cpu::x64;
@@ -642,6 +644,36 @@ void DFT::createPrimitive() {
         createJITKernels(hasDFT, hasFFT);
     }
     Node::createPrimitive();
+}
+
+void DFT::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << twiddlesFFT;
+    out_buf << twiddlesMapDFT;
+    out_buf << axes;
+    out_buf << inverse;
+    out_buf << lastInverse;
+    out_buf << m_is_axes_size_const;
+    out_buf << m_is_signal_size_const;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DFT::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> twiddlesFFT;
+    in_buf >> twiddlesMapDFT;
+    in_buf >> axes;
+    in_buf >> inverse;
+    in_buf >> lastInverse;
+    in_buf >> m_is_axes_size_const;
+    in_buf >> m_is_signal_size_const;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

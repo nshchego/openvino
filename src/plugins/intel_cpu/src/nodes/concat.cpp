@@ -86,6 +86,7 @@ Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
+    m_ov_core_shape_infer = true;
     const auto inRank = getInputShapeAtPort(0).getRank();
     auto concatOp = ov::as_type_ptr<ov::op::v0::Concat>(op);
     auto axis = concatOp->get_axis();
@@ -911,23 +912,24 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
     }
 }
 
-void Concat::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Concat::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+out_buf.dump_position();  // TODO: remove
 
-    ob << axis;
-    ob << reorderedAxis;
-    ob << canBeInPlace;
-    ob << canOptimizeNspc;
-    ob << canOptimize1DCase;
-    ob << hasOuterLoop;
-    ob << inputPrecision;
-    ob << outputPrecision;
-    ob << canExecRef;
-    ob << getParentEdges().size();  // TODO: take form base?
+    out_buf << axis;
+    out_buf << reorderedAxis;
+    out_buf << canBeInPlace;
+    out_buf << canOptimizeNspc;
+    out_buf << canOptimize1DCase;
+    out_buf << hasOuterLoop;
+    out_buf << inputPrecision;
+    out_buf << outputPrecision;
+    out_buf << canExecRef;
+    out_buf << getParentEdges().size();  // TODO: take form base?
+    out_buf << 
 
-ob.dump_position();  // TODO: remove
+out_buf.dump_position();  // TODO: remove
 }
 
 void Concat::load(BinaryInputBuffer& in_buf) {

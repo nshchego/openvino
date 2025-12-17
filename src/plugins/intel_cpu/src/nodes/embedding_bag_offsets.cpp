@@ -70,7 +70,7 @@ EmbeddingBagOffset::EmbeddingBagOffset(const std::shared_ptr<ov::Node>& op, cons
                            ov::as_string(offsets_op->get_reduction()));
         }
     }
-    CPU_NODE_ASSERT(getInputShapeAtPort(INDICES_IDX).getRank() == 1UL, "has indices data with invalid rank.");
+    CPU_NODE_ASSERT(getInputShapeAtPort(m_indices_index).getRank() == 1UL, "has indices data with invalid rank.");
 
     CPU_NODE_ASSERT(getInputShapeAtPort(OFFSETS_IDX).getRank() == 1UL, "offsets data has invalid rank.");
 }
@@ -112,10 +112,10 @@ void EmbeddingBagOffset::initSupportedPrimitiveDescriptors() {
     std::vector<PortConfigurator> inDataConfigurators({{LayoutType::ncsp, inDataPrecision},
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32}});
-    if (m_input_shapes.size() > DEFAULT_INDEX_IDX) {
+    if (m_input_shapes.size() > m_default_index) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
-    if (m_input_shapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
+    if (m_input_shapes.size() > m_per_sample_weights_index) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, inDataPrecision);
     }
 
@@ -123,17 +123,17 @@ void EmbeddingBagOffset::initSupportedPrimitiveDescriptors() {
 }
 
 void EmbeddingBagOffset::prepareParams() {
-    _indicesLen = getParentEdgeAt(INDICES_IDX)->getMemory().getStaticDims()[0];
+    _indicesLen = getParentEdgeAt(m_indices_index)->getMemory().getStaticDims()[0];
     _offsetsLen = getParentEdgeAt(OFFSETS_IDX)->getMemory().getStaticDims()[0];
     EmbeddingBag::prepareParams(getParentEdgeAt(EMB_TABLE_IDX)->getMemory().getStaticDims());
 }
 
 void EmbeddingBagOffset::initFromInputs() {
-    indicesData_ = getSrcDataAtPortAs<const int>(INDICES_IDX);
+    indicesData_ = getSrcDataAtPortAs<const int>(m_indices_index);
     offsetsData_ = getSrcDataAtPortAs<const int>(OFFSETS_IDX);
 
-    if (getParentEdges().size() > DEFAULT_INDEX_IDX && *getSrcDataAtPortAs<const int>(DEFAULT_INDEX_IDX) != -1) {
-        defaultIndices_ = getSrcDataAtPortAs<const int>(DEFAULT_INDEX_IDX);
+    if (getParentEdges().size() > m_default_index && *getSrcDataAtPortAs<const int>(m_default_index) != -1) {
+        defaultIndices_ = getSrcDataAtPortAs<const int>(m_default_index);
     }
 }
 
@@ -188,7 +188,7 @@ void EmbeddingBagOffset::execute([[maybe_unused]] const dnnl::stream& strm) {
     const auto* srcData = getSrcDataAtPortAs<const uint8_t>(0);
     const uint8_t* weightsData = nullptr;
     if (_withWeights) {
-        weightsData = getSrcDataAtPortAs<const uint8_t>(PER_SAMPLE_WEIGHTS_IDX);
+        weightsData = getSrcDataAtPortAs<const uint8_t>(m_per_sample_weights_index);
     }
 
     const auto& inputMem = getParentEdgeAt(0)->getMemory();
@@ -201,6 +201,26 @@ void EmbeddingBagOffset::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool EmbeddingBagOffset::created() const {
     return getType() == Type::EmbeddingBagOffsets;
+}
+
+void EmbeddingBagOffset::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+    EmbeddingBag::save(out_buf);
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << _indicesLen;
+    out_buf << _offsetsLen;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void EmbeddingBagOffset::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> _indicesLen;
+    in_buf >> _offsetsLen;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

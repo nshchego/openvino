@@ -829,6 +829,7 @@ protected:
         std::make_shared<std::unordered_map<std::string, MemoryPtr>>();
 
     bool m_model_from_cache = false;
+    bool m_ov_core_shape_infer = false;
 
 private:
     static void removeEdge(const EdgePtr edge, std::vector<EdgeWeakPtr>& edges) {

@@ -53,7 +53,7 @@ protected:
     /// \ brief m_axis stores default value for all iterations
     int64_t m_axis;
     /// \brief m_concat_axis stores m_axis plus the number of rank for each iteration
-    int64_t m_concat_axis = -1;
+    int64_t m_concat_axis = -1;  // TODO: deprecated?
 };
 }  // namespace v0
 }  // namespace op

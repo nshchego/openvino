@@ -116,7 +116,7 @@ public:
 
     NodePtr getOutputNodeByIndex(std::size_t index) {
         OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output node index '", index, "'.");
-        OPENVINO_ASSERT(m_input_nodes[index], "[ CPU ] Output node with index ", index, " is empty.");
+        OPENVINO_ASSERT(m_output_nodes[index], "[ CPU ] Output node with index ", index, " is empty.");
         return m_output_nodes[index];
     }
 
@@ -128,7 +128,7 @@ public:
 
     NodeConstPtr getOutputNodeByIndex(std::size_t index) const {
         OPENVINO_ASSERT(index < m_output_nodes.size(), "[ CPU ] Invalid output node index '", index, "'.");
-        OPENVINO_ASSERT(m_input_nodes[index], "[ CPU ] Output node with index ", index, " is empty.");
+        OPENVINO_ASSERT(m_output_nodes[index], "[ CPU ] Output node with index ", index, " is empty.");
         return m_output_nodes[index];
     }
 
@@ -286,7 +286,7 @@ public:
         return m_outputNodesMemBlocks;
     }
 
-    void export_graph(BinaryOutputBuffer& ob);
+    void export_graph(BinaryOutputBuffer& ob) const;
 
     friend class GraphOptimizer;
 

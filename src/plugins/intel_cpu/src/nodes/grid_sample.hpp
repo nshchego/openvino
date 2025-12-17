@@ -57,7 +57,15 @@ public:
         uint64_t dstBatchStepB = 0LU;
         uint64_t workAmount = 0LU;
         std::vector<int> buffer;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;

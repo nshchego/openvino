@@ -36,6 +36,10 @@ struct PortMap {
     int start;     /**< Start index of iteration range */
     int end;       /**< Last index of iteration range  */
     int part_size; /**< Part size which will be transfered to body subnetwork */
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 };
 
 /**
@@ -135,6 +139,10 @@ public:
         return true;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     //  needShapeInfer() should return false
     //  because we cannot resolve the output dimensions before the inference is completed
@@ -206,7 +214,7 @@ private:
     int lastUsedTripCount = -1;
     bool lastUsedCond = false;
 
-    const std::shared_ptr<ov::Node> ngraphOp;
+    const std::shared_ptr<ov::Node> m_ov_node;
 };
 
 }  // namespace ov::intel_cpu::node

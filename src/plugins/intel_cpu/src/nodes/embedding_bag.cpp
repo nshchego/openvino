@@ -17,6 +17,8 @@
 #include "openvino/core/parallel.hpp"
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/core/type/element_type_traits.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/string_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -25,29 +27,26 @@ EmbeddingBag::EmbeddingBag(const std::shared_ptr<ov::Node>& op,
                            size_t indicesIdx,
                            size_t perSampleWeightsIdx,
                            size_t defaultIndexIdx)
-    : INDICES_IDX(indicesIdx),
-      PER_SAMPLE_WEIGHTS_IDX(perSampleWeightsIdx),
-      DEFAULT_INDEX_IDX(defaultIndexIdx),
+    : m_indices_index(indicesIdx),
+      m_per_sample_weights_index(perSampleWeightsIdx),
+      m_default_index(defaultIndexIdx),
       _layerName(op->get_friendly_name()) {
     std::string logPrefix = std::string("Layer EmbeddingBag with name '") + _layerName + "' ";
     OPENVINO_ASSERT(op->get_input_size() >= requiredInputNum && op->get_output_size() == 1,
                     logPrefix,
                     "has incorrect number of input or output edges!");
-    if ((op->get_input_size() > PER_SAMPLE_WEIGHTS_IDX)) {
+    if ((op->get_input_size() > m_per_sample_weights_index)) {
         _withWeights = true;
     }
     if (_withWeights) {
-        if (op->get_input_shape(PER_SAMPLE_WEIGHTS_IDX) != op->get_input_shape(INDICES_IDX)) {
+        if (op->get_input_shape(m_per_sample_weights_index) != op->get_input_shape(m_indices_index)) {
             OPENVINO_THROW(logPrefix, "must have equal shapes for indices and per_sample_weights inputs.");
         }
     }
 }
 
-EmbeddingBag::EmbeddingBag(BinaryInputBuffer& in_buf)
-    : INDICES_IDX(0),
-      PER_SAMPLE_WEIGHTS_IDX(0),
-      DEFAULT_INDEX_IDX(0) {
-    // load(in_buf);
+EmbeddingBag::EmbeddingBag(BinaryInputBuffer& in_buf) {
+    load(in_buf);
 }
 
 void EmbeddingBag::prepareParams(const VectorDims& indexStaticShape) {
@@ -172,6 +171,34 @@ void EmbeddingBag::execute(const uint8_t* srcData,
         OPENVINO_THROW("EmbeddingBag layer does not support precision '" + std::string(srcPrc.get_type_name()) + "'");
     }
     }
+}
+
+void EmbeddingBag::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_indices_index;
+    out_buf << m_per_sample_weights_index;
+    out_buf << m_default_index;
+    out_buf << _reduction;
+    out_buf << _withWeights;
+    out_buf << _embDepth;
+    out_buf << _layerName;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void EmbeddingBag::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_indices_index;
+    in_buf >> m_per_sample_weights_index;
+    in_buf >> m_default_index;
+    in_buf >> _reduction;
+    in_buf >> _withWeights;
+    in_buf >> _embDepth;
+    in_buf >> _layerName;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

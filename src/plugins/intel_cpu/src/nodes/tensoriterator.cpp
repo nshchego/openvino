@@ -43,6 +43,7 @@
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -444,7 +445,7 @@ bool TensorIterator::isSupportedOperation(const std::shared_ptr<const ov::Node>&
 
 TensorIterator::TensorIterator(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
     : Node(op, context, InternalDynShapeInferFactory()),
-      ngraphOp(op) {
+      m_ov_node(op) {
     std::string errorMessage;
     if (!isSupportedOperation(op, errorMessage)) {
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
@@ -457,7 +458,7 @@ TensorIterator::TensorIterator(BinaryInputBuffer& in_buf, const GraphContext::CP
 }
 
 void TensorIterator::initSupportedPrimitiveDescriptors() {
-    auto subgraphOp = ov::as_type_ptr<const ov::op::util::SubGraphOp>(ngraphOp);
+    auto subgraphOp = ov::as_type_ptr<const ov::op::util::SubGraphOp>(m_ov_node);
     CPU_NODE_ASSERT(subgraphOp, "cannot be cast to ov::op::util::SubGraphOp");
 
     sub_graph.Init(subgraphOp->get_function(), m_context);
@@ -466,13 +467,13 @@ void TensorIterator::initSupportedPrimitiveDescriptors() {
         return;
     }
 
-    supportedPrimitiveDescriptors.emplace_back(make_plain_config(ngraphOp), impl_desc_type::unknown);
+    supportedPrimitiveDescriptors.emplace_back(make_plain_config(m_ov_node), impl_desc_type::unknown);
 }
 
 void TensorIterator::createPrimitive() {
     sub_graph.Activate();
 
-    auto subgraphOp = ov::as_type_ptr<const ov::op::util::SubGraphOp>(ngraphOp);
+    auto subgraphOp = ov::as_type_ptr<const ov::op::util::SubGraphOp>(m_ov_node);
     CPU_NODE_ASSERT(subgraphOp, "cannot be cast to ov::op::util::SubGraphOp");
 
     for (const auto& param : subgraphOp->get_function()->get_parameters()) {
@@ -556,7 +557,7 @@ void TensorIterator::createPrimitive() {
         }
     }
 
-    if (auto loopOp = ov::as_type_ptr<const ov::op::v5::Loop>(ngraphOp)) {
+    if (auto loopOp = ov::as_type_ptr<const ov::op::v5::Loop>(m_ov_node)) {
         algorithm = Algorithm::TensorIteratorLoop;
         auto spec_port = loopOp->get_special_body_ports();
         if (spec_port.current_iteration_input_idx != -1) {
@@ -567,7 +568,7 @@ void TensorIterator::createPrimitive() {
         }
         loopTripCountIdx = 0;
         loopExecutionConditionIdx = 1;
-    } else if (auto ti = ov::as_type_ptr<const ov::op::v0::TensorIterator>(ngraphOp)) {
+    } else if (auto ti = ov::as_type_ptr<const ov::op::v0::TensorIterator>(m_ov_node)) {
         algorithm = Algorithm::TensorIteratorCommon;
     } else {
         CPU_NODE_THROW("isn't supported!");
@@ -1041,6 +1042,70 @@ bool TensorIterator::runAsDynamic() const {
 
 bool TensorIterator::created() const {
     return getType() == Type::TensorIterator;
+}
+
+void TensorIterator::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    sub_graph.export_graph(out_buf);
+    out_buf << inputPortMap;
+    out_buf << outputPortMap;
+    out_buf << backEdges;
+    out_buf << loopBodyCurrentIterationIdx;
+    out_buf << loopBodyConditionOutputIdx;
+    out_buf << loopTripCountIdx;
+    out_buf << loopExecutionConditionIdx;
+    out_buf << lastUsedTripCount;
+    out_buf << lastUsedCond;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void TensorIterator::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    sub_graph.Init(in_buf, m_context);
+    in_buf >> inputPortMap;
+    in_buf >> outputPortMap;
+    in_buf >> backEdges;
+    in_buf >> loopBodyCurrentIterationIdx;
+    in_buf >> loopBodyConditionOutputIdx;
+    in_buf >> loopTripCountIdx;
+    in_buf >> loopExecutionConditionIdx;
+    in_buf >> lastUsedTripCount;
+    in_buf >> lastUsedCond;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void PortMap::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << from;
+    out_buf << to;
+    out_buf << axis;
+    out_buf << stride;
+    out_buf << start;
+    out_buf << end;
+    out_buf << part_size;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void PortMap::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> from;
+    in_buf >> to;
+    in_buf >> axis;
+    in_buf >> stride;
+    in_buf >> start;
+    in_buf >> end;
+    in_buf >> part_size;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

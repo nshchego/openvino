@@ -35,6 +35,10 @@ public:
 
     virtual ~EmbeddingBag() = default;
 
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
+
 protected:
     virtual void initFromInputs() = 0;
     virtual void getIndices(size_t embIndex,
@@ -49,9 +53,9 @@ protected:
     void processData(const T* srcData, const T* weightsData, const VectorDims& inDataDims, const MemoryPtr& outMemory);
 
     const size_t EMB_TABLE_IDX = 0LU;
-    const size_t INDICES_IDX;
-    const size_t PER_SAMPLE_WEIGHTS_IDX;
-    const size_t DEFAULT_INDEX_IDX;
+    size_t m_indices_index;
+    size_t m_per_sample_weights_index;
+    size_t m_default_index;
 
     Reduction _reduction = Reduction::SUM;
     bool _withWeights = false;

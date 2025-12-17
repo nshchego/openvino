@@ -23,6 +23,7 @@
 #include "openvino/core/type.hpp"
 #include "openvino/core/type/element_type.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(HAVE_AVX2)
 #    include <immintrin.h>
@@ -485,6 +486,34 @@ bool ExperimentalDetectronGenerateProposalsSingleImage::needShapeInfer() const {
 
 bool ExperimentalDetectronGenerateProposalsSingleImage::needPrepareParams() const {
     return false;
+}
+
+void ExperimentalDetectronGenerateProposalsSingleImage::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << min_size_;
+    out_buf << pre_nms_topn_;
+    out_buf << post_nms_topn_;
+    out_buf << nms_thresh_;
+    out_buf << coordinates_offset;
+    out_buf << roi_indices_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ExperimentalDetectronGenerateProposalsSingleImage::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> min_size_;
+    in_buf >> pre_nms_topn_;
+    in_buf >> post_nms_topn_;
+    in_buf >> nms_thresh_;
+    in_buf >> coordinates_offset;
+    in_buf >> roi_indices_;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

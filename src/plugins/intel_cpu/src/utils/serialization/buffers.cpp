@@ -180,7 +180,7 @@ size_t TensorInputBuffer::get_position() const {
 //     return nullptr;
 // }
 const void* TensorInputBuffer::get_data() {
-    return m_data;
+    return m_data + m_offset;
 }
 
 // std::istream& TensorInputBuffer::seekg(std::istream::off_type offset, std::ios_base::seekdir way) {

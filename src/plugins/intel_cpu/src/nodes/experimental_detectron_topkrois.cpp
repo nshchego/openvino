@@ -99,4 +99,22 @@ bool ExperimentalDetectronTopKROIs::created() const {
     return getType() == Type::ExperimentalDetectronTopKROIs;
 }
 
+void ExperimentalDetectronTopKROIs::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << max_rois_num_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ExperimentalDetectronTopKROIs::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> max_rois_num_;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

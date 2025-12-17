@@ -39,6 +39,7 @@ std::string OneHot1LayerTest::getTestCaseName(const testing::TestParamInfo<oneHo
 }
 
 void OneHot1LayerTest::SetUp() {
+    printf("[TEST] OneHot1LayerTest::SetUp '%s'\n", GetTestName().data());
     const auto& [depth_type, depth_val, set_type, on_val, off_val, axis, model_type, shapes, _targetDevice] =
         this->GetParam();
     targetDevice = _targetDevice;

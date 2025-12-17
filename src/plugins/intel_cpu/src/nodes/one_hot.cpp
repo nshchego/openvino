@@ -29,8 +29,10 @@
 #include "selective_build.h"
 #include "shape_inference/custom/one_hot.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
+using in_type = element_type_traits<ov::element::i32>::value_type;
 
 bool OneHot::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
@@ -41,16 +43,16 @@ bool OneHot::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std
             return false;
         }
 
-        const auto* oneHot = ov::as_type<const op::util::OneHotBase>(op.get());
-        if (ov::as_type_ptr<const ov::op::v0::Constant>(oneHot->get_input_node_shared_ptr(ON_VALUE_ID)) == nullptr) {
-            errorMessage = "Only const 'on_value' input is supported";
-            return false;
-        }
-        if (ov::as_type_ptr<const ov::op::v0::Constant>(oneHot->get_input_node_shared_ptr(OFF_VALUEAXES_ID)) ==
-            nullptr) {
-            errorMessage = "Only const 'off_value' input is supported";
-            return false;
-        }
+        // const auto* oneHot = ov::as_type<const op::util::OneHotBase>(op.get());
+        // if (ov::as_type_ptr<const ov::op::v0::Constant>(oneHot->get_input_node_shared_ptr(ON_VALUE_ID)) == nullptr) {
+        //     errorMessage = "Only const 'on_value' input is supported";
+        //     return false;
+        // }
+        // if (ov::as_type_ptr<const ov::op::v0::Constant>(oneHot->get_input_node_shared_ptr(OFF_VALUEAXES_ID)) ==
+        //     nullptr) {
+        //     errorMessage = "Only const 'off_value' input is supported";
+        //     return false;
+        // }
     } catch (...) {
         return false;
     }
@@ -66,7 +68,7 @@ OneHot::OneHot(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
 
     const auto oneHot = ov::as_type_ptr<const ov::op::util::OneHotBase>(op);
     const auto depthNode = ov::as_type_ptr<const ov::op::v0::Constant>(oneHot->get_input_node_shared_ptr(DEPTH_ID));
-    if (depthNode) {
+    if (depthNode) {  // TODO: check it in isSupportedOperation or get value on execution
         depth = depthNode->cast_vector<uint32_t>()[0];
     }
     axis = static_cast<int32_t>(oneHot->get_axis());
@@ -132,11 +134,12 @@ void OneHot::initSupportedPrimitiveDescriptors() {
 
 template <typename out_type>
 void OneHot::one_hot(size_t prefix_size, size_t suffix_size) {
-    const auto* src_data = getSrcDataAtPortAs<const in_type>(0);
+    const auto* src_data = getSrcDataAtPortAs<const in_type>(INDICES_ID);
     auto* dst_data = getDstDataAtPortAs<out_type>(0);
 
-    const out_type on_value = getSrcDataAtPortAs<const out_type>(2)[0];
-    const out_type off_value = getSrcDataAtPortAs<const out_type>(3)[0];
+    const out_type on_value = getSrcDataAtPortAs<const out_type>(ON_VALUE_ID)[0];
+    const out_type off_value = getSrcDataAtPortAs<const out_type>(OFF_VALUEAXES_ID)[0];
+    // std::cout << "[ CPU ] OneHot::one_hot on_value: " << on_value << "; off_value: " << off_value << std::endl;  // TODO: remove
 
     // fill the output with off_value
     std::size_t dst_size = prefix_size * depth * suffix_size;
@@ -186,19 +189,28 @@ bool OneHot::created() const {
     return getType() == Type::OneHot;
 }
 
-void OneHot::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void OneHot::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << depth;
+    out_buf << axis;
+    out_buf << is_mode_normalize;
+    out_buf << output_precision;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void OneHot::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> depth;
+    in_buf >> axis;
+    in_buf >> is_mode_normalize;
+    in_buf >> output_precision;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

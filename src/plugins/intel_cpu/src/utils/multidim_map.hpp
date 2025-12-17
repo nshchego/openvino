@@ -8,6 +8,8 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include "utils/serialization/map_serializer.hpp"
+
 namespace ov::intel_cpu {
 
 namespace internal {
@@ -37,6 +39,14 @@ public:
 
     const mapped_type& at(const key_type& key) const {
         return _map.at(key);
+    }
+
+    void save(BinaryOutputBuffer& out_buf) const {
+        out_buf << _map;
+    }
+
+    void load(BinaryInputBuffer& in_buf) {
+        in_buf >> _map;
     }
 
 private:

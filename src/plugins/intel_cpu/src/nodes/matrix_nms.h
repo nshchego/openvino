@@ -72,7 +72,7 @@ private:
     int m_nmsTopk;
     int m_keepTopk;
     int m_backgroundClass;
-    MatrixNmsDecayFunction m_decayFunction;
+    MatrixNmsDecayFunction m_decay_function_type;
     float m_gaussianSigma;
     float m_postThreshold;
     bool m_normalized;
@@ -87,6 +87,10 @@ private:
               y2{y_right} {}
 
         Rectangle() = default;
+
+        void save(BinaryOutputBuffer& ob) const;
+
+        void load(BinaryInputBuffer& in_buf);
 
         float x1 = 0.0F;
         float y1 = 0.0F;
@@ -109,7 +113,12 @@ private:
         int64_t batchIndex = -1;
         int64_t classIndex = -1;
         float score = 0.0F;
+
+        void save(BinaryOutputBuffer& ob) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
+
     const std::string m_inType = "input", m_outType = "output";
     std::vector<int64_t> m_numPerBatch;
     std::vector<std::vector<int64_t>> m_numPerBatchClass;

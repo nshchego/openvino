@@ -30,11 +30,25 @@
 #include "ov_ops/nms_static_shape_ie.hpp"
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
 using ngNmsSortResultType = ov::op::v8::MatrixNms::SortResultType;
 using ngNmseDcayFunction = ov::op::v8::MatrixNms::DecayFunction;
+
+// void init_decay_function() {
+//     if (m_decay_function_type == MatrixNmsDecayFunction::LINEAR) {
+//         m_decay_fn = [](float iou, float max_iou, [[maybe_unused]] float sigma) -> float {
+//             return (1.F - iou) / (1.F - max_iou + 1e-10F);
+//         };
+//     } else {
+//         m_decay_fn = [](float iou, float max_iou, float sigma) -> float {
+//             return std::exp((max_iou * max_iou - iou * iou) * sigma);
+//         };
+//     }
+// }
 
 bool MatrixNms::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept {
     try {
@@ -90,9 +104,9 @@ MatrixNms::MatrixNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     }
 
     if (attrs.decay_function == ov::op::v8::MatrixNms::DecayFunction::GAUSSIAN) {
-        m_decayFunction = GAUSSIAN;
+        m_decay_function_type = GAUSSIAN;
     } else if (attrs.decay_function == ov::op::v8::MatrixNms::DecayFunction::LINEAR) {
-        m_decayFunction = LINEAR;
+        m_decay_function_type = LINEAR;
     }
 
     m_sortResultAcrossBatch = attrs.sort_result_across_batch;
@@ -104,7 +118,7 @@ MatrixNms::MatrixNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     m_gaussianSigma = attrs.gaussian_sigma;
     m_postThreshold = attrs.post_threshold;
     m_normalized = attrs.normalized;
-    if (m_decayFunction == MatrixNmsDecayFunction::LINEAR) {
+    if (m_decay_function_type == MatrixNmsDecayFunction::LINEAR) {
         m_decay_fn = [](float iou, float max_iou, [[maybe_unused]] float sigma) -> float {
             return (1.F - iou) / (1.F - max_iou + 1e-10F);
         };
@@ -124,6 +138,16 @@ MatrixNms::MatrixNms(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
 MatrixNms::MatrixNms(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
     load(in_buf);
+
+    if (m_decay_function_type == MatrixNmsDecayFunction::LINEAR) {
+        m_decay_fn = [](float iou, float max_iou, [[maybe_unused]] float sigma) -> float {
+            return (1.F - iou) / (1.F - max_iou + 1e-10F);
+        };
+    } else {
+        m_decay_fn = [](float iou, float max_iou, float sigma) -> float {
+            return std::exp((max_iou * max_iou - iou * iou) * sigma);
+        };
+    }
 }
 
 void MatrixNms::initSupportedPrimitiveDescriptors() {
@@ -486,19 +510,108 @@ void MatrixNms::checkPrecision(const ov::element::Type prec,
                     prec);
 }
 
-void MatrixNms::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void MatrixNms::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << m_numBatches;
+    out_buf << m_numBoxes;
+    out_buf << m_numClasses;
+    out_buf << m_maxBoxesPerBatch;
+    out_buf << m_sortResultType;
+    out_buf << m_sortResultAcrossBatch;
+    out_buf << m_scoreThreshold;
+    out_buf << m_nmsTopk;
+    out_buf << m_keepTopk;
+    out_buf << m_backgroundClass;
+    out_buf << m_decay_function_type;
+    out_buf << m_gaussianSigma;
+    out_buf << m_postThreshold;
+    out_buf << m_normalized;
+    out_buf << m_outStaticShape;
+    out_buf << m_numPerBatch;
+    out_buf << m_numPerBatchClass;
+    out_buf << m_filteredBoxes;
+    out_buf << m_classOffset;
+    out_buf << m_realNumClasses;
+    out_buf << m_realNumBoxes;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void MatrixNms::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> m_numBatches;
+    in_buf >> m_numBoxes;
+    in_buf >> m_numClasses;
+    in_buf >> m_maxBoxesPerBatch;
+    in_buf >> m_sortResultType;
+    in_buf >> m_sortResultAcrossBatch;
+    in_buf >> m_scoreThreshold;
+    in_buf >> m_nmsTopk;
+    in_buf >> m_keepTopk;
+    in_buf >> m_backgroundClass;
+    in_buf >> m_decay_function_type;
+    in_buf >> m_gaussianSigma;
+    in_buf >> m_postThreshold;
+    in_buf >> m_normalized;
+    in_buf >> m_outStaticShape;
+    in_buf >> m_numPerBatch;
+    in_buf >> m_numPerBatchClass;
+    in_buf >> m_filteredBoxes;
+    in_buf >> m_classOffset;
+    in_buf >> m_realNumClasses;
+    in_buf >> m_realNumBoxes;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void MatrixNms::BoxInfo::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << box;
+    out_buf << index;
+    out_buf << batchIndex;
+    out_buf << classIndex;
+    out_buf << score;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void MatrixNms::BoxInfo::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> box;
+    in_buf >> index;
+    in_buf >> batchIndex;
+    in_buf >> classIndex;
+    in_buf >> score;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void MatrixNms::Rectangle::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << x1;
+    out_buf << y1;
+    out_buf << x2;
+    out_buf << y2;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void MatrixNms::Rectangle::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> x1;
+    in_buf >> y1;
+    in_buf >> x2;
+    in_buf >> y2;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

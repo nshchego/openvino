@@ -270,7 +270,8 @@
 #include "unsqueeze_shape_inference.hpp"
 #include "utils.hpp"
 #include "utils/bit_util.hpp"
-#include "utils/serialization/bind.hpp"
+// #include "utils/serialization/bind.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 // #include "utils/serialization/buffers.hpp"
 #include "variadic_split_shape_inference.hpp"
 // NOLINTEND(misc-include-cleaner)
@@ -336,6 +337,22 @@ public:
     }
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferBase)
+
+    virtual void save(BinaryOutputBuffer& out_buf) const {
+        out_buf.dump_position();  // TODO: remove
+
+        out_buf << m_input_ranks;
+
+        out_buf.dump_position();  // TODO: remove
+    }
+
+    virtual void load(BinaryInputBuffer& in_buf) {
+        in_buf.check_position();  // TODO: remove
+
+        in_buf >> m_input_ranks;
+
+        in_buf.check_position();  // TODO: remove
+    }
 
 protected:
     std::vector<int64_t> m_input_ranks;
@@ -500,6 +517,26 @@ public:
     }
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferPaddingBase)
+
+    void save(BinaryOutputBuffer& out_buf) const override {
+        ShapeInferBase::save(out_buf);
+
+        out_buf.dump_position();  // TODO: remove
+
+        out_buf << m_pads_begin;
+        out_buf << m_pads_end;
+
+        out_buf.dump_position();  // TODO: remove
+    }
+
+    void load(BinaryInputBuffer& in_buf) override {
+        in_buf.check_position();  // TODO: remove
+
+        in_buf >> m_pads_begin;
+        in_buf >> m_pads_end;
+
+        in_buf.check_position();  // TODO: remove
+    }
 
 protected:
     ov::CoordinateDiff m_pads_begin, m_pads_end;
@@ -840,17 +877,26 @@ std::shared_ptr<IStaticShapeInfer> make_shape_inference(std::shared_ptr<ov::Node
 using ShapeInferTA_Broadcast_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Broadcast_6)
 
-using ShapeInferTA_Split_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Split, 6U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Split_6)
-
-using ShapeInferTA_VariadicSplit_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::VariadicSplit, 6U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_VariadicSplit_6)
-
 using ShapeInferTA_Concat_0 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Concat, 0U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Concat_0)
 
+using ShapeInferTA_EmbeddingBagOffsetsSum_0 = ov::intel_cpu::ShapeInferTA<ov::op::v3::EmbeddingBagOffsetsSum, 0U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_EmbeddingBagOffsetsSum_0)
+
+using ShapeInferTA_GridSample_0 = ov::intel_cpu::ShapeInferTA<ov::op::v9::GridSample, 0U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_GridSample_0)
+
+using ShapeInferTA_ReduceSum_2 = ov::intel_cpu::ShapeInferTA<ov::op::v1::ReduceSum, 2U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ReduceSum_2)
+
+using ShapeInferTA_ScatterElementsUpdate_8 = ov::intel_cpu::ShapeInferTA<ov::op::v3::ScatterElementsUpdate, 8U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ScatterElementsUpdate_8)
+
 using ShapeInferTA_Slice_30 = ov::intel_cpu::ShapeInferTA<ov::op::v8::Slice, 30U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Slice_30)
+
+using ShapeInferTA_Split_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Split, 6U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Split_6)
 
 using ShapeInferTA_Tile_2 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Tile, 2U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Tile_2)
@@ -858,10 +904,7 @@ BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Tile_2)
 using ShapeInferTA_TopK_2 = ov::intel_cpu::ShapeInferTA<ov::op::v11::TopK, 2U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_TopK_2)
 
-using ShapeInferTA_ScatterElementsUpdate_8 = ov::intel_cpu::ShapeInferTA<ov::op::v3::ScatterElementsUpdate, 8U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ScatterElementsUpdate_8)
-
-using ShapeInferTA_ReduceSum_2 = ov::intel_cpu::ShapeInferTA<ov::op::v1::ReduceSum, 2U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ReduceSum_2)
+using ShapeInferTA_VariadicSplit_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::VariadicSplit, 6U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_VariadicSplit_6)
 
 BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferCopy)

@@ -2290,7 +2290,7 @@ void Graph::ForgetGraphData() {
     m_executableSyncNodesInds.clear();
 }
 
-void Graph::export_graph(BinaryOutputBuffer& out_buf) {
+void Graph::export_graph(BinaryOutputBuffer& out_buf) const {  // TODO: rename to load()?
 // printf("--CPU-- Graph::export_graph pos: %llu\n", out_buf.get_position());
     out_buf.dump_position();  // Read/Write sync position
 

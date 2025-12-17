@@ -34,7 +34,7 @@
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
-//#include "utils/ngraph_utils.hpp"
+#include "utils/serialization/string_serializer.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl;
@@ -639,6 +639,58 @@ void PSROIPooling::executeSpecified() {
     });
 
     std::fill(dstData + realRois * nc * nh * nw, dstData + nn * nc * nh * nw, static_cast<outputType>(0));
+}
+
+void PSROIPooling::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << outputDim;
+    out_buf << groupSize;
+    out_buf << spatialScale;
+    out_buf << pooledHeight;
+    out_buf << pooledWidth;
+    out_buf << spatialBinsX;
+    out_buf << spatialBinsY;
+    out_buf << mode;
+    out_buf << channels;
+    out_buf << height;
+    out_buf << width;
+    out_buf << nn;
+    out_buf << nc;
+    out_buf << nh;
+    out_buf << nw;
+    out_buf << noTrans;
+    out_buf << partSize;
+    out_buf << transStd;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void PSROIPooling::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> outputDim;
+    in_buf >> groupSize;
+    in_buf >> spatialScale;
+    in_buf >> pooledHeight;
+    in_buf >> pooledWidth;
+    in_buf >> spatialBinsX;
+    in_buf >> spatialBinsY;
+    in_buf >> mode;
+    in_buf >> channels;
+    in_buf >> height;
+    in_buf >> width;
+    in_buf >> nn;
+    in_buf >> nc;
+    in_buf >> nh;
+    in_buf >> nw;
+    in_buf >> noTrans;
+    in_buf >> partSize;
+    in_buf >> transStd;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 namespace {

@@ -97,9 +97,9 @@ public:
 
     void assignState(const MemStatePtr& newState);
 
-    // void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
-    // void load(BinaryInputBuffer& in_buf) override;
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     virtual void runStatic(dnnl::stream strm) = 0;
@@ -183,6 +183,10 @@ public:
     MemoryOutputBase& getOutputNode();
     void assignState(MemStatePtr newState) override final;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     MemoryInputBase(const std::string& id,
                     const std::string& name,
@@ -212,7 +216,7 @@ private:
      */
     MemoryOutputBase* outputNode = nullptr;
     MemStatePtr state = nullptr;
-    executeHookPtr executeHook;
+    executeHookPtr m_execute_hook = nullptr;
 };
 
 class MemoryInput : public MemoryInputBase {

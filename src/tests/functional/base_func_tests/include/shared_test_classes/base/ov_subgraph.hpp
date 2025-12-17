@@ -35,10 +35,13 @@ public:
     virtual void import_export();
 
 protected:
+    ~SubgraphBaseTest() override;  // TODO: remove
+
     virtual void compare(const std::vector<ov::Tensor>& expected, const std::vector<ov::Tensor>& actual);
     virtual void compile_model();
     virtual void infer();
     virtual void validate();
+    virtual void models_cache();
     virtual void configure_model();
     virtual void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes);
     virtual void init_thresholds();
@@ -85,9 +88,11 @@ protected:
            mvn_threshold = disable_tensor_metrics;
 
     ov::test::utils::OpSummary& summary = ov::test::utils::OpSummary::getInstance();
-    bool is_report_stages = false;
+    bool is_report_stages = true;  // TODO: set false
     bool is_reported = false;
+    bool m_check_models_caching = true;  // TODO: how to set properly?
     double rel_influence_coef = 1.f;
+    ov::TensorVector m_expected_outputs;  // Stores reference outputs for reusing.
 
     virtual std::vector<ov::Tensor> calculate_refs();
     virtual std::vector<ov::Tensor> get_plugin_outputs();

@@ -10,6 +10,8 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/type.hpp"
 #include "openvino/op/grid_sample.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace ov::intel_cpu;
 using namespace ov::intel_cpu::node;
@@ -336,3 +338,97 @@ bool GridSample::created() const {
 }
 
 #endif  // OPENVINO_ARCH_X86_64
+
+void GridSample::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << alignCorners;
+    out_buf << interpolationMode;
+    out_buf << paddingMode;
+    out_buf << dataTypeSize;
+    out_buf << gridTypeSize;
+    out_buf << dataPrecision;
+    out_buf << gridPrecision;
+    out_buf << m_threads_num;
+    out_buf << execParamsPerThread;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void GridSample::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> alignCorners;
+    in_buf >> interpolationMode;
+    in_buf >> paddingMode;
+    in_buf >> dataTypeSize;
+    in_buf >> gridTypeSize;
+    in_buf >> dataPrecision;
+    in_buf >> gridPrecision;
+    in_buf >> m_threads_num;
+    in_buf >> execParamsPerThread;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void GridSample::threadExecParams::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << batchNum;
+    out_buf << channelsNum;
+    out_buf << srcHeightF;
+    out_buf << srcWidthF;
+    out_buf << srcWidthB;
+    out_buf << dataTypeSize;
+    out_buf << srcHeightMul2F;
+    out_buf << srcWidthMul2F;
+    out_buf << srcHeightMul2Sub1F;
+    out_buf << srcWidthMul2Sub1F;
+    out_buf << srcHeightSub1F;
+    out_buf << srcWidthSub1F;
+    out_buf << wDenormCoefF;
+    out_buf << hDenormCoefF;
+    out_buf << gridStartB;
+    out_buf << dstStartB;
+    out_buf << srcChannelStepB;
+    out_buf << dstChannelStepB;
+    out_buf << srcBatchStepB;
+    out_buf << gridBatchStepB;
+    out_buf << dstBatchStepB;
+    out_buf << workAmount;
+    out_buf << buffer;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void GridSample::threadExecParams::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> batchNum;
+    in_buf >> channelsNum;
+    in_buf >> srcHeightF;
+    in_buf >> srcWidthF;
+    in_buf >> srcWidthB;
+    in_buf >> dataTypeSize;
+    in_buf >> srcHeightMul2F;
+    in_buf >> srcWidthMul2F;
+    in_buf >> srcHeightMul2Sub1F;
+    in_buf >> srcWidthMul2Sub1F;
+    in_buf >> srcHeightSub1F;
+    in_buf >> srcWidthSub1F;
+    in_buf >> wDenormCoefF;
+    in_buf >> hDenormCoefF;
+    in_buf >> gridStartB;
+    in_buf >> dstStartB;
+    in_buf >> srcChannelStepB;
+    in_buf >> dstChannelStepB;
+    in_buf >> srcBatchStepB;
+    in_buf >> gridBatchStepB;
+    in_buf >> dstBatchStepB;
+    in_buf >> workAmount;
+    in_buf >> buffer;
+
+    in_buf.check_position();  // TODO: remove
+}

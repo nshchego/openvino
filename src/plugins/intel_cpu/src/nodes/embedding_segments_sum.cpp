@@ -51,9 +51,9 @@ EmbeddingSegmentsSum::EmbeddingSegmentsSum(const std::shared_ptr<ov::Node>& op, 
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
     _reduction = Reduction::SUM;
-    CPU_NODE_ASSERT(getInputShapeAtPort(INDICES_IDX).getRank() == 1UL,
+    CPU_NODE_ASSERT(getInputShapeAtPort(m_indices_index).getRank() == 1UL,
                     "has indices data with invalid rank: ",
-                    getInputShapeAtPort(INDICES_IDX).getRank());
+                    getInputShapeAtPort(m_indices_index).getRank());
 
     CPU_NODE_ASSERT(getInputShapeAtPort(SEGMENT_ID_IDX).getRank() == 1UL,
                     "has invalid segmentID data rank: ",
@@ -98,10 +98,10 @@ void EmbeddingSegmentsSum::initSupportedPrimitiveDescriptors() {
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32},
                                                        {LayoutType::ncsp, ov::element::i32}});
-    if (m_input_shapes.size() > DEFAULT_INDEX_IDX) {
+    if (m_input_shapes.size() > m_default_index) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, ov::element::i32);
     }
-    if (m_input_shapes.size() > PER_SAMPLE_WEIGHTS_IDX) {
+    if (m_input_shapes.size() > m_per_sample_weights_index) {
         inDataConfigurators.emplace_back(LayoutType::ncsp, inDataPrecision);
     }
 
@@ -113,14 +113,14 @@ void EmbeddingSegmentsSum::prepareParams() {
 }
 
 void EmbeddingSegmentsSum::initFromInputs() {
-    indices_ = getSrcDataAtPortAs<const int>(INDICES_IDX);
-    indicesSize_ = getParentEdgeAt(INDICES_IDX)->getMemory().getShape().getElementsCount();
+    indices_ = getSrcDataAtPortAs<const int>(m_indices_index);
+    indicesSize_ = getParentEdgeAt(m_indices_index)->getMemory().getShape().getElementsCount();
 
     segmentIds_ = getSrcDataAtPortAs<const int>(SEGMENT_ID_IDX);
     lastNumSegments_ = getNumSegments();
 
-    if (getParentEdges().size() > DEFAULT_INDEX_IDX) {
-        defaultIndices_ = getSrcDataAtPortAs<const int>(DEFAULT_INDEX_IDX);
+    if (getParentEdges().size() > m_default_index) {
+        defaultIndices_ = getSrcDataAtPortAs<const int>(m_default_index);
     }
 }
 
@@ -184,7 +184,7 @@ void EmbeddingSegmentsSum::execute([[maybe_unused]] const dnnl::stream& strm) {
     const auto* srcData = getSrcDataAtPortAs<const uint8_t>(0);
     const uint8_t* weightsData = nullptr;
     if (_withWeights) {
-        weightsData = getSrcDataAtPortAs<const uint8_t>(PER_SAMPLE_WEIGHTS_IDX);
+        weightsData = getSrcDataAtPortAs<const uint8_t>(m_per_sample_weights_index);
     }
 
     const auto& inputMem = getParentEdgeAt(0)->getMemory();
@@ -197,6 +197,24 @@ void EmbeddingSegmentsSum::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool EmbeddingSegmentsSum::created() const {
     return getType() == Type::EmbeddingSegmentsSum;
+}
+
+void EmbeddingSegmentsSum::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+    EmbeddingBag::save(out_buf);
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << lastNumSegments_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void EmbeddingSegmentsSum::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> lastNumSegments_;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

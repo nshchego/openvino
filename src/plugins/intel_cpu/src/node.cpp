@@ -2270,6 +2270,7 @@ void Node::save(BinaryOutputBuffer& out_buf) const {
 
     // out_buf << lastInputDims;  // Skip to call prepareParams()
 
+    out_buf << m_ov_core_shape_infer;
     out_buf << shapeInference;
 
     out_buf << originalInputPrecisions;
@@ -2344,7 +2345,10 @@ void Node::load(BinaryInputBuffer& in_buf) {
 
     // in_buf >> lastInputDims; // Skip to call prepareParams()
 
-    in_buf >> shapeInference;
+    in_buf >> m_ov_core_shape_infer;
+    if (!m_ov_core_shape_infer) {  // Need to create ov core node. Deserialize in derived class.
+        in_buf >> shapeInference;
+    }
 
     in_buf >> originalInputPrecisions;
     in_buf >> originalOutputPrecisions;

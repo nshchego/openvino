@@ -53,7 +53,7 @@ public:
     void load(BinaryInputBuffer& in_buf) override;
 
 private:
-    size_t axis = 0;
+    size_t axis = 0UL;
     size_t reorderedAxis = 0;
     bool canBeInPlace = false;
     bool canOptimizeNspc = false;

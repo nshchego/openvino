@@ -32,6 +32,8 @@
 #include "openvino/op/util/attr_types.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -763,6 +765,32 @@ const std::set<size_t> ExtractImagePatches::_supported_precisions_sizes = {1, 2,
 
 bool ExtractImagePatches::created() const {
     return getType() == Type::ExtractImagePatches;
+}
+
+void ExtractImagePatches::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << _ksizes;
+    out_buf << _strides;
+    out_buf << _rates;
+    // out_buf << _supported_precisions_sizes; // TODO: add set
+    out_buf << _auto_pad;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ExtractImagePatches::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> _ksizes;
+    in_buf >> _strides;
+    in_buf >> _rates;
+    // in_buf >> _supported_precisions_sizes;
+    in_buf >> _auto_pad;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

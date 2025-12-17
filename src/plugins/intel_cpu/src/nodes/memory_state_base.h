@@ -27,9 +27,9 @@ public:
         return m_id;
     }
 
-    // void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const;
 
-    // void load(BinaryInputBuffer& in_buf) override;
+    void load(BinaryInputBuffer& in_buf);
 
 private:
     std::string m_id;

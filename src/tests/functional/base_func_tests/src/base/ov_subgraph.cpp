@@ -34,8 +34,20 @@
 
 #include "shared_test_classes/base/utils/ranges.hpp"
 
-namespace ov {
-namespace test {
+namespace ov::test {
+
+void print_blobs(const std::map<std::shared_ptr<ov::Node>, ov::Tensor>& tensors_map) {
+    for (const auto& pair : tensors_map) {
+        printf("[ TEST ] '%s'\n", pair.first->get_friendly_name().data());
+        auto el_num = pair.second.get_size();
+        auto data = reinterpret_cast<const int32_t*>(pair.second.data());
+        std::string res = "    {";
+        for (size_t i = 0UL; i < el_num; i++) {
+            res += std::to_string(data[i]) + "; ";
+        }
+        printf("%s}\n", res.data());
+    }
+}
 
 std::ostream& operator <<(std::ostream& os, const InputShape& inputShape) {
     auto shape_str = ov::test::utils::vec2str(inputShape.second);
@@ -44,7 +56,12 @@ std::ostream& operator <<(std::ostream& os, const InputShape& inputShape) {
     return os;
 }
 
+SubgraphBaseTest::~SubgraphBaseTest() {
+    printf("[TEST] ~SubgraphBaseTest '%s'\n", GetTestName().data());
+}
+
 void SubgraphBaseTest::run() {
+    printf("[TEST] SubgraphBaseTest::run '%s'\n", GetTestName().data());
     is_reported = true;
     bool isCurrentTestDisabled = ov::test::utils::current_test_is_disabled();
 
@@ -77,6 +94,9 @@ void SubgraphBaseTest::run() {
             for (const auto& targetStaticShapeVec : targetStaticShapes) {
                 generate_inputs(targetStaticShapeVec);
                 validate();
+                if (m_check_models_caching) {
+                    models_cache();
+                }
             }
             status = ov::test::utils::PassRate::Statuses::PASSED;
         } catch (const std::exception& ex) {
@@ -419,7 +439,7 @@ void SubgraphBaseTest::match_parameters(const ov::ParameterVector& params, const
     }
 }
 
-std::vector<ov::Tensor> SubgraphBaseTest::calculate_refs() {
+std::vector<ov::Tensor> SubgraphBaseTest::calculate_refs() {  // TODO: pass outputs as reference param?
     if (is_report_stages) {
         std::cout << "[ REFERENCE   ] `SubgraphBaseTest::calculate_refs()` is started"<< std::endl;
     }
@@ -463,25 +483,31 @@ std::vector<ov::Tensor> SubgraphBaseTest::get_plugin_outputs() {
 }
 
 void SubgraphBaseTest::validate() {
-    std::vector<ov::Tensor> expectedOutputs, actualOutputs;
+    std::vector<ov::Tensor> actual_outputs;
     std::exception_ptr expected_outputs_error, actual_output_error;
 
 #ifndef NDEBUG
-    actualOutputs = get_plugin_outputs();
-    expectedOutputs = calculate_refs();
+    // printf("Before get_plugin_outputs\n");
+    // print_blobs(inputs);
+    actual_outputs = get_plugin_outputs();
+    // printf("After get_plugin_outputs\n");
+    // print_blobs(inputs);
+    m_expected_outputs = calculate_refs();
+    // printf("After calculate_refs\n");
+    // print_blobs(inputs);
 #else
-    std::thread t_device([this, &actualOutputs, &actual_output_error] {
+    std::thread t_device([this, &actual_outputs, &actual_output_error] {
         // The try ... catch block is required to handle exceptions during output calculations and report as test fail.
         // If exception is not caught then application would be terminated with crash. (CVS-133676)
         try {
-            actualOutputs = get_plugin_outputs();
+            actual_outputs = get_plugin_outputs();
         } catch (...) {
             actual_output_error = std::current_exception();
         }
     });
-    std::thread t_ref([this, &expectedOutputs, &expected_outputs_error] {
+    std::thread t_ref([this, &expected_outputs_error] {
         try {
-            expectedOutputs = calculate_refs();
+            m_expected_outputs = calculate_refs();
         } catch (...) {
             expected_outputs_error = std::current_exception();
         }
@@ -497,18 +523,18 @@ void SubgraphBaseTest::validate() {
     }
 #endif
 
-    if (expectedOutputs.empty()) {
+    if (m_expected_outputs.empty()) {
         return;
     }
 
-    ASSERT_EQ(actualOutputs.size(), expectedOutputs.size())
-        << "TEMPLATE plugin has " << expectedOutputs.size() << " outputs, while " << targetDevice << " " << actualOutputs.size();
+    ASSERT_EQ(actual_outputs.size(), m_expected_outputs.size())
+        << "TEMPLATE plugin has " << m_expected_outputs.size() << " outputs, while " << targetDevice << " " << actual_outputs.size();
     if (is_report_stages) {
-        std::cout << "[ COMPARATION ] `ov_tensor_utils.hpp::compare()` is started"<< std::endl;
+        std::cout << "[ COMPARATION ] `ov_tensor_utils.hpp::compare()` is started" << std::endl;
     }
     auto start_time = std::chrono::system_clock::now();
 
-    compare(expectedOutputs, actualOutputs);
+    compare(m_expected_outputs, actual_outputs);
     if (is_report_stages) {
         auto end_time = std::chrono::system_clock::now();
         std::chrono::duration<double> duration = end_time - start_time;
@@ -641,5 +667,118 @@ void SubgraphBaseTest::compare_models_param_res(const std::shared_ptr<ov::Model>
     }
 }
 
-}  // namespace test
-}  // namespace ov
+void SubgraphBaseTest::models_cache() {
+    if (is_report_stages) {
+        std::cout << "[ PLUGIN      ] `SubgraphBaseTest::models_cache()` is started" << std::endl;
+    }
+    const std::string gen_ir_name = ov::test::utils::generateTestFilePrefix();
+
+    const std::string xml_path   = gen_ir_name + ".xml";
+    const std::string bin_path   = gen_ir_name + ".bin";
+    const std::string cache_path = gen_ir_name + ".blob";
+    const std::string cache_dir  = gen_ir_name + "_cache_dir";
+
+    auto config = configuration;
+    config.insert(ov::cache_dir(cache_dir));
+    // for (const auto& property : std::get<4>(GetParam())) {
+    //     config.insert(property);
+    // }
+
+    auto config_with_weights_path = config;
+    // if (ov::util::is_weightless_enabled(config).value_or(false)) {
+    //     config_with_weights_path.insert(ov::weights_path(bin_path));
+    // }
+    config_with_weights_path.erase(ov::cache_dir.name());
+
+    // if (m_do_encryption) {
+    //     ov::EncryptionCallbacks encryption_callbacks;
+    //     encryption_callbacks.encrypt = ov::util::codec_xor;
+    //     encryption_callbacks.decrypt = ov::util::codec_xor;
+    //     config.insert(ov::cache_encryption_callbacks(encryption_callbacks));
+    //     config_with_weights_path.insert(ov::cache_encryption_callbacks(encryption_callbacks));
+    // }
+    ov::pass::Serialize(xml_path, bin_path).run_on_model(function);
+
+    auto compiled_model = core->compile_model(xml_path, targetDevice, config);
+
+    // if (!m_use_compile_model_api) {
+    //     auto ofstr = std::ofstream(m_cache_path, std::ofstream::binary);
+    //     compiled_model.export_model(ofstr);
+    //     ofstr.close();
+    // }
+
+    auto get_cache_path = [&]() {
+        std::string path;
+        // if (m_use_compile_model_api) {
+            auto blobs = ov::test::utils::listFilesWithExt(cache_dir, "blob");
+            EXPECT_EQ(blobs.size(), 1);
+            path = blobs[0];
+        // } else {
+            // path = cache_path;
+        // }
+        return path;
+    };
+
+    auto get_mod_time = [&](const std::string& path) {
+        struct stat result;
+        if (stat(path.c_str(), &result) == 0) {
+            return result.st_mtime;
+        }
+        return static_cast<time_t>(0);
+    };
+
+    auto first_cache_path = get_cache_path();
+    auto first_mod_time = get_mod_time(first_cache_path);
+    ASSERT_NE(first_mod_time, static_cast<time_t>(0));
+
+    ov::CompiledModel imported_model;
+    // if (m_use_compile_model_api) {
+        imported_model = core->compile_model(xml_path, targetDevice, config);
+    // } else {
+    //     auto ifstr = std::ifstream(m_cache_path, std::ifstream::binary);
+    //     imported_model = core->import_model(ifstr, targetDevice, config_with_weights_path);
+    //     ifstr.close();
+    // }
+
+    auto second_cache_path = get_cache_path();
+    auto second_mod_time = get_mod_time(second_cache_path);
+
+    // Something went wrong if a new cache is created during the second run.
+    ASSERT_EQ(first_mod_time, second_mod_time);
+
+    // auto orig_req = compiled_model.create_infer_request();
+    auto new_req = imported_model.create_infer_request();
+    for (const auto& input : inputs) {
+        new_req.set_tensor(input.first, input.second);
+    }
+
+    // for (size_t param_idx = 0; param_idx < m_model->get_parameters().size(); ++param_idx) {
+    //     auto input = m_model->get_parameters().at(param_idx);
+    //     auto tensor = ov::test::utils::create_and_fill_tensor_real_distribution(input->get_element_type(),
+    //                                                                             input->get_shape(),
+    //                                                                             -100,
+    //                                                                             100,
+    //                                                                             param_idx);
+    //     orig_req.set_tensor(input, tensor);
+    //     new_req.set_tensor(input, tensor);
+    // }
+
+    // orig_req.infer();
+    // printf("Before new_req.infer\n");
+    // print_blobs(inputs);
+    new_req.infer();
+
+    // auto result_vector = function->get_results();
+    // for (auto& res : result_vector) {
+    //     auto orig_out = orig_req.get_tensor(res);
+    //     auto new_out = new_req.get_tensor(res);
+    //     ov::test::utils::compare(orig_out, new_out, m_inference_mode);
+    // }
+    std::vector<ov::Tensor> actual_outputs{};
+    for (const auto& output : function->outputs()) {
+        actual_outputs.push_back(new_req.get_tensor(output));
+    }
+    compare(m_expected_outputs, actual_outputs);
+}
+
+}  // namespace ov::test
