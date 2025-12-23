@@ -207,7 +207,7 @@ public:
 
     enum : Dim { UNDEFINED_DIM = std::numeric_limits<Dim>::max() };
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& in_buf);
 

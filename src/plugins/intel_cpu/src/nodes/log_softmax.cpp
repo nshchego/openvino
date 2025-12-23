@@ -159,19 +159,30 @@ bool LogSoftmax::created() const {
     return getType() == Type::LogSoftmax;
 }
 
-void LogSoftmax::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void LogSoftmax::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << axis;
+    out_buf << reducedAxisSize;
+    out_buf << reducedAxisStride;
+    out_buf << axisStep;
+    out_buf << isLastDim;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void LogSoftmax::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> axis;
+    in_buf >> reducedAxisSize;
+    in_buf >> reducedAxisStride;
+    in_buf >> axisStep;
+    in_buf >> isLastDim;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

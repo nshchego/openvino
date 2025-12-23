@@ -42,6 +42,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
 #include "utils/precision_support.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -3038,19 +3039,28 @@ bool MVN::created() const {
     return getType() == Type::MVN;
 }
 
-void MVN::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void MVN::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << mvnAttrs;
+    out_buf << shape5D;
+    out_buf << onlyUnaryPostOps;
+    out_buf << canUseAclExecutor;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void MVN::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> mvnAttrs;
+    in_buf >> shape5D;
+    in_buf >> onlyUnaryPostOps;
+    in_buf >> canUseAclExecutor;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

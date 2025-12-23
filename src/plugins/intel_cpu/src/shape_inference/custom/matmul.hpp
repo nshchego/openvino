@@ -19,6 +19,8 @@ namespace ov::intel_cpu::node {
 using Result = IShapeInfer::Result;
 class MMShapeInfer : public ShapeInferEmptyPads {
 public:
+    explicit MMShapeInfer() = default;
+
     MMShapeInfer(const size_t& out_rank, const bool& transpose_a, const bool& transpose_b)
         : m_out_rank(out_rank),
           m_transpose_a(transpose_a),
@@ -32,11 +34,17 @@ public:
         return EMPTY_PORT_MASK;
     }
 
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::MMShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     VectorDims m_shapeY;
-    const size_t m_out_rank;
-    const bool m_transpose_a;
-    const bool m_transpose_b;
+    size_t m_out_rank;
+    bool m_transpose_a;
+    bool m_transpose_b;
 };
 
 class MMShapeInferFactory : public ShapeInferFactory {

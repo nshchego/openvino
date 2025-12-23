@@ -453,14 +453,14 @@ std::vector<ov::Tensor> SubgraphBaseTest::calculate_refs() {  // TODO: pass outp
         inputs_ref[param] = inputs.at(matched_parameters[param]);
     }
 
-    auto outputs = ov::test::utils::infer_on_template(functionRefs, inputs_ref);
+    m_expected_outputs = ov::test::utils::infer_on_template(functionRefs, inputs_ref);
 
     if (is_report_stages) {
         auto end_time = std::chrono::system_clock::now();
         std::chrono::duration<double> duration = end_time - start_time;
         std::cout << "[ REFERENCE   ] `SubgraphBaseTest::calculate_refs()` is finished successfully. Duration is " << duration.count() << "s" << std::endl;
     }
-    return outputs;
+    return m_expected_outputs;
 }
 
 std::vector<ov::Tensor> SubgraphBaseTest::get_plugin_outputs() {
@@ -492,7 +492,7 @@ void SubgraphBaseTest::validate() {
     actual_outputs = get_plugin_outputs();
     // printf("After get_plugin_outputs\n");
     // print_blobs(inputs);
-    m_expected_outputs = calculate_refs();
+    m_expected_outputs = calculate_refs();  // TODO: m_expected_outputs -> expected_outputs
     // printf("After calculate_refs\n");
     // print_blobs(inputs);
 #else
@@ -748,9 +748,12 @@ void SubgraphBaseTest::models_cache() {
 
     // auto orig_req = compiled_model.create_infer_request();
     auto new_req = imported_model.create_infer_request();
+    printf("[ TEST ] SubgraphBaseTest::models_cache ");
     for (const auto& input : inputs) {
+        printf(" in_: %p", input.second.data());
         new_req.set_tensor(input.first, input.second);
     }
+    printf("\n");
 
     // for (size_t param_idx = 0; param_idx < m_model->get_parameters().size(); ++param_idx) {
     //     auto input = m_model->get_parameters().at(param_idx);

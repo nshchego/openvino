@@ -223,7 +223,7 @@ public:
         return broadcastingPolicy;
     }
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
@@ -313,7 +313,7 @@ private:
             _do_shrink(osh);
         }
 
-        void save(BinaryOutputBuffer& ob) const;
+        void save(BinaryOutputBuffer& out_buf) const;
 
         void load(BinaryInputBuffer& in_buf);
     } optimizedFormula;

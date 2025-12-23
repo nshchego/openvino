@@ -27,6 +27,8 @@
 #include "openvino/reference/segment_max.hpp"
 #include "selective_build.h"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 SegmentMax::SegmentMax(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
@@ -178,4 +180,27 @@ void SegmentMax::execute([[maybe_unused]] const dnnl::stream& strm) {
               OV_CASE(ov::element::i32, int32_t),
               OV_CASE(ov::element::i64, int64_t))
 }
+
+void SegmentMax::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << fillMode;
+    out_buf << lastSegmentIds;
+    out_buf << lastNumSegments;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void SegmentMax::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> fillMode;
+    in_buf >> lastSegmentIds;
+    in_buf >> lastNumSegments;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

@@ -64,7 +64,7 @@ public:
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::DnnlMemoryDesc)
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 

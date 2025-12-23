@@ -30,6 +30,8 @@ class PriorBoxShapeInfer : public ShapeInferEmptyPads {
      *
      */
 public:
+    explicit PriorBoxShapeInfer() = default;
+
     explicit PriorBoxShapeInfer(int64_t number_of_priors) : m_number_of_priors(number_of_priors) {}
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                  const std::unordered_map<size_t, MemoryPtr>& data_dependency) override;
@@ -37,6 +39,12 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return PortMask(0);
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::PriorBoxShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     int64_t m_number_of_priors = 0;

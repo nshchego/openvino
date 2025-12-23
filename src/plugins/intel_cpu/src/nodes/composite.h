@@ -59,6 +59,10 @@ public:
         return m_graph;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     std::shared_ptr<const ov::Model> m_body;
     Graph m_graph;

@@ -39,6 +39,8 @@
 #include "ov_ops/nms_ie_internal.hpp"
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <cpu/x64/cpu_isa_traits.hpp>
@@ -94,11 +96,11 @@ NonMaxSuppression::NonMaxSuppression(const std::shared_ptr<ov::Node>& op, const 
                     getOriginalOutputsNumber());
 
     if (const auto* nms9 = as_type<const op::v9::NonMaxSuppression>(op.get())) {
-        boxEncodingType = static_cast<NMSBoxEncodeType>(nms9->get_box_encoding());
+        m_box_encoding_type = static_cast<NMSBoxEncodeType>(nms9->get_box_encoding());
         m_sort_result_descending = nms9->get_sort_result_descending();
         m_coord_num = 4LU;
     } else if (const auto* nmsIe = as_type<const op::internal::NonMaxSuppressionIEInternal>(op.get())) {
-        boxEncodingType = nmsIe->m_center_point_box ? NMSBoxEncodeType::CENTER : NMSBoxEncodeType::CORNER;
+        m_box_encoding_type = nmsIe->m_center_point_box ? NMSBoxEncodeType::CENTER : NMSBoxEncodeType::CORNER;
         m_sort_result_descending = nmsIe->m_sort_result_descending;
         m_coord_num = 4LU;
     } else if (const auto* nms = as_type<const op::v13::NMSRotated>(op.get())) {
@@ -231,7 +233,7 @@ void NonMaxSuppression::createJitKernel() {
 #if defined(OPENVINO_ARCH_X86_64)
     if (!m_rotated_boxes) {
         auto jcp = kernel::NmsCompileParams();
-        jcp.box_encode_type = boxEncodingType;
+        jcp.box_encode_type = m_box_encoding_type;
         jcp.is_soft_suppressed_by_iou = m_is_soft_suppressed_by_iou;
 
         m_jit_kernel =
@@ -944,7 +946,7 @@ void NonMaxSuppression::nmsRotated(const float* boxes,
 
 float NonMaxSuppression::intersectionOverUnion(const float* boxesI, const float* boxesJ) {
     auto [yminI, xminI, ymaxI, xmaxI, yminJ, xminJ, ymaxJ, xmaxJ] = [&] {
-        if (boxEncodingType == NMSBoxEncodeType::CENTER) {
+        if (m_box_encoding_type == NMSBoxEncodeType::CENTER) {
             // box format: x_center, y_center, width, height
             return std::tuple{boxesI[1] - boxesI[3] / 2.F,
                               boxesI[0] - boxesI[2] / 2.F,
@@ -1013,19 +1015,80 @@ bool NonMaxSuppression::created() const {
     return getType() == Type::NonMaxSuppression;
 }
 
-void NonMaxSuppression::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void NonMaxSuppression::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << m_box_encoding_type;
+    out_buf << m_sort_result_descending;
+    out_buf << m_clockwise;
+    out_buf << m_rotated_boxes;
+    out_buf << m_coord_num;
+    out_buf << m_batches_num;
+    out_buf << m_boxes_num;
+    out_buf << m_classes_num;
+    out_buf << m_max_output_boxes_per_class;
+    out_buf << m_output_boxes_per_class;
+    out_buf << m_iou_threshold;
+    out_buf << m_score_threshold;
+    out_buf << m_soft_nms_sigma;
+    out_buf << m_scale;
+    out_buf << m_is_soft_suppressed_by_iou;
+    out_buf << m_out_static_shape;
+    out_buf << m_num_filtered_boxes;
+    // out_buf << m_defined_outputs[NMS_VALID_OUTPUTS + 1] = {false, false, false};
+    out_buf << m_filtered_boxes;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void NonMaxSuppression::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> m_box_encoding_type;
+    in_buf >> m_sort_result_descending;
+    in_buf >> m_clockwise;
+    in_buf >> m_rotated_boxes;
+    in_buf >> m_coord_num;
+    in_buf >> m_batches_num;
+    in_buf >> m_boxes_num;
+    in_buf >> m_classes_num;
+    in_buf >> m_max_output_boxes_per_class;
+    in_buf >> m_output_boxes_per_class;
+    in_buf >> m_iou_threshold;
+    in_buf >> m_score_threshold;
+    in_buf >> m_soft_nms_sigma;
+    in_buf >> m_scale;
+    in_buf >> m_is_soft_suppressed_by_iou;
+    in_buf >> m_out_static_shape;
+    in_buf >> m_num_filtered_boxes;
+    // in_buf >> m_defined_outputs[NMS_VALID_OUTPUTS + 1] = {false, false, false};
+    in_buf >> m_filtered_boxes;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void NonMaxSuppression::FilteredBox::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << score;
+    out_buf << batch_index;
+    out_buf << class_index;
+    out_buf << box_index;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void NonMaxSuppression::FilteredBox::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> score;
+    in_buf >> batch_index;
+    in_buf >> class_index;
+    in_buf >> box_index;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

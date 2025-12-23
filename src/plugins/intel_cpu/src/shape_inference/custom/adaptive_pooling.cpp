@@ -43,6 +43,14 @@ Result AdaptivePoolingShapeInfer::infer(const std::vector<std::reference_wrapper
     return {std::move(result), ShapeInferStatus::success};
 }
 
+void AdaptivePoolingShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_outputs_count;
+}
+
+void AdaptivePoolingShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_outputs_count;
+}
+
 ShapeInferPtr AdaptivePoolingShapeInferFactory::makeShapeInfer() const {
     size_t outputs_count = m_op->get_output_size();
     return std::make_shared<AdaptivePoolingShapeInfer>(outputs_count);

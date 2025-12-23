@@ -48,12 +48,12 @@ public:
         return supportFuseConvert;
     }
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
 private:
-    size_t axis = 0UL;
+    size_t m_axis = 0UL;
     size_t reorderedAxis = 0;
     bool canBeInPlace = false;
     bool canOptimizeNspc = false;

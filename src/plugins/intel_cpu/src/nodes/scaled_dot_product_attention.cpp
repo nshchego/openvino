@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "scaled_attn.h"
+#include "scaled_dot_product_attention.h"
 
 #include <cassert>
 #include <cfloat>
@@ -38,6 +38,7 @@
 #include "transformations/cpu_opset/common/op/sdpa.hpp"
 #include "utils/general_utils.h"
 #include "utils/plain_tensor.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 #ifdef OPENVINO_ARCH_X86_64
 #    include "openvino/core/type/bfloat16.hpp"
@@ -2166,6 +2167,56 @@ ov::element::Type ScaledDotProductAttention::getRuntimePrecision() const {
         rtPrecision = ov::element::f32;
     }
     return rtPrecision;
+}
+
+void ScaledDotProductAttention::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_config;
+    // std::shared_ptr<Executor> m_executor;
+    // std::shared_ptr<VariableStateKVcache> m_k_state;
+    // std::shared_ptr<VariableStateKVcache> m_v_state;
+    out_buf << m_kvstate_layout;
+    out_buf << m_key_quant_param;
+    out_buf << m_value_quant_param;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ScaledDotProductAttention::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_config;
+    // std::shared_ptr<Executor> m_executor;
+    // std::shared_ptr<VariableStateKVcache> m_k_state;
+    // std::shared_ptr<VariableStateKVcache> m_v_state;
+    in_buf >> m_kvstate_layout;
+    in_buf >> m_key_quant_param;
+    in_buf >> m_value_quant_param;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void ScaledDotProductAttention::SDPAQuantParam::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << precision;
+    out_buf << groupSize;
+    out_buf << isByChannel;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ScaledDotProductAttention::SDPAQuantParam::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> precision;
+    in_buf >> groupSize;
+    in_buf >> isByChannel;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

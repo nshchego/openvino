@@ -29,6 +29,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -288,19 +290,54 @@ void Multinomial::execute_convert_type() {
     }
 }
 
-void Multinomial::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Multinomial::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << m_with_replacement;
+    out_buf << m_log_probs;
+    out_buf << m_global_seed;
+    out_buf << m_op_seed;
+    // out_buf << m_const_inputs[2] = {false, false};
+    out_buf << m_const_batch;
+    out_buf << m_output_shape;
+    out_buf << m_probs_precision;
+    out_buf << m_num_samples_precision;
+    out_buf << m_output_precision;
+    out_buf << m_probs_count;
+    out_buf << m_batches_count;
+    out_buf << m_samples_count;
+    out_buf << m_samples_probs_count;
+    out_buf << m_input_elements_count;
+    out_buf << m_output_elements_count;
+    out_buf << m_batches_samples_probs_count;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Multinomial::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> m_with_replacement;
+    in_buf >> m_log_probs;
+    in_buf >> m_global_seed;
+    in_buf >> m_op_seed;
+    // in_buf >> m_const_inputs[2] = {false, false};
+    in_buf >> m_const_batch;
+    in_buf >> m_output_shape;
+    in_buf >> m_probs_precision;
+    in_buf >> m_num_samples_precision;
+    in_buf >> m_output_precision;
+    in_buf >> m_probs_count;
+    in_buf >> m_batches_count;
+    in_buf >> m_samples_count;
+    in_buf >> m_samples_probs_count;
+    in_buf >> m_input_elements_count;
+    in_buf >> m_output_elements_count;
+    in_buf >> m_batches_samples_probs_count;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

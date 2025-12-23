@@ -23,7 +23,7 @@
 
 #include "cpu_types.h"
 #include "node.h"
-#include "nodes/scaled_attn.h"
+#include "nodes/scaled_dot_product_attention.h"
 #include "onednn/dnnl.h"
 #include "openvino/core/except.hpp"
 #include "openvino/core/model.hpp"

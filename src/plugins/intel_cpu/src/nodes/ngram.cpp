@@ -171,19 +171,42 @@ bool Ngram::created() const {
     return getType() == Type::Ngram;
 }
 
-void Ngram::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Ngram::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << k;
+    out_buf << windowSize;
+    out_buf << windowStride;
+    out_buf << leftPad;
+    out_buf << rightPad;
+    out_buf << leftPaddingSize;
+    out_buf << rightPaddingSize;
+    out_buf << idcesShapeSize;
+    out_buf << idcesStride;
+    out_buf << numIdces;
+    out_buf << numOutElems;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Ngram::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> k;
+    in_buf >> windowSize;
+    in_buf >> windowStride;
+    in_buf >> leftPad;
+    in_buf >> rightPad;
+    in_buf >> leftPaddingSize;
+    in_buf >> rightPaddingSize;
+    in_buf >> idcesShapeSize;
+    in_buf >> idcesStride;
+    in_buf >> numIdces;
+    in_buf >> numOutElems;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

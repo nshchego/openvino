@@ -26,6 +26,7 @@
 #include "openvino/op/prior_box_clustered.hpp"
 #include "shape_inference/custom/priorbox_clustered.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 bool PriorBoxClustered::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
@@ -175,6 +176,40 @@ void PriorBoxClustered::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool PriorBoxClustered::created() const {
     return getType() == Type::PriorBoxClustered;
+}
+
+void PriorBoxClustered::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << widths;
+    out_buf << heights;
+    out_buf << variances;
+    out_buf << clip;
+    out_buf << step;
+    out_buf << step_heights;
+    out_buf << step_widths;
+    out_buf << offset;
+    out_buf << number_of_priors;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void PriorBoxClustered::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> widths;
+    in_buf >> heights;
+    in_buf >> variances;
+    in_buf >> clip;
+    in_buf >> step;
+    in_buf >> step_heights;
+    in_buf >> step_widths;
+    in_buf >> offset;
+    in_buf >> number_of_priors;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

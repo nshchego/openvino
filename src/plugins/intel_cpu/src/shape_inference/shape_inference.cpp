@@ -336,6 +336,10 @@ public:
         return EMPTY_PORT_MASK;
     }
 
+    void set_ov_core_node(std::shared_ptr<ov::Node> node) override {
+        m_node = std::move(node);
+    }
+
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferBase)
 
     virtual void save(BinaryOutputBuffer& out_buf) const {
@@ -906,5 +910,8 @@ BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_TopK_2)
 
 using ShapeInferTA_VariadicSplit_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::VariadicSplit, 6U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_VariadicSplit_6)
+
+using ShapeInferTA_SearchSorted_0 = ov::intel_cpu::ShapeInferTA<ov::op::v15::SearchSorted, 0U>;
+BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_SearchSorted_0)
 
 BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferCopy)

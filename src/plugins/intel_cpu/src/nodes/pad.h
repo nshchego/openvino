@@ -38,6 +38,10 @@ public:
     bool isExecutable() const override;
     bool needPrepareParams() const override;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
@@ -55,6 +59,10 @@ private:
         int endPadIdx = 0;
         ov::element::Type prc;
         bool constPadValue = false;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     } attrs;
 
     struct PadExecutor {
@@ -114,6 +122,10 @@ private:
             size_t innerBeginPadCount = 0LU;
             size_t innerEndPadCount = 0LU;
             PadMode padMode = PadMode::CONSTANT;
+
+            // void save(BinaryOutputBuffer& out_buf) const;
+
+            // void load(BinaryInputBuffer& in_buf);
         } params;
     };
 

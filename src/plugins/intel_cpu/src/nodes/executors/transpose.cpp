@@ -139,8 +139,8 @@ jit_permute_config_params TransposeExecutor::prepareParams(const PermuteParams& 
     return jcp;
 }
 
-void TransposeParams::save(BinaryOutputBuffer& ob) const {
-    ob << permuteParams;
+void TransposeParams::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << permuteParams;
 }
 
 void TransposeParams::load(BinaryInputBuffer& in_buf) {

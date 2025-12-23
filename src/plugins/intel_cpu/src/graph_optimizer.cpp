@@ -46,7 +46,7 @@
 #include "nodes/reorder.h"
 #include "nodes/reshape.h"
 #include "nodes/rnn.h"
-#include "nodes/scaled_attn.h"
+#include "nodes/scaled_dot_product_attention.h"
 #include "nodes/transpose.h"
 #include "onednn/dnnl.h"
 #include "onednn/iml_type_mapper.h"

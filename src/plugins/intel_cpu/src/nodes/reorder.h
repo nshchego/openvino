@@ -76,7 +76,7 @@ public:
 
     static void reorderData(const IMemory& input, const IMemory& output, const MultiCachePtr& cache = nullptr);
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 

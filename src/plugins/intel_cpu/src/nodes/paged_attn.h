@@ -54,6 +54,10 @@ public:
 
     static bool isQuantByChannel(Config::CacheQuantMode mode, ov::element::Type precision, bool isKey);
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     ov::element::Type getRuntimePrecision() const override;
 

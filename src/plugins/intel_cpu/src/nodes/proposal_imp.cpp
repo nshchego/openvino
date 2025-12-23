@@ -438,5 +438,60 @@ void proposal_exec(const float* input0,
                           p_probs);
     }
 }
-
 }  // namespace ov::Extensions::Cpu::XARCH
+
+// namespace ov::Extensions::Cpu {
+
+// void proposal_conf::save(intel_cpu::BinaryOutputBuffer& out_buf) const {
+//     out_buf.dump_position();  // TODO: remove
+
+//     out_buf << feat_stride_;
+//     out_buf << base_size_;
+//     out_buf << min_size_;
+//     out_buf << pre_nms_topn_;
+//     out_buf << post_nms_topn_;
+//     out_buf << nms_thresh_;
+//     out_buf << box_coordinate_scale_;
+//     out_buf << box_size_scale_;
+//     out_buf << scales;
+//     out_buf << ratios;
+//     out_buf << normalize_;
+//     out_buf << anchors_shape_0;
+//     out_buf << coordinates_offset;
+//     out_buf << swap_xy;
+//     out_buf << initial_clip;
+//     out_buf << clip_before_nms;
+//     out_buf << clip_after_nms;
+//     out_buf << round_ratios;
+//     out_buf << shift_anchors;
+
+//     out_buf.dump_position();  // TODO: remove
+// }
+
+// void proposal_conf::load(intel_cpu::BinaryInputBuffer& in_buf) {
+//     in_buf.check_position();  // TODO: remove
+
+//     in_buf >> feat_stride_;
+//     in_buf >> base_size_;
+//     in_buf >> min_size_;
+//     in_buf >> pre_nms_topn_;
+//     in_buf >> post_nms_topn_;
+//     in_buf >> nms_thresh_;
+//     in_buf >> box_coordinate_scale_;
+//     in_buf >> box_size_scale_;
+//     in_buf >> scales;
+//     in_buf >> ratios;
+//     in_buf >> normalize_;
+//     in_buf >> anchors_shape_0;
+//     in_buf >> coordinates_offset;
+//     in_buf >> swap_xy;
+//     in_buf >> initial_clip;
+//     in_buf >> clip_before_nms;
+//     in_buf >> clip_after_nms;
+//     in_buf >> round_ratios;
+//     in_buf >> shift_anchors;
+
+//     in_buf.check_position();  // TODO: remove
+// }
+
+// }  // namespace ov::Extensions::Cpu

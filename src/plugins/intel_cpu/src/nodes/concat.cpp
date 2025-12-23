@@ -86,7 +86,7 @@ Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
         OPENVINO_THROW_NOT_IMPLEMENTED(errorMessage);
     }
 
-    m_ov_core_shape_infer = true;
+    // m_ov_core_shape_infer = true;
     const auto inRank = getInputShapeAtPort(0).getRank();
     auto concatOp = ov::as_type_ptr<ov::op::v0::Concat>(op);
     auto axis = concatOp->get_axis();
@@ -94,7 +94,7 @@ Concat::Concat(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& co
         axis += inRank;
     }
     CPU_NODE_ASSERT(axis < static_cast<int64_t>(inRank) && axis >= 0, "has invalid value of axis parameter: ", axis);
-    this->axis = axis;
+    m_axis = axis;
 }
 
 Concat::Concat(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
@@ -108,7 +108,7 @@ void Concat::getSupportedDescriptors() {
         const auto& dims = getInputShapeAtPort(i).getDims();
         bool incorrectDims = false;
         for (size_t j = 0; j < firstParentDims.size(); j++) {
-            if (j == axis) {
+            if (j == m_axis) {
                 continue;
             }
             if (dims.size() != firstParentDims.size() || !dimsEqualWeak(firstParentDims[j], dims[j])) {
@@ -123,8 +123,8 @@ void Concat::getSupportedDescriptors() {
     // concat
 
     const auto& childDims = m_output_shapes[0].getDims();
-    if (childDims[axis] != Shape::UNDEFINED_DIM &&
-        std::all_of(childDims.begin(), childDims.begin() + axis, [](size_t dim) {
+    if (childDims[m_axis] != Shape::UNDEFINED_DIM &&
+        std::all_of(childDims.begin(), childDims.begin() + m_axis, [](size_t dim) {
             return dim == 1;
         })) {
         canBeInPlace = true;
@@ -226,7 +226,7 @@ void Concat::initSupportedPrimitiveDescriptors() {
             // canBeInPlace means all dims before axis are 1, so for nspc layout we only need check sp dimensions in
             // axis=1 cases here
             const auto& childDims = m_output_shapes[0].getDims();
-            if (axis != 1 || std::all_of(childDims.crbegin(), childDims.crend() - 2, [](const Dim dim) {
+            if (m_axis != 1 || std::all_of(childDims.crbegin(), childDims.crend() - 2, [](const Dim dim) {
                     return 1 == dim;
                 })) {
                 pdIndexesToReuse.push_back(supportedPrimitiveDescriptors.size() - 1);
@@ -410,7 +410,7 @@ void Concat::prepareParams() {
     const auto& src0BlkMemDesc = getSrcMemoryAtPort(0)->getDescPtr()->as<BlockedMemoryDesc>();
     const auto& outputOrder = src0BlkMemDesc->getOrder();
     for (size_t i = 0; i < outputOrder.size(); i++) {
-        if (outputOrder[i] == axis) {
+        if (outputOrder[i] == m_axis) {
             reorderedAxis = i;
             break;
         }
@@ -490,7 +490,7 @@ void Concat::prepareParams() {
             desc.get()->padded_dims[i] = dims[i];
         }
 
-        auto primitive_desc = concat::primitive_desc(getEngine(), desc, static_cast<int>(axis), srcs_d);
+        auto primitive_desc = concat::primitive_desc(getEngine(), desc, static_cast<int>(m_axis), srcs_d);
         prim = concat(primitive_desc);
 #ifdef CPU_DEBUG_CAPS
         if (prim) {
@@ -559,7 +559,7 @@ void Concat::initOptimalPrimitiveDescriptor() {
     }
     // check if selected Tensor descriptor has nspc layout and concat axis is C
     canOptimizeNspc =
-        axis == channelAxis &&
+        m_axis == channelAxis &&
         getSelectedPrimitiveDescriptor()->getConfig().outConfs.front().getMemDesc()->hasLayoutType(LayoutType::nspc);
 }
 
@@ -872,7 +872,7 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
     const auto& config = selected_pd->getConfig();
     size_t numberOfInputs = config.inConfs.size();
     size_t inplaceOutIndx = selected_pd->getConfig().inConfs[0].inPlace();
-    auto baseDim = m_output_shapes.front().getDims()[axis];
+    auto baseDim = m_output_shapes.front().getDims()[m_axis];
     CPU_NODE_ASSERT(baseDim != Shape::UNDEFINED_DIM,
                     "can't use inPlace memory with concatenation on dynamic dimension");
 
@@ -887,7 +887,7 @@ void Concat::resolveInPlaceEdges(Edge::LOOK look) {
 
     ptrdiff_t offset = 0;
     for (size_t i = 0; i < numberOfInputs; ++i) {
-        auto partDim = m_input_shapes[i].getDims()[axis];
+        auto partDim = m_input_shapes[i].getDims()[m_axis];
         CPU_NODE_ASSERT(partDim != Shape::UNDEFINED_DIM,
                         "can't use inPlace memory with concatenation on dynamic dimension");
 
@@ -917,7 +917,7 @@ void Concat::save(BinaryOutputBuffer& out_buf) const {
 
 out_buf.dump_position();  // TODO: remove
 
-    out_buf << axis;
+    out_buf << m_axis;
     out_buf << reorderedAxis;
     out_buf << canBeInPlace;
     out_buf << canOptimizeNspc;
@@ -927,7 +927,6 @@ out_buf.dump_position();  // TODO: remove
     out_buf << outputPrecision;
     out_buf << canExecRef;
     out_buf << getParentEdges().size();  // TODO: take form base?
-    out_buf << 
 
 out_buf.dump_position();  // TODO: remove
 }
@@ -935,7 +934,7 @@ out_buf.dump_position();  // TODO: remove
 void Concat::load(BinaryInputBuffer& in_buf) {
 in_buf.check_position();  // TODO: remove
 
-    in_buf >> axis;
+    in_buf >> m_axis;
     in_buf >> reorderedAxis;
     in_buf >> canBeInPlace;
     in_buf >> canOptimizeNspc;
@@ -952,6 +951,12 @@ in_buf.check_position();  // TODO: remove
         dstOffset.resize(parent_edges);
         inputStrides.resize(parent_edges, VectorDims(MAX_RANK_REF, 0LU));
         srcPtrs.resize(parent_edges);
+    }
+
+    if (isDynamic) {
+        auto ov_concat = std::make_shared<op::v0::Concat>();
+        ov_concat->set_axis(m_axis);
+        shapeInference->set_ov_core_node(ov_concat);
     }
 
 in_buf.check_position();  // TODO: remove

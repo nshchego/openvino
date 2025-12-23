@@ -30,6 +30,7 @@
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -273,6 +274,52 @@ void If::executeDynamicImpl(const dnnl::stream& strm) {
 
 bool If::created() const {
     return getType() == Type::If;
+}
+
+void If::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    m_thenGraph.export_graph(out_buf);
+    m_elseGraph.export_graph(out_buf);
+    out_buf << thenInputPortMap;
+    out_buf << thenOutputPortMap;
+    out_buf << elseInputPortMap;
+    out_buf << elseOutputPortMap;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void If::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    m_thenGraph.Init(in_buf, m_context);
+    m_elseGraph.Init(in_buf, m_context);
+    in_buf >> thenInputPortMap;
+    in_buf >> thenOutputPortMap;
+    in_buf >> elseInputPortMap;
+    in_buf >> elseOutputPortMap;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void If::PortMap::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << from;
+    out_buf << to;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void If::PortMap::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> from;
+    in_buf >> to;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

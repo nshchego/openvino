@@ -20,7 +20,7 @@ struct ConvertParams {
     ov::element::Type dstPrc;
     size_t size = 0UL;
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& in_buf);
 };

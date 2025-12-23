@@ -40,6 +40,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -1465,11 +1467,46 @@ bool BinaryConvolution::created() const {
     return getType() == Type::BinaryConvolution;
 }
 
-void BinaryConvolution::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void BinaryConvolution::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << withSum;
+    out_buf << withBinarization;
+    out_buf << group;
+    out_buf << pad_value;
+    out_buf << stride;
+    out_buf << dilation;
+    out_buf << paddingL;
+    out_buf << paddingR;
+    // out_buf << jcp;
+    // std::shared_ptr<jit_uni_bin_conv_kernel> bin_conv_kernel = nullptr;
+    // dnnl::primitive_attr attr;
+    // std::vector<const void*> postOpsDataPtrs;
+    out_buf << implType;
+
+    out_buf.dump_position();  // TODO: remove
 }
 
 void BinaryConvolution::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> withSum;
+    in_buf >> withBinarization;
+    in_buf >> group;
+    in_buf >> pad_value;
+    in_buf >> stride;
+    in_buf >> dilation;
+    in_buf >> paddingL;
+    in_buf >> paddingR;
+    // in_buf >> jcp;
+    // std::shared_ptr<jit_uni_bin_conv_kernel> bin_conv_kernel = nullptr;
+    // dnnl::primitive_attr attr;
+    // std::vector<const void*> postOpsDataPtrs;
+    in_buf >> implType;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

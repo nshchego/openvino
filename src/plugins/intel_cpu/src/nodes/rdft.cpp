@@ -34,6 +34,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include "cpu/x64/cpu_isa_traits.hpp"
@@ -1144,6 +1145,34 @@ std::shared_ptr<RDFTExecutor> RDFTExecutor::build(bool inverse, NodeDesc* primDe
     executor = std::make_shared<RDFTRefExecutor>(inverse);
     primDesc->setImplementationType(ref_any);
     return executor;
+}
+
+void RDFT::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << inverse;
+    out_buf << axes;
+    out_buf << signalSizes;
+    out_buf << twiddles;
+    out_buf << isAxesConstant;
+    out_buf << isSignalSizesConstant;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RDFT::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> inverse;
+    in_buf >> axes;
+    in_buf >> signalSizes;
+    in_buf >> twiddles;
+    in_buf >> isAxesConstant;
+    in_buf >> isSignalSizesConstant;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

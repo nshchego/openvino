@@ -27,6 +27,7 @@
 #include "openvino/op/prior_box.hpp"
 #include "shape_inference/custom/priorbox.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 namespace {
@@ -342,6 +343,48 @@ void PriorBox::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool PriorBox::created() const {
     return getType() == Type::PriorBox;
+}
+
+void PriorBox::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << offset;
+    out_buf << step;
+    out_buf << min_size;
+    out_buf << max_size;
+    out_buf << flip;
+    out_buf << clip;
+    out_buf << scale_all_sizes;
+    out_buf << fixed_size;
+    out_buf << fixed_ratio;
+    out_buf << density;
+    out_buf << aspect_ratio;
+    out_buf << variance;
+    out_buf << number_of_priors;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void PriorBox::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> offset;
+    in_buf >> step;
+    in_buf >> min_size;
+    in_buf >> max_size;
+    in_buf >> flip;
+    in_buf >> clip;
+    in_buf >> scale_all_sizes;
+    in_buf >> fixed_size;
+    in_buf >> fixed_ratio;
+    in_buf >> density;
+    in_buf >> aspect_ratio;
+    in_buf >> variance;
+    in_buf >> number_of_priors;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

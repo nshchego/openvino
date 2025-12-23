@@ -169,7 +169,7 @@ public:
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::MemoryDesc)
 
-    virtual void save(BinaryOutputBuffer& ob) const;
+    virtual void save(BinaryOutputBuffer& out_buf) const;
 
     virtual void load(BinaryInputBuffer& in_buf);
 

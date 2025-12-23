@@ -26,6 +26,8 @@
 #include "shape_inference/shape_inference_status.hpp"
 #include "slice_shape_inference_utils.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/set.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -104,6 +106,22 @@ Result StridedSliceShapeInfer::infer(const std::vector<std::reference_wrapper<co
     }
 
     return {{m_outputShape}, ShapeInferStatus::success};
+}
+
+void StridedSliceShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_outputShape;
+    out_buf << m_begin_mask_set;
+    out_buf << m_end_mask_set;
+    out_buf << m_new_axis_mask_set;
+    out_buf << m_shrink_axis_mask_set;
+}
+
+void StridedSliceShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_outputShape;
+    in_buf >> m_begin_mask_set;
+    in_buf >> m_end_mask_set;
+    in_buf >> m_new_axis_mask_set;
+    in_buf >> m_shrink_axis_mask_set;
 }
 
 ShapeInferPtr StridedSliceShapeInferFactory::makeShapeInfer() const {

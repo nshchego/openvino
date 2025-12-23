@@ -123,4 +123,30 @@ void ROIAlignRotated::execute([[maybe_unused]] const dnnl::stream& strm) {
 #undef CASE
 }
 
+void ROIAlignRotated::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << pooledH;
+    out_buf << pooledW;
+    out_buf << samplingRatio;
+    out_buf << spatialScale;
+    out_buf << clockwiseMode;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ROIAlignRotated::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> pooledH;
+    in_buf >> pooledW;
+    in_buf >> samplingRatio;
+    in_buf >> spatialScale;
+    in_buf >> clockwiseMode;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

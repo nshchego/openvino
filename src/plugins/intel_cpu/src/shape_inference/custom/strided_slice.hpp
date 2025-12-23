@@ -27,6 +27,8 @@ constexpr IShapeInfer::port_mask_t port_mask = PortMask(/*BEGIN_ID*/ 1, /*END_ID
 
 class StridedSliceShapeInfer : public ShapeInferEmptyPads {
 public:
+    explicit StridedSliceShapeInfer() = default;
+
     StridedSliceShapeInfer(size_t output_size,
                            std::unordered_set<int64_t> begin_mask,
                            std::unordered_set<int64_t> end_mask,
@@ -40,12 +42,18 @@ public:
         return port_mask;
     }
 
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::StridedSliceShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     VectorDims m_outputShape;
-    const std::unordered_set<int64_t> m_begin_mask_set;
-    const std::unordered_set<int64_t> m_end_mask_set;
-    const std::unordered_set<int64_t> m_new_axis_mask_set;
-    const std::unordered_set<int64_t> m_shrink_axis_mask_set;
+    std::unordered_set<int64_t> m_begin_mask_set;
+    std::unordered_set<int64_t> m_end_mask_set;
+    std::unordered_set<int64_t> m_new_axis_mask_set;
+    std::unordered_set<int64_t> m_shrink_axis_mask_set;
 };
 
 class StridedSliceShapeInferFactory : public ShapeInferFactory {

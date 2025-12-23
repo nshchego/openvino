@@ -37,6 +37,10 @@ struct jit_roi_pooling_params {
     Algorithm alg;
 
     bool operator==(const jit_roi_pooling_params& rhs) const noexcept;
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 };
 
 struct jit_roi_pooling_call_args {
@@ -86,6 +90,10 @@ public:
 
     void executeDynamicImpl(const dnnl::stream& strm) override;
     void prepareParams() override;
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;

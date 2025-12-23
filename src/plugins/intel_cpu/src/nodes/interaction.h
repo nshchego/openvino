@@ -69,6 +69,10 @@ public:
     void executeDynamicImpl(const dnnl::stream& strm) override;
     void prepareParams() override;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     void execRef(const dnnl::stream& strm);
     dnnl::primitive prim;

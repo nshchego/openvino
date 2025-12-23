@@ -56,6 +56,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_status.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include "nodes/executors/acl/acl_deconv.hpp"
@@ -1355,11 +1356,64 @@ void Deconvolution::initSupportedPrimitiveDescriptors() {
     pushDesc(LayoutType::ncsp);
 }
 
-void Deconvolution::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Deconvolution::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << isDW;
+    out_buf << isInt8;
+    out_buf << autoPad;
+    out_buf << externOutShape;
+    out_buf << groupNum;
+    out_buf << IC;
+    out_buf << OC;
+    out_buf << lastOutputSpatialDims;
+    out_buf << dnnlCompatibleWeiDims;
+    out_buf << expectedBiasDims;
+    out_buf << useACL;
+    out_buf << deconvAttrs;
+    out_buf << inShape;
+    out_buf << outShape;
+    // out_buf << pAttr;
+    out_buf << outputDataType;
+    out_buf << withBiases;
+    out_buf << biasPort;
+    out_buf << weightIsConst;
+    out_buf << asymmetricPaddingAnd1x1;
+    out_buf << is1x1;
+    out_buf << isConstOutShape;
+
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Deconvolution::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> isDW;
+    in_buf >> isInt8;
+    in_buf >> autoPad;
+    in_buf >> externOutShape;
+    in_buf >> groupNum;
+    in_buf >> IC;
+    in_buf >> OC;
+    in_buf >> lastOutputSpatialDims;
+    in_buf >> dnnlCompatibleWeiDims;
+    in_buf >> expectedBiasDims;
+    in_buf >> useACL;
+    in_buf >> deconvAttrs;
+    in_buf >> inShape;
+    in_buf >> outShape;
+    // in_buf >> pAttr;
+    in_buf >> outputDataType;
+    in_buf >> withBiases;
+    in_buf >> biasPort;
+    in_buf >> weightIsConst;
+    in_buf >> asymmetricPaddingAnd1x1;
+    in_buf >> is1x1;
+    in_buf >> isConstOutShape;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

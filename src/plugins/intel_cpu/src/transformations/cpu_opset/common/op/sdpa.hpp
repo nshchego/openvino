@@ -12,6 +12,7 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/node_vector.hpp"
 #include "openvino/op/op.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 /// \brief Scaled dot product attention from PyTorch, fused with Concat
@@ -25,8 +26,8 @@ public:
     ScaledDotProductAttentionWithKVCache() = default;
 
     struct Config {
-        bool input_BLHxS = false;   // true implies that input is [B,L,H*S]
-        bool output_BLHxS = false;  // true implies that output is [B,L,H*S]
+        bool input_BLHxS = false;          // true implies that input is [B,L,H*S]
+        bool output_BLHxS = false;         // true implies that output is [B,L,H*S]
 
         bool fuse_causal_attn = false;     // fuse causal mask and attn mask into attn_mask
         bool is_causal = false;            // apply causal mask internally
@@ -34,6 +35,26 @@ public:
         std::vector<size_t> permute_axes;  // not empty means input has transpose. output of permutation is [B,H,L,S]
                                            // e.g. [L,B,H,S] -> permute[1, 2, 0, 3] ->[B, H, L, S]
         std::vector<size_t> order_HS;      // Reshape[B,L,H*S]->B,L,H,S], H,S are fixed value, when input_BLHxS is true.
+
+        void save(BinaryOutputBuffer& out_buf) const {
+            out_buf << input_BLHxS;
+            out_buf << output_BLHxS;
+            out_buf << fuse_causal_attn;
+            out_buf << is_causal;
+            out_buf << fuse_concat;
+            out_buf << permute_axes;
+            out_buf << order_HS;
+        }
+
+        void load(BinaryInputBuffer& in_buf) {
+            in_buf >> input_BLHxS;
+            in_buf >> output_BLHxS;
+            in_buf >> fuse_causal_attn;
+            in_buf >> is_causal;
+            in_buf >> fuse_concat;
+            in_buf >> permute_axes;
+            in_buf >> order_HS;
+        }
     };
 
     ScaledDotProductAttentionWithKVCache(const OutputVector& args, Config cfg);

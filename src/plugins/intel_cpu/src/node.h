@@ -172,7 +172,7 @@ public:
         return outputConfigs[portIdx].hasZeroDims();
     }
 
-    virtual void save(BinaryOutputBuffer& ob) const;
+    virtual void save(BinaryOutputBuffer& out_buf) const;
 
     virtual void load(BinaryInputBuffer& in_buf);
 
@@ -665,7 +665,7 @@ public:
         return keepOriginalPrecision;
     }
 
-    virtual void save(BinaryOutputBuffer& ob) const;
+    virtual void save(BinaryOutputBuffer& out_buf) const;
 
     virtual void load(BinaryInputBuffer& in_buf);
 
@@ -829,7 +829,7 @@ protected:
         std::make_shared<std::unordered_map<std::string, MemoryPtr>>();
 
     bool m_model_from_cache = false;
-    bool m_ov_core_shape_infer = false;
+    // bool m_ov_core_shape_infer = false;
 
 private:
     static void removeEdge(const EdgePtr edge, std::vector<EdgeWeakPtr>& edges) {

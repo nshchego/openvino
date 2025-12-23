@@ -34,6 +34,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "transformations/cpu_opset/x64/op/interaction.hpp"
 #include "utils/debug_capabilities.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -406,6 +408,52 @@ bool Interaction::isSupportedOperation(const std::shared_ptr<const ov::Node>& op
         return false;
     }
     return true;
+}
+
+void Interaction::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+    
+    // out_buf << prim;
+    out_buf << batchSize;
+    out_buf << featureSize;
+    out_buf << inputSizes;
+    out_buf << outputFeaturesLen;
+    out_buf << interactFeatureSize;
+    // out_buf << inputMemPtr;
+    // out_buf << flatMemPtr;
+    // out_buf << outputMemPtr;
+    out_buf << featureSizes;
+    out_buf << dataPrecision;
+    out_buf << outputDataType;
+    out_buf << fqScales;
+    // out_buf << moveFeatureKernel;
+    // out_buf << moveInteractKernel;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Interaction::load(BinaryInputBuffer& in_buf) {
+in_buf.check_position(); // TODO: remove
+
+    // in_buf >> prim;
+    in_buf >> batchSize;
+    in_buf >> featureSize;
+    in_buf >> inputSizes;
+    in_buf >> outputFeaturesLen;
+    in_buf >> interactFeatureSize;
+    // in_buf >> inputMemPtr;
+    // in_buf >> flatMemPtr;
+    // in_buf >> outputMemPtr;
+    in_buf >> featureSizes;
+    in_buf >> dataPrecision;
+    in_buf >> outputDataType;
+    in_buf >> fqScales;
+    // in_buf >> moveFeatureKernel;
+    // in_buf >> moveInteractKernel;
+
+in_buf.check_position(); // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

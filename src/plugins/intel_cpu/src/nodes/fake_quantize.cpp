@@ -2485,55 +2485,55 @@ bool FakeQuantize::created() const {
     return getType() == Type::FakeQuantize;
 }
 
-void FakeQuantize::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void FakeQuantize::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
-    ob << levels;
-    ob << binarization;
-    ob << binarizationThresholds;
-    ob << binarizationOutputMask;
-    ob << cropLow;
-    ob << cropHigh;
-    ob << inputScale;
-    ob << inputShift;
-    ob << outputScale;
-    ob << outputShift;
-    ob << optimizedFormula;
-    ob << quantizationData;
-    ob << quantizationDataSize;
-    // ob << quantizationMemory;
+    out_buf << levels;
+    out_buf << binarization;
+    out_buf << binarizationThresholds;
+    out_buf << binarizationOutputMask;
+    out_buf << cropLow;
+    out_buf << cropHigh;
+    out_buf << inputScale;
+    out_buf << inputShift;
+    out_buf << outputScale;
+    out_buf << outputShift;
+    out_buf << optimizedFormula;
+    out_buf << quantizationData;
+    out_buf << quantizationDataSize;
+    // out_buf << quantizationMemory;
 
-    ob << cropLowSize;
-    ob << cropHighSize;
-    ob << inputScaleSize;
-    ob << inputShiftSize;
-    ob << outputScaleSize;
-    ob << outputShiftSize;
+    out_buf << cropLowSize;
+    out_buf << cropHighSize;
+    out_buf << inputScaleSize;
+    out_buf << inputShiftSize;
+    out_buf << outputScaleSize;
+    out_buf << outputShiftSize;
 
-    ob << broadcasted;
+    out_buf << broadcasted;
 
-    ob << fqScales;
+    out_buf << fqScales;
 
-    ob << parameterVersion;
-    ob << postOpDataVersion;
-    ob << legacyPostOpDataVersion;
+    out_buf << parameterVersion;
+    out_buf << postOpDataVersion;
+    out_buf << legacyPostOpDataVersion;
 
-    ob << isInputLowBroadcasted;
-    ob << isInputHighBroadcasted;
-    ob << isOutputLowBroadcasted;
-    ob << isOutputHighBroadcasted;
+    out_buf << isInputLowBroadcasted;
+    out_buf << isInputHighBroadcasted;
+    out_buf << isOutputLowBroadcasted;
+    out_buf << isOutputHighBroadcasted;
 
-    ob << currentAxisSize;
-    ob << axis;
+    out_buf << currentAxisSize;
+    out_buf << axis;
 
-    ob << inputPrecision;
-    ob << outputPrecision;
+    out_buf << inputPrecision;
+    out_buf << outputPrecision;
 
-    ob << broadcastingPolicy;
+    out_buf << broadcastingPolicy;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void FakeQuantize::load(BinaryInputBuffer& in_buf) {
@@ -2585,17 +2585,17 @@ in_buf.check_position();  // TODO: remove
 in_buf.check_position();  // TODO: remove
 }
 
-void FakeQuantize::OptimizedFormula::save(BinaryOutputBuffer& ob) const {
-ob.dump_position();  // TODO: remove
+void FakeQuantize::OptimizedFormula::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
 
-    ob << isc;
-    ob << ish;
-    ob << osc;
-    ob << osh;
-    ob << clo;
-    ob << chi;
+    out_buf << isc;
+    out_buf << ish;
+    out_buf << osc;
+    out_buf << osh;
+    out_buf << clo;
+    out_buf << chi;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void FakeQuantize::OptimizedFormula::load(BinaryInputBuffer& in_buf) {

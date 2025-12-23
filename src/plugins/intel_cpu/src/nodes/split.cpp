@@ -611,15 +611,15 @@ void Split::resolveInPlaceEdges(Edge::LOOK look) {
     }
 }
 
-void Split::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Split::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << canUseOptimizedNspc2Ncsp;
-    ob << m_axis;
+    out_buf << canUseOptimizedNspc2Ncsp;
+    out_buf << m_axis;
     // std::vector<std::pair<size_t, MemoryCPtr>> dstMemPtrs;
-    ob << INPUTS_NUM;
-    ob << constSplitLengths;
-    ob << splitLengths;
+    out_buf << INPUTS_NUM;
+    out_buf << constSplitLengths;
+    out_buf << splitLengths;
 }
 
 void Split::load(BinaryInputBuffer& in_buf) {

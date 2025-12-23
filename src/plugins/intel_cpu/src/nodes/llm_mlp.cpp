@@ -682,19 +682,24 @@ bool LLMMLP::isSupportedOperation([[maybe_unused]] const std::shared_ptr<const o
 #endif
 }
 
-void LLMMLP::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void LLMMLP::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    // out_buf << m_executor;
+    out_buf << m_mlp_config;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void LLMMLP::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    // in_buf >> m_executor;
+    in_buf >> m_mlp_config;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

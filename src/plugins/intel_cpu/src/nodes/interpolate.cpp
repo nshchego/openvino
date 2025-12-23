@@ -4566,25 +4566,25 @@ bool Interpolate::created() const {
     return getType() == Type::Interpolate;
 }
 
-void Interpolate::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Interpolate::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
-    ob << is_version11;
-    ob << interpAttrs;
-    ob << dataRank;
-    ob << hasPad;
-    ob << isAxesSpecified;
-    ob << axes;
-    ob << scales;
-    ob << isScaleConstant;
-    ob << lastScales;
-    ob << lastSizes;
-    ob << lastOutputDims;
-    ob << canUseAclExecutor;
+    out_buf << is_version11;
+    out_buf << interpAttrs;
+    out_buf << dataRank;
+    out_buf << hasPad;
+    out_buf << isAxesSpecified;
+    out_buf << axes;
+    out_buf << scales;
+    out_buf << isScaleConstant;
+    out_buf << lastScales;
+    out_buf << lastSizes;
+    out_buf << lastOutputDims;
+    out_buf << canUseAclExecutor;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Interpolate::load(BinaryInputBuffer& in_buf) {

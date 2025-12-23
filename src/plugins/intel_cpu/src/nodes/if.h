@@ -42,6 +42,10 @@ public:
         return true;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;
     bool needPrepareParams() const override {
@@ -60,6 +64,10 @@ private:
     struct PortMap {
         int from; /**< Index of external/internal out data */
         int to;   /**< Index of external/internal in data */
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     class PortMapHelper {

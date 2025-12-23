@@ -169,6 +169,7 @@ void AdaptivePooling::execute([[maybe_unused]] const dnnl::stream& strm) {
     const auto* src = getSrcDataAtPortAs<const float>(0);
     const auto* srcPooledSpatialShapes = getSrcDataAtPortAs<const int>(1);
     auto* dst = getDstDataAtPortAs<float>(0);
+    printf("[CPU] AdaptivePooling::execute src: %p; srcPooledSpatialShapes: %p; dst: %p\n", src, srcPooledSpatialShapes, dst);
 
     CPU_NODE_ASSERT(static_cast<int>(srcMemory1.getShape().getElementsCount()) == spatialDimsCount,
                     "has input spatial dimension (",
@@ -271,6 +272,7 @@ void AdaptivePooling::execute([[maybe_unused]] const dnnl::stream& strm) {
         pool = poolAvg;
     }
 
+    printf("[CPU] AdaptivePooling::execute N: %d; blockCount: %d; OD: %d; OH: %d; OW: %d;\n", N, blockCount, OD, OH, OW);  // TODO: remove
     parallel_for5d(N, blockCount, OD, OH, OW, [&](int n, int blkIdx, int od, int oh, int ow) {
         const auto* srcData = src + n * inStrides[0] + blkIdx * inStrides[1];
         auto* dstData = dst + n * outStrides[0] + blkIdx * outStrides[1] + od * outStrides[2] + oh * outStrides[3] +
@@ -308,12 +310,12 @@ inline void AdaptivePooling::setBinBorders(size_t* startPtr,
     *(endPtr) = std::ceil(static_cast<float>((idx + 1) * inputLength) / outputLength);
 }
 
-void AdaptivePooling::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void AdaptivePooling::save(BinaryOutputBuffer& out_buff) const {
+    Node::save(out_buff);
 
-    ob << spatialDimsCount;
-    ob << spatialDimsValue;
-    ob << precision;
+    out_buff << spatialDimsCount;
+    out_buff << spatialDimsValue;
+    out_buff << precision;
 }
 
 void AdaptivePooling::load(BinaryInputBuffer& in_buf) {

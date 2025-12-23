@@ -646,7 +646,7 @@ NodePtr Edge::modifiedInPlace() const {
     return nullptr;
 }
 
-void Edge::save(BinaryOutputBuffer& ob) const {
+void Edge::save(BinaryOutputBuffer& out_buf) const {
     // bool useExternalMemory = false;
     // EdgeWeakPtr memoryFromEdge;
     // MemoryPtr memoryPtr;

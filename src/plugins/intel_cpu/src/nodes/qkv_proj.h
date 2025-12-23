@@ -44,6 +44,10 @@ public:
                                      int concurrency = 0,
                                      uint64_t fcDynamicQuantizationGroupSize = 0) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     struct ExecutorBase {
         virtual void execute() = 0;

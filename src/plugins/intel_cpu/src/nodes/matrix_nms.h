@@ -47,7 +47,7 @@ public:
     }
     void prepareParams() override;
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
@@ -88,7 +88,7 @@ private:
 
         Rectangle() = default;
 
-        void save(BinaryOutputBuffer& ob) const;
+        void save(BinaryOutputBuffer& out_buf) const;
 
         void load(BinaryInputBuffer& in_buf);
 
@@ -114,7 +114,7 @@ private:
         int64_t classIndex = -1;
         float score = 0.0F;
 
-        void save(BinaryOutputBuffer& ob) const;
+        void save(BinaryOutputBuffer& out_buf) const;
 
         void load(BinaryInputBuffer& in_buf);
     };

@@ -35,6 +35,8 @@
 #include "ov_ops/multiclass_nms_ie_internal.hpp"
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace ov;
 
@@ -691,19 +693,78 @@ void MultiClassNms::checkPrecision(const ov::element::Type prec,
                     prec);
 }
 
-void MultiClassNms::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void MultiClassNms::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << m_sortResultAcrossBatch;
+    out_buf << m_sortResultType;
+    out_buf << m_numBatches;
+    out_buf << m_numBoxes;
+    out_buf << m_numClasses;
+    out_buf << m_maxBoxesPerBatch;
+    out_buf << m_nmsRealTopk;
+    out_buf << m_nmsTopK;
+    out_buf << m_iouThreshold;
+    out_buf << m_scoreThreshold;
+    out_buf << m_backgroundClass;
+    out_buf << m_keepTopK;
+    out_buf << m_nmsEta;
+    out_buf << m_normalized;
+    out_buf << m_outStaticShape;
+    out_buf << m_numFiltBox;
+    out_buf << m_numBoxOffset;
+    out_buf << m_filtBoxes;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void MultiClassNms::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> m_sortResultAcrossBatch;
+    in_buf >> m_sortResultType;
+    in_buf >> m_numBatches;
+    in_buf >> m_numBoxes;
+    in_buf >> m_numClasses;
+    in_buf >> m_maxBoxesPerBatch;
+    in_buf >> m_nmsRealTopk;
+    in_buf >> m_nmsTopK;
+    in_buf >> m_iouThreshold;
+    in_buf >> m_scoreThreshold;
+    in_buf >> m_backgroundClass;
+    in_buf >> m_keepTopK;
+    in_buf >> m_nmsEta;
+    in_buf >> m_normalized;
+    in_buf >> m_outStaticShape;
+    in_buf >> m_numFiltBox;
+    in_buf >> m_numBoxOffset;
+    in_buf >> m_filtBoxes;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void MultiClassNms::filteredBoxes::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << score;
+    out_buf << batch_index;
+    out_buf << class_index;
+    out_buf << box_index;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void MultiClassNms::filteredBoxes::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> score;
+    in_buf >> batch_index;
+    in_buf >> class_index;
+    in_buf >> box_index;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

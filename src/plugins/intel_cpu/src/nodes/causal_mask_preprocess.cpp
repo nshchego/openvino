@@ -184,10 +184,10 @@ void CausalMaskPreprocess::execute(const dnnl::stream& strm) {
     m_executor->execute(strm, this, m_config);
 }
 
-void CausalMaskPreprocess::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void CausalMaskPreprocess::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << m_config;
+    out_buf << m_config;
 }
 
 void CausalMaskPreprocess::load(BinaryInputBuffer& in_buf) {

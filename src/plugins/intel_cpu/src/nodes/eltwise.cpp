@@ -1167,26 +1167,26 @@ bool Eltwise::canFuseConvert(const NodePtr& convertNode) {
                                         {convertNode->getOriginalOutputPrecisionAtPort(0)});
 }
 
-void Eltwise::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Eltwise::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob.dump_position();  // TODO: remove
+        out_buf.dump_position();  // TODO: remove
 
-    ob << m_attrs;
-    ob << m_depthwiseData;
-    ob << m_depthwiseDataSize;
+    out_buf << m_attrs;
+    out_buf << m_depthwiseData;
+    out_buf << m_depthwiseDataSize;
 
     // if (m_factory) {  // Fused nodes does not have initialized Factory
-        // ob << true;
-        ob << m_factory;
+        // out_buf << true;
+        out_buf << m_factory;
     // } else {
-    //     ob << ;
+    //     out_buf << ;
     // }
-    // ob << m_executor;
-    // ob << m_memory;
-    // ob << m_depthwiseMemory;
+    // out_buf << m_executor;
+    // out_buf << m_memory;
+    // out_buf << m_depthwiseMemory;
 
-    ob.dump_position();  // TODO: remove
+        out_buf.dump_position();  // TODO: remove
 }
 
 void Eltwise::load(BinaryInputBuffer& in_buf) {

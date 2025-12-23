@@ -555,18 +555,18 @@ void Reorder::reorderData(const IMemory& input, const IMemory& output, const Mul
     }
 }
 
-void Reorder::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Reorder::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    // ob << prim;
-    // ob << input;
-    // ob << output;
-    ob << src_permutation;
-    ob << isOptimized;
-    ob << isNspc2NcspCase;
-    ob << isNcsp2NspcCase;
-    ob << canUseNspc2Ncsp;
-    ob << canUseNcsp2Nspc;
+    // out_buf << prim;
+    // out_buf << input;
+    // out_buf << output;
+    out_buf << src_permutation;
+    out_buf << isOptimized;
+    out_buf << isNspc2NcspCase;
+    out_buf << isNcsp2NspcCase;
+    out_buf << canUseNspc2Ncsp;
+    out_buf << canUseNcsp2Nspc;
 }
 
 void Reorder::load(BinaryInputBuffer& in_buf) {

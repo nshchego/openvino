@@ -36,7 +36,7 @@ struct EltwiseData {
                gamma == rhs.gamma;
     }
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& ib);
 };
@@ -67,7 +67,7 @@ struct EltwiseAttrs {
 
     PostOps postOps;
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& ib);
 };

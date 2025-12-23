@@ -56,4 +56,30 @@ bool QKVProjectionNode::visit_attributes(ov::AttributeVisitor& visitor) {
     return true;
 }
 
+void QKVProjectionNode::Config::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << quantized;
+    out_buf << hidden_size;
+    out_buf << proj_size0;
+    out_buf << proj_size1;
+    out_buf << proj_size2;
+    out_buf << weights_combined;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void QKVProjectionNode::Config::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> quantized;
+    in_buf >> hidden_size;
+    in_buf >> proj_size0;
+    in_buf >> proj_size1;
+    in_buf >> proj_size2;
+    in_buf >> weights_combined;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu

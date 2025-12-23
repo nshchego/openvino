@@ -261,16 +261,16 @@ bool Bucketize::created() const {
     return getType() == Type::Bucketize;
 }
 
-void Bucketize::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Bucketize::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << num_values;
-    ob << num_bin_values;
-    ob << with_right;
-    ob << with_bins;
-    ob << input_precision;
-    ob << boundaries_precision;
-    ob << output_precision;
+    out_buf << num_values;
+    out_buf << num_bin_values;
+    out_buf << with_right;
+    out_buf << with_bins;
+    out_buf << input_precision;
+    out_buf << boundaries_precision;
+    out_buf << output_precision;
 }
 
 void Bucketize::load(BinaryInputBuffer& in_buf) {

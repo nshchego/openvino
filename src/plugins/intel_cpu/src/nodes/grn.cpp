@@ -127,4 +127,30 @@ bool GRN::created() const {
     return getType() == Type::GRN;
 }
 
+void GRN::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << bias;
+    out_buf << N;
+    out_buf << C;
+    out_buf << H;
+    out_buf << W;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void GRN::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> bias;
+    in_buf >> N;
+    in_buf >> C;
+    in_buf >> H;
+    in_buf >> W;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

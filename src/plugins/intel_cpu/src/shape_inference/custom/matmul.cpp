@@ -19,6 +19,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_status.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/set.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -71,6 +73,20 @@ Result MMShapeInfer::infer(const std::vector<std::reference_wrapper<const Vector
     }
 
     return {{m_shapeY}, ShapeInferStatus::success};
+}
+
+void MMShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_shapeY;
+    out_buf << m_out_rank;
+    out_buf << m_transpose_a;
+    out_buf << m_transpose_b;
+}
+
+void MMShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_shapeY;
+    in_buf >> m_out_rank;
+    in_buf >> m_transpose_a;
+    in_buf >> m_transpose_b;
 }
 
 ShapeInferPtr MMShapeInferFactory::makeShapeInfer() const {

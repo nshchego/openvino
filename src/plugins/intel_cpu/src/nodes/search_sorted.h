@@ -28,6 +28,10 @@ public:
     [[nodiscard]] bool needPrepareParams() const override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     template <typename INPUT_TYPE, typename OUTPUT_TYPE>
     void executeImpl();

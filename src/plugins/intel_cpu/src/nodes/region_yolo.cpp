@@ -32,6 +32,8 @@
 #include "utils/bfloat16.hpp"
 #include "utils/cpp/bit_cast.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -495,6 +497,38 @@ void RegionYolo::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool RegionYolo::created() const {
     return getType() == Type::RegionYolo;
+}
+
+void RegionYolo::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << classes;
+    out_buf << coords;
+    out_buf << num;
+    out_buf << do_softmax;
+    out_buf << mask;
+    out_buf << input_prec;
+    out_buf << output_prec;
+    out_buf << block_size;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RegionYolo::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> classes;
+    in_buf >> coords;
+    in_buf >> num;
+    in_buf >> do_softmax;
+    in_buf >> mask;
+    in_buf >> input_prec;
+    in_buf >> output_prec;
+    in_buf >> block_size;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

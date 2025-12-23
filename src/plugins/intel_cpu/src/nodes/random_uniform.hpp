@@ -68,6 +68,10 @@ public:
 
     [[nodiscard]] std::string getPrimitiveDescriptorType() const override;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     [[nodiscard]] bool needShapeInfer() const override;
 
@@ -106,12 +110,20 @@ private:
         uint64_t dst_shift = 0LU;
         uint64_t n_shift = 0LU;
         uint64_t step = 0LU;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     struct MersenneTwisterThreadParams {
         uint64_t src_start_idx = 0LU;
         uint64_t dst_start_idx = 0LU;
         uint64_t state_accesses_count = 0LU;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     int32_t m_threads_num = 0;

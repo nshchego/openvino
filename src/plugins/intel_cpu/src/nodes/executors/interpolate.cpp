@@ -608,25 +608,25 @@ const uint8_t* ov::intel_cpu::InterpolateExecutor::padPreprocess(const std::vect
     return src_data;
 }
 
-void InterpolateAttrs::save(BinaryOutputBuffer& ob) const {
-ob.dump_position();  // TODO: remove
+void InterpolateAttrs::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
 
-    ob << shapeCalcMode;
-    ob << mode;
-    ob << coordTransMode;
-    ob << nearestMode;
-    ob << antialias;
-    ob << cubeCoeff;
-    ob << padBegin;
-    ob << padEnd;
-    ob << inPrc;
-    ob << outPrc;
-    ob << layout;
-    ob << dataScales;
-    ob << hasPad;
-    ob << NCHWAsNHWC;
+    out_buf << shapeCalcMode;
+    out_buf << mode;
+    out_buf << coordTransMode;
+    out_buf << nearestMode;
+    out_buf << antialias;
+    out_buf << cubeCoeff;
+    out_buf << padBegin;
+    out_buf << padEnd;
+    out_buf << inPrc;
+    out_buf << outPrc;
+    out_buf << layout;
+    out_buf << dataScales;
+    out_buf << hasPad;
+    out_buf << NCHWAsNHWC;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void InterpolateAttrs::load(BinaryInputBuffer& in_buf) {

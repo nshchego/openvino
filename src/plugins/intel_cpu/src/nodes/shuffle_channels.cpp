@@ -31,6 +31,8 @@
 #include "openvino/core/type/element_type.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -320,6 +322,54 @@ void ShuffleChannels::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool ShuffleChannels::created() const {
     return getType() == Type::ShuffleChannels;
+}
+
+void ShuffleChannels::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << attrs;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ShuffleChannels::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> attrs;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void ShuffleChannels::ShuffleChannelsAttributes::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << layoutType;
+    out_buf << dataRank;
+    out_buf << axis;
+    out_buf << spatialRank;
+    out_buf << group;
+    out_buf << dataSize;
+    out_buf << srcDims;
+    out_buf << srcBlockedDims;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ShuffleChannels::ShuffleChannelsAttributes::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> layoutType;
+    in_buf >> dataRank;
+    in_buf >> axis;
+    in_buf >> spatialRank;
+    in_buf >> group;
+    in_buf >> dataSize;
+    in_buf >> srcDims;
+    in_buf >> srcBlockedDims;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

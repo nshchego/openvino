@@ -38,11 +38,11 @@ const VectorDims& InputRepacker::out_offsets() const {
     return m_out_offsets;
 }
 
-void InputRepacker::save(BinaryOutputBuffer& ob) const {
-    ob << m_in_offsets;
-    ob << m_out_offsets;
-    // ob << m_desc;
-    // ob << m_kernel;
+void InputRepacker::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_in_offsets;
+    out_buf << m_out_offsets;
+    // out_buf << m_desc;
+    // out_buf << m_kernel;
 }
 
 void InputRepacker::load(BinaryInputBuffer& in_buf) {

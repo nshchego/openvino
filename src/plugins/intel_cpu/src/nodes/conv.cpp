@@ -857,51 +857,51 @@ void Convolution::initializeInputZeroPoints(const uint8_t* inputZpData, const si
     }
 }
 
-void Convolution::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Convolution::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << m_atoi;
+    out_buf << m_atoi;
 
-    ob << m_attrs.stride;
-    ob << m_attrs.dilation;
-    ob << m_attrs.paddingL;
-    ob << m_attrs.paddingR;
-    ob << m_attrs.autoPadding;
-    ob << m_attrs.withBias;
-    ob << m_attrs.weightsNonTransposed;
-    ob << m_attrs.isGrouped;
-    ob << m_attrs.isGraphQuantized;
-    ob << m_attrs.fcSemantic;
-    // ob << m_attrs.nonConstantWeights;
-    ob << m_attrs.inputZeroPointsType;
-    ob << m_attrs.dqScales;
-    // ob << m_attrs.postOps;
+    out_buf << m_attrs.stride;
+    out_buf << m_attrs.dilation;
+    out_buf << m_attrs.paddingL;
+    out_buf << m_attrs.paddingR;
+    out_buf << m_attrs.autoPadding;
+    out_buf << m_attrs.withBias;
+    out_buf << m_attrs.weightsNonTransposed;
+    out_buf << m_attrs.isGrouped;
+    out_buf << m_attrs.isGraphQuantized;
+    out_buf << m_attrs.fcSemantic;
+    // out_buf << m_attrs.nonConstantWeights;
+    out_buf << m_attrs.inputZeroPointsType;
+    out_buf << m_attrs.dqScales;
+    // out_buf << m_attrs.postOps;
 
-    // ob << m_memory;
-    // ob << m_factory;
-    // ob << m_executor;
-    // ob << fallbackExecutor;
+    // out_buf << m_memory;
+    // out_buf << m_factory;
+    // out_buf << m_executor;
+    // out_buf << fallbackExecutor;
 
-    ob << withSum;
-    ob << withDWConv;
-    ob << withSumBroadcast;
+    out_buf << withSum;
+    out_buf << withDWConv;
+    out_buf << withSumBroadcast;
 
-    ob << dw_conv_oc;
-    ob << dw_conv_ih;
-    ob << dw_conv_iw;
-    ob << dw_conv_kernel;
-    ob << dw_conv_strides;
-    ob << dw_conv_in_dt;
+    out_buf << dw_conv_oc;
+    out_buf << dw_conv_ih;
+    out_buf << dw_conv_iw;
+    out_buf << dw_conv_kernel;
+    out_buf << dw_conv_strides;
+    out_buf << dw_conv_in_dt;
 
-    ob << groupNum;
-    ob << IC;
-    ob << groupIC;
-    ob << groupOC;
+    out_buf << groupNum;
+    out_buf << IC;
+    out_buf << groupIC;
+    out_buf << groupOC;
 
-    // ob << subgraph;
-    // ob << fusedConstNodes;
+    // out_buf << subgraph;
+    // out_buf << fusedConstNodes;
 
-    ob << useJitPlanar;
+    out_buf << useJitPlanar;
 }
 
 void Convolution::load(BinaryInputBuffer& in_buf) {

@@ -183,4 +183,32 @@ bool GatherElements::created() const {
     return getType() == Type::GatherElements;
 }
 
+void GatherElements::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << axis_;
+    out_buf << dataTypeSize_ ;
+    out_buf << strideAxDst_;
+    out_buf << dstAxDim_;
+    out_buf << dataAxDim_;
+    out_buf << strideAx1Diff_;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void GatherElements::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> axis_;
+    in_buf >> dataTypeSize_ ;
+    in_buf >> strideAxDst_;
+    in_buf >> dstAxDim_;
+    in_buf >> dataAxDim_;
+    in_buf >> strideAx1Diff_;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

@@ -46,7 +46,15 @@ public:
         VectorDims srcBlockedDims;
         [[nodiscard]] size_t hash() const;
         bool operator==(const ShuffleChannelsAttributes& rhs) const;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;

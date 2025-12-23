@@ -28,6 +28,14 @@ Result NgramShapeInfer::infer(const std::vector<std::reference_wrapper<const Vec
     return {{std::move(output_shape)}, ShapeInferStatus::success};
 }
 
+void NgramShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_k;
+}
+
+void NgramShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_k;
+}
+
 ShapeInferPtr NgramShapeInferFactory::makeShapeInfer() const {
     auto ngram = ov::as_type_ptr<NgramNode>(m_op);
     OPENVINO_ASSERT(ngram, "Wrong operation type");

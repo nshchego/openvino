@@ -55,25 +55,17 @@ Result GatherShapeInfer::infer(const std::vector<std::reference_wrapper<const Ve
 }
 
 void GatherShapeInfer::save(BinaryOutputBuffer& out_buf) const {
-    out_buf.dump_position();  // TODO: remove
-
     out_buf << m_isAxisInputConst;
     out_buf << m_isIndicesScalar;
     out_buf << m_axis;
     out_buf << m_batchDims;
-
-    out_buf.dump_position();  // TODO: remove
 }
 
 void GatherShapeInfer::load(BinaryInputBuffer& in_buf) {
-    in_buf.check_position();  // TODO: remove
-
     in_buf >> m_isAxisInputConst;
     in_buf >> m_isIndicesScalar;
     in_buf >> m_axis;
     in_buf >> m_batchDims;
-
-    in_buf.check_position();  // TODO: remove
 }
 
 ShapeInferPtr GatherShapeInferFactory::makeShapeInfer() const {
@@ -96,5 +88,3 @@ ShapeInferPtr GatherShapeInferFactory::makeShapeInfer() const {
 }
 
 }  // namespace ov::intel_cpu::node
-
-BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::node::GatherShapeInfer)

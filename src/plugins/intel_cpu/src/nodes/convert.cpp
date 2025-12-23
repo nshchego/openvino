@@ -221,16 +221,16 @@ bool Convert::created() const {
     return getType() == Type::Convert;
 }
 
-void Convert::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Convert::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
-    // ob << input;
-    // ob << output;
-    ob << m_convert_params;
+    // out_buf << input;
+    // out_buf << output;
+    out_buf << m_convert_params;
     
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Convert::load(BinaryInputBuffer& in_buf) {

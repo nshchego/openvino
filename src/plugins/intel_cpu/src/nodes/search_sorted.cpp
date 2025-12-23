@@ -145,4 +145,23 @@ void SearchSorted::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 #undef CASE
 }
+
+void SearchSorted::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << right_mode;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void SearchSorted::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> right_mode;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

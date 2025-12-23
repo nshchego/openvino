@@ -740,7 +740,7 @@ ov::element::Type FullyConnected::getRuntimePrecision() const {
 }
 
 void FCTensorParallelConfig::save(BinaryOutputBuffer& out_buf) const {
-out_buf.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
     out_buf << w_rank;
     out_buf << w_size;
@@ -753,11 +753,11 @@ out_buf.dump_position();  // TODO: remove
     // out_buf << cached_zeropoint;
     // out_buf << cached_dst;
 
-out_buf.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void FCTensorParallelConfig::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
     in_buf >> w_rank;
     in_buf >> w_size;
@@ -770,7 +770,7 @@ in_buf.check_position();  // TODO: remove
     // in_buf >> cached_zeropoint;
     // in_buf >> cached_dst;
 
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 }
 
 void FullyConnected::save(BinaryOutputBuffer& out_buf) const {

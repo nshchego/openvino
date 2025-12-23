@@ -25,7 +25,7 @@ struct PermuteParams {
 
     [[nodiscard]] size_t hash() const;
     bool operator==(const PermuteParams& rhs) const;
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
     void load(BinaryInputBuffer& in_buf);
 };
 

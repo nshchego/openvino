@@ -25,6 +25,8 @@ namespace ov::intel_cpu::node {
 
 class SDPAShapeInfer : public ShapeInferEmptyPads {
 public:
+    SDPAShapeInfer() = default;
+
     explicit SDPAShapeInfer(ScaledDotProductAttentionWithKVCache::Config config) : m_config(std::move(config)) {}
 
     IShapeInfer::Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
@@ -121,3 +123,5 @@ ShapeInferPtr SDPAShapeInferFactory::makeShapeInfer() const {
 }
 
 }  // namespace ov::intel_cpu::node
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::node::SDPAShapeInfer)

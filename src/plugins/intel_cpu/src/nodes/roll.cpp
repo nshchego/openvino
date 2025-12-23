@@ -95,7 +95,7 @@ Roll::Roll(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& contex
 
 Roll::Roll(BinaryInputBuffer& in_buf, const GraphContext::CPtr& context)
     : Node(in_buf, context) {
-    load(in_buf);
+    // load(in_buf);
 }
 
 void Roll::getSupportedDescriptors() {}

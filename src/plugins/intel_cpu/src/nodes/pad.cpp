@@ -41,6 +41,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -695,6 +697,58 @@ inline void Pad::PadExecutor::getDstIdx(const VectorIdxs& indexes, size_t& dstId
 
 bool Pad::created() const {
     return getType() == Type::Pad;
+}
+
+void Pad::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << attrs;
+    out_buf << isPadValueSpecified;
+    out_buf << shapeHasDataDependency;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Pad::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> attrs;
+    in_buf >> isPadValueSpecified;
+    in_buf >> shapeHasDataDependency;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void Pad::PadAttrs::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << padMode;
+    out_buf << padValue;
+    out_buf << padsBegin;
+    out_buf << padsEnd;
+    out_buf << beginPadIdx;
+    out_buf << endPadIdx;
+    out_buf << prc;
+    out_buf << constPadValue;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Pad::PadAttrs::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> padMode;
+    in_buf >> padValue;
+    in_buf >> padsBegin;
+    in_buf >> padsEnd;
+    in_buf >> beginPadIdx;
+    in_buf >> endPadIdx;
+    in_buf >> prc;
+    in_buf >> constPadValue;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -70,10 +70,18 @@ public:
         ov::element::Type precision = ov::element::dynamic;
         size_t groupSize = 0;
         bool isByChannel = false;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
     ov::element::Type getKVCachePrecision();
     const SDPAQuantParam& getKeyQuantParam();
     const SDPAQuantParam& getValueQuantParam();
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     void gatherConcatPastkv(const MemoryPtr& mem_cur_k, const MemoryPtr& mem_cur_v, const MemoryPtr& mem_beam_idx);
@@ -84,6 +92,14 @@ private:
 
     struct Config {
         ScaledDotProductAttentionWithKVCache::Config config;
+
+        void save(BinaryOutputBuffer& out_buf) const {
+            out_buf << config;
+        }
+
+        void load(BinaryInputBuffer& in_buf) {
+            in_buf >> config;
+        }
     };
 
     struct Executor {

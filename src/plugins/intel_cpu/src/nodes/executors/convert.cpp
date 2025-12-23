@@ -14,15 +14,15 @@ namespace ov::intel_cpu {
 ConvertExecutor::ConvertExecutor(ov::intel_cpu::ExecutorContext::CPtr context)
     : convertContext(std::move(context)) {}
 
-void ConvertParams::save(BinaryOutputBuffer& ob) const {
-ob.dump_position();  // TODO: remove
+void ConvertParams::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
 
-    ob << srcPrc;
-    ob << origPrc;
-    ob << dstPrc;
-    ob << size;
+    out_buf << srcPrc;
+    out_buf << origPrc;
+    out_buf << dstPrc;
+    out_buf << size;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void ConvertParams::load(BinaryInputBuffer& in_buf) {

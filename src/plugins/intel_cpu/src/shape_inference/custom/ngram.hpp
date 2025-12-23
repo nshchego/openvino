@@ -20,6 +20,8 @@ namespace ov::intel_cpu::node {
 using Result = IShapeInfer::Result;
 class NgramShapeInfer : public ShapeInferEmptyPads {
 public:
+    explicit NgramShapeInfer() = default;
+
     explicit NgramShapeInfer(const size_t k) : m_k(k) {}
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                  const std::unordered_map<size_t, MemoryPtr>& data_dependency) override;
@@ -27,6 +29,12 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return EMPTY_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::NgramShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     size_t m_k;

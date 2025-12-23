@@ -31,6 +31,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -298,11 +299,30 @@ void CumSum::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
 }
 
-void CumSum::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void CumSum::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << exclusive;
+    out_buf << reverse;
+    out_buf << numOfDims;
+    out_buf << axis;
+    out_buf << dataPrecision;
+
+    out_buf.dump_position();  // TODO: remove
 }
 
 void CumSum::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> exclusive;
+    in_buf >> reverse;
+    in_buf >> numOfDims;
+    in_buf >> axis;
+    in_buf >> dataPrecision;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

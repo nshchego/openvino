@@ -31,6 +31,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/caseless.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -1016,6 +1017,92 @@ inline void DetectionOutput::generateOutput(const float* reorderedConfData,
 
 bool DetectionOutput::created() const {
     return getType() == Type::DetectionOutput;
+}
+
+void DetectionOutput::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << imgNum;
+    out_buf << priorsNum;
+    out_buf << classesNum;
+    out_buf << priorSize;
+    out_buf << isPriorsPerImg;
+    out_buf << isShareLoc;
+    out_buf << locNumForClasses;
+    out_buf << withAddBoxPred;
+    out_buf << objScore;
+    out_buf << confidenceThreshold;
+    out_buf << sparsityThreshold;
+    out_buf << topK;
+    out_buf << NMSThreshold;
+    out_buf << clipBeforeNMS;
+    out_buf << clipAfterNMS;
+    out_buf << backgroundClassId;
+    out_buf << decreaseClassId;
+    out_buf << keepTopK;
+    out_buf << varianceEncodedInTarget;
+    out_buf << normalized;
+    out_buf << codeType;
+    out_buf << imgWidth;
+    out_buf << imgHeight;
+    out_buf << coordOffset;
+    out_buf << cacheSizeL3;
+    out_buf << confInfoLen;
+    out_buf << isSparsityWorthwhile;
+    out_buf << decodedBboxes;
+    out_buf << indicesBuffer;
+    out_buf << indices;
+    out_buf << detectionsCount;
+    out_buf << reorderedConf;
+    out_buf << bboxSizes;
+    out_buf << numPriorsActual;
+    out_buf << confInfoForPrior;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DetectionOutput::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> imgNum;
+    in_buf >> priorsNum;
+    in_buf >> classesNum;
+    in_buf >> priorSize;
+    in_buf >> isPriorsPerImg;
+    in_buf >> isShareLoc;
+    in_buf >> locNumForClasses;
+    in_buf >> withAddBoxPred;
+    in_buf >> objScore;
+    in_buf >> confidenceThreshold;
+    in_buf >> sparsityThreshold;
+    in_buf >> topK;
+    in_buf >> NMSThreshold;
+    in_buf >> clipBeforeNMS;
+    in_buf >> clipAfterNMS;
+    in_buf >> backgroundClassId;
+    in_buf >> decreaseClassId;
+    in_buf >> keepTopK;
+    in_buf >> varianceEncodedInTarget;
+    in_buf >> normalized;
+    in_buf >> codeType;
+    in_buf >> imgWidth;
+    in_buf >> imgHeight;
+    in_buf >> coordOffset;
+    in_buf >> cacheSizeL3;
+    in_buf >> confInfoLen;
+    in_buf >> isSparsityWorthwhile;
+    in_buf >> decodedBboxes;
+    in_buf >> indicesBuffer;
+    in_buf >> indices;
+    in_buf >> detectionsCount;
+    in_buf >> reorderedConf;
+    in_buf >> bboxSizes;
+    in_buf >> numPriorsActual;
+    in_buf >> confInfoForPrior;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

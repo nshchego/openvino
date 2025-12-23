@@ -60,6 +60,10 @@
 #include "transformations/utils/utils.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl;
 
@@ -1508,6 +1512,100 @@ void RNN::cleanup() {
 RNN::RnnDnnlExecutor::RnnDnnlExecutor(const dnnl::primitive_desc& pd) : DnnlExecutorLegacy(pd) {
     wghts_iter_md = DnnlExtensionUtils::makeDescriptor(pd.weights_desc(1));
     bias_md = DnnlExtensionUtils::makeDescriptor(pd.weights_desc(2));
+}
+
+void RNN::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << is_cell;
+    out_buf << is_augru;
+    out_buf << nativeOrder;
+    out_buf << direction;
+    out_buf << cell_type;
+    out_buf << cell_act;
+    out_buf << N;
+    out_buf << N_SEQ;
+    out_buf << T;
+    out_buf << DC;
+    out_buf << SC;
+    out_buf << G;
+    out_buf << Gb;
+    out_buf << S;
+    out_buf << inDataDescs;
+    out_buf << outDataDescs;
+    // out_buf << wDescs;
+    out_buf << inDataTypes;
+    out_buf << outDataTypes;
+    out_buf << sIdx;
+    out_buf << wIdx;
+    out_buf << rIdx;
+    out_buf << bIdx;
+    out_buf << aIdx;
+    out_buf << yIdx;
+    out_buf << hoIdx;
+    out_buf << coIdx;
+    out_buf << inputScale;
+    out_buf << inputShift;
+    out_buf << weightsScales;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RNN::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> is_cell;
+    in_buf >> is_augru;
+    in_buf >> nativeOrder;
+    in_buf >> direction;
+    in_buf >> cell_type;
+    in_buf >> cell_act;
+    in_buf >> N;
+    in_buf >> N_SEQ;
+    in_buf >> T;
+    in_buf >> DC;
+    in_buf >> SC;
+    in_buf >> G;
+    in_buf >> Gb;
+    in_buf >> S;
+    in_buf >> inDataDescs;
+    in_buf >> outDataDescs;
+    // in_buf >> wDescs;
+    in_buf >> inDataTypes;
+    in_buf >> outDataTypes;
+    in_buf >> sIdx;
+    in_buf >> wIdx;
+    in_buf >> rIdx;
+    in_buf >> bIdx;
+    in_buf >> aIdx;
+    in_buf >> yIdx;
+    in_buf >> hoIdx;
+    in_buf >> coIdx;
+    in_buf >> inputScale;
+    in_buf >> inputShift;
+    in_buf >> weightsScales;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void RNN::Interval::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << minVal;
+    out_buf << maxVal;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RNN::Interval::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> minVal;
+    in_buf >> maxVal;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

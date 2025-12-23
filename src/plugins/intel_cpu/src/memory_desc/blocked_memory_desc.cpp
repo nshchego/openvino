@@ -80,16 +80,16 @@ std::string BlockedMemoryDesc::serializeFormat() const {
     return result.str();
 }
 
-void BlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
-    MemoryDesc::save(ob);
-    ob.dump_position();  // TODO: remove
+void BlockedMemoryDesc::save(BinaryOutputBuffer& out_buf) const {
+    MemoryDesc::save(out_buf);
+    out_buf.dump_position();  // TODO: remove
 
-    ob << blockedDims;
-    ob << strides;
-    ob << order;
-    ob << m_offset_padding_to_data;
+    out_buf << blockedDims;
+    out_buf << strides;
+    out_buf << order;
+    out_buf << m_offset_padding_to_data;
 
-    ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void BlockedMemoryDesc::load(BinaryInputBuffer& in_buf) {

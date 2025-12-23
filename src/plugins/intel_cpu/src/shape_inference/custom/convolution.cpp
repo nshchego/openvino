@@ -23,6 +23,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_status.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -104,6 +105,24 @@ Result ConvolutionShapeInfer::infer(const std::vector<std::reference_wrapper<con
                                                 m_isGrouped);
 
     return {{output_shape}, ShapeInferStatus::success};
+}
+
+void ConvolutionShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_strides;
+    out_buf << m_dilations;
+    out_buf << m_pads_begin;
+    out_buf << m_pads_end;
+    out_buf << m_auto_padding;
+    out_buf << m_isGrouped;
+}
+
+void ConvolutionShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_strides;
+    in_buf >> m_dilations;
+    in_buf >> m_pads_begin;
+    in_buf >> m_pads_end;
+    in_buf >> m_auto_padding;
+    in_buf >> m_isGrouped;
 }
 
 ShapeInferPtr ConvolutionShapeInferFactory::makeShapeInfer() const {

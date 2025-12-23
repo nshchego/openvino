@@ -372,11 +372,11 @@ MemoryDescPtr CpuBlockedMemoryDesc::cloneWithNewPrecision(const ov::element::Typ
     return newDesc;
 }
 
-void CpuBlockedMemoryDesc::save(BinaryOutputBuffer& ob) const {
-    BlockedMemoryDesc::save(ob);
+void CpuBlockedMemoryDesc::save(BinaryOutputBuffer& out_buf) const {
+    BlockedMemoryDesc::save(out_buf);
 
-    ob << precision;
-    ob << offsetPadding;
+    out_buf << precision;
+    out_buf << offsetPadding;
 }
 
 void CpuBlockedMemoryDesc::load(BinaryInputBuffer& in_buf) {

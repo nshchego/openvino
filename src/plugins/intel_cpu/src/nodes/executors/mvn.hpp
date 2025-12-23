@@ -31,6 +31,10 @@ struct MVNAttrs {
     MVNEpsMode epsMode_ = INSIDE_SQRT;
     ov::element::Type src_prc;
     ov::element::Type dst_prc;
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 };
 
 class MVNExecutor {

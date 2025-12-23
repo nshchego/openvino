@@ -34,6 +34,7 @@
 #include "openvino/op/lrn.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 namespace {
@@ -268,19 +269,30 @@ void Lrn::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
 }
 
-void Lrn::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Lrn::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << alg;
+    out_buf << size;
+    out_buf << k;
+    out_buf << alpha;
+    out_buf << beta;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Lrn::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> alg;
+    in_buf >> size;
+    in_buf >> k;
+    in_buf >> alpha;
+    in_buf >> beta;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

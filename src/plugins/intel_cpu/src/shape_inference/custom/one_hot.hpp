@@ -28,6 +28,8 @@ using Result = IShapeInfer::Result;
  */
 class OneHotShapeInfer : public ShapeInferEmptyPads {
 public:
+    explicit OneHotShapeInfer() = default;
+
     explicit OneHotShapeInfer(int64_t axis) : m_axis(axis) {}
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                  const std::unordered_map<size_t, MemoryPtr>& data_dependency) override;
@@ -35,6 +37,12 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return PortMask(1);
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::OneHotShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     int64_t m_axis = 0;

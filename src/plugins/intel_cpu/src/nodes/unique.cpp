@@ -32,6 +32,8 @@
 #include "selective_build.h"
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace ov::intel_cpu;
 using namespace ov::intel_cpu::node;
@@ -515,4 +517,40 @@ void Unique::slicedTensorExec() {
             cpu_parallel_memcpy(occurNPtr, occurTmp.data(), uniqueLenIB);
         }
     }
+}
+
+void Unique::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << firstUniTmp;
+    out_buf << inToOutTmp;
+    out_buf << occurTmp;
+    out_buf << sorted;
+    out_buf << flattened;
+    out_buf << axis;
+    // out_buf << definedOutputs[4] = {false, false, false, false};
+    out_buf << dataPrecision;
+    out_buf << dataTypeSize;
+    out_buf << uniqueLen;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Unique::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> firstUniTmp;
+    in_buf >> inToOutTmp;
+    in_buf >> occurTmp;
+    in_buf >> sorted;
+    in_buf >> flattened;
+    in_buf >> axis;
+    // in_buf >> definedOutputs[4] = {false, false, false, false};
+    in_buf >> dataPrecision;
+    in_buf >> dataTypeSize;
+    in_buf >> uniqueLen;
+
+    in_buf.check_position();  // TODO: remove
 }

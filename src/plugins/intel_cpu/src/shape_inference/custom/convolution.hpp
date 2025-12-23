@@ -30,6 +30,8 @@ VectorDims convolution_shape_infer(const VectorDims& data_shape,
 using Result = IShapeInfer::Result;
 class ConvolutionShapeInfer : public ShapeInferEmptyPads {
 public:
+    explicit ConvolutionShapeInfer() = default;
+
     ConvolutionShapeInfer(std::vector<size_t> strides,
                           std::vector<size_t> dilations,
                           std::vector<ptrdiff_t> pads_begin,
@@ -48,6 +50,12 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return EMPTY_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::ConvolutionShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     std::vector<size_t> m_strides;

@@ -36,6 +36,8 @@
 #include "openvino/util/pp.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 using namespace dnnl::impl;
 
@@ -340,6 +342,52 @@ void DepthToSpace::executeDynamicImpl(const dnnl::stream& strm) {
 
 bool DepthToSpace::created() const {
     return getType() == Type::DepthToSpace;
+}
+
+void DepthToSpace::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << attrs;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DepthToSpace::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> attrs;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void DepthToSpace::DepthToSpaceAttrs::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << layoutType;
+    out_buf << mode;
+    out_buf << blockSize;
+    out_buf << blockStep;
+    out_buf << dataSize;
+    out_buf << nSpatialDims;
+    out_buf << srcBlockedDims;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DepthToSpace::DepthToSpaceAttrs::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> layoutType;
+    in_buf >> mode;
+    in_buf >> blockSize;
+    in_buf >> blockStep;
+    in_buf >> dataSize;
+    in_buf >> nSpatialDims;
+    in_buf >> srcBlockedDims;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

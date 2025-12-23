@@ -289,20 +289,20 @@ void ISTFT::createPrimitive() {
     Node::createPrimitive();
 }
 
-void ISTFT::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void ISTFT::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
-    ob << m_center;
-    ob << m_normalized;
-    // ob << rdft_executor;
-    ob << m_is_frame_size_const;
-    ob << m_is_frame_step_const;
-    ob << m_is_signal_length_const;
-    ob << m_has_signal_length_input;
+    out_buf << m_center;
+    out_buf << m_normalized;
+    // out_buf << rdft_executor;
+    out_buf << m_is_frame_size_const;
+    out_buf << m_is_frame_step_const;
+    out_buf << m_is_signal_length_const;
+    out_buf << m_has_signal_length_input;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void ISTFT::load(BinaryInputBuffer& in_buf) {

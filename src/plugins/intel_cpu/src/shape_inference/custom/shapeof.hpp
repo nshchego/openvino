@@ -37,7 +37,7 @@ public:
         return EMPTY_PORT_MASK;
     }
 
-    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferPassThrough)
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeOfShapeInfer)
 };
 
 class ShapeOfShapeInferFactory : public ShapeInferFactory {

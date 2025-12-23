@@ -500,4 +500,48 @@ bool RoPE::isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::
     return true;
 }
 
+void RoPE::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    // out_buf << m_config;  // It's located outside the plugin
+    out_buf << m_config.gather_position_arg_id;
+    out_buf << m_config.head_cnt;
+    out_buf << m_config.head_size;
+    out_buf << m_config.input_trans0213;
+    out_buf << m_config.is_chatglm;
+    out_buf << m_config.is_interleaved;
+    out_buf << m_config.is_qwen;
+    out_buf << m_config.output_trans0213;
+    out_buf << m_config.rotary_ndims;
+    out_buf << m_config.slice_start;
+    out_buf << m_config.slice_stop;
+    out_buf << m_config.support_2d_rope;
+    out_buf << m_config.use_rope_cache;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RoPE::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    // in_buf >> m_config;
+    in_buf >> m_config.gather_position_arg_id;
+    in_buf >> m_config.head_cnt;
+    in_buf >> m_config.head_size;
+    in_buf >> m_config.input_trans0213;
+    in_buf >> m_config.is_chatglm;
+    in_buf >> m_config.is_interleaved;
+    in_buf >> m_config.is_qwen;
+    in_buf >> m_config.output_trans0213;
+    in_buf >> m_config.rotary_ndims;
+    in_buf >> m_config.slice_start;
+    in_buf >> m_config.slice_stop;
+    in_buf >> m_config.support_2d_rope;
+    in_buf >> m_config.use_rope_cache;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

@@ -15,6 +15,7 @@
 #include "memory_desc/cpu_memory_desc.h"
 #include "onednn/iml_type_mapper.h"
 #include "openvino/core/coordinate_diff.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu {
 
@@ -29,6 +30,32 @@ struct DeconvAttrs {
 #if defined(OV_CPU_WITH_ACL)
     bool aclFastMath = false;
 #endif
+
+    void save(BinaryOutputBuffer& out_buf) const {
+        out_buf << kernel;
+        out_buf << stride;
+        out_buf << dilation;
+        out_buf << paddingL;
+        out_buf << paddingR;
+        out_buf << outputPadding;
+        out_buf << withBiasesParam;
+#if defined(OV_CPU_WITH_ACL)
+        out_buf << aclFastMath;
+#endif
+    }
+
+    void load(BinaryInputBuffer& in_buf) {
+        in_buf >> kernel;
+        in_buf >> stride;
+        in_buf >> dilation;
+        in_buf >> paddingL;
+        in_buf >> paddingR;
+        in_buf >> outputPadding;
+        in_buf >> withBiasesParam;
+#if defined(OV_CPU_WITH_ACL)
+        in_buf >> aclFastMath;
+#endif
+    }
 };
 
 class DeconvExecutor {

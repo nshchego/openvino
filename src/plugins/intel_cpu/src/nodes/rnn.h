@@ -54,6 +54,10 @@ public:
 
     enum InOutKind : uint8_t { Layer = 0, HiddenState = 1, CellState = 2, Attention = 2 };
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     void prepareParams() override;
     void executeDynamicImpl(const dnnl::stream& strm) override;
@@ -123,6 +127,10 @@ private:
 
         Dim minVal = 0;
         Dim maxVal = 0;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
     // Internal attributes
     Interval N;         /**< Batch value */

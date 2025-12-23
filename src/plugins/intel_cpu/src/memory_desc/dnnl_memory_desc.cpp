@@ -18,6 +18,7 @@
 #include "memory_desc/cpu_memory_desc.h"
 #include "openvino/core/except.hpp"
 #include "openvino/core/type/element_type.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
 
@@ -139,16 +140,38 @@ size_t DnnlMemoryDesc::getOffsetPadding() const {
     return DnnlExtensionUtils::convertToDim(wrap.offset0());
 }
 
-void DnnlMemoryDesc::save(BinaryOutputBuffer& ob) const {
-    MemoryDesc::save(ob);
+void DnnlMemoryDesc::save(BinaryOutputBuffer& out_buf) const {
+    MemoryDesc::save(out_buf);
 
-    // ob << desc;
+    auto desc_data = desc.get();
+    out_buf << desc_data->format_kind;
+    out_buf << desc_data->data_type;
+    out_buf << desc_data->ndims;
+    out_buf << make_data(desc_data->dims, sizeof(dnnl::impl::dims_t));
+    out_buf << make_data(desc_data->padded_dims, sizeof(dnnl::impl::dims_t));
+    out_buf << make_data(desc_data->padded_offsets, sizeof(dnnl::impl::dims_t));
+    out_buf << desc_data->format_desc.blocking.inner_nblks;
+    out_buf << make_data(desc_data->format_desc.blocking.inner_blks, sizeof(dnnl::impl::dims_t));
+    out_buf << make_data(desc_data->format_desc.blocking.inner_idxs, sizeof(dnnl::impl::dims_t));
+    out_buf << make_data(desc_data->format_desc.blocking.strides, sizeof(dnnl::impl::dims_t));
+    out_buf << desc_data->offset0;
 }
 
 void DnnlMemoryDesc::load(BinaryInputBuffer& in_buf) {
     MemoryDesc::load(in_buf);
 
-    // in_buf >> desc;
+    auto desc_data = desc.get();
+    in_buf >> desc_data->format_kind;
+    in_buf >> desc_data->data_type;
+    in_buf >> desc_data->ndims;
+    in_buf >> make_data(desc_data->dims, sizeof(dnnl::impl::dims_t));
+    in_buf >> make_data(desc_data->padded_dims, sizeof(dnnl::impl::dims_t));
+    in_buf >> make_data(desc_data->padded_offsets, sizeof(dnnl::impl::dims_t));
+    in_buf >> desc_data->format_desc.blocking.inner_nblks;
+    in_buf >> make_data(desc_data->format_desc.blocking.inner_blks, sizeof(dnnl::impl::dims_t));
+    in_buf >> make_data(desc_data->format_desc.blocking.inner_idxs, sizeof(dnnl::impl::dims_t));
+    in_buf >> make_data(desc_data->format_desc.blocking.strides, sizeof(dnnl::impl::dims_t));
+    in_buf >> desc_data->offset0;
 }
 
 }  // namespace ov::intel_cpu

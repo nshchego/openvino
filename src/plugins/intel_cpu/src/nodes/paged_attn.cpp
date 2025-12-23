@@ -333,4 +333,22 @@ ov::element::Type PagedAttention::getRuntimePrecision() const {
     return rtPrecision;
 }
 
+void PagedAttention::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_hasScore;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void PagedAttention::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_hasScore;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

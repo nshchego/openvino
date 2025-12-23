@@ -30,6 +30,10 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 protected:
     void executeDynamicImpl(const dnnl::stream& strm) override;
     void prepareParams() override;
@@ -43,6 +47,10 @@ private:
 
         VectorDims srcDims;
         VectorDims srcStrides;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     } attrs;
 
     struct GatherNDExecutor {

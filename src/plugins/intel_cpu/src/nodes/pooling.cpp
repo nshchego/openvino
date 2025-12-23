@@ -823,27 +823,25 @@ void Pooling::setPostOps(dnnl::primitive_attr& attr) {
     attr.set_post_ops(ops);
 }
 
-void Pooling::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Pooling::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << poolingAttrs.exclude_pad;
-    ob << poolingAttrs.auto_pad;
-    ob << poolingAttrs.pad_type;
-    ob << poolingAttrs.algorithm;
-    ob << poolingAttrs.rounding;
-    ob << poolingAttrs.stride;
-    ob << poolingAttrs.kernel;
-    ob << poolingAttrs.dilation;
-    ob << poolingAttrs.data_pad_begin;
-    ob << poolingAttrs.data_pad_end;
-    ob << poolingAttrs.effective_pad_begin;
-    ob << poolingAttrs.effective_pad_end;
-    ob << poolingAttrs.effective_dilation;
-    
-    ob << inShape;
-
-    ob << isNotMaxPool1;
-    ob << useACL;
+    out_buf << poolingAttrs.exclude_pad;
+    out_buf << poolingAttrs.auto_pad;
+    out_buf << poolingAttrs.pad_type;
+    out_buf << poolingAttrs.algorithm;
+    out_buf << poolingAttrs.rounding;
+    out_buf << poolingAttrs.stride;
+    out_buf << poolingAttrs.kernel;
+    out_buf << poolingAttrs.dilation;
+    out_buf << poolingAttrs.data_pad_begin;
+    out_buf << poolingAttrs.data_pad_end;
+    out_buf << poolingAttrs.effective_pad_begin;
+    out_buf << poolingAttrs.effective_pad_end;
+    out_buf << poolingAttrs.effective_dilation;
+    out_buf << inShape;
+    out_buf << isNotMaxPool1;
+    out_buf << useACL;
 }
 
 void Pooling::load(BinaryInputBuffer& in_buf) {
@@ -860,9 +858,7 @@ void Pooling::load(BinaryInputBuffer& in_buf) {
     in_buf >> poolingAttrs.effective_pad_begin;
     in_buf >> poolingAttrs.effective_pad_end;
     in_buf >> poolingAttrs.effective_dilation;
-    
     in_buf >> inShape;
-
     in_buf >> isNotMaxPool1;
     in_buf >> useACL;
 }

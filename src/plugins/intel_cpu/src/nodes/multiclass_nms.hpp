@@ -46,7 +46,7 @@ public:
     }
     void prepareParams() override;
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
@@ -96,6 +96,10 @@ private:
               batch_index(_batch_index),
               class_index(_class_index),
               box_index(_box_index) {}
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     struct boxInfo {

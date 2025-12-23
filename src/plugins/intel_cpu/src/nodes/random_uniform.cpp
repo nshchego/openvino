@@ -36,6 +36,8 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/cpp/bit_cast.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <cpu/x64/cpu_isa_traits.hpp>
@@ -917,5 +919,97 @@ void RandomUniform::computeStl(void* out, size_t work_amount) {
 }
 
 //////////////////////////////////
+
+void RandomUniform::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    // out_buf << m_const_inputs[3] = {false, false, false};
+    out_buf << m_output_prc;
+    out_buf << m_global_seed;
+    out_buf << m_op_seed;
+    // out_buf << m_state;
+    out_buf << m_out_shape;
+    out_buf << m_output_elements_count;
+    // out_buf << m_min_val;
+    // out_buf << m_max_val;
+    // out_buf << m_range_val;
+    out_buf << m_algo;
+    out_buf << m_threads_num;
+    out_buf << m_philox_thread_params;
+    out_buf << m_mersenne_twister_thread_params;
+    out_buf << m_skip_count;
+    out_buf << m_mersenne_twister_optimization_enabled;
+    out_buf << m_uint_storage_capacity_per_thread;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RandomUniform::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    // in_buf >> m_const_inputs[3] = {false, false, false};
+    in_buf >> m_output_prc;
+    in_buf >> m_global_seed;
+    in_buf >> m_op_seed;
+    // in_buf >> m_state;
+    in_buf >> m_out_shape;
+    in_buf >> m_output_elements_count;
+    // in_buf >> m_min_val;
+    // in_buf >> m_max_val;
+    // in_buf >> m_range_val;
+    in_buf >> m_algo;
+    in_buf >> m_threads_num;
+    in_buf >> m_philox_thread_params;
+    in_buf >> m_mersenne_twister_thread_params;
+    in_buf >> m_skip_count;
+    in_buf >> m_mersenne_twister_optimization_enabled;
+    in_buf >> m_uint_storage_capacity_per_thread;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void RandomUniform::PhiloxThreadParams::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << work_amount;
+    out_buf << dst_shift;
+    out_buf << n_shift;
+    out_buf << step;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RandomUniform::PhiloxThreadParams::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> work_amount;
+    in_buf >> dst_shift;
+    in_buf >> n_shift;
+    in_buf >> step;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void RandomUniform::MersenneTwisterThreadParams::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << src_start_idx;
+    out_buf << dst_start_idx;
+    out_buf << state_accesses_count;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void RandomUniform::MersenneTwisterThreadParams::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> src_start_idx;
+    in_buf >> dst_start_idx;
+    in_buf >> state_accesses_count;
+
+    in_buf.check_position();  // TODO: remove
+}
 
 }  // namespace ov::intel_cpu::node

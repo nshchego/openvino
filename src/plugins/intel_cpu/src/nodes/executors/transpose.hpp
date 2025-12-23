@@ -17,7 +17,7 @@ namespace ov::intel_cpu {
 struct TransposeParams {
     PermuteParams permuteParams;
     
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
     void load(BinaryInputBuffer& in_buf);
 };
 

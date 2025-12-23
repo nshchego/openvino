@@ -36,6 +36,14 @@ Result PriorBoxShapeInfer::infer(
     return {{{2, output}}, ShapeInferStatus::success};
 }
 
+void PriorBoxShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_number_of_priors;
+}
+
+void PriorBoxShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_number_of_priors;
+}
+
 ShapeInferPtr PriorBoxShapeInferFactory::makeShapeInfer() const {
     auto priorBox = ov::as_type_ptr<const ov::op::v0::PriorBox>(m_op);
     OPENVINO_ASSERT(priorBox, "Unexpected op type in PriorBox shape inference factory: ", m_op->get_type_name());

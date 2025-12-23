@@ -104,7 +104,7 @@ public:
     inline int get_scale_id() const;
     inline int get_axis_id() const;
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 

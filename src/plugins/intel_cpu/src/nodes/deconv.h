@@ -71,10 +71,9 @@ public:
     bool canBeExecutedInInt8() const override;
     const std::vector<impl_desc_type>& getDefaultImplPriority() override;
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
-
 
 protected:
     AttrPtr initPrimitiveAttr() override;
@@ -96,6 +95,7 @@ private:
     };
 
     bool isImplicit1x1PaddingAsymmetric(const VectorDims& inputDims);
+
     bool withGroups = false;
     bool isDW = false;
     bool isInt8 = false;

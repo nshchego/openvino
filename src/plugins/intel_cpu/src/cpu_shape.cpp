@@ -82,14 +82,14 @@ Shape mergeShapes(const Shape& lhs, const Shape& rhs) {
     return Shape{resultMinDims, resultMaxDims};
 }
 
-void Shape::save(BinaryOutputBuffer& ob) const {
-    ob << type;
+void Shape::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << type;
 
-    ob << hasZeroDimensions;
+    out_buf << hasZeroDimensions;
 
-    ob << minDims;
-    ob << maxDims;
-    ob << dims;
+    out_buf << minDims;
+    out_buf << maxDims;
+    out_buf << dims;
 }
 
 void Shape::load(BinaryInputBuffer& in_buf) {

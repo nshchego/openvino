@@ -33,6 +33,7 @@
 #include "selective_build.h"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -288,6 +289,50 @@ void GatherND::executeDynamicImpl(const dnnl::stream& strm) {
 
 bool GatherND::created() const {
     return getType() == Type::GatherND;
+}
+
+void GatherND::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << attrs;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void GatherND::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> attrs;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void GatherND::GatherNDAttributes::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << batchDims;
+    out_buf << dataSize;
+    out_buf << dstElementCount;
+    out_buf << sliceRank;
+    out_buf << srcDims;
+    out_buf << srcStrides;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void GatherND::GatherNDAttributes::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> batchDims;
+    in_buf >> dataSize;
+    in_buf >> dstElementCount;
+    in_buf >> sliceRank;
+    in_buf >> srcDims;
+    in_buf >> srcStrides;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

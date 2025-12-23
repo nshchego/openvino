@@ -31,7 +31,7 @@ public:
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::PortDescBase)
 
-    virtual void save(BinaryOutputBuffer& ob) const = 0;
+    virtual void save(BinaryOutputBuffer& out_buf) const = 0;
 
     virtual void load(BinaryInputBuffer& in_buf) = 0;
 
@@ -73,7 +73,7 @@ public:
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::PortDescGeneric)
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
@@ -105,7 +105,7 @@ public:
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::PortDescBlocked)
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
@@ -173,7 +173,7 @@ public:
         return desc->getShape().hasZeroDims() && !desc->empty();
     }
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& in_buf);
 
@@ -202,7 +202,7 @@ struct NodeConfig {
         : inConfs(std::move(inConfs)),
           outConfs(std::move(outConfs)) {}
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& in_buf);
 

@@ -116,13 +116,13 @@ protected:
     void validate() override {
         auto actualOutputs = get_plugin_outputs();
         if (function->get_parameters().size() == 2) {
-            auto pos = std::find_if(inputs.begin(),
-                                    inputs.end(),
-                                    [](const std::pair<std::shared_ptr<ov::Node>, ov::Tensor>& params) {
-                                        return params.first->get_friendly_name() == "ParamSecondInput";
-                                    });
-            OPENVINO_ASSERT(pos != inputs.end());
-            inputs.erase(pos);
+            // auto pos = std::find_if(inputs.begin(),
+            //                         inputs.end(),
+            //                         [](const std::pair<std::shared_ptr<ov::Node>, ov::Tensor>& params) {
+            //                             return params.first->get_friendly_name() == "ParamSecondInput";
+            //                         });
+            // OPENVINO_ASSERT(pos != inputs.end());
+            // inputs.erase(pos);
         }
         auto expectedOutputs = calculate_refs();
         if (expectedOutputs.empty()) {
@@ -137,6 +137,7 @@ protected:
     void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes) override {
         inputs.clear();
         const auto& funcInputs = function->inputs();
+        printf("[ TEST ] AdaPoolLayerCPUTest::generate_inputs ");
         for (size_t i = 0; i < funcInputs.size(); ++i) {
             const auto& funcInput = funcInputs[i];
             ov::Tensor tensor;
@@ -154,8 +155,10 @@ protected:
                 in_data.resolution = 256;
                 tensor = ov::test::utils::create_and_fill_tensor(funcInput.get_element_type(), targetInputStaticShapes[i], in_data);
             }
+            printf(" in_%lu: %p", i, tensor.data());
             inputs.insert({funcInput.get_node_shared_ptr(), tensor});
         }
+        printf("\n");
     }
 
 private:

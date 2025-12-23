@@ -59,8 +59,8 @@ bool CausalMaskPreprocessNode::visit_attributes(ov::AttributeVisitor& visitor) {
     return true;
 }
 
-void CausalMaskPreprocessNode::Config::save(BinaryOutputBuffer& ob) const {
-    ob << type;
+void CausalMaskPreprocessNode::Config::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << type;
 }
 
 void CausalMaskPreprocessNode::Config::load(BinaryInputBuffer& in_buf) {

@@ -13,6 +13,7 @@
 #include "openvino/core/node_vector.hpp"
 #include "openvino/core/rtti.hpp"
 #include "openvino/op/op.hpp"
+#include "utils/serialization/buffers.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -32,6 +33,10 @@ public:
         int hidden_size;
         int up_size;
         bool gate_up_combined;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     // args:

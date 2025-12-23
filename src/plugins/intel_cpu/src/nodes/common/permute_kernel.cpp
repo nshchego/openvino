@@ -312,13 +312,13 @@ bool PermuteParams::operator==(const PermuteParams& rhs) const {
            (order == rhs.order) && (data_size == rhs.data_size);
 }
 
-void PermuteParams::save(BinaryOutputBuffer& ob) const {
-    ob << src_block_dims;
-    ob << dst_block_dims;
-    ob << src_block_order;
-    ob << dst_block_order;
-    ob << order;
-    ob << data_size;
+void PermuteParams::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << src_block_dims;
+    out_buf << dst_block_dims;
+    out_buf << src_block_order;
+    out_buf << dst_block_order;
+    out_buf << order;
+    out_buf << data_size;
 }
 
 void PermuteParams::load(BinaryInputBuffer& in_buf) {

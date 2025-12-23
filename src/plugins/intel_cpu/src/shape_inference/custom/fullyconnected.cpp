@@ -42,19 +42,11 @@ Result FCShapeInfer::infer(const std::vector<std::reference_wrapper<const Vector
 }
 
 void FCShapeInfer::save(BinaryOutputBuffer& out_buf) const {
-    out_buf.dump_position();  // TODO: remove
-
     out_buf << out_rank;
-
-    out_buf.dump_position();  // TODO: remove
 }
 
 void FCShapeInfer::load(BinaryInputBuffer& in_buf) {
-    in_buf.check_position();  // TODO: remove
-
     in_buf >> out_rank;
-
-    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -103,7 +103,15 @@ public:
         std::vector<ptrdiff_t> stride;
         std::vector<ptrdiff_t> dilation;
         std::vector<ptrdiff_t> padL;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     } defConvAttr;
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     std::vector<int> sampledCoordsVector;

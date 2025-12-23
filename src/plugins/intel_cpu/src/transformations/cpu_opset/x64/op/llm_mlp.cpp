@@ -13,6 +13,7 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/node_vector.hpp"
 #include "transformations/itt.hpp"
+#include "utils/serialization/internal_types.hpp"
 namespace ov {
 
 template <>
@@ -76,5 +77,32 @@ std::shared_ptr<Node> LLMMLPNode::clone_with_new_inputs(const ov::OutputVector& 
     check_new_args_count(this, new_args);
     return std::make_shared<LLMMLPNode>(new_args, m_config);
 }
+
+void LLMMLPNode::Config::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << act;
+    out_buf << gate_up_quantized;
+    out_buf << down_quantized;
+    out_buf << hidden_size;
+    out_buf << up_size;
+    out_buf << gate_up_combined;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void LLMMLPNode::Config::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> act;
+    in_buf >> gate_up_quantized;
+    in_buf >> down_quantized;
+    in_buf >> hidden_size;
+    in_buf >> up_size;
+    in_buf >> gate_up_combined;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace intel_cpu
 }  // namespace ov

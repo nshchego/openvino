@@ -29,7 +29,7 @@ struct MatMulAttrs {
     // Post-operations for fused operations
     PostOps postOps;
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& ib);
 };

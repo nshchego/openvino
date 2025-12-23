@@ -32,6 +32,10 @@ public:
         return false;
     };
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     bool ctcMergeRepeated;
     bool preprocessCollapseRepeated;

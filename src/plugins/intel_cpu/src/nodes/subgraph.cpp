@@ -925,34 +925,34 @@ void Subgraph::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
 }
 
-void Subgraph::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Subgraph::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << host_isa;
-    ob << subgraph_attrs->bodyHash; // TODO: move to SubgraphAttrs
-    ob << subgraph_attrs->inMemOrders;
-    ob << subgraph_attrs->outMemOrders;
-    ob << subgraph_attrs->inMemPrecs;
-    ob << subgraph_attrs->outMemPrecs;
-    // ob << subgraph_attrs->snippet;
+    out_buf << host_isa;
+    out_buf << subgraph_attrs->bodyHash; // TODO: move to SubgraphAttrs
+    out_buf << subgraph_attrs->inMemOrders;
+    out_buf << subgraph_attrs->outMemOrders;
+    out_buf << subgraph_attrs->inMemPrecs;
+    out_buf << subgraph_attrs->outMemPrecs;
+    // out_buf << subgraph_attrs->snippet;
 
     const auto& subgraph = subgraph_attrs->snippet;
-    ob << subgraph_attrs->snippet->is_quantized();
-    ob << subgraph_attrs->snippet->has_domain_sensitive_ops();
-    ob << bool(false);
-    ob << subgraph->get_linear_ir()->get_config();
+    out_buf << subgraph_attrs->snippet->is_quantized();
+    out_buf << subgraph_attrs->snippet->has_domain_sensitive_ops();
+    out_buf << bool(false);
+    out_buf << subgraph->get_linear_ir()->get_config();
 
-    ob << broadcastable_inputs;
-    ob << input_num;
-    ob << output_num;
-    // ob << srcMemPtrs;
-    // ob << dstMemPtrs;
-    ob << start_offset_in;
-    ob << start_offset_out;
-    // ob << external_ptrs_idces;  // TODO: enable set
-    ob << is_dynamic;
-    ob << in_shapes;
-    // ob << execPtr;
+    out_buf << broadcastable_inputs;
+    out_buf << input_num;
+    out_buf << output_num;
+    // out_buf << srcMemPtrs;
+    // out_buf << dstMemPtrs;
+    out_buf << start_offset_in;
+    out_buf << start_offset_out;
+    // out_buf << external_ptrs_idces;  // TODO: enable set
+    out_buf << is_dynamic;
+    out_buf << in_shapes;
+    // out_buf << execPtr;
 }
 
 void Subgraph::load(BinaryInputBuffer& in_buf) {

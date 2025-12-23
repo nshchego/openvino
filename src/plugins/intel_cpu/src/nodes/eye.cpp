@@ -28,6 +28,7 @@
 #include "selective_build.h"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 using namespace ov::intel_cpu;
@@ -173,4 +174,25 @@ void Eye::executeSpecified() {
 bool Eye::created() const {
     return getType() == Type::Eye;
 }
+
+void Eye::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << outType;
+    out_buf << withBatchShape;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Eye::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> outType;
+    in_buf >> withBatchShape;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

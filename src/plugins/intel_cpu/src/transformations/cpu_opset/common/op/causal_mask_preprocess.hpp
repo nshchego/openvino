@@ -24,7 +24,7 @@ public:
     struct Config {
         std::string type;
 
-        void save(BinaryOutputBuffer& ob) const;
+        void save(BinaryOutputBuffer& out_buf) const;
 
         void load(BinaryInputBuffer& in_buf);
     };

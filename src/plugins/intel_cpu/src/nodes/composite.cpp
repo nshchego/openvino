@@ -150,4 +150,22 @@ void Composite::executeDynamicImpl(const dnnl::stream& strm) {
     }
 }
 
+void Composite::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    m_graph.export_graph(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Composite::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    m_graph.Init(in_buf, m_context);
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

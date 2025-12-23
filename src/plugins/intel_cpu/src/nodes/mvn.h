@@ -108,7 +108,7 @@ public:
     bool canFuse(const NodePtr& node) const override;
     void prepareParams() override;
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 

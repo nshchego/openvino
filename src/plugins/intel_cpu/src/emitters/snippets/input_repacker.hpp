@@ -39,7 +39,7 @@ struct InputRepacker {
     [[nodiscard]] const VectorDims& in_offsets() const;
     [[nodiscard]] const VectorDims& out_offsets() const;
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& in_buf);
 

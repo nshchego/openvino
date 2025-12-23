@@ -189,13 +189,13 @@ ov::TensorVector Reference::prepareOutputs() const {
     return outputs;
 }
 
-void Reference::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Reference::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << hasOutputShapeDataDependency;
+    out_buf << hasOutputShapeDataDependency;
     
-    ob << m_ov_core_node->get_element_type();
-    ob << m_ov_core_node->get_friendly_name();
+    out_buf << m_ov_core_node->get_element_type();
+    out_buf << m_ov_core_node->get_friendly_name();
 }
 
 void Reference::load(BinaryInputBuffer& in_buf) {

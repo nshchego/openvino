@@ -9,6 +9,7 @@
 #include "cpu_types.h"
 #include "nodes/executors/executor.hpp"
 #include "openvino/core/except.hpp"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu {
 
@@ -43,6 +44,36 @@ VectorDims MVNExecutor::transformTo5DCase(const VectorDims& shape, bool initAcro
         OPENVINO_THROW("MVN executor doesn't support planar layout with rank: ", shape.size());
     }
     }
+}
+
+void MVNAttrs::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << layout;
+    out_buf << initAcrossChannels_;
+    out_buf << execAcrossChannels_;
+    out_buf << normalizeVariance_;
+    out_buf << epsValue_;
+    out_buf << epsMode_;
+    out_buf << src_prc;
+    out_buf << dst_prc;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void MVNAttrs::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> layout;
+    in_buf >> initAcrossChannels_;
+    in_buf >> execAcrossChannels_;
+    in_buf >> normalizeVariance_;
+    in_buf >> epsValue_;
+    in_buf >> epsMode_;
+    in_buf >> src_prc;
+    in_buf >> dst_prc;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

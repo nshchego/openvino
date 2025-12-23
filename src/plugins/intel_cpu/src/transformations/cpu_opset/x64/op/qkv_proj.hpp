@@ -10,6 +10,7 @@
 #include "openvino/core/node.hpp"
 #include "openvino/core/node_vector.hpp"
 #include "openvino/op/op.hpp"
+#include "utils/serialization/buffers.hpp"
 
 namespace ov::intel_cpu {
 
@@ -26,6 +27,10 @@ public:
         int proj_size1;
         int proj_size2;
         bool weights_combined;
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     QKVProjectionNode(const OutputVector& args, const Config& cfg) : Op(args), m_config(cfg) {

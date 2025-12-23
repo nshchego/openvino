@@ -85,7 +85,7 @@
 #include "nodes/roi_pooling.h"
 #include "nodes/roll.h"
 #include "nodes/rope.h"
-#include "nodes/scaled_attn.h"
+#include "nodes/scaled_dot_product_attention.h"
 #include "nodes/scatter_update.h"
 #include "nodes/search_sorted.h"
 #include "nodes/segment_max.h"

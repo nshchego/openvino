@@ -101,7 +101,7 @@ public:
     [[nodiscard]] std::string hash() const;
     [[nodiscard]] const MemoryDesc& getOriginalDesc() const;
 
-    void save(BinaryOutputBuffer& ob) const;
+    void save(BinaryOutputBuffer& out_buf) const;
 
     void load(BinaryInputBuffer& in_buf);
 

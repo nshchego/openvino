@@ -53,6 +53,7 @@
 #include "selective_build.h"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -1630,19 +1631,54 @@ bool NormalizeL2::created() const {
     return getType() == Type::NormalizeL2;
 }
 
-void NormalizeL2::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void NormalizeL2::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << attrs;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void NormalizeL2::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> attrs;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void NormalizeL2::NormalizeL2Attrs::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << layout;
+    out_buf << epsMode;
+    out_buf << across_spatial;
+    out_buf << cornerCase;
+    out_buf << eps;
+    out_buf << input_prec;
+    out_buf << output_prec;
+    out_buf << src_data_size;
+    out_buf << dst_data_size;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void NormalizeL2::NormalizeL2Attrs::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> layout;
+    in_buf >> epsMode;
+    in_buf >> across_spatial;
+    in_buf >> cornerCase;
+    in_buf >> eps;
+    in_buf >> input_prec;
+    in_buf >> output_prec;
+    in_buf >> src_data_size;
+    in_buf >> dst_data_size;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -330,19 +330,26 @@ Math::getInitializers() {
     return initializers;
 }
 
-void Math::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Math::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
+    out_buf << alpha;
+    out_buf << beta;
+    out_buf << gamma;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Math::load(BinaryInputBuffer& in_buf) {
-in_buf.check_position();  // TODO: remove
+    in_buf.check_position();  // TODO: remove
 
-in_buf.check_position();  // TODO: remove
+    in_buf >> alpha;
+    in_buf >> beta;
+    in_buf >> gamma;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

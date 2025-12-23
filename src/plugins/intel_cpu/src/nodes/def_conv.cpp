@@ -40,6 +40,8 @@
 #include "openvino/util/pp.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/vector_serializer.hpp"
+
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
 
@@ -1387,6 +1389,58 @@ bool DeformableConvolution::created() const {
 
 ov::element::Type DeformableConvolution::getRuntimePrecision() const {
     return getMaxPrecision(getInputPrecisions());
+}
+
+void DeformableConvolution::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << defConvAttr;
+    out_buf << sampledCoordsVector;
+    out_buf << interpWeightsVector;
+    out_buf << enforceRef;
+    out_buf << autoPadding;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DeformableConvolution::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> defConvAttr;
+    in_buf >> sampledCoordsVector;
+    in_buf >> interpWeightsVector;
+    in_buf >> enforceRef;
+    in_buf >> autoPadding;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void DeformableConvolution::DefConvAttr::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << group;
+    out_buf << deformable_group;
+    out_buf << with_bilinear_pad;
+    out_buf << stride;
+    out_buf << dilation;
+    out_buf << padL;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DeformableConvolution::DefConvAttr::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> group;
+    in_buf >> deformable_group;
+    in_buf >> with_bilinear_pad;
+    in_buf >> stride;
+    in_buf >> dilation;
+    in_buf >> padL;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

@@ -52,6 +52,10 @@ public:
               batch_index(_batch_index),
               class_index(_class_index),
               box_index(_box_index) {}
+
+        void save(BinaryOutputBuffer& out_buf) const;
+
+        void load(BinaryInputBuffer& in_buf);
     };
 
     struct boxInfo {
@@ -88,7 +92,7 @@ public:
         }
     };
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 
@@ -134,7 +138,7 @@ private:
 
     void createJitKernel();
 
-    NMSBoxEncodeType boxEncodingType = NMSBoxEncodeType::CORNER;
+    NMSBoxEncodeType m_box_encoding_type = NMSBoxEncodeType::CORNER;
     bool m_sort_result_descending = true;
     bool m_clockwise = false;
     bool m_rotated_boxes = false;

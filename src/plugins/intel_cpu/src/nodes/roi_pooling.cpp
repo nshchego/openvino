@@ -34,6 +34,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>
@@ -1009,6 +1010,68 @@ std::shared_ptr<ROIPooling::ROIPoolingExecutor> ROIPooling::ROIPoolingExecutor::
 
 bool ROIPooling::created() const {
     return getType() == Type::ROIPooling;
+}
+
+void ROIPooling::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << refParams;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ROIPooling::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> refParams;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void jit_roi_pooling_params::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << mb;
+    out_buf << c;
+    out_buf << ih;
+    out_buf << iw;
+    out_buf << oh;
+    out_buf << ow;
+    out_buf << c_block;
+    out_buf << nb_c;
+    out_buf << nb_c_blocking;
+    out_buf << spatial_scale;
+    out_buf << pooled_h;
+    out_buf << pooled_w;
+    out_buf << src_prc;
+    out_buf << dst_prc;
+    out_buf << alg;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void jit_roi_pooling_params::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> mb;
+    in_buf >> c;
+    in_buf >> ih;
+    in_buf >> iw;
+    in_buf >> oh;
+    in_buf >> ow;
+    in_buf >> c_block;
+    in_buf >> nb_c;
+    in_buf >> nb_c_blocking;
+    in_buf >> spatial_scale;
+    in_buf >> pooled_h;
+    in_buf >> pooled_w;
+    in_buf >> src_prc;
+    in_buf >> dst_prc;
+    in_buf >> alg;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

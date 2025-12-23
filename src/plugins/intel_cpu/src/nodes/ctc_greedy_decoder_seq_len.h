@@ -30,6 +30,10 @@ public:
 
     static bool isSupportedOperation(const std::shared_ptr<const ov::Node>& op, std::string& errorMessage) noexcept;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     const size_t DATA_INDEX = 0LU;
     const size_t SEQUENCE_LENGTH_INDEX = 1LU;

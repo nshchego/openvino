@@ -257,11 +257,11 @@ void SoftMax::executeDynamicImpl(const dnnl::stream& strm) {
     execute(strm);
 }
 
-void SoftMax::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void SoftMax::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << m_axis;
-    // ob << execPtr;
+    out_buf << m_axis;
+    // out_buf << execPtr;
 }
 
 void SoftMax::load(BinaryInputBuffer& in_buf) {

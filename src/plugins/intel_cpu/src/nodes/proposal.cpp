@@ -23,6 +23,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "proposal.h"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -223,6 +224,30 @@ void Proposal::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool Proposal::created() const {
     return getType() == Type::Proposal;
+}
+
+void Proposal::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << conf;
+    out_buf << anchors;
+    out_buf << roi_indices;
+    out_buf << store_prob;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void Proposal::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> conf;
+    in_buf >> anchors;
+    in_buf >> roi_indices;
+    in_buf >> store_prob;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

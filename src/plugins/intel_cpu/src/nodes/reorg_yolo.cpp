@@ -109,4 +109,22 @@ bool ReorgYolo::created() const {
     return getType() == Type::ReorgYolo;
 }
 
+void ReorgYolo::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << stride;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ReorgYolo::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> stride;
+
+    in_buf.check_position();  // TODO: remove
+}
+
 }  // namespace ov::intel_cpu::node

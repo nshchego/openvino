@@ -286,7 +286,7 @@ public:
         return m_outputNodesMemBlocks;
     }
 
-    void export_graph(BinaryOutputBuffer& ob) const;
+    void export_graph(BinaryOutputBuffer& out_buf) const;
 
     friend class GraphOptimizer;
 

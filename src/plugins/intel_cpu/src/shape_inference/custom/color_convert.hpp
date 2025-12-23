@@ -26,12 +26,20 @@ using Result = IShapeInfer::Result;
  */
 class ColorConvertShapeInfer : public ShapeInferEmptyPads {
 public:
+    explicit ColorConvertShapeInfer() = default;
+
     explicit ColorConvertShapeInfer(bool singlePlain) : m_singlePlain(singlePlain) {}
     Result infer(const std::vector<std::reference_wrapper<const VectorDims>>& input_shapes,
                  const std::unordered_map<size_t, MemoryPtr>& data_dependency) override;
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return EMPTY_PORT_MASK;
     }
+
+    DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::ColorConvertShapeInfer)
+
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
 
 private:
     bool m_singlePlain = false;

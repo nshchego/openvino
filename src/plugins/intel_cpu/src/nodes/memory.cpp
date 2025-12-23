@@ -42,7 +42,7 @@
 #include "openvino/op/read_value.hpp"
 #include "openvino/util/common_util.hpp"
 #include "proxy_mem_blk.h"
-#include "scaled_attn.h"
+#include "scaled_dot_product_attention.h"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "shape_inference/shape_inference_pass_through.hpp"

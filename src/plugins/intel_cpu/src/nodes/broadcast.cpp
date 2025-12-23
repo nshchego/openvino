@@ -293,12 +293,12 @@ bool Broadcast::created() const {
     return getType() == Type::Broadcast;
 }
 
-void Broadcast::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Broadcast::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-    ob << broadcastType;
-    ob << targetShape;
-    ob << axesMapping;
+    out_buf << broadcastType;
+    out_buf << targetShape;
+    out_buf << axesMapping;
 }
 
 void Broadcast::load(BinaryInputBuffer& in_buf) {

@@ -25,6 +25,7 @@
 #include "openvino/op/reverse_sequence.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
+#include "utils/serialization/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 
@@ -203,6 +204,28 @@ void ReverseSequence::execute([[maybe_unused]] const dnnl::stream& strm) {
 
 bool ReverseSequence::created() const {
     return getType() == Type::ReverseSequence;
+}
+
+void ReverseSequence::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << seq_axis;
+    out_buf << batch_axis;
+    out_buf << lengthsPrecision;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ReverseSequence::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> seq_axis;
+    in_buf >> batch_axis;
+    in_buf >> lengthsPrecision;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

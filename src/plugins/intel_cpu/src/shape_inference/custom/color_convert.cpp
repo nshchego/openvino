@@ -39,6 +39,14 @@ Result ColorConvertShapeInfer::infer(const std::vector<std::reference_wrapper<co
             ShapeInferStatus::success};
 }
 
+void ColorConvertShapeInfer::save(BinaryOutputBuffer& out_buf) const {
+    out_buf << m_singlePlain;
+}
+
+void ColorConvertShapeInfer::load(BinaryInputBuffer& in_buf) {
+    in_buf >> m_singlePlain;
+}
+
 ShapeInferPtr ColorConvertShapeInferFactory::makeShapeInfer() const {
     bool isSinglePlain = m_op->get_input_size() == 1;
     return std::make_shared<ColorConvertShapeInfer>(isSinglePlain);

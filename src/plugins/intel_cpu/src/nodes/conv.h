@@ -90,7 +90,7 @@ public:
         return m_attrs.isGrouped && 1 == groupOC && 1 == groupIC;
     }
 
-    void save(BinaryOutputBuffer& ob) const override;
+    void save(BinaryOutputBuffer& out_buf) const override;
 
     void load(BinaryInputBuffer& in_buf) override;
 

@@ -25,6 +25,7 @@
 #include "openvino/reference/col2im.hpp"
 #include "selective_build.h"
 #include "shape_inference/shape_inference_cpu.hpp"
+#include "utils/serialization/vector_serializer.hpp"
 
 namespace ov::intel_cpu::node {
 Col2Im::Col2Im(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)
@@ -131,11 +132,28 @@ void Col2Im::execute([[maybe_unused]] const dnnl::stream& strm) {
               OV_CASE2(ov::element::u8, ov::element::i32, uint8_t, int32_t))
 }
 
-void Col2Im::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Col2Im::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << strides;
+    out_buf << dilations;
+    out_buf << padsBegin;
+    out_buf << padsEnd;
+
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Col2Im::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> strides;
+    in_buf >> dilations;
+    in_buf >> padsBegin;
+    in_buf >> padsEnd;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node

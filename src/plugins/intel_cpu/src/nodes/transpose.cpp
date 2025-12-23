@@ -292,20 +292,20 @@ bool Transpose::created() const {
     return getType() == Type::Transpose;
 }
 
-void Transpose::save(BinaryOutputBuffer& ob) const {
-    Node::save(ob);
+void Transpose::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 
-    // ob << prim;
-    ob << order;
-    ob << prec;
-    ob << m_transpose_params;
-    ob << isInputOrderConst;
-    ob << performAsReorder;
-    ob << isOptimized;
+    // out_buf << prim;
+    out_buf << order;
+    out_buf << prec;
+    out_buf << m_transpose_params;
+    out_buf << isInputOrderConst;
+    out_buf << performAsReorder;
+    out_buf << isOptimized;
 
-ob.dump_position();  // TODO: remove
+    out_buf.dump_position();  // TODO: remove
 }
 
 void Transpose::load(BinaryInputBuffer& in_buf) {

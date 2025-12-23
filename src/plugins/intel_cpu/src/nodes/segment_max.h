@@ -30,6 +30,10 @@ public:
     void executeDynamicImpl(const dnnl::stream& strm) override;
     [[nodiscard]] bool needShapeInfer() const override;
 
+    void save(BinaryOutputBuffer& out_buf) const override;
+
+    void load(BinaryInputBuffer& in_buf) override;
+
 private:
     template <class OV_DATA_TYPE>
     void executeImpl();
