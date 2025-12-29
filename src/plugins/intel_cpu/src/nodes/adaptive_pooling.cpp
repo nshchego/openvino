@@ -148,6 +148,7 @@ void AdaptivePooling::executeDynamicImpl(const dnnl::stream& strm) {
 void AdaptivePooling::execute([[maybe_unused]] const dnnl::stream& strm) {
     auto inputPrec = getParentEdgeAt(0)->getMemory().getDataType();
     auto outputPrec = getChildEdgeAt(0)->getMemory().getDataType();
+    // auto outputPrec = getChildEdgesAtPort(0)[0]->getMemory().getDataType();
     CPU_NODE_ASSERT(inputPrec == dnnl_f32 && outputPrec == dnnl_f32, "doesn't support demanded precisions");
 
     const auto& srcMemory0 = getParentEdgeAt(0)->getMemory();
@@ -156,6 +157,7 @@ void AdaptivePooling::execute([[maybe_unused]] const dnnl::stream& strm) {
 
     if (algorithm == Algorithm::AdaptivePoolingMax) {
         indexDst = getDstDataAtPortAs<int>(1);
+        // indexDst = static_cast<int *>(getChildEdgesAtPort(1)[0]->getMemoryPtr()->getData());
     }
 
     auto isPlainFmt = srcMemory0.getDesc().hasLayoutType(LayoutType::ncsp);
@@ -169,6 +171,7 @@ void AdaptivePooling::execute([[maybe_unused]] const dnnl::stream& strm) {
     const auto* src = getSrcDataAtPortAs<const float>(0);
     const auto* srcPooledSpatialShapes = getSrcDataAtPortAs<const int>(1);
     auto* dst = getDstDataAtPortAs<float>(0);
+    // auto* dst = static_cast<float *>(getChildEdgesAtPort(0)[0]->getMemoryPtr()->getData());
     printf("[CPU] AdaptivePooling::execute src: %p; srcPooledSpatialShapes: %p; dst: %p\n", src, srcPooledSpatialShapes, dst);
 
     CPU_NODE_ASSERT(static_cast<int>(srcMemory1.getShape().getElementsCount()) == spatialDimsCount,

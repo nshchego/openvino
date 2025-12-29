@@ -253,7 +253,16 @@ public:
     }
 
     void addChildEdge(const EdgePtr& edge) {
-        childEdges.push_back(edge);
+        assert(std::none_of(childEdges.begin(), childEdges.end(), [&edge](const EdgeWeakPtr& _edge) {
+            return _edge.lock()->getInputNum() == edge->getInputNum();
+        }));
+        childEdges.insert(std::upper_bound(childEdges.begin(),
+                                           childEdges.end(),
+                                           edge,
+                                           [](const EdgeWeakPtr& lhs, const EdgeWeakPtr& rhs) {
+                                               return lhs.lock()->getInputNum() < rhs.lock()->getInputNum();
+                                           }),
+                          edge);
     }
 
     void removeParentEdge(const EdgePtr& edge) {

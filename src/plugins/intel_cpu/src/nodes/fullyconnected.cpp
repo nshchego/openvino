@@ -68,6 +68,12 @@ const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::FCAttrs>::get_t
     return type_name;
 }
 
+// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::DnnlExecutor<ov::intel_cpu::FCAttrs>)
+// const std::string& ov::intel_cpu::DnnlExecutor<ov::intel_cpu::FCAttrs>::get_type_info_s() {
+//     static const std::string type_name("ov::intel_cpu::ExecutorFactory<ov::intel_cpu::FCAttrs>");
+//     return type_name;
+// }
+
 namespace ov::intel_cpu::node {
 
 ov::element::TypeVector FullyConnected::getSupportedCompressedWeightsTypes([[maybe_unused]] bool apply_fp8) {
@@ -575,15 +581,15 @@ static bool useSparseWeightsDecompression(const NodePtr& weightsInput,
 }
 
 void FullyConnected::initSupportedPrimitiveDescriptors() {
-    attrs.withBias = getOriginalInputPrecisionAtPort(BIAS) != ov::element::dynamic;
+    m_attrs.withBias = getOriginalInputPrecisionAtPort(BIAS) != ov::element::dynamic;
 
-    attrs.sparseWeights = useSparseWeightsDecompression(getParentEdgeAt(WEIGHTS)->getParent(),
+    m_attrs.sparseWeights = useSparseWeightsDecompression(getParentEdgeAt(WEIGHTS)->getParent(),
                                                         getOriginalInputPrecisionAtPort(DATA),
                                                         m_context->getConfig().fcSparseWeiDecompressionRate);
-    attrs.dynamicQuantizationGroupSize = m_context->getConfig().fcDynamicQuantizationGroupSize;
-    attrs.modelType = m_context->getConfig().modelType;
+    m_attrs.dynamicQuantizationGroupSize = m_context->getConfig().fcDynamicQuantizationGroupSize;
+    m_attrs.modelType = m_context->getConfig().modelType;
 
-    attrs.postOps = getPostOps(fusedWith);
+    m_attrs.postOps = getPostOps(fusedWith);
 
     const auto& srcTypes = getOriginalInputPrecisions();
     auto dstTypes = getOriginalOutputPrecisions();
@@ -617,8 +623,8 @@ void FullyConnected::initSupportedPrimitiveDescriptors() {
     };
 
     auto executionContext = std::make_shared<ExecutorContext>(m_context, getImplPriority(), privateWeightCache);
-    factory = std::make_shared<ExecutorFactory<FCAttrs>>(attrs, executionContext, descs);
-    const std::vector<MemoryDescArgs> nodeDescriptorsList = factory->getProperMemoryDescriptors(descs);
+    m_exec_factory = std::make_shared<ExecutorFactory<FCAttrs>>(m_attrs, executionContext, descs);
+    const std::vector<MemoryDescArgs> nodeDescriptorsList = m_exec_factory->getProperMemoryDescriptors(descs);
     const MemoryDescArgs& nodeDescriptors = nodeDescriptorsList.front();
 
     NodeConfig nodeConfig;
@@ -652,11 +658,11 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
         // wgt
         // split N direction
         tp_cfg.cached_splited_weight =
-            attrs.weightsNonTransposed ? split_vertical(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size)
+            m_attrs.weightsNonTransposed ? split_vertical(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size)
                                        : split_horizontal(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size);
         memory[ARG_WEI] = tp_cfg.cached_splited_weight;
         // bias
-        if (attrs.withBias) {
+        if (m_attrs.withBias) {
             auto bias = getSrcMemoryAtPort(BIAS);
             auto select_bias = split_horizontal(m_context->getEngine(), bias, 0, tp_cfg.w_rank, tp_cfg.w_size);
             tp_cfg.cached_splited_bias = std::move(select_bias);
@@ -674,7 +680,7 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
 
         if (auto it = memory.find(ARG_WEI | ARG_ATTR_SCALES); it != memory.end()) {
             auto scale_mem = std::const_pointer_cast<IMemory>(it->second);
-            it->second = attrs.weightsNonTransposed
+            it->second = m_attrs.weightsNonTransposed
                              ? split_vertical(m_context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
                              : split_horizontal(m_context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
         }
@@ -684,7 +690,7 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
             auto element_num = zeropoint_mem->getSize() / zeropoint_mem->getPrecision().size();
             if (element_num != 1) {
                 it->second =
-                    attrs.weightsNonTransposed
+                    m_attrs.weightsNonTransposed
                         ? split_vertical(m_context->getEngine(), zeropoint_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
                         : split_horizontal(m_context->getEngine(), zeropoint_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
             }
@@ -718,7 +724,7 @@ void FullyConnected::createPrimitive() {
     needSplitMemoryForTensorParallel();
     // @todo should we preconfigure only for dynamic shapes?
     // Since for static shapes primitive is created in scope of compile_model() anyway
-    executor = factory->make(memory);
+    executor = m_exec_factory->make(memory);
 
     Node::createPrimitive();
 }
@@ -737,6 +743,37 @@ ov::element::Type FullyConnected::getRuntimePrecision() const {
     }
 
     return getMaxPrecision(srcTypes);
+}
+
+void FullyConnected::save(BinaryOutputBuffer& out_buf) const {
+    Node::save(out_buf);
+
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_attrs;
+    out_buf << m_atoi;
+    // out_buf << memory;
+    out_buf << m_exec_factory;
+    // out_buf << executor;
+    out_buf << tp_cfg;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void FullyConnected::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_attrs;
+    in_buf >> m_atoi;
+    // in_buf >> memory;
+    in_buf(m_exec_factory, m_context);
+    // in_buf >> executor;
+    in_buf >> tp_cfg;
+
+    m_attrs.postOps = getPostOps(fusedWith);
+    m_exec_factory->set_attr(m_attrs);
+
+    in_buf.check_position();  // TODO: remove
 }
 
 void FCTensorParallelConfig::save(BinaryOutputBuffer& out_buf) const {
@@ -769,34 +806,6 @@ void FCTensorParallelConfig::load(BinaryInputBuffer& in_buf) {
     // in_buf >> cached_scale;
     // in_buf >> cached_zeropoint;
     // in_buf >> cached_dst;
-
-    in_buf.check_position();  // TODO: remove
-}
-
-void FullyConnected::save(BinaryOutputBuffer& out_buf) const {
-    Node::save(out_buf);
-
-    out_buf.dump_position();  // TODO: remove
-
-    out_buf << m_atoi;
-    out_buf << attrs;
-    // out_buf << memory;
-    out_buf << factory;
-    // out_buf << executor;
-    out_buf << tp_cfg;
-
-    out_buf.dump_position();  // TODO: remove
-}
-
-void FullyConnected::load(BinaryInputBuffer& in_buf) {
-    in_buf.check_position();  // TODO: remove
-
-    in_buf >> m_atoi;
-    in_buf >> attrs;
-    // in_buf >> memory;
-    in_buf(factory, m_context);
-    // in_buf >> executor;
-    in_buf >> tp_cfg;
 
     in_buf.check_position();  // TODO: remove
 }

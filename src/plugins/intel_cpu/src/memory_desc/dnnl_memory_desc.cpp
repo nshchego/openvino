@@ -144,6 +144,7 @@ void DnnlMemoryDesc::save(BinaryOutputBuffer& out_buf) const {
     MemoryDesc::save(out_buf);
 
     auto desc_data = desc.get();
+
     out_buf << desc_data->format_kind;
     out_buf << desc_data->data_type;
     out_buf << desc_data->ndims;
@@ -161,6 +162,7 @@ void DnnlMemoryDesc::load(BinaryInputBuffer& in_buf) {
     MemoryDesc::load(in_buf);
 
     auto desc_data = desc.get();
+
     in_buf >> desc_data->format_kind;
     in_buf >> desc_data->data_type;
     in_buf >> desc_data->ndims;
@@ -175,5 +177,3 @@ void DnnlMemoryDesc::load(BinaryInputBuffer& in_buf) {
 }
 
 }  // namespace ov::intel_cpu
-
-// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::DnnlMemoryDesc)

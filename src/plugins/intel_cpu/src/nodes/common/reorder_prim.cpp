@@ -29,6 +29,7 @@ size_t ReorderKey::hash() const {
     size_t seed = 0;
     seed = hash_combine(seed, get_md_hash(*src.get()));
     seed = hash_combine(seed, get_md_hash(*dest.get()));
+    printf("[ CPU ] ReorderKey::hash() seed: %lu\n", seed);  // TODO: remove
 
     return seed;
 }

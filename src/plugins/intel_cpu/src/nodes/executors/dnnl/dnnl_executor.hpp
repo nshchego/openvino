@@ -26,6 +26,8 @@ namespace ov::intel_cpu {
 template <typename Primitive, typename Attrs, typename ShapeAgnosticData, typename Instantiator>
 class DnnlExecutor : public Executor {
 public:
+    explicit DnnlExecutor() = default;
+
     using PrimitivePtr = std::shared_ptr<Primitive>;
     DnnlExecutor(Attrs attrs,
                  const MemoryArgs& memory,
@@ -37,6 +39,16 @@ public:
           m_shapeAgnosticData(Primitive::createShapeAgnosticData(m_attrs, memory, m_context, cacheWeights)),
           m_primArgs(m_shapeAgnosticData->m_primAttrs.dnnlArgs),
           m_fc3Das2D(fc3Das2D) {}
+
+    // DnnlExecutor(BinaryInputBuffer& in_buf, const GraphContext::CPtr& graph_context) {
+    //     // printf("--CPU-- ExecutorFactory ctr 2 type name: %s\n", typeid(*this).name());
+    //     in_buf.check_position();  // TODO: Remove
+    //     in_buf(m_context, graph_context);
+    //     // m_context = std::make_shared<ExecutorContext>(in_buf, context);
+    //     load(in_buf);
+    //     OPENVINO_ASSERT(!m_suitable_implementations.empty(), "[CPU] No suitable executor implementation found.");
+    // }
+
     bool update(const MemoryArgs& memory) override {
         const auto primitive = createPrimitive(memory, m_attrs);
         if (!primitive) {
@@ -95,6 +107,48 @@ public:
             }
         }
         curNumaNode = numaNodeID;
+    }
+
+    static const std::string& get_type_info_s() {
+        static const std::string type_name =
+            std::string("ov::intel_cpu::DnnlExecutor<") + typeid(Primitive).name() + "," + typeid(Attrs).name() + ">";
+        return type_name;
+    }
+
+    virtual const std::string& get_type_info() const { return get_type_info_s(); }
+
+    void save(BinaryOutputBuffer& out_buf) const {
+        out_buf.dump_position();  // TODO: remove
+
+        out_buf << m_attrs;
+        // out_buf << m_context;
+        // out_buf << m_shapeAgnosticData;
+        // out_buf << m_primArgs;
+        out_buf << resetSrcMemoryDataHandle;
+        out_buf << resetDstMemoryDataHandle;
+        // out_buf << m_scratchPadMemory;
+        // out_buf << m_primitive;
+        out_buf << curNumaNode;
+        out_buf << m_fc3Das2D;
+
+        out_buf.dump_position();  // TODO: remove
+    }
+
+    void load(BinaryInputBuffer& in_buf) {
+        in_buf.check_position();  // TODO: Remove
+
+        in_buf >> m_attrs;
+        // in_buf >> m_context;
+        // in_buf >> m_shapeAgnosticData;
+        // in_buf >> m_primArgs;
+        in_buf >> resetSrcMemoryDataHandle;
+        in_buf >> resetDstMemoryDataHandle;
+        // in_buf >> m_scratchPadMemory;
+        // in_buf >> m_primitive;
+        in_buf >> curNumaNode;
+        in_buf >> m_fc3Das2D;
+
+        in_buf.check_position();  // TODO: Remove
     }
 
 private:
@@ -200,6 +254,7 @@ private:
     PrimitivePtr createPrimitive(const MemoryArgs& memory, const Attrs& attrs) {
         return Instantiator{}(memory, attrs, m_context, m_shapeAgnosticData);
     }
+
     // @todo there is no real reason to store attrs. Better to just pass as api argument
     Attrs m_attrs;
     const ExecutorContext::CPtr m_context;

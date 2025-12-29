@@ -186,6 +186,10 @@ public:
         in_buf.check_position();  // TODO: Remove
     }
 
+    void set_attr(Attrs attrs) {
+        m_attrs = attrs;
+    }
+
 private:
     /**
      * @brief Filters and retrieves suitable implementations based on the provided executor configuration.
@@ -257,7 +261,5 @@ using ExecutorFactoryPtr = std::shared_ptr<ExecutorFactory<Attrs>>;
 
 template <typename Attrs>
 using ExecutorFactoryCPtr = std::shared_ptr<const ExecutorFactory<Attrs>>;
-
-// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory);
 
 }  // namespace ov::intel_cpu

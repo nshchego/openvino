@@ -826,41 +826,70 @@ void Pooling::setPostOps(dnnl::primitive_attr& attr) {
 void Pooling::save(BinaryOutputBuffer& out_buf) const {
     Node::save(out_buf);
 
-    out_buf << poolingAttrs.exclude_pad;
-    out_buf << poolingAttrs.auto_pad;
-    out_buf << poolingAttrs.pad_type;
-    out_buf << poolingAttrs.algorithm;
-    out_buf << poolingAttrs.rounding;
-    out_buf << poolingAttrs.stride;
-    out_buf << poolingAttrs.kernel;
-    out_buf << poolingAttrs.dilation;
-    out_buf << poolingAttrs.data_pad_begin;
-    out_buf << poolingAttrs.data_pad_end;
-    out_buf << poolingAttrs.effective_pad_begin;
-    out_buf << poolingAttrs.effective_pad_end;
-    out_buf << poolingAttrs.effective_dilation;
+    // out_buf << poolingAttrs.exclude_pad;
+    // out_buf << poolingAttrs.auto_pad;
+    // out_buf << poolingAttrs.pad_type;
+    // out_buf << poolingAttrs.algorithm;
+    // out_buf << poolingAttrs.rounding;
+    // out_buf << poolingAttrs.stride;
+    // out_buf << poolingAttrs.kernel;
+    // out_buf << poolingAttrs.dilation;
+    // out_buf << poolingAttrs.data_pad_begin;
+    // out_buf << poolingAttrs.data_pad_end;
+    // out_buf << poolingAttrs.effective_pad_begin;
+    // out_buf << poolingAttrs.effective_pad_end;
+    // out_buf << poolingAttrs.effective_dilation;
+    out_buf << poolingAttrs;
     out_buf << inShape;
     out_buf << isNotMaxPool1;
     out_buf << useACL;
 }
 
 void Pooling::load(BinaryInputBuffer& in_buf) {
-    in_buf >> poolingAttrs.exclude_pad;
-    in_buf >> poolingAttrs.auto_pad;
-    in_buf >> poolingAttrs.pad_type;
-    in_buf >> poolingAttrs.algorithm;
-    in_buf >> poolingAttrs.rounding;
-    in_buf >> poolingAttrs.stride;
-    in_buf >> poolingAttrs.kernel;
-    in_buf >> poolingAttrs.dilation;
-    in_buf >> poolingAttrs.data_pad_begin;
-    in_buf >> poolingAttrs.data_pad_end;
-    in_buf >> poolingAttrs.effective_pad_begin;
-    in_buf >> poolingAttrs.effective_pad_end;
-    in_buf >> poolingAttrs.effective_dilation;
+    // in_buf >> poolingAttrs.exclude_pad;
+    // in_buf >> poolingAttrs.auto_pad;
+    // in_buf >> poolingAttrs.pad_type;
+    // in_buf >> poolingAttrs.algorithm;
+    // in_buf >> poolingAttrs.rounding;
+    // in_buf >> poolingAttrs.stride;
+    // in_buf >> poolingAttrs.kernel;
+    // in_buf >> poolingAttrs.dilation;
+    // in_buf >> poolingAttrs.data_pad_begin;
+    // in_buf >> poolingAttrs.data_pad_end;
+    // in_buf >> poolingAttrs.effective_pad_begin;
+    // in_buf >> poolingAttrs.effective_pad_end;
+    // in_buf >> poolingAttrs.effective_dilation;
+    in_buf >> poolingAttrs;
     in_buf >> inShape;
     in_buf >> isNotMaxPool1;
     in_buf >> useACL;
+
+    if (isDynamic) {
+        // std::shared_ptr<op::util::ConvolutionBackPropBase> conv_bp_ptr;
+        // if (algorithm == Algorithm::DeconvolutionCommon) {
+        //     conv_bp_ptr = std::make_shared<op::v1::ConvolutionBackpropData>();
+        // } else if (algorithm == Algorithm::DeconvolutionGrouped) {
+        //     conv_bp_ptr = std::make_shared<op::v1::GroupConvolutionBackpropData>();
+        // } else {
+        //     CPU_NODE_THROW("deserialized unsupported operation type '", static_cast<uint8_t>(algorithm), "'");
+        // }
+
+        // conv_bp_ptr->set_strides(ov::Strides(deconvAttrs.stride.begin(), deconvAttrs.stride.end()));
+        // conv_bp_ptr->set_dilations(ov::Strides(deconvAttrs.dilation.begin(), deconvAttrs.dilation.end()));
+        // conv_bp_ptr->set_pads_begin(deconvAttrs.paddingL);
+        // conv_bp_ptr->set_pads_end(deconvAttrs.paddingR);
+        // conv_bp_ptr->set_output_padding(deconvAttrs.outputPadding);
+        // conv_bp_ptr->set_auto_pad(autoPad ? op::PadType::SAME_LOWER : op::PadType::EXPLICIT);
+
+        // if (externOutShape) {
+        //     // auto output_shape = std::make_shared<op::v0::Constant>(element::i32, ov::Shape{lastOutputSpatialDims.size()}, lastOutputSpatialDims.data());
+        //     std::vector<int64_t> new_shape(lastOutputSpatialDims.begin(), lastOutputSpatialDims.end());
+        //     auto output_shape = std::make_shared<op::v0::Constant>(element::i64, ov::Shape{lastOutputSpatialDims.size()}, new_shape.data());
+        //     conv_bp_ptr->set_argument(2, output_shape);
+        // }
+
+        // shapeInference->set_ov_core_node(conv_bp_ptr);
+    }
 }
 
 }  // namespace ov::intel_cpu::node

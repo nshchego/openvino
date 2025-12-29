@@ -283,7 +283,7 @@ Edge::ReorderStatus Edge::needReorder() {
 
 void Edge::reuse(MemoryPtr ptr) {
     OPENVINO_ASSERT(ptr, "Attempt to reuse uninitialized memory in ", *this);
-    if (child.lock()->getName() == "Subtract_3509") {
+    if (child.lock()->getName() == "Multiply_417_acdeb_abcde_Result_418") {  // TODO: remove
         printf("--CPU-- Edge::reuse '%s'->'%s'\n", parent.lock()->getName().data(), child.lock()->getName().data());
     }
     memoryPtr = std::move(ptr);
@@ -302,7 +302,7 @@ int Edge::getOutputNum() const {
 
 void Edge::allocateCommon(const std::function<MemoryPtr(const MemoryDesc&)>& allocate) {
     OPENVINO_ASSERT(!memoryPtr, "Unexpected behaviour: status == NeedAllocation but memory is already allocated.");
-    if (child.lock()->getName() == "Subtract_3509") {
+    if (child.lock()->getName() == "Multiply_417_acdeb_abcde_Result_418") {  // TODO: remove
         printf("--CPU-- Edge::allocateCommon '%s'\n", child.lock()->getName().data());
     }
 
@@ -361,7 +361,7 @@ void Edge::externalAllocate(const WeightsSharing::Ptr& weightsCache) {
             return memoryPtr;
         };
 
-        if (child.lock()->getName() == "Subtract_3509") {
+        if (child.lock()->getName() == "Multiply_417_acdeb_abcde_Result_418") {  // TODO: remove
             printf("--CPU-- Edge::externalAllocate '%s'\n", child.lock()->getName().data());
         }
         auto ptr = weightsCache->findOrCreate(hash(), alloc, false);
@@ -472,6 +472,9 @@ const IMemory& Edge::getMemory() {
 }
 
 MemoryPtr Edge::getMemoryPtr() const {
+    if (child.lock()->getName() == "Multiply_417_acdeb_abcde_Result_418") {  // TODO: remove
+        printf("--CPU-- Edge::externalAllocate '%s'\n", child.lock()->getName().data());
+    }
     return memoryPtr;
 }
 

@@ -4035,6 +4035,48 @@ in_buf.check_position();  // TODO: remove
     // std::shared_ptr<jit_uni_reduce_kernel> reduce_tmp_kernel;
     // std::shared_ptr<jit_uni_reduce_post_kernel> reduce_post_kernel;
 
+    if (isDynamic) {
+        std::shared_ptr<op::util::ReductionBase> reduce_op;
+        switch (algorithm) {
+            case Algorithm::ReduceL1:
+                reduce_op = std::make_shared<op::v4::ReduceL1>();
+                break;
+            case Algorithm::ReduceL2:
+                reduce_op = std::make_shared<op::v4::ReduceL2>();
+                break;
+            case Algorithm::ReduceAnd:
+                reduce_op = std::make_shared<op::v1::ReduceLogicalAnd>();
+                break;
+            case Algorithm::ReduceOr:
+                reduce_op = std::make_shared<op::v1::ReduceLogicalOr>();
+                break;
+            case Algorithm::ReduceMax:
+                reduce_op = std::make_shared<op::v1::ReduceMax>();
+                break;
+            case Algorithm::ReduceMean:
+                reduce_op = std::make_shared<op::v1::ReduceMean>();
+                break;
+            case Algorithm::ReduceMin:
+                reduce_op = std::make_shared<op::v1::ReduceMin>();
+                break;
+            case Algorithm::ReduceProd:
+                reduce_op = std::make_shared<op::v1::ReduceProd>();
+                break;
+            case Algorithm::ReduceSum:
+                reduce_op = std::make_shared<op::v1::ReduceSum>();
+                break;
+        }
+
+        reduce_op->set_argument(1, op::v0::Constant::create(element::i64, ov::Shape{raw_axes.size()}, std::vector<int64_t>(raw_axes.begin(), raw_axes.end()))->output(0));
+        if (auto arithmetic = ov::as_type<op::util::ArithmeticReductionKeepDims>(reduce_op.get())) {
+            arithmetic->set_keep_dims(keep_dims);
+        } else if (auto logical = ov::as_type<op::util::LogicalReductionKeepDims>(reduce_op.get())) {
+            logical->set_keep_dims(keep_dims);
+        }
+
+        shapeInference->set_ov_core_node(reduce_op);
+    }
+
 in_buf.check_position();  // TODO: remove
 }
 

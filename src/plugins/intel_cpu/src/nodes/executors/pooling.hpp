@@ -44,6 +44,10 @@ struct PoolingAttrs {
     /// Effective dilation. Used to define correct dilation for OneDNN.
     /// For OneDNN default dilation is vector of zero
     std::vector<ptrdiff_t> effective_dilation;
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 };
 
 class PoolingExecutor {

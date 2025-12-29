@@ -66,7 +66,7 @@ public:
      */
     [[nodiscard]] virtual port_mask_t get_port_mask() const = 0;
 
-    virtual void set_ov_core_node(std::shared_ptr<ov::Node> node) {};  // TODO make = 0;
+    virtual void set_ov_core_node(const std::shared_ptr<ov::Node>& node) {};  // TODO make = 0;
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS(ov::intel_cpu::IShapeInfer)
 

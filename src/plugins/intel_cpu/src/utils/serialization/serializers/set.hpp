@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2025 Intel Corporation
+// Copyright (C) 2018-2026 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -8,8 +8,8 @@
 #include <type_traits>
 #include <unordered_set>
 
-#include "buffers.hpp"
-#include "helpers.hpp"
+#include "../buffers.hpp"
+#include "../helpers.hpp"
 // #include "openvino/core/axis_set.hpp"
 
 namespace ov::intel_cpu {

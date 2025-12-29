@@ -57,6 +57,8 @@
 #include "shape_inference/shape_inference_status.hpp"
 #include "utils/general_utils.h"
 #include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/polymorphic_serializer.hpp"
+#include "utils/serialization/string_serializer.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include "nodes/executors/acl/acl_deconv.hpp"
@@ -75,7 +77,7 @@ using DefaultDeconvDescs =
     std::pair<dnnl::convolution_backward_data::primitive_desc, dnnl::convolution_forward::primitive_desc>;
 using Int8DeconvDesc = dnnl::deconvolution_forward::primitive_desc;
 
-namespace {
+// namespace {
 
 struct DeconvKey {
     DnnlMemoryDescCPtr inp0;
@@ -165,9 +167,10 @@ public:
         return std::make_shared<DeconvolutionShapeInfer>(m_op);
     }
 
-private:
     class DeconvolutionShapeInfer : public IShapeInfer {
     public:
+        explicit DeconvolutionShapeInfer() = default;
+
         explicit DeconvolutionShapeInfer(const std::shared_ptr<ov::Node>& op)
             : m_shape_infer(make_shape_inference(op)),
               m_port_mask((op->get_input_size() > 2) ? PortMask(2) : EMPTY_PORT_MASK) {}
@@ -189,14 +192,31 @@ private:
             return m_port_mask;
         };
 
+        void set_ov_core_node(const std::shared_ptr<ov::Node>& node) override {
+            m_shape_infer->set_ov_core_node(node);
+        }
+
+        DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::node::DeconvolutionShapeInferFactory::DeconvolutionShapeInfer)
+
+        void save(BinaryOutputBuffer& out_buf) const override {
+            out_buf << m_shape_infer;
+            out_buf << m_port_mask;
+        }
+
+        void load(BinaryInputBuffer& in_buf) override {
+            in_buf >> m_shape_infer;
+            in_buf >> m_port_mask;
+        }
+
     private:
-        ShapeInferPtr m_shape_infer;
-        const port_mask_t m_port_mask;
+        ShapeInferPtr m_shape_infer = nullptr;
+        port_mask_t m_port_mask = 0U;
     };
 
+private:
     std::shared_ptr<ov::Node> m_op;
 };
-}  // namespace
+// }  // namespace
 
 bool Deconvolution::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,
                                          std::string& errorMessage) noexcept {
@@ -1361,6 +1381,8 @@ void Deconvolution::save(BinaryOutputBuffer& out_buf) const {
 
     out_buf.dump_position();  // TODO: remove
 
+    out_buf << deconvAttrs;
+    out_buf << withGroups;
     out_buf << isDW;
     out_buf << isInt8;
     out_buf << autoPad;
@@ -1372,7 +1394,6 @@ void Deconvolution::save(BinaryOutputBuffer& out_buf) const {
     out_buf << dnnlCompatibleWeiDims;
     out_buf << expectedBiasDims;
     out_buf << useACL;
-    out_buf << deconvAttrs;
     out_buf << inShape;
     out_buf << outShape;
     // out_buf << pAttr;
@@ -1384,12 +1405,22 @@ void Deconvolution::save(BinaryOutputBuffer& out_buf) const {
     out_buf << is1x1;
     out_buf << isConstOutShape;
 
+    // if (isDynamic) {
+    //     out_buf << deconvAttrs.stride;
+    //     out_buf << deconvAttrs.dilation;
+    //     out_buf << deconvAttrs.paddingL;
+    //     out_buf << deconvAttrs.paddingR;
+    //     out_buf << deconvAttrs.outputPadding;
+    // }
+
     out_buf.dump_position();  // TODO: remove
 }
 
 void Deconvolution::load(BinaryInputBuffer& in_buf) {
     in_buf.check_position();  // TODO: remove
 
+    in_buf >> deconvAttrs;
+    in_buf >> withGroups;
     in_buf >> isDW;
     in_buf >> isInt8;
     in_buf >> autoPad;
@@ -1401,7 +1432,6 @@ void Deconvolution::load(BinaryInputBuffer& in_buf) {
     in_buf >> dnnlCompatibleWeiDims;
     in_buf >> expectedBiasDims;
     in_buf >> useACL;
-    in_buf >> deconvAttrs;
     in_buf >> inShape;
     in_buf >> outShape;
     // in_buf >> pAttr;
@@ -1413,7 +1443,60 @@ void Deconvolution::load(BinaryInputBuffer& in_buf) {
     in_buf >> is1x1;
     in_buf >> isConstOutShape;
 
+    if (isDynamic) {
+        std::shared_ptr<op::util::ConvolutionBackPropBase> conv_bp_ptr;
+        if (algorithm == Algorithm::DeconvolutionCommon) {
+            conv_bp_ptr = std::make_shared<op::v1::ConvolutionBackpropData>();
+        } else if (algorithm == Algorithm::DeconvolutionGrouped) {
+            conv_bp_ptr = std::make_shared<op::v1::GroupConvolutionBackpropData>();
+        } else {
+            CPU_NODE_THROW("deserialized unsupported operation type '", static_cast<uint8_t>(algorithm), "'");
+        }
+
+        // Strides strides;
+        // Strides dilations;
+        // CoordinateDiff pads_begin;
+        // CoordinateDiff pads_end;
+        // CoordinateDiff output_padding;
+        // op::PadType auto_pad;
+        // // size_t num_spatial;
+
+        // in_buf >> strides;
+        // in_buf >> dilations;
+        // in_buf >> pads_begin;
+        // in_buf >> pads_end;
+        // in_buf >> output_padding;
+        // in_buf >> auto_pad;
+        // // in_buf >> num_spatial;
+
+        // conv_bp_ptr->set_strides(strides);
+        // conv_bp_ptr->set_dilations(dilations);
+        // conv_bp_ptr->set_pads_begin(pads_begin);
+        // conv_bp_ptr->set_pads_end(pads_end);
+        // conv_bp_ptr->set_output_padding(output_padding);
+        // conv_bp_ptr->set_auto_pad(auto_pad);
+        // // conv_bp_ptr->m_num_spatial = num_spatial;
+
+        conv_bp_ptr->set_strides(ov::Strides(deconvAttrs.stride.begin(), deconvAttrs.stride.end()));
+        conv_bp_ptr->set_dilations(ov::Strides(deconvAttrs.dilation.begin(), deconvAttrs.dilation.end()));
+        conv_bp_ptr->set_pads_begin(deconvAttrs.paddingL);
+        conv_bp_ptr->set_pads_end(deconvAttrs.paddingR);
+        conv_bp_ptr->set_output_padding(deconvAttrs.outputPadding);
+        conv_bp_ptr->set_auto_pad(autoPad ? op::PadType::SAME_LOWER : op::PadType::EXPLICIT);
+
+        if (externOutShape) {
+            // auto output_shape = std::make_shared<op::v0::Constant>(element::i32, ov::Shape{lastOutputSpatialDims.size()}, lastOutputSpatialDims.data());
+            std::vector<int64_t> new_shape(lastOutputSpatialDims.begin(), lastOutputSpatialDims.end());
+            auto output_shape = std::make_shared<op::v0::Constant>(element::i64, ov::Shape{lastOutputSpatialDims.size()}, new_shape.data());
+            conv_bp_ptr->set_argument(2, output_shape);
+        }
+
+        shapeInference->set_ov_core_node(conv_bp_ptr);
+    }
+
     in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu::node
+
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::node::DeconvolutionShapeInferFactory::DeconvolutionShapeInfer)

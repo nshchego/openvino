@@ -336,8 +336,8 @@ public:
         return EMPTY_PORT_MASK;
     }
 
-    void set_ov_core_node(std::shared_ptr<ov::Node> node) override {
-        m_node = std::move(node);
+    void set_ov_core_node(const std::shared_ptr<ov::Node>& node) override {
+        m_node = node;
     }
 
     DECLARE_SERIALIZATION_OBJECT_MEMBERS_OVERRIDE(ov::intel_cpu::ShapeInferBase)
@@ -510,6 +510,8 @@ public:
 /** @brief Base shape inference object implementing the IStaticShapeInfer with padding support. */
 class ShapeInferPaddingBase : public ShapeInferBase {
 public:
+    explicit ShapeInferPaddingBase() = default;
+
     explicit ShapeInferPaddingBase(std::shared_ptr<ov::Node> node) : ShapeInferBase(std::move(node)) {}
 
     const ov::CoordinateDiff& get_pads_begin() override {
@@ -534,6 +536,7 @@ public:
     }
 
     void load(BinaryInputBuffer& in_buf) override {
+        ShapeInferBase::load(in_buf);
         in_buf.check_position();  // TODO: remove
 
         in_buf >> m_pads_begin;
@@ -565,6 +568,14 @@ public:
     [[nodiscard]] port_mask_t get_port_mask() const override {
         return MASK;
     }
+
+    static const std::string& get_type_info_s() {
+        static const std::string type_name =
+            std::string("ov::intel_cpu::ShapeInferPaddingTA<") + typeid(TOp).name() + "_" + std::to_string(MASK) + ">";
+        return type_name;
+    }
+
+    const std::string& get_type_info() const override { return get_type_info_s(); }
 };
 
 /**
@@ -582,6 +593,14 @@ public:
                                                   [[maybe_unused]] const ov::ITensorAccessor& acc) override {
         return {shape_infer(static_cast<TOp*>(m_node.get()), input_shapes, m_pads_begin, m_pads_end)};
     }
+
+    static const std::string& get_type_info_s() {
+        static const std::string type_name =
+            std::string("ov::intel_cpu::ShapeInferPaddingTA<") + typeid(TOp).name() + "_" + std::to_string(EMPTY_PORT_MASK) + ">";
+        return type_name;
+    }
+
+    const std::string& get_type_info() const override { return get_type_info_s(); }
 };
 
 /**
@@ -878,11 +897,18 @@ std::shared_ptr<IStaticShapeInfer> make_shape_inference(std::shared_ptr<ov::Node
 //         StaticInstance<InstanceCreator<BinaryInputBuffer, ShapeInferTA<ov::op::v1::Broadcast, 6U>>>::get_instance().instantiate();
 // }  // namespace ov::intel_cpu
 
-using ShapeInferTA_Broadcast_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Broadcast_6)
+// TODO: include into OV_OP_SHAPE_INFER_NON_TEMPLATE_REG ?
 
-using ShapeInferTA_Concat_0 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Concat, 0U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Concat_0)
+#define BIND_BINARY_BUFFER_WITH_SI(OP, VER, SHAPE_INFER, MASK) \
+    using SHAPE_INFER ## OP ## VER = ov::intel_cpu::SHAPE_INFER<ov::op::VER::OP, MASK>; \
+    BIND_BINARY_BUFFER_WITH_TYPE(SHAPE_INFER ## OP ## VER)
+
+
+// using ShapeInferTA_Broadcast_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Broadcast, 6U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Broadcast_6)
+
+// using ShapeInferTA_Concat_0 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Concat, 0U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Concat_0)
 
 using ShapeInferTA_EmbeddingBagOffsetsSum_0 = ov::intel_cpu::ShapeInferTA<ov::op::v3::EmbeddingBagOffsetsSum, 0U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_EmbeddingBagOffsetsSum_0)
@@ -890,8 +916,8 @@ BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_EmbeddingBagOffsetsSum_0)
 using ShapeInferTA_GridSample_0 = ov::intel_cpu::ShapeInferTA<ov::op::v9::GridSample, 0U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_GridSample_0)
 
-using ShapeInferTA_ReduceSum_2 = ov::intel_cpu::ShapeInferTA<ov::op::v1::ReduceSum, 2U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ReduceSum_2)
+// using ShapeInferTA_ReduceSum_2 = ov::intel_cpu::ShapeInferTA<ov::op::v1::ReduceSum, 2U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ReduceSum_2)
 
 using ShapeInferTA_ScatterElementsUpdate_8 = ov::intel_cpu::ShapeInferTA<ov::op::v3::ScatterElementsUpdate, 8U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ScatterElementsUpdate_8)
@@ -899,19 +925,94 @@ BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_ScatterElementsUpdate_8)
 using ShapeInferTA_Slice_30 = ov::intel_cpu::ShapeInferTA<ov::op::v8::Slice, 30U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Slice_30)
 
-using ShapeInferTA_Split_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Split, 6U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Split_6)
+// using ShapeInferTA_Split_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::Split, 6U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Split_6)
 
-using ShapeInferTA_Tile_2 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Tile, 2U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Tile_2)
+// using ShapeInferTA_Tile_2 = ov::intel_cpu::ShapeInferTA<ov::op::v0::Tile, 2U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_Tile_2)
 
 using ShapeInferTA_TopK_2 = ov::intel_cpu::ShapeInferTA<ov::op::v11::TopK, 2U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_TopK_2)
 
-using ShapeInferTA_VariadicSplit_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::VariadicSplit, 6U>;
-BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_VariadicSplit_6)
+// using ShapeInferTA_VariadicSplit_6 = ov::intel_cpu::ShapeInferTA<ov::op::v1::VariadicSplit, 6U>;
+// BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_VariadicSplit_6)
 
 using ShapeInferTA_SearchSorted_0 = ov::intel_cpu::ShapeInferTA<ov::op::v15::SearchSorted, 0U>;
 BIND_BINARY_BUFFER_WITH_TYPE(ShapeInferTA_SearchSorted_0)
 
 BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferCopy)
+BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferFallback)
+// BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ShapeInferPaddingBase)
+
+// BIND_BINARY_BUFFER_WITH_SI(ConvolutionBackpropData, v1, ShapeInferPaddingTA, ov::util::bit::mask(2))
+// BIND_BINARY_BUFFER_WITH_SI(GroupConvolutionBackpropData, v1, ShapeInferPaddingTA, ov::util::bit::mask(2))
+// BIND_BINARY_BUFFER_WITH_SI(Interpolate, v11, ShapeInferPaddingTA, ov::util::bit::mask(1, 2))
+
+
+// opset1
+BIND_BINARY_BUFFER_WITH_SI(AvgPool, v1, ShapeInferPaddingTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(BinaryConvolution, v1, ShapeInferPaddingTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(Broadcast, v1, ShapeInferTA, ov::util::bit::mask(1, 2))
+BIND_BINARY_BUFFER_WITH_SI(Concat, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(ConvolutionBackpropData, v1, ShapeInferPaddingTA, ov::util::bit::mask(2))
+BIND_BINARY_BUFFER_WITH_SI(CTCGreedyDecoder, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(DeformableConvolution, v1, ShapeInferPaddingTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(DeformablePSROIPooling, v1, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(DepthToSpace, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(DetectionOutput, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(FakeQuantize, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(Gather, v1, ShapeInferTA, ov::util::bit::mask(2))
+BIND_BINARY_BUFFER_WITH_SI(GatherTree, v1, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(GroupConvolution, v1, ShapeInferPaddingTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(GroupConvolutionBackpropData, v1, ShapeInferPaddingTA, ov::util::bit::mask(2))
+BIND_BINARY_BUFFER_WITH_SI(Interpolate, v0, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(LSTMCell, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(MatMul, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(MaxPool, v1, ShapeInferPaddingTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(NonMaxSuppression, v1, ShapeInferTA, ov::util::bit::mask(2))
+BIND_BINARY_BUFFER_WITH_SI(OneHot, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(Pad, v1, ShapeInferTA, ov::util::bit::mask(1, 2))
+BIND_BINARY_BUFFER_WITH_SI(PriorBox, v0, ShapeInferTA, ov::util::bit::mask(0))
+BIND_BINARY_BUFFER_WITH_SI(PriorBoxClustered, v0, ShapeInferTA, ov::util::bit::mask(0))
+BIND_BINARY_BUFFER_WITH_SI(Proposal, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(Range, v0, ShapeInferTA, ov::util::bit::mask(0, 1, 2))
+BIND_BINARY_BUFFER_WITH_SI(ReduceLogicalAnd, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReduceLogicalOr, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReduceMax, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReduceMean, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReduceMin, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReduceProd, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReduceSum, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(Reshape, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(Reverse, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(ReverseSequence, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(RNNCell, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(Select, v1, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(ShapeOf, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(ShuffleChannels, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(SpaceToDepth, v0, ShapeInferTA, ov::util::bit::mask())
+BIND_BINARY_BUFFER_WITH_SI(Split, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(Squeeze, v0, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(StridedSlice, v1, ShapeInferTA, ov::util::bit::mask(1, 2, 3))
+BIND_BINARY_BUFFER_WITH_SI(Tile, v0, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(TopK, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(Transpose, v1, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(Unsqueeze, v0, ShapeInferTA, ov::util::bit::mask(1))
+BIND_BINARY_BUFFER_WITH_SI(VariadicSplit, v1, ShapeInferTA, ov::util::bit::mask(1, 2))
+
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::BatchNormInference, ShapeInferBase),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::Convert, ShapeInferCopy),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::HardSigmoid, ShapeInferBase),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v1::LogicalNot, ShapeInferCopy),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::LRN, ShapeInferBase),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::NormalizeL2, ShapeInferBase),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::PRelu, ShapeInferBase),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v0::Selu, ShapeInferBase),
+// OV_OP_SHAPE_INFER_NON_TEMPLATE_REG(op::v1::Softmax, ShapeInferCopy),
+// // Internal operations
+// BIND_BINARY_BUFFER_WITH_SI(ov::op::internal::AUGRUCell, ShapeInferTA, util::bit::mask()),
+// BIND_BINARY_BUFFER_WITH_SI(ov::op::internal::AUGRUSequence, ShapeInferTA, util::bit::mask()),
+// BIND_BINARY_BUFFER_WITH_SI(ov::op::internal::RMSNorm, ShapeInferTA, util::bit::mask(1)),
+// BIND_BINARY_BUFFER_WITH_SI(ov::op::internal::GLU, ShapeInferTA, util::bit::mask())
+
+#undef BIND_BINARY_BUFFER_WITH_SI

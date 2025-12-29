@@ -94,7 +94,7 @@ public:
     void executeDynamicImpl(const dnnl::stream& strm) override;
     bool canBeExecutedInInt8() const override;
     void keepWeightsNonTransposed(bool weightsNonTransposed) {
-        this->attrs.weightsNonTransposed = weightsNonTransposed;
+        m_attrs.weightsNonTransposed = weightsNonTransposed;
     }
 
     void fuseDecompressionMultiply(const MemoryCPtr& memory);
@@ -133,9 +133,9 @@ private:
     void execTensorParallelSync();
     void needSplitMemoryForTensorParallel();
 
-    FCAttrs attrs;
+    FCAttrs m_attrs;
     MemoryArgs memory;
-    ExecutorFactoryPtr<FCAttrs> factory;
+    ExecutorFactoryPtr<FCAttrs> m_exec_factory;
     ExecutorPtr executor = nullptr;
 
     FCTensorParallelConfig tp_cfg;

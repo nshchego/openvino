@@ -387,5 +387,3 @@ void CpuBlockedMemoryDesc::load(BinaryInputBuffer& in_buf) {
 }
 
 }  // namespace ov::intel_cpu
-
-BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::CpuBlockedMemoryDesc)
