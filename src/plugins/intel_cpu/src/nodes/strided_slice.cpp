@@ -36,7 +36,7 @@
 #include "openvino/op/strided_slice.hpp"
 #include "shape_inference/custom/strided_slice.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 

@@ -38,9 +38,9 @@
 #include "utils/general_utils.h"
 #include "utils/memory_stats_dump.hpp"
 #include "utils/model_utils.hpp"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/layout_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/string.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include <arm_compute/runtime/IScheduler.h>

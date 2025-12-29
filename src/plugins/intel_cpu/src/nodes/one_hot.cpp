@@ -29,7 +29,7 @@
 #include "selective_build.h"
 #include "shape_inference/custom/one_hot.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 
 namespace ov::intel_cpu::node {
 using in_type = element_type_traits<ov::element::i32>::value_type;

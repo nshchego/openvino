@@ -10,7 +10,7 @@
 #include "cpu_types.h"
 #include "memory_desc/cpu_blocked_memory_desc.h"
 #include "openvino/core/except.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu {
 

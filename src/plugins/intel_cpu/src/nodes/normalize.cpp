@@ -53,7 +53,7 @@
 #include "selective_build.h"
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>

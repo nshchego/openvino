@@ -25,8 +25,8 @@
 #include "openvino/runtime/tensor.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_status.hpp"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/string.hpp"
 
 namespace ov::intel_cpu::node {
 

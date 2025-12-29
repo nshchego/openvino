@@ -38,9 +38,9 @@
 #include "shape_inference/custom/matmul.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/serialization/map_serializer.hpp"
-#include "utils/serialization/polymorphic_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/map.hpp"
+#include "utils/serialization/serializers/polymorphic.hpp"
+#include "utils/serialization/serializers/string.hpp"
 
 BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory<ov::intel_cpu::MatMulAttrs>)
 const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::MatMulAttrs>::get_type_info_s() {

@@ -15,7 +15,7 @@
 #include "memory_desc/cpu_memory_desc.h"
 #include "onednn/iml_type_mapper.h"
 #include "openvino/core/coordinate_diff.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu {
 

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <vector>
 // #include "utils/serialization/buffers.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::Extensions::Cpu {
 

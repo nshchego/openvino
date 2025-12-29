@@ -28,7 +28,7 @@
 #include "openvino/op/convert.hpp"
 #include "shape_inference/shape_inference_pass_through.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 
 using namespace dnnl;
 

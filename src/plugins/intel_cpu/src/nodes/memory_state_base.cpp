@@ -9,7 +9,7 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/node.hpp"
 #include "openvino/op/util/variable_extension.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/string.hpp"
 
 using namespace ov::intel_cpu::node;
 

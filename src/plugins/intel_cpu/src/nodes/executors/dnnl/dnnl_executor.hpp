@@ -20,6 +20,7 @@
 #include "nodes/executors/memory_arguments.hpp"
 #include "onednn/iml_type_mapper.h"
 #include "utils/debug_capabilities.h"
+#include "utils/serialization/serializers/executors.hpp"
 
 namespace ov::intel_cpu {
 

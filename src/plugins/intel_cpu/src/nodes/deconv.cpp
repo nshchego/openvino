@@ -56,9 +56,9 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "shape_inference/shape_inference_status.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/polymorphic_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/polymorphic.hpp"
+#include "utils/serialization/serializers/string.hpp"
 
 #if defined(OV_CPU_WITH_ACL)
 #    include "nodes/executors/acl/acl_deconv.hpp"

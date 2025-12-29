@@ -35,8 +35,8 @@
 #include "ov_ops/multiclass_nms_ie_internal.hpp"
 #include "shape_inference/shape_inference_internal_dyn.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace ov;
 

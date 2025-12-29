@@ -6,38 +6,12 @@
 
 // #include <vector>
 // #include <type_traits>
-#include "buffers.hpp"
-// #include "helpers.hpp"
+#include "../buffers.hpp"
+// #include "../helpers.hpp"
 // #include "intel_gpu/runtime/layout.hpp"
 
 namespace ov::intel_cpu {
 
-template <typename BufferType>
-class Serializer<BufferType, ov::PartialShape, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
-public:
-    static void save(BufferType& buffer, const ov::PartialShape& partial_shape) {
-        std::vector<ov::Dimension> dimensions(partial_shape);
-        buffer << dimensions.size();
-        for (const auto& dimension : dimensions) {
-            buffer << dimension.get_interval().get_min_val();
-            buffer << dimension.get_interval().get_max_val();
-        }
-    }
-};
-
-template <typename BufferType>
-class Serializer<BufferType, ov::PartialShape, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value>::type> {
-public:
-    static void load(BufferType& buffer, ov::PartialShape& partial_shape) {
-        size_t num_dimensions;
-        buffer >> num_dimensions;
-        for (size_t i = 0lu; i < num_dimensions; i++) {
-            ov::Interval::value_type min_val, max_val;
-            buffer >> min_val >> max_val;
-            partial_shape.push_back(ov::Dimension(min_val, max_val));
-        }
-    }
-};
 
 // template <typename BufferType>
 // class Serializer<BufferType, cldnn::format_traits, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {

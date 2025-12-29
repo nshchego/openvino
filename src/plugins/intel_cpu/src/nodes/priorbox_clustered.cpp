@@ -26,7 +26,7 @@
 #include "openvino/op/prior_box_clustered.hpp"
 #include "shape_inference/custom/priorbox_clustered.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu::node {
 bool PriorBoxClustered::isSupportedOperation(const std::shared_ptr<const ov::Node>& op,

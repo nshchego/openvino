@@ -13,7 +13,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "openvino/op/op.hpp"
 #include "transformations/itt.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/string.hpp"
 
 namespace ov::intel_cpu {
 

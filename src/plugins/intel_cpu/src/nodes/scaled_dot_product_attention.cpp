@@ -38,7 +38,7 @@
 #include "transformations/cpu_opset/common/op/sdpa.hpp"
 #include "utils/general_utils.h"
 #include "utils/plain_tensor.hpp"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 
 #ifdef OPENVINO_ARCH_X86_64
 #    include "openvino/core/type/bfloat16.hpp"

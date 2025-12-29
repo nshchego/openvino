@@ -46,8 +46,8 @@
 #include "openvino/op/util/max_pool_base.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 // to access and change C pooling primitive desc internal padding field
 

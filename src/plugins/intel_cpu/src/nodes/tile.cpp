@@ -25,7 +25,7 @@
 #include "openvino/op/tile.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/model_utils.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu::node {
 

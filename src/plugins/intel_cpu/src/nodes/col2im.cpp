@@ -25,7 +25,7 @@
 #include "openvino/reference/col2im.hpp"
 #include "selective_build.h"
 #include "shape_inference/shape_inference_cpu.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu::node {
 Col2Im::Col2Im(const std::shared_ptr<ov::Node>& op, const GraphContext::CPtr& context)

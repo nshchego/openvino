@@ -38,8 +38,8 @@
 #include "openvino/op/idft.hpp"
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/map_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/map.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::cpu::x64;

@@ -12,8 +12,8 @@
 #include "cpu_types.h"
 #include "openvino/core/except.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu {
 

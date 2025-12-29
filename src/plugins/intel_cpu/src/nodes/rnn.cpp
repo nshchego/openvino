@@ -60,10 +60,10 @@
 #include "transformations/utils/utils.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/polymorphic_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/polymorphic.hpp"
+#include "utils/serialization/serializers/string.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 

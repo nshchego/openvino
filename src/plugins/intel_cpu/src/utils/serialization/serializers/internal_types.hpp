@@ -6,7 +6,7 @@
 
 #include <bitset>
 
-#include "buffers.hpp"
+#include "../buffers.hpp"
 #include "openvino/core/type/element_type.hpp"
 
 namespace ov::intel_cpu {

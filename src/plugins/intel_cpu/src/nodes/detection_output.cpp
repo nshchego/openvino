@@ -31,7 +31,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/caseless.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 

@@ -6,6 +6,7 @@
 
 #include <unordered_map>
 #include <functional>
+#include <stdarg.h>
 
 #include "buffers.hpp"
 //#include "graph_context.h"
@@ -92,11 +93,14 @@ struct LoaderStorage {
     }
 
     const FuncType& get_load_function(const std::string& type) {
-        // printf("LoaderStorage::get_load_function type: '%s'\n", type.data());
+        printf("[ SER ] LoaderStorage::get_load_function type: '%s'\n", type.data());  // TODO: remove
         return m_functions_map.at(type);
     }
 
     void set_load_function(const ValueType& pair) {
+        // if (m_functions_map.find(pair.first) == m_functions_map.end()) {  // TODO: remove
+            printf("[ SER ] LoaderStorage::set_load_function '%s'\n", pair.first.data());
+        // }
         m_functions_map.insert(pair);  // TODO: Actually there is a one fn for different Keys. Change key to args list?
     }
 
@@ -110,6 +114,9 @@ private:
 
 template <typename BufferType>
 using def = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&)>>;
+
+// template <typename BufferType>
+// using VarLS = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&, ...)>>;
 
 // template <typename BufferType>
 // using dif = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&, dnnl::engine&)>>;
@@ -175,6 +182,17 @@ private:
             derived_ptr->load(buffer);
             dst_ptr.reset(derived_ptr.release());
         }});
+
+    // BufferBinder() {
+    //     VarLS<BufferType>::instance().set_load_function(
+    //             {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, ...) {
+    //         std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T());
+    //         va_list args;
+    //         va_start(args, dst_ptr);
+    //         derived_ptr->load(buffer, args);
+    //         va_end(args);
+    //         dst_ptr.reset(derived_ptr.release());
+    //     }});
     }
 
     BufferBinder(const BufferBinder&) = delete;

@@ -54,9 +54,9 @@
 #include "post_ops.hpp"
 #include "shape_inference/custom/convolution.hpp"
 #include "utils/debug_capabilities.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/map_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/map.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 

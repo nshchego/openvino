@@ -5,8 +5,8 @@
 #pragma once
 
 #include <string>
-#include "buffers.hpp"
-#include "helpers.hpp"
+#include "../buffers.hpp"
+#include "../helpers.hpp"
 
 namespace ov::intel_cpu {
 

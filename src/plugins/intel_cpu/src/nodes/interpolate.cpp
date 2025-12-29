@@ -50,7 +50,7 @@
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 #if defined(OPENVINO_ARCH_X86) || defined(OPENVINO_ARCH_X86_64)
 #    include <xbyak/xbyak.h>

@@ -271,7 +271,7 @@
 #include "utils.hpp"
 #include "utils/bit_util.hpp"
 // #include "utils/serialization/bind.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 // #include "utils/serialization/buffers.hpp"
 #include "variadic_split_shape_inference.hpp"
 // NOLINTEND(misc-include-cleaner)

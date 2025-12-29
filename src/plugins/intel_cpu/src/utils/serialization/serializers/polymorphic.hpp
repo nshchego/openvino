@@ -8,11 +8,8 @@
 #include <exception>
 #include <type_traits>
 
-#include "buffers.hpp"
-#include "bind.hpp"
+#include "../buffers.hpp"
 #include "graph_context.h"
-#include "helpers.hpp"
-//#include "onednn/dnnl.h"
 
 namespace ov {
 namespace intel_cpu {
@@ -37,7 +34,7 @@ printf("-READ unique_ptr eng-\n");
         std::string type;
         buffer >> type;
         const auto load_func = dif<BufferType>::instance().get_load_function(type);
-        std::unique_ptr<void, VoidDeleter<void>> result;
+        std::unique_ptr<void, VoidDeleter<void>> result;  // TODO: use void* instead?
         load_func(buffer, result, engine);
         ptr.reset(static_cast<T*>(result.release()));
     }

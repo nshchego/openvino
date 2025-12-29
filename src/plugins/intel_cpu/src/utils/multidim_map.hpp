@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <unordered_map>
 
-#include "utils/serialization/map_serializer.hpp"
+#include "utils/serialization/serializers/map.hpp"
 
 namespace ov::intel_cpu {
 

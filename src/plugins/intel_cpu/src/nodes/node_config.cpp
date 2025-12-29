@@ -5,9 +5,9 @@
 #pragma once
 
 #include "node_config.h"
-#include "utils/serialization/polymorphic_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/polymorphic.hpp"
+#include "utils/serialization/serializers/string.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu {
 

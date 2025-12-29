@@ -16,7 +16,7 @@
 #include "openvino/core/except.hpp"
 #include "openvino/core/parallel.hpp"
 #include "utils/bfloat16.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 #if defined(OPENVINO_ARCH_X86_64)
 #    include "utils/cpu_utils.hpp"

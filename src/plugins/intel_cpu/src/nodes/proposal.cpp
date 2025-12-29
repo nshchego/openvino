@@ -23,7 +23,7 @@
 #include "openvino/core/type/element_type.hpp"
 #include "proposal.h"
 #include "shape_inference/shape_inference_cpu.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu::node {
 

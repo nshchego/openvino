@@ -91,10 +91,10 @@
 #include <vector>
 
 #include "utils/model_utils.hpp"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 #include "utils/serialization/snippets/linear_ir.hpp"
-#include "utils/serialization/map_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/map.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 #ifdef SNIPPETS_LIBXSMM_TPP
 #    include "snippets/lowered/pass/optimize_domain.hpp"

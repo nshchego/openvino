@@ -8,10 +8,10 @@
 #include <exception>
 #include <type_traits>
 
-#include "buffers.hpp"
-#include "bind.hpp"
+#include "../buffers.hpp"
+// #include "../bind.hpp"
 #include "graph_context.h"
-#include "helpers.hpp"
+// #include "../helpers.hpp"
 
 namespace ov {
 namespace intel_cpu {
@@ -48,8 +48,13 @@ namespace intel_cpu {
 //     }
 // };
 
-template <typename BufferType, typename ObjT, typename AttrT>
-class Serializer<BufferType, std::shared_ptr<ObjT>, typename std::enable_if<std::is_base_of_v<InputBuffer<BufferType>, BufferType> && std::is_base_of_v<Executor, ObjT>>::type> {
+template <typename BufferType>
+using ExecLS = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&, ...)>>;
+
+template <typename BufferType, typename ObjT>
+// template <typename BufferType, typename ObjT, typename ... Args>
+//template <typename BufferType, typename ObjT, typename AttrT>
+class Serializer<BufferType, std::shared_ptr<ObjT>, typename std::enable_if_t<std::is_base_of_v<InputBuffer<BufferType>, BufferType> && std::is_base_of_v<Executor, ObjT>>> {
 public:
 //     static void load(BufferType& buffer, std::shared_ptr<ObjT>& ptr, dnnl::engine& engine) {
 // // printf("-READ shared_ptr eng-\n");
@@ -63,7 +68,8 @@ public:
 //         }
 //     }
 
-    static void load(BufferType& buffer, std::shared_ptr<ObjT>& ptr, ...) {
+    template <typename BufferType, typename ObjT, typename ... Args>
+    static void load(BufferType& buffer, std::shared_ptr<ObjT>& ptr, Args ... args) {
         uint8_t not_null;
         buffer >> not_null;
         if (not_null == 0) {
@@ -74,9 +80,9 @@ public:
         std::string type;
         buffer >> type;
         if (type.compare("NONE") != 0) {
-            const auto load_func = dif<BufferType>::instance().get_load_function(type);
+            const auto load_func = ExecLS<BufferType>::instance().get_load_function(type);
             std::unique_ptr<void, VoidDeleter<void>> result;
-            load_func(buffer, result, context);
+            load_func(buffer, result, ...);
             ptr.reset(static_cast<ObjT*>(result.release()));
         }
     }
@@ -99,6 +105,29 @@ public:
 //             ptr.reset(static_cast<ObjT*>(result.release()));
 //         }
 //     }
+};
+
+template <typename BufferType, typename ObjT>
+class BufferBinder<BufferType, ObjT, typename std::enable_if_t<std::is_base_of_v<InputBuffer<BufferType>, BufferType> &&
+                                                            std::is_base_of_v<Executor, ObjT>>> {
+public:
+    static BufferBinder& instance() {
+        static BufferBinder instance;
+        return instance;
+    }
+
+private:
+    BufferBinder() {
+        VarLS<BufferType>::instance().set_load_function(
+                {ObjT::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, std::any& attr) {
+            std::unique_ptr<ObjT> derived_ptr = std::unique_ptr<ObjT>(new ObjT());
+            derived_ptr->load(buffer, attr);
+            dst_ptr.reset(derived_ptr.release());
+        }});
+    }
+
+    BufferBinder(const BufferBinder&) = delete;
+    void operator=(const BufferBinder&) = delete;
 };
 
 }  // namespace intel_cpu

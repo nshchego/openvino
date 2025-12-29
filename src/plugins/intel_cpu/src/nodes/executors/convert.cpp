@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "nodes/executors/executor.hpp"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 
 namespace ov::intel_cpu {
 

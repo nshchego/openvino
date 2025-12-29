@@ -32,8 +32,8 @@
 #include "openvino/op/adaptive_max_pool.hpp"
 #include "shape_inference/custom/adaptive_pooling.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 

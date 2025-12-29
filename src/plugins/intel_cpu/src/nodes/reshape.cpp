@@ -28,7 +28,7 @@
 #include "openvino/op/unsqueeze.hpp"
 #include "shape_inference/custom/reshape.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 

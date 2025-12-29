@@ -40,7 +40,7 @@
 #include "shape_inference/shape_inference_cpu.hpp"
 #include "utils/debug_capabilities.h"
 #include "utils/general_utils.h"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 
 using namespace dnnl;
 

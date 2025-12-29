@@ -34,7 +34,7 @@
 #include "utils/bfloat16.hpp"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
-#include "utils/serialization/string_serializer.hpp"
+#include "utils/serialization/serializers/string.hpp"
 
 using namespace dnnl;
 using namespace dnnl::impl;

@@ -57,10 +57,10 @@
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
 #include "utils/rt_info/memory_formats_attribute.hpp"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/polymorphic_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/polymorphic.hpp"
+#include "utils/serialization/serializers/string.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 using namespace dnnl;
 using namespace openvino;

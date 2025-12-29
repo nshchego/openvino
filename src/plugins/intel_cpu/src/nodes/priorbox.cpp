@@ -27,7 +27,7 @@
 #include "openvino/op/prior_box.hpp"
 #include "shape_inference/custom/priorbox.hpp"
 #include "utils/general_utils.h"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu::node {
 namespace {

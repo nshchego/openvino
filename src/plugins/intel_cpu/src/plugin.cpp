@@ -58,7 +58,7 @@
 #include "utils/denormals.hpp"
 #include "utils/model_utils.hpp"
 #include "utils/precision_support.h"
-#include "utils/serialization/internal_types.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
 #include "weights_cache.hpp"
 #include "xbyak/xbyak_util.h"
 

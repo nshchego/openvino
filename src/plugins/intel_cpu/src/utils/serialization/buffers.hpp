@@ -146,13 +146,14 @@ private:
         Serializer<BufferType, typename std::remove_reference<T>::type>::load(*Buffer<BufferType>::m_buffer,
                                                                               std::forward<T>(object),
                                                                               std::forward<OtherTypes>(args)...);
+    }
 
     // template <typename T, typename ... OtherTypes>
     // inline void process(T&& object, OtherTypes&& ... args) {
     //     Serializer<BufferType, typename std::remove_reference<T>::type, OtherTypes>::load(*Buffer<BufferType>::m_buffer,
     //                                                                           std::forward<T>(object),
     //                                                                           std::forward<OtherTypes>(args)...);
-    }
+    // }
 
     //GraphContext::Ptr m_context;
     // dnnl::engine& m_engine;

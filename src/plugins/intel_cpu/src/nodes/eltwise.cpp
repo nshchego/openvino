@@ -109,10 +109,10 @@
 #include "transformations/cpu_opset/common/op/swish_cpu.hpp"
 #include "utils/general_utils.h"
 #include "utils/model_utils.hpp"
-#include "utils/serialization/internal_types.hpp"
-#include "utils/serialization/polymorphic_serializer.hpp"
-#include "utils/serialization/string_serializer.hpp"
-#include "utils/serialization/vector_serializer.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/polymorphic.hpp"
+#include "utils/serialization/serializers/string.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 BIND_BINARY_BUFFER_WITH_TYPE(ov::intel_cpu::ExecutorFactory<ov::intel_cpu::EltwiseAttrs>)
 const std::string& ov::intel_cpu::ExecutorFactory<ov::intel_cpu::EltwiseAttrs>::get_type_info_s() {
