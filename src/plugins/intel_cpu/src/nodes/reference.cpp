@@ -34,6 +34,7 @@ Reference::Reference(const std::shared_ptr<ov::Node>& op, const GraphContext::CP
     : Node(op, context, NgraphShapeInferFactory(op)),
       m_ov_core_node(op),
       additionalErrorMessage(std::move(errorMessage)) {
+    printf("[ CPU ][ Reference ]\n");
     if (!op->has_evaluate()) {
         OPENVINO_THROW_NOT_IMPLEMENTED(
             "Cannot fallback on ngraph reference implementation. Ngraph::Node::evaluate() is not implemented for op: ",

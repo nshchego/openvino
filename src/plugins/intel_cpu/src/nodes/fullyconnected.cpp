@@ -306,19 +306,19 @@ void FullyConnected::needPrepareParamsForTensorParallel() {
         new_dims[dim] = splited_dim_vec[tp_cfg.w_rank];
         auto memory_desc = dst_desc->cloneWithNewDims(new_dims, true);
         tp_cfg.cached_dst->redefineDesc(std::move(memory_desc));
-        memory[ARG_DST] = tp_cfg.cached_dst;
+        m_memory[ARG_DST] = tp_cfg.cached_dst;
     }
 }
 
 void FullyConnected::prepareParams() {
     needPrepareParamsForTensorParallel();
 
-    executor->update(memory);
+    m_executor->update(m_memory);
     // @todo avoid updating implementation type in scope of every prepareParams call.
     // Currently the tests are implemented in such way that the actual used implementation type is changed
     // based on a shape and the expected implementation type is determined by the last shape.
     // I.e. for convolution it is different. The dymmy shape determines the expected implementation type.
-    getSelectedPrimitiveDescriptor()->setImplementationType(executor->implType());
+    getSelectedPrimitiveDescriptor()->setImplementationType(m_executor->implType());
 }
 
 void FullyConnected::initTensorParallelSync() {
@@ -352,7 +352,7 @@ void FullyConnected::execTensorParallelSync() {
         auto prec = dst->getPrecision();
 
         // cur dst
-        auto cur_dst = memory[ARG_DST];
+        auto cur_dst = m_memory[ARG_DST];
 
         auto split_parts = [](int len, int n) {
             int average = len / n;
@@ -434,7 +434,7 @@ void FullyConnected::execTensorParallelSync() {
 void FullyConnected::execute([[maybe_unused]] const dnnl::stream& strm) {
     initTensorParallelSync();
 
-    executor->execute(memory);
+    m_executor->execute(m_memory);
 
     execTensorParallelSync();
 }
@@ -478,7 +478,7 @@ bool FullyConnected::created() const {
 }
 
 void FullyConnected::toNumaNodeImpl(int numaID) {
-    executor->moveMemToNumaNode(numaID);
+    m_executor->moveMemToNumaNode(numaID);
 }
 
 const std::vector<impl_desc_type>& FullyConnected::getDefaultImplPriority() {
@@ -654,13 +654,13 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
         auto wgt = getSrcMemoryAtPort(WEIGHTS);
         auto dst = getDstMemoryAtPort(0);
         // src
-        memory[ARG_SRC] = getSrcMemoryAtPort(DATA);
+        m_memory[ARG_SRC] = getSrcMemoryAtPort(DATA);
         // wgt
         // split N direction
         tp_cfg.cached_splited_weight =
             m_attrs.weightsNonTransposed ? split_vertical(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size)
                                        : split_horizontal(m_context->getEngine(), wgt, 0, tp_cfg.w_rank, tp_cfg.w_size);
-        memory[ARG_WEI] = tp_cfg.cached_splited_weight;
+        m_memory[ARG_WEI] = tp_cfg.cached_splited_weight;
         // bias
         if (m_attrs.withBias) {
             auto bias = getSrcMemoryAtPort(BIAS);
@@ -669,23 +669,23 @@ void FullyConnected::needSplitMemoryForTensorParallel() {
         } else {
             tp_cfg.cached_splited_bias = MemoryDescUtils::makeEmptyMemory(m_context);
         }
-        memory[ARG_BIAS] = tp_cfg.cached_splited_bias;
+        m_memory[ARG_BIAS] = tp_cfg.cached_splited_bias;
         // dst
-        memory[ARG_DST] = getDstMemoryAtPort(0);
+        m_memory[ARG_DST] = getDstMemoryAtPort(0);
         tp_cfg.cached_dst = split_horizontal(m_context->getEngine(), dst, -1, tp_cfg.w_rank, tp_cfg.w_size, false);
 
-        if (auto it = memory.find(ARG_DST | ARG_ATTR_SCALES); it != memory.end()) {
+        if (auto it = m_memory.find(ARG_DST | ARG_ATTR_SCALES); it != m_memory.end()) {
             it->second = split_horizontal(m_context->getEngine(), it->second, 0, tp_cfg.w_rank, tp_cfg.w_size);
         }
 
-        if (auto it = memory.find(ARG_WEI | ARG_ATTR_SCALES); it != memory.end()) {
+        if (auto it = m_memory.find(ARG_WEI | ARG_ATTR_SCALES); it != m_memory.end()) {
             auto scale_mem = std::const_pointer_cast<IMemory>(it->second);
             it->second = m_attrs.weightsNonTransposed
                              ? split_vertical(m_context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size)
                              : split_horizontal(m_context->getEngine(), scale_mem, 0, tp_cfg.w_rank, tp_cfg.w_size);
         }
 
-        if (auto it = memory.find(ARG_WEI | ARG_ATTR_ZERO_POINTS); it != memory.end()) {
+        if (auto it = m_memory.find(ARG_WEI | ARG_ATTR_ZERO_POINTS); it != m_memory.end()) {
             auto zeropoint_mem = std::const_pointer_cast<IMemory>(it->second);
             auto element_num = zeropoint_mem->getSize() / zeropoint_mem->getPrecision().size();
             if (element_num != 1) {
@@ -716,15 +716,19 @@ void FullyConnected::createPrimitive() {
     for (const auto& entry : m_atoi) {
         const auto argumentId = entry.first;
         const auto inputId = entry.second;
-        memory[argumentId] = getSrcMemoryAtPort(inputId);
+        m_memory[argumentId] = getSrcMemoryAtPort(inputId);
     }
 
-    memory[ARG_DST] = getDstMemoryAtPort(0);
+    m_memory[ARG_DST] = getDstMemoryAtPort(0);
 
     needSplitMemoryForTensorParallel();
     // @todo should we preconfigure only for dynamic shapes?
     // Since for static shapes primitive is created in scope of compile_model() anyway
-    executor = m_exec_factory->make(memory);
+    if (m_executor) {
+        m_executor->update(m_memory);
+    } else {
+        m_executor = m_exec_factory->make(m_memory);
+    }
 
     Node::createPrimitive();
 }
@@ -770,8 +774,8 @@ void FullyConnected::load(BinaryInputBuffer& in_buf) {
     // in_buf >> executor;
     in_buf >> tp_cfg;
 
-    m_attrs.postOps = getPostOps(fusedWith);
-    m_exec_factory->set_attr(m_attrs);
+    // m_attrs.postOps = getPostOps(fusedWith);
+    // m_exec_factory->set_attr(m_attrs);
 
     in_buf.check_position();  // TODO: remove
 }

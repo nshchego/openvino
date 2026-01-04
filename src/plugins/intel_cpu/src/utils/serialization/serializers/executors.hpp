@@ -118,8 +118,9 @@ public:
 
 private:
     BufferBinder() {
+        printf("[ SER ] BufferBinder '%s'\n", typeid(T).name());
         VarLS<BufferType>::instance().set_load_function(
-                {ObjT::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, std::any& attr) {
+                {typeid(ObjT).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, std::any& attr) {
             std::unique_ptr<ObjT> derived_ptr = std::unique_ptr<ObjT>(new ObjT());
             derived_ptr->load(buffer, attr);
             dst_ptr.reset(derived_ptr.release());

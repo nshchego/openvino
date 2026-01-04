@@ -38,6 +38,10 @@ struct ConvAttrs {
     std::vector<float> dqScales;
 
     PostOps postOps;
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& ib);
 };
 
 using ConvConfig = executor::Config<ConvAttrs>;

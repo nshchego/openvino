@@ -56,10 +56,10 @@ public:
     void load(BinaryInputBuffer& in_buf) override;
 
 private:
-    const size_t m_out_rank = 0;
-    const std::vector<size_t> m_axes_vec = {};
+    size_t m_out_rank = 0;
+    std::vector<size_t> m_axes_vec = {};
     VectorDims m_outputShape = {};
-    const bool m_needReverse = true;
+    bool m_needReverse = true;
 };
 
 class TransposeShapeInferFactory : public ShapeInferFactory {

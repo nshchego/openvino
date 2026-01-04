@@ -49,20 +49,20 @@ namespace ov::intel_cpu {
 template <typename BufferType>
 struct SaverStorage {
     using SaveFunction = std::function<void(BufferType&, const void*)>;
-    using ValueType = typename std::unordered_map<std::string, SaveFunction>::value_type;
+    using ValueType = typename std::unordered_map<size_t, SaveFunction>::value_type;
 
     static SaverStorage<BufferType>& instance() {
         static SaverStorage<BufferType> instance;
         return instance;
     }
 
-    const SaveFunction& get_save_function(const std::string& type) const {
-        auto it = m_functions_map.find(type);
-        OPENVINO_ASSERT(it != m_functions_map.end(), "[SERIALIZER] Could nod find save function for object '", type, "'");
+    const SaveFunction& get_save_function(const size_t type_hash) const {
+        auto it = m_functions_map.find(type_hash);
+        OPENVINO_ASSERT(it != m_functions_map.end(), "[ SERIALIZER ] Could nod find save function for object '", type_hash, "'");
         return it->second;
     }
 
-    void set_save_function(const ValueType& pair) {  // TODO: static
+    void set_save_function(const ValueType& pair) {  // TODO: static?
         m_functions_map.insert(pair);
     }
 
@@ -71,7 +71,7 @@ private:
     SaverStorage(const SaverStorage&) = delete;
     void operator=(const SaverStorage&) = delete;
 
-    std::unordered_map<std::string, SaveFunction> m_functions_map;  // TODO: static
+    std::unordered_map<size_t, SaveFunction> m_functions_map;  // TODO: static?
 };
 // #define ...
 // SomeWrapper{
@@ -85,21 +85,23 @@ struct VoidDeleter {
 
 template <typename BufferType, typename FuncType>
 struct LoaderStorage {
-    using ValueType = typename std::unordered_map<std::string, FuncType>::value_type;
+    using ValueType = typename std::unordered_map<size_t, FuncType>::value_type;
 
     static LoaderStorage& instance() {
         static LoaderStorage instance;
         return instance;
     }
 
-    const FuncType& get_load_function(const std::string& type) {
-        printf("[ SER ] LoaderStorage::get_load_function type: '%s'\n", type.data());  // TODO: remove
-        return m_functions_map.at(type);
+    const FuncType& get_load_function(const size_t type_hash) {
+        printf("[ SER ] LoaderStorage::get_load_function type: '%zu'\n", type_hash);  // TODO: remove
+        auto it = m_functions_map.find(type_hash);
+        OPENVINO_ASSERT(it != m_functions_map.end(), "[ SERIALIZER ] Could nod find load function for object '", type_hash, "'");
+        return it->second;
     }
 
     void set_load_function(const ValueType& pair) {
         // if (m_functions_map.find(pair.first) == m_functions_map.end()) {  // TODO: remove
-            printf("[ SER ] LoaderStorage::set_load_function '%s'\n", pair.first.data());
+            printf("[ SER ] LoaderStorage::set_load_function '%zu'\n", pair.first);
         // }
         m_functions_map.insert(pair);  // TODO: Actually there is a one fn for different Keys. Change key to args list?
     }
@@ -109,7 +111,7 @@ private:
     LoaderStorage(const LoaderStorage&) = delete;
     void operator=(const LoaderStorage&) = delete;
 
-    std::unordered_map<std::string, FuncType> m_functions_map;
+    std::unordered_map<size_t, FuncType> m_functions_map;
 };
 
 template <typename BufferType>
@@ -126,7 +128,7 @@ using def = LoaderStorage<BufferType, std::function<void(BufferType&, std::uniqu
 
 class GraphContext;
 template <typename BufferType>
-using dif = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&, const std::shared_ptr<const GraphContext>&)>>;
+using LSGraphContext = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&, const std::shared_ptr<const GraphContext>&)>>;
 
 // template <typename BufferType>
 // using dif = LoaderStorage<BufferType, std::function<void(BufferType&, std::unique_ptr<void, VoidDeleter<void>>&, ...)>>;
@@ -139,7 +141,7 @@ template <typename BufferType, typename T, typename Enable = void>
 class BufferBinder;
 
 template <typename BufferType, typename T>
-class BufferBinder<BufferType, T, typename std::enable_if<std::is_base_of<OutputBuffer<BufferType>, BufferType>::value>::type> {
+class BufferBinder<BufferType, T, typename std::enable_if_t<std::is_base_of_v<OutputBuffer<BufferType>, BufferType>>> {
 public:
     static BufferBinder& instance() {
         static BufferBinder instance;
@@ -148,7 +150,7 @@ public:
 
 private:
     BufferBinder() {
-        SaverStorage<BufferType>::instance().set_save_function({T::get_type_info_s(), save});
+        SaverStorage<BufferType>::instance().set_save_function({typeid(T).hash_code(), save});
     }
 
     BufferBinder(const BufferBinder&) = delete;
@@ -166,8 +168,8 @@ private:
 };
 
 template <typename BufferType, typename T>
-class BufferBinder<BufferType, T, typename std::enable_if<std::is_base_of<InputBuffer<BufferType>, BufferType>::value &&
-                                                          std::is_default_constructible<T>::value>::type> {
+class BufferBinder<BufferType, T, typename std::enable_if_t<std::is_base_of_v<InputBuffer<BufferType>, BufferType> &&
+                                                            std::is_default_constructible<T>::value>> {
 public:
     static BufferBinder& instance() {
         static BufferBinder instance;
@@ -176,8 +178,9 @@ public:
 
 private:
     BufferBinder() {
+        printf("[ SER ] BufferBinder '%s'\n", typeid(T).name());
         def<BufferType>::instance().set_load_function(
-                {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
+                {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
             std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T());
             derived_ptr->load(buffer);
             dst_ptr.reset(derived_ptr.release());
@@ -185,7 +188,7 @@ private:
 
     // BufferBinder() {
     //     VarLS<BufferType>::instance().set_load_function(
-    //             {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, ...) {
+    //             {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, ...) {
     //         std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T());
     //         va_list args;
     //         va_start(args, dst_ptr);
@@ -210,35 +213,36 @@ public:
 
 private:
     BufferBinder() {
+        printf("[ SER ] BufferBinder '%s'\n", typeid(T).name());
         // def<BufferType>::instance().set_load_function(  // TODO: it should for default ctr only. Remove.
-        //         {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
+        //         {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr) {
         //     std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T());
         //     derived_ptr->load(buffer);
         //     dst_ptr.reset(derived_ptr.release());
         // }});
 
         // dif<BufferType>::instance().set_load_function(
-        //         {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, dnnl::engine& engine) {
+        //         {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, dnnl::engine& engine) {
         //     std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T(engine));
         //     derived_ptr->load(buffer);
         //     dst_ptr.reset(derived_ptr.release());
         // }});
 
         // dif<BufferType>::instance().set_load_function(
-        //         {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::Ptr& context) {
+        //         {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::Ptr& context) {
         //     std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T(context));
         //     derived_ptr->load(buffer);
         //     dst_ptr.reset(derived_ptr.release());
         // }});
 
         // dif<BufferType>::instance().set_load_function(
-        //     {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::Ptr& context) {
+        //     {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::Ptr& context) {
         //     std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T(buffer, context));
         //     dst_ptr.reset(derived_ptr.release());
         // }});
 
-        dif<BufferType>::instance().set_load_function(
-            {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::CPtr& context) {
+        LSGraphContext<BufferType>::instance().set_load_function(
+            {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, const GraphContext::CPtr& context) {
             std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T(buffer, context));
             // auto derived_ptr = std::unique_ptr<T>(new T(buffer, context));
             dst_ptr.reset(derived_ptr.release());
@@ -261,7 +265,7 @@ private:
 // private:
 //     BufferBinder() {
 //         diif<BufferType>::instance().set_load_function(
-//                 {T::get_type_info_s(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, ...) {
+//                 {typeid(T).hash_code(), [](BufferType& buffer, std::unique_ptr<void, VoidDeleter<void>>& dst_ptr, ...) {
 //             va_list a_list;
 //             std::unique_ptr<T> derived_ptr = std::unique_ptr<T>(new T(a_list));
 //             derived_ptr->load(buffer);

@@ -7,7 +7,9 @@
 #include <cstdint>
 
 #include "fullyconnected_config.hpp"
+#include "utils/serialization/serializers/any.hpp"
 #include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu {
 
@@ -20,7 +22,7 @@ void FCAttrs::save(BinaryOutputBuffer& out_buf) const {
     out_buf << dynamicQuantizationGroupSize;
     out_buf << constantWeights;
     out_buf << modelType;
-    // out_buf << postOps;
+    out_buf << postOps;
 
     out_buf.dump_position();  // TODO: remove
 }
@@ -34,7 +36,7 @@ void FCAttrs::load(BinaryInputBuffer& in_buf) {
     in_buf >> dynamicQuantizationGroupSize;
     in_buf >> constantWeights;
     in_buf >> modelType;
-    // in_buf >> postOps;
+    in_buf >> postOps;
 
     in_buf.check_position();  // TODO: remove
 }

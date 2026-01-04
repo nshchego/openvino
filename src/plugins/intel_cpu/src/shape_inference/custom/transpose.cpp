@@ -44,10 +44,10 @@ Result TransposeShapeInfer::infer(const std::vector<std::reference_wrapper<const
 void TransposeShapeInfer::save(BinaryOutputBuffer& out_buf) const {
     out_buf.dump_position();  // TODO: remove
 
-    // out_buf << m_out_rank;
-    // out_buf << m_axes_vec;
+    out_buf << m_out_rank;
+    out_buf << m_axes_vec;
     out_buf << m_outputShape;
-    // out_buf << m_needReverse;
+    out_buf << m_needReverse;
 
     out_buf.dump_position();  // TODO: remove
 }
@@ -55,10 +55,10 @@ void TransposeShapeInfer::save(BinaryOutputBuffer& out_buf) const {
 void TransposeShapeInfer::load(BinaryInputBuffer& in_buf) {
     in_buf.check_position();  // TODO: remove
 
-    // in_buf >> m_out_rank;
-    // in_buf >> m_axes_vec;
+    in_buf >> m_out_rank;
+    in_buf >> m_axes_vec;
     in_buf >> m_outputShape;
-    // in_buf >> m_needReverse;
+    in_buf >> m_needReverse;
 
     in_buf.check_position();  // TODO: remove
 }

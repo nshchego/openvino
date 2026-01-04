@@ -17,6 +17,8 @@
 #include "nodes/fake_quantize.h"
 #include "openvino/core/except.hpp"
 #include "openvino/core/type/element_type.hpp"
+#include "utils/serialization/serializers/internal_types.hpp"
+#include "utils/serialization/serializers/vector.hpp"
 
 namespace ov::intel_cpu {
 
@@ -455,6 +457,124 @@ PostOps getPostOps(const std::vector<NodePtr>& fused, ov::element::Type_t sumDat
     }
 
     return ops;
+}
+
+void ActivationPostOp::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_type;
+    out_buf << m_alpha;
+    out_buf << m_beta;
+    out_buf << m_gamma;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ActivationPostOp::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_type;
+    in_buf >> m_alpha;
+    in_buf >> m_beta;
+    in_buf >> m_gamma;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void ScaleShiftPostOp::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_type;
+    out_buf << m_scales;
+    out_buf << m_shifts;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void ScaleShiftPostOp::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_type;
+    in_buf >> m_scales;
+    in_buf >> m_shifts;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void FakeQuantizePostOp::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_type;
+    out_buf << m_cropLow;
+    out_buf << m_cropHigh;
+    out_buf << m_inputScale;
+    out_buf << m_inputShift;
+    out_buf << m_outputScale;
+    out_buf << m_outputShift;
+    out_buf << m_levels;
+    out_buf << m_isInputLowBroadcasted;
+    out_buf << m_isOutputHighBroadcasted;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void FakeQuantizePostOp::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_type;
+    in_buf >> m_cropLow;
+    in_buf >> m_cropHigh;
+    in_buf >> m_inputScale;
+    in_buf >> m_inputShift;
+    in_buf >> m_outputScale;
+    in_buf >> m_outputShift;
+    in_buf >> m_levels;
+    in_buf >> m_isInputLowBroadcasted;
+    in_buf >> m_isOutputHighBroadcasted;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void DepthwiseConvolutionPostOp::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_ih;
+    out_buf << m_iw;
+    out_buf << m_kernel;
+    out_buf << m_strides;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void DepthwiseConvolutionPostOp::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_ih;
+    in_buf >> m_iw;
+    in_buf >> m_kernel;
+    in_buf >> m_strides;
+
+    in_buf.check_position();  // TODO: remove
+}
+
+void SumPostOp::save(BinaryOutputBuffer& out_buf) const {
+    out_buf.dump_position();  // TODO: remove
+
+    out_buf << m_scale;
+    out_buf << m_zero_point;
+    out_buf << m_dataType;
+
+    out_buf.dump_position();  // TODO: remove
+}
+
+void SumPostOp::load(BinaryInputBuffer& in_buf) {
+    in_buf.check_position();  // TODO: remove
+
+    in_buf >> m_scale;
+    in_buf >> m_zero_point;
+    in_buf >> m_dataType;
+
+    in_buf.check_position();  // TODO: remove
 }
 
 }  // namespace ov::intel_cpu

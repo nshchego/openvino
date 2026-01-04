@@ -186,9 +186,9 @@ public:
         in_buf.check_position();  // TODO: Remove
     }
 
-    void set_attr(Attrs attrs) {
-        m_attrs = attrs;
-    }
+    // void set_attr(Attrs attrs) {
+    //     m_attrs = attrs;
+    // }
 
 private:
     /**

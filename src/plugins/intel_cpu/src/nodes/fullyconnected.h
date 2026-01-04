@@ -134,9 +134,9 @@ private:
     void needSplitMemoryForTensorParallel();
 
     FCAttrs m_attrs;
-    MemoryArgs memory;
+    MemoryArgs m_memory;
     ExecutorFactoryPtr<FCAttrs> m_exec_factory;
-    ExecutorPtr executor = nullptr;
+    ExecutorPtr m_executor = nullptr;
 
     FCTensorParallelConfig tp_cfg;
 };

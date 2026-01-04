@@ -59,6 +59,8 @@ struct ActivationPostOp {
         log,
     };
 
+    ActivationPostOp() = default;
+
     ActivationPostOp(const Type type,
                      const float alpha,
                      const float beta,
@@ -85,11 +87,15 @@ struct ActivationPostOp {
         return m_type;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
+
 private:
-    const Type m_type;
-    const float m_alpha;
-    const float m_beta;
-    const float m_gamma;
+    Type m_type;
+    float m_alpha;
+    float m_beta;
+    float m_gamma;
 };
 
 struct ScaleShiftPostOp {
@@ -126,6 +132,8 @@ struct ScaleShiftPostOp {
         bitwise_xor
     };
 
+    ScaleShiftPostOp() = default;
+
     ScaleShiftPostOp(const Type m_type, std::vector<float> _scales, std::vector<float> _shifts)
         : m_type(m_type),
           m_scales(std::move(_scales)),
@@ -143,14 +151,20 @@ struct ScaleShiftPostOp {
         return m_type;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
+
 private:
-    const Type m_type;
-    const std::vector<float> m_scales;
-    const std::vector<float> m_shifts;
+    Type m_type;
+    std::vector<float> m_scales;
+    std::vector<float> m_shifts;
 };
 
 struct FakeQuantizePostOp {
     enum class Type : uint8_t { binarization, quantization_only, quantization_dequantization };
+
+    FakeQuantizePostOp() = default;
 
     FakeQuantizePostOp(const Type type,
                        std::vector<float> cropLow,
@@ -213,21 +227,27 @@ struct FakeQuantizePostOp {
         return m_isOutputHighBroadcasted;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
+
 private:
-    const Type m_type;
-    const std::vector<float> m_cropLow;
-    const std::vector<float> m_cropHigh;
-    const std::vector<float> m_inputScale;
-    const std::vector<float> m_inputShift;
-    const std::vector<float> m_outputScale;
-    const std::vector<float> m_outputShift;
-    const size_t m_levels;
+    Type m_type;
+    std::vector<float> m_cropLow;
+    std::vector<float> m_cropHigh;
+    std::vector<float> m_inputScale;
+    std::vector<float> m_inputShift;
+    std::vector<float> m_outputScale;
+    std::vector<float> m_outputShift;
+    size_t m_levels;
     // necessary only for legacy post ops
     bool m_isInputLowBroadcasted;
     bool m_isOutputHighBroadcasted;
 };
 
 struct DepthwiseConvolutionPostOp {
+    DepthwiseConvolutionPostOp() = default;
+
     DepthwiseConvolutionPostOp(size_t ih, size_t iw, std::vector<size_t> kernel, std::vector<size_t> strides)
         : m_ih(ih),
           m_iw(iw),
@@ -250,6 +270,10 @@ struct DepthwiseConvolutionPostOp {
         return m_strides;
     }
 
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
+
 private:
     size_t m_ih;
     size_t m_iw;
@@ -258,6 +282,8 @@ private:
 };
 
 struct SumPostOp {
+    SumPostOp() = default;
+
     SumPostOp(float scale, int32_t zero_point, ov::element::Type_t dataType)
         : m_scale(scale),
           m_zero_point(zero_point),
@@ -274,6 +300,10 @@ struct SumPostOp {
     [[nodiscard]] ov::element::Type_t dataType() const {
         return m_dataType;
     }
+
+    void save(BinaryOutputBuffer& out_buf) const;
+
+    void load(BinaryInputBuffer& in_buf);
 
 private:
     float m_scale;
