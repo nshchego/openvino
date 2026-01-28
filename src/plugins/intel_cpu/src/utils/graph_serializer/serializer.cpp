@@ -84,6 +84,7 @@ private:
     bool append_rt_attribute(pugi::xml_node& node, const ov::RuntimeAttribute& attribute) override {
         bool result = false;
         if (const auto* wl_attr = ov::as_type<const ov::WeightlessCacheAttribute>(&attribute)) {
+            // if (m_weightless_mode) {
             m_weightless_const_writer.skip_weights(true);
 
             const auto& type_info = attribute.get_type_info();
@@ -95,6 +96,7 @@ private:
             node.append_attribute("original_size").set_value(wl_attr->original_size);
 
             result = true;
+            // }
         } else {
             result = util::XmlSerializer::append_rt_attribute(node, attribute);
         }

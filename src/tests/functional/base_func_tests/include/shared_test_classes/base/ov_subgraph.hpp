@@ -86,6 +86,10 @@ protected:
     bool m_check_models_caching = true;
     double rel_influence_coef = 1.f;
     ov::TensorVector m_expected_outputs;  // Stores reference outputs for reusing.
+    std::string m_xml_path;
+    std::string m_bin_path;
+    std::string m_cache_dir;
+    std::string m_cache_dir_weightless;
 
     virtual std::vector<ov::Tensor> calculate_refs();
     virtual std::vector<ov::Tensor> get_plugin_outputs();
