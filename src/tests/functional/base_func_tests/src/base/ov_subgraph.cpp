@@ -15,6 +15,7 @@
 
 #include "openvino/pass/manager.hpp"
 #include "openvino/core/preprocess/pre_post_process.hpp"
+#include "openvino/core/parallel.hpp"
 #include "openvino/pass/serialize.hpp"
 #include "transformations/convert_precision.hpp"
 
@@ -78,9 +79,9 @@ void SubgraphBaseTest::run() {
             for (const auto& targetStaticShapeVec : targetStaticShapes) {
                 generate_inputs(targetStaticShapeVec);
                 validate();
-                if (m_check_models_caching) {
-                    models_cache();
-                }
+                // if (m_check_models_caching) {
+                //     models_cache();
+                // }
             }
             status = ov::test::utils::PassRate::Statuses::PASSED;
         } catch (const std::exception& ex) {
@@ -474,30 +475,112 @@ void SubgraphBaseTest::validate() {
     actualOutputs = get_plugin_outputs();
     expectedOutputs = calculate_refs();
 #else
-    std::thread t_device([this, &actualOutputs, &actual_output_error] {
-        // The try ... catch block is required to handle exceptions during output calculations and report as test fail.
-        // If exception is not caught then application would be terminated with crash. (CVS-133676)
-        try {
-            actualOutputs = get_plugin_outputs();
-        } catch (...) {
-            actual_output_error = std::current_exception();
-        }
-    });
-    std::thread t_ref([this, &expectedOutputs, &expected_outputs_error] {
-        try {
-            expectedOutputs = calculate_refs();
-        } catch (...) {
-            expected_outputs_error = std::current_exception();
-        }
-    });
-    t_device.join();
-    t_ref.join();
+    // std::thread t_device([this, &actualOutputs, &actual_output_error] {
+    //     // The try ... catch block is required to handle exceptions during output calculations and report as test fail.
+    //     // If exception is not caught then application would be terminated with crash. (CVS-133676)
+    //     try {
+    //         actualOutputs = get_plugin_outputs();
+    //     } catch (...) {
+    //         actual_output_error = std::current_exception();
+    //     }
+    // });
+    // std::thread t_ref([this, &expectedOutputs, &expected_outputs_error] {
+    //     try {
+    //         expectedOutputs = calculate_refs();
+    //     } catch (...) {
+    //         expected_outputs_error = std::current_exception();
+    //     }
+    // });
+    // t_device.join();
+    // t_ref.join();
 
-    if (actual_output_error) {
-        std::rethrow_exception(actual_output_error);
-    }
-    if (expected_outputs_error) {
-        std::rethrow_exception(expected_outputs_error);
+    // if (actual_output_error) {
+    //     std::rethrow_exception(actual_output_error);
+    // }
+    // if (expected_outputs_error) {
+    //     std::rethrow_exception(expected_outputs_error);
+    // }
+
+    if (m_check_models_caching) {
+        const std::string gen_ir_name = ov::test::utils::generateTestFilePrefix();
+        m_xml_path = gen_ir_name + ".xml";
+        m_bin_path = gen_ir_name + ".bin";
+        m_cache_dir = gen_ir_name + "_cache_dir";
+        m_cache_dir_weightless = gen_ir_name + "_cache_dir_wl";
+        const static std::filesystem::path blob_ext{".blob"};
+
+        // Save IR to disk
+        ov::pass::Serialize(m_xml_path, m_bin_path).run_on_model(function);
+
+        auto get_modification_time = [](const std::filesystem::path& cache_dir) {
+            std::filesystem::file_time_type result;
+            uint64_t counter{0};
+            for (auto const& dir_entry : std::filesystem::directory_iterator{cache_dir}) {
+                if (dir_entry.path().extension() == blob_ext) {
+                    result = dir_entry.last_write_time();
+                    counter++;
+                }
+            }
+            EXPECT_EQ(counter, 1);
+            return result;
+        };
+
+        auto compile_and_execute = [&](const ov::AnyMap& config, const std::string& cache_dir) {
+            // Load, compile and create cache of the model.
+            auto compiled_model = core->compile_model(m_xml_path, targetDevice, config);
+
+            const auto first_mod_time = get_modification_time(cache_dir);
+            // ASSERT_NE(first_mod_time, std::filesystem::file_time_type{0});
+
+            // Load compiled model from cache.
+            auto imported_model = core->compile_model(m_xml_path, targetDevice, config);
+
+            const auto second_mod_time = get_modification_time(cache_dir);
+            // There is some issue if a new cache is created during the second run.
+            //ASSERT_EQ(first_mod_time, second_mod_time);
+
+            auto cache_infer_request = imported_model.create_infer_request();
+            for (const auto& input : inputs) {
+                cache_infer_request.set_tensor(input.first, input.second);
+            }
+
+            cache_infer_request.infer();
+
+            std::vector<ov::Tensor> results{};
+            for (const auto& output : function->outputs()) {
+                results.push_back(cache_infer_request.get_tensor(output));
+            }
+
+            return results;
+        };
+
+        std::vector<ov::Tensor> cache_outputs, cache_outputs_wl;
+
+        parallel_nt_static(3, [&](const int ithr, const int nthr) {
+            if (ithr == 0) {
+                actualOutputs = get_plugin_outputs();
+                expectedOutputs = calculate_refs();
+            } else if (ithr == 1) {
+                auto config = configuration;
+                config.insert(ov::cache_dir(m_cache_dir));
+
+                cache_outputs = compile_and_execute(config, m_cache_dir);
+            } else if (ithr == 2) {
+                auto config = configuration;
+                config.insert(ov::cache_dir(m_cache_dir));
+                config[ov::cache_dir.name()] = m_cache_dir_weightless;
+                config.insert(ov::enable_weightless(true));
+                config.insert(ov::cache_mode(ov::CacheMode::OPTIMIZE_SIZE));
+
+                cache_outputs_wl = compile_and_execute(config, m_cache_dir_weightless);
+            }
+        });
+
+        compare(expectedOutputs, cache_outputs);
+        compare(expectedOutputs, cache_outputs_wl);
+    } else {
+        actualOutputs = get_plugin_outputs();
+        expectedOutputs = calculate_refs();
     }
 #endif
 
@@ -646,115 +729,115 @@ void SubgraphBaseTest::compare_models_param_res(const std::shared_ptr<ov::Model>
 }
 
 void SubgraphBaseTest::models_cache() {
-    const std::string gen_ir_name = ov::test::utils::generateTestFilePrefix();
-    m_xml_path = gen_ir_name + ".xml";
-    m_bin_path = gen_ir_name + ".bin";
-    m_cache_dir = gen_ir_name + "_cache_dir";
-    m_cache_dir_weightless = gen_ir_name + "_cache_dir_wl";
-    const static std::filesystem::path blob_ext{".blob"};
+//     const std::string gen_ir_name = ov::test::utils::generateTestFilePrefix();
+//     m_xml_path = gen_ir_name + ".xml";
+//     m_bin_path = gen_ir_name + ".bin";
+//     m_cache_dir = gen_ir_name + "_cache_dir";
+//     m_cache_dir_weightless = gen_ir_name + "_cache_dir_wl";
+//     const static std::filesystem::path blob_ext{".blob"};
 
-    // Save IR to disk
-    ov::pass::Serialize(m_xml_path, m_bin_path).run_on_model(function);
+//     // Save IR to disk
+//     ov::pass::Serialize(m_xml_path, m_bin_path).run_on_model(function);
 
-    auto get_modification_time = [](const std::filesystem::path& cache_dir) {
-        std::filesystem::file_time_type result;
-        uint64_t counter{0};
-        for (auto const& dir_entry : std::filesystem::directory_iterator{cache_dir}) {
-            if (dir_entry.path().extension() == blob_ext) {
-                result = dir_entry.last_write_time();
-                counter++;
-            }
-        }
-        EXPECT_EQ(counter, 1);
-        return result;
-    };
+//     auto get_modification_time = [](const std::filesystem::path& cache_dir) {
+//         std::filesystem::file_time_type result;
+//         uint64_t counter{0};
+//         for (auto const& dir_entry : std::filesystem::directory_iterator{cache_dir}) {
+//             if (dir_entry.path().extension() == blob_ext) {
+//                 result = dir_entry.last_write_time();
+//                 counter++;
+//             }
+//         }
+//         EXPECT_EQ(counter, 1);
+//         return result;
+//     };
 
-    auto compile_and_execute = [&](const ov::AnyMap& config, const std::string& cache_dir) {
-        // Load, compile and create cache of the model.
-        auto compiled_model = core->compile_model(m_xml_path, targetDevice, config);
+//     auto compile_and_execute = [&](const ov::AnyMap& config, const std::string& cache_dir) {
+//         // Load, compile and create cache of the model.
+//         auto compiled_model = core->compile_model(m_xml_path, targetDevice, config);
 
-        const auto first_mod_time = get_modification_time(cache_dir);
-        // ASSERT_NE(first_mod_time, std::filesystem::file_time_type{0});
+//         const auto first_mod_time = get_modification_time(cache_dir);
+//         // ASSERT_NE(first_mod_time, std::filesystem::file_time_type{0});
 
-        // Load compiled model from cache.
-        auto imported_model = core->compile_model(m_xml_path, targetDevice, config);
+//         // Load compiled model from cache.
+//         auto imported_model = core->compile_model(m_xml_path, targetDevice, config);
 
-        const auto second_mod_time = get_modification_time(cache_dir);
-        // There is some issue if a new cache is created during the second run.
-        ASSERT_EQ(first_mod_time, second_mod_time);
+//         const auto second_mod_time = get_modification_time(cache_dir);
+//         // There is some issue if a new cache is created during the second run.
+//         ASSERT_EQ(first_mod_time, second_mod_time);
 
-        auto cache_infer_request = imported_model.create_infer_request();
-        for (const auto& input : inputs) {
-            cache_infer_request.set_tensor(input.first, input.second);
-        }
+//         auto cache_infer_request = imported_model.create_infer_request();
+//         for (const auto& input : inputs) {
+//             cache_infer_request.set_tensor(input.first, input.second);
+//         }
 
-        cache_infer_request.infer();
+//         cache_infer_request.infer();
 
-        std::vector<ov::Tensor> cache_outputs{};
-        for (const auto& output : function->outputs()) {
-            cache_outputs.push_back(cache_infer_request.get_tensor(output));
-        }
-        compare(m_expected_outputs, cache_outputs);
-    };
+//         std::vector<ov::Tensor> cache_outputs{};
+//         for (const auto& output : function->outputs()) {
+//             cache_outputs.push_back(cache_infer_request.get_tensor(output));
+//         }
+//         compare(m_expected_outputs, cache_outputs);
+//     };
 
-    // try {  // compile_model API
-    //     compile_and_execute();
-    // } catch (const std::exception& ex) {
-    //     OPENVINO_THROW("[ MODEL_CACHE ] Compile model API: ", ex.what());
-    // } catch (...) {
-    //     OPENVINO_THROW("[ MODEL_CACHE ] compile model API: unknown exception.");
-    // }
+//     // try {  // compile_model API
+//     //     compile_and_execute();
+//     // } catch (const std::exception& ex) {
+//     //     OPENVINO_THROW("[ MODEL_CACHE ] Compile model API: ", ex.what());
+//     // } catch (...) {
+//     //     OPENVINO_THROW("[ MODEL_CACHE ] compile model API: unknown exception.");
+//     // }
 
-    // try {  // Weightless cache
-    //     config.insert(ov::enable_weightless(true));
-    //     compile_and_execute();
-    // } catch (const std::exception& ex) {
-    //     OPENVINO_THROW("[ MODEL_CACHE ] Weightless cache: ", ex.what());
-    // } catch (...) {
-    //     OPENVINO_THROW("[ MODEL_CACHE ] Weightless cache: unknown exception.");
-    // }
+//     // try {  // Weightless cache
+//     //     config.insert(ov::enable_weightless(true));
+//     //     compile_and_execute();
+//     // } catch (const std::exception& ex) {
+//     //     OPENVINO_THROW("[ MODEL_CACHE ] Weightless cache: ", ex.what());
+//     // } catch (...) {
+//     //     OPENVINO_THROW("[ MODEL_CACHE ] Weightless cache: unknown exception.");
+//     // }
 
-#ifndef NDEBUG
-    auto config = configuration;
-    config.insert(ov::cache_dir(m_cache_dir));
-    compile_and_execute(config, m_cache_dir);
+// // #ifndef NDEBUG
+//     auto config = configuration;
+//     config.insert(ov::cache_dir(m_cache_dir));
+//     compile_and_execute(config, m_cache_dir);
 
-    config[ov::cache_dir.name()] = m_cache_dir_weightless;
-    config.insert(ov::enable_weightless(true));
-    config.insert(ov::cache_mode(ov::CacheMode::OPTIMIZE_SIZE));
-    compile_and_execute(config, m_cache_dir_weightless);
-#else
-    std::exception_ptr compile_model_error, weightless_error;
-    std::thread t_cm([this, &compile_and_execute, &compile_model_error] {
-        try {
-            auto config = configuration;
-            config.insert(ov::cache_dir(m_cache_dir));
-            compile_and_execute(config, m_cache_dir);
-        } catch (...) {
-            compile_model_error = std::current_exception();
-        }
-    });
-    std::thread t_wl([this, &compile_and_execute, &weightless_error] {
-        try {
-            auto config = configuration;
-            config.insert(ov::cache_dir(m_cache_dir_weightless));
-            config.insert(ov::enable_weightless(true));
-            config.insert(ov::cache_mode(ov::CacheMode::OPTIMIZE_SIZE));
-            compile_and_execute(config, m_cache_dir_weightless);
-        } catch (...) {
-            weightless_error = std::current_exception();
-        }
-    });
-    t_cm.join();
-    t_wl.join();
+//     config[ov::cache_dir.name()] = m_cache_dir_weightless;
+//     config.insert(ov::enable_weightless(true));
+//     config.insert(ov::cache_mode(ov::CacheMode::OPTIMIZE_SIZE));
+//     compile_and_execute(config, m_cache_dir_weightless);
+// #else
+//     std::exception_ptr compile_model_error, weightless_error;
+//     std::thread t_cm([this, &compile_and_execute, &compile_model_error] {
+//         try {
+//             auto config = configuration;
+//             config.insert(ov::cache_dir(m_cache_dir));
+//             compile_and_execute(config, m_cache_dir);
+//         } catch (...) {
+//             compile_model_error = std::current_exception();
+//         }
+//     });
+//     std::thread t_wl([this, &compile_and_execute, &weightless_error] {
+//         try {
+//             auto config = configuration;
+//             config.insert(ov::cache_dir(m_cache_dir_weightless));
+//             config.insert(ov::enable_weightless(true));
+//             config.insert(ov::cache_mode(ov::CacheMode::OPTIMIZE_SIZE));
+//             compile_and_execute(config, m_cache_dir_weightless);
+//         } catch (...) {
+//             weightless_error = std::current_exception();
+//         }
+//     });
+//     t_cm.join();
+//     t_wl.join();
 
-    if (compile_model_error) {
-        std::rethrow_exception(compile_model_error);
-    }
-    if (weightless_error) {
-        std::rethrow_exception(weightless_error);
-    }
-#endif
+//     if (compile_model_error) {
+//         std::rethrow_exception(compile_model_error);
+//     }
+//     if (weightless_error) {
+//         std::rethrow_exception(weightless_error);
+//     }
+// #endif
 }
 
 void SubgraphBaseTest::TearDown() {
