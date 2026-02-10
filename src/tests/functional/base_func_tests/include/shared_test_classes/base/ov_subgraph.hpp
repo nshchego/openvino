@@ -38,7 +38,7 @@ protected:
     virtual void compare(const std::vector<ov::Tensor>& expected, const std::vector<ov::Tensor>& actual);
     virtual void compile_model();
     virtual void infer();
-    virtual void validate();
+    virtual void validate(bool check_models_caching = false);
     virtual void configure_model();
     virtual void generate_inputs(const std::vector<ov::Shape>& targetInputStaticShapes);
     virtual void init_thresholds();
