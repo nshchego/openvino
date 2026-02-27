@@ -467,28 +467,8 @@ void SubgraphBaseTest::validate() {
     std::vector<ov::Tensor> expected_outputs, actual_outputs;
     std::exception_ptr inference_exception;
 
-#ifndef NDEBUG
     actual_outputs = get_plugin_outputs();
     expected_outputs = calculate_refs();
-#else
-    parallel_nt_static(2, [&](const int ithr, const int nthr) {  // TODO: try parallel_nt()
-        // The try ... catch block is required to handle exceptions during output calculations and report as test fail.
-        // If exception is not caught then application would be terminated with crash. (CVS-133676)
-        try {
-            if (ithr == 0) {
-                actual_outputs = get_plugin_outputs();
-            } else if (ithr == 1) {
-                expected_outputs = calculate_refs();
-            }
-        } catch (...) {
-            inference_exception = std::current_exception();
-        }
-    });
-
-    if (inference_exception) {
-        std::rethrow_exception(inference_exception);
-    }
-#endif
 
     if (expected_outputs.empty()) {
         return;
