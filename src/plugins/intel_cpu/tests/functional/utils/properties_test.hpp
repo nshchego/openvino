@@ -16,7 +16,6 @@ public:
     const std::string deviceName = "CPU";
 
     void SetUp() override {
-        m_parallel_validation = false;
         SKIP_IF_CURRENT_TEST_IS_DISABLED();
         model = ov::test::utils::make_conv_pool_relu();
     }
