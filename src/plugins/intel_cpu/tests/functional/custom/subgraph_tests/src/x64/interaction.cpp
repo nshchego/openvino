@@ -154,6 +154,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inType, inputShape] = this->GetParam();
         bool with_bf16 = ov::with_cpu_x86_bfloat16() || with_cpu_x86_avx2_vnni_2();
         if (with_bf16 && (inType == ov::element::bf16 || inType == ov::element::i32)) {

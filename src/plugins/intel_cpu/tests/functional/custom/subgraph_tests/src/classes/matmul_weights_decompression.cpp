@@ -63,6 +63,7 @@ std::shared_ptr<ov::Model> MatmulWeightsDecompression::initSubgraph(const ov::Pa
 }
 
 void MatmulWeightsDecompression::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [shape_params, weights_precision, decompression_precision, scale_precision, transpose_weights,
                  decompression_multiply_type, decompression_subtract_type, reshape_on_decompression, additional_config,

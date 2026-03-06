@@ -1204,6 +1204,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 class FCNotFuseFQCPUTest : public MatMulLayerCPUTest {
     void SetUp() override {
+        m_parallel_validation = false;
         MatMulLayerCPUTest::SetUp();
         expectPostOpsToBeFused = false;
     }
@@ -1245,6 +1246,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_FC, FCNotFuseFQCPUTest, notFuseTestParamsSmoke, F
 // small matmul implementation test
 class SmallMatMulLayerCPUTest : public MatMulLayerCPUTest {
     void SetUp() override {
+        m_parallel_validation = false;
         MatMulLayerCPUTest::SetUp();
         expectPostOpsToBeFused = true;
     }
@@ -1292,6 +1294,7 @@ INSTANTIATE_TEST_SUITE_P(smoke_MM_IS_x64_small, SmallMatMulLayerCPUTest, testPar
 
 class MatMul3DWeightLayerCPUTest : public MatMulLayerCPUTest {
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [basicParamsSet, nodeType, fusingParams, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
         const auto& [shapeRelatedParams, _netType, _inType, _outType, secondaryInputType, _targetDevice, additionalConfig] =

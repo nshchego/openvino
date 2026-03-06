@@ -108,6 +108,7 @@ void SparseFillEmptyRowsLayerCPUTest::generate_inputs(const std::vector<ov::Shap
 }
 
 void SparseFillEmptyRowsLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     const auto& [basicParamsSet, cpuParams] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
     const auto& [sparseFillEmptyRowsParams, valuesPrecision, indicesPrecision, secondaryInputType, _targetDevice] =

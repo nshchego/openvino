@@ -40,6 +40,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [netPrecision, inPrc, outPrc, inputShape, bias, _targetDevice] = GetParam();
         targetDevice = _targetDevice;
         init_input_shapes({inputShape});

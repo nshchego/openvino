@@ -138,6 +138,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(fmt, shape) = this->GetParam();
         ASSERT_TRUE(shape.hasZeroDims()) << "Can't run MemDescWithZeroDimsTest, because shape doesn't contain zero dims";
     }
@@ -169,6 +170,7 @@ public:
     }
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         shape = this->GetParam();
         fmt = dnnl::memory::format_tag::nchw;
         ASSERT_TRUE(shape.hasZeroDims()) << "Can't run MemDescWithZeroDimsTest, because shape doesn't contain zero dims";
@@ -202,6 +204,7 @@ protected:
     Shape shapeDynamic;
 
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(fmt, shapeDynamic, shape) = this->GetParam();
         ASSERT_TRUE(shape.hasZeroDims()) << "Can't run MemDescWithZeroDimsTest, because shape doesn't contain zero dims";
     }

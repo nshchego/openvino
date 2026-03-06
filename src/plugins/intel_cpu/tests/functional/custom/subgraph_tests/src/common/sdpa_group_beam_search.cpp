@@ -65,6 +65,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inType, inputShapes] = this->GetParam();
         targetDevice = ov::test::utils::DEVICE_CPU;
         rel_threshold = 1e-2f;

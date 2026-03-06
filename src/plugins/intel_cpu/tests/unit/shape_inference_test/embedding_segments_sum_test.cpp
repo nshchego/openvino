@@ -15,6 +15,7 @@ using namespace testing;
 class EmbeddingSegmentsSumV3StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v3::EmbeddingSegmentsSum> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

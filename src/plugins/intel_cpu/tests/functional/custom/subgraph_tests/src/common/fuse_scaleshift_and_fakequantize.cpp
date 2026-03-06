@@ -40,6 +40,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inputShape, inputPrecision, scaleShift, quantizeIntervals, _targetDevice] = this->GetParam();
         targetDevice = _targetDevice;
         const auto param = std::make_shared<ov::op::v0::Parameter>(inputPrecision, inputShape);

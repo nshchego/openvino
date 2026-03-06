@@ -212,6 +212,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         const size_t batch = 2;

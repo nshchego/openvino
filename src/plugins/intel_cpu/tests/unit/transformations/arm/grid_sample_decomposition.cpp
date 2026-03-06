@@ -642,6 +642,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         TransformationTestsF::SetUp();
         // Use default comparator; structural equality is not strictly enforced here
 

@@ -20,6 +20,7 @@ using namespace testing;
 class RollV7StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v7::Roll> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

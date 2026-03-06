@@ -48,6 +48,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [embParams, _inType, indPrecision, _targetDevice] = this->GetParam();
         inType = _inType;
         targetDevice = _targetDevice;

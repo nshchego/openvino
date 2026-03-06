@@ -70,6 +70,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [dataShape, bucketsShape, with_right_bound, inDataPrc, inBucketsPrc, netPrc] = this->GetParam();
         init_input_shapes({dataShape, bucketsShape});

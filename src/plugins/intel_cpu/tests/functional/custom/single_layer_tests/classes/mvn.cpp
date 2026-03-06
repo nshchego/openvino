@@ -52,6 +52,7 @@ std::string MvnLayerCPUTest::getTestCaseName(const testing::TestParamInfo<MvnLay
 }
 
 void MvnLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [basicParamsSet, cpuParams, fusingParams, inPrc, outPrc, additionalConfig] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

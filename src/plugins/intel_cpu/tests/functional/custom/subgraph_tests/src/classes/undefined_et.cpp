@@ -54,6 +54,7 @@ std::string UndefinedEtSubgraphTest::getTestCaseName(const testing::TestParamInf
 }
 
 void UndefinedEtSubgraphTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = test::utils::DEVICE_CPU;
 
     const auto& params = this->GetParam();

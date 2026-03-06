@@ -33,6 +33,7 @@ namespace CPUSubgraphTestsDefinitions {
 class DynamicShapeStatefulModel : public SubgraphBaseTest, public CPUTestsBase {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
         ov::element::Type netPrc = ElementType::f32;
 

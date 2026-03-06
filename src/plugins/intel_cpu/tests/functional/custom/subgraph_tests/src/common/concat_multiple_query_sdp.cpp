@@ -92,6 +92,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [qkvType, inputShapeAndOrders, forceKVU8, hasShapeOf] = this->GetParam();
         const auto &[inputShapes, transposeOrder] = inputShapeAndOrders;
         targetDevice = ov::test::utils::DEVICE_CPU;

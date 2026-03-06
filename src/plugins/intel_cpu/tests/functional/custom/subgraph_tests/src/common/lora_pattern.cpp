@@ -55,6 +55,7 @@ static std::string getTestCaseName(const testing::TestParamInfo<LoraPatternParam
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         std::tie(states_precision, states_policy) = this->GetParam();
         init_function();

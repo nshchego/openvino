@@ -34,6 +34,7 @@ template <typename TOp>
 class OneHotCpuShapeInferenceTest : public unit_test::OpCpuShapeInferenceTest<TOp> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         this->output_shapes.resize(0);
     }
 

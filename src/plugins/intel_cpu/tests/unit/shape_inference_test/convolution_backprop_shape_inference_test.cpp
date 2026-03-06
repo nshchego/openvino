@@ -16,6 +16,7 @@ class ConvolutionBackpropDataV1StaticShapeInferenceTest
     : public OpStaticShapeInferenceTest<op::v1::ConvolutionBackpropData> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

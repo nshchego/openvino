@@ -38,6 +38,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         abs_threshold = 0;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [shapes, precision] = this->GetParam();

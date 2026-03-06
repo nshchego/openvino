@@ -53,6 +53,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inputShape, inputPrecision, quantizationParams, withBias, targetName] = this->GetParam();
         abs_threshold = 4e-3f;
         targetDevice = targetName;

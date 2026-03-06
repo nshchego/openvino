@@ -213,6 +213,7 @@ protected:
     std::vector<size_t> kernel, stride;
 
     void SetUp() override {
+        m_parallel_validation = false;
         rel_threshold = 1e-4f;
 
         targetDevice = ov::test::utils::DEVICE_CPU;

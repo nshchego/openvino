@@ -54,6 +54,7 @@ namespace ov::test {
 class BF16RotaryEmbMatMul : public SubgraphBaseTest {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         const std::vector<InputShape> input_shapes = {
             {{-1, 1, -1}, {{2, 1, 32}}},    // param 0
             {{-1, 32, -1}, {{2, 32, 32}}},  // param 1

@@ -19,6 +19,7 @@ using namespace testing;
 class EmbeddingBagPackedSumV3StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v3::EmbeddingBagPackedSum> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

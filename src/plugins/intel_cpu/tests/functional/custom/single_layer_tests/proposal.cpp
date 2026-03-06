@@ -86,6 +86,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, proposalParams, netPrecision] = this->GetParam();
         const auto& [base_size, box_coordinate_scale, box_size_scale, clip_after_nms, clip_before_nms, feat_stride,

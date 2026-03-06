@@ -34,6 +34,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inputShape, inputPrecision, axis, num_splits, scale_factor, _targetDevice] = this->GetParam();
         targetDevice = _targetDevice;
         size_t num_of_concat_inputs = num_splits * scale_factor;

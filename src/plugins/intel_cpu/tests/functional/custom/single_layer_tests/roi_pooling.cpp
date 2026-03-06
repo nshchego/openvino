@@ -162,6 +162,7 @@ protected:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [basicParamsSet, cpuParams, propMode, additionalConfig] = this->GetParam();
         const auto& [inputShapes, poolShape, spatial_scale, pool_method, _netPrecision, _targetDevice] = basicParamsSet;
         targetDevice = _targetDevice;

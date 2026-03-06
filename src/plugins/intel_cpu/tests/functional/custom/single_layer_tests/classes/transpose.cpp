@@ -35,6 +35,7 @@ std::string TransposeLayerCPUTest::getTestCaseName(const testing::TestParamInfo<
 }
 
 void TransposeLayerCPUTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [inputShapes, inputOrder, netPrecision, _targetDevice, additionalConfig, cpuParams] = this->GetParam();
     targetDevice = _targetDevice;
     configuration.insert(additionalConfig.begin(), additionalConfig.end());

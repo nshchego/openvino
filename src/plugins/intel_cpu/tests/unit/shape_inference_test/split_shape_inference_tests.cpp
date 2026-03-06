@@ -24,6 +24,7 @@ class SplitStaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v1::
                                       public WithParamInterface<SplitTestParams> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(input_shapes, axis, num_of_splits, exp_shape) = GetParam();
 
         output_shapes = StaticShapeVector();

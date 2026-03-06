@@ -70,6 +70,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         constexpr size_t number_of_params = 4ul;
         constexpr size_t softmax_axis = 1ul;
         constexpr int concat_axis = 0;

@@ -94,6 +94,7 @@ public:
         return result.str();
     }
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto &[additionalConfig, inputShapes, targetShapes] = this->GetParam();
         configuration.insert(additionalConfig.begin(), additionalConfig.end());

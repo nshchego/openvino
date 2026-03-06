@@ -13,6 +13,7 @@ namespace test {
 
 class FuseNon0OuputPort : public SubgraphBaseTest {
     void SetUp() override {
+        m_parallel_validation = false;
         const ov::Shape x_shape = {1, 10};
         const ov::Shape y_shape = {1};
         const ov::Shape z_shape = {1};

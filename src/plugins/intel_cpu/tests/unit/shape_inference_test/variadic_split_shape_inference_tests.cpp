@@ -24,6 +24,7 @@ class VariadicSplitStaticShapeInferenceTest : public OpStaticShapeInferenceTest<
                                               public WithParamInterface<VariadicSplitTestParams> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(input_shapes, axis, split_lengths, exp_shapes) = GetParam();
 
         data = std::make_shared<op::v0::Parameter>(element::f32, input_shapes.front().get_shape());

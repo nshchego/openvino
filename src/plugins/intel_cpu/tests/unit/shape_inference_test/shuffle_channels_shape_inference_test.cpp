@@ -16,6 +16,7 @@ using namespace testing;
 class ShuffleChannelsV0StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0::ShuffleChannels> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

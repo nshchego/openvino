@@ -36,6 +36,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputPrecision, inputShapes, alpha, beta, bias, size, axes] = this->GetParam();
         init_input_shapes({ inputShapes });

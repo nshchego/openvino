@@ -15,6 +15,7 @@ using namespace testing;
 class MaxPoolV1StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v1::MaxPool> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };
@@ -88,6 +89,7 @@ TEST_F(MaxPoolV1StaticShapeInferenceTest, auto_padding_same_lower_round_ceil) {
 class MaxPoolV14StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v14::MaxPool> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(2);
     }
 };

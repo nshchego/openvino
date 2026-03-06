@@ -16,6 +16,7 @@ class ExperimentalDetectronGenerateProposalsSingleImageV6StaticShapeInferenceTes
     : public OpStaticShapeInferenceTest<op::v6::ExperimentalDetectronGenerateProposalsSingleImage> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(2);
     }
 

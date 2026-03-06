@@ -58,6 +58,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         abs_threshold = 0.05;
         const auto &[inputShapes, decompose, activations, clip, netPrecision, cpuParams, additionalConfig] =
             this->GetParam();

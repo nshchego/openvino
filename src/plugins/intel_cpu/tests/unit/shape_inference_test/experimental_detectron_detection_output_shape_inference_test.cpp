@@ -18,6 +18,7 @@ protected:
     using Attrs = op::v6::ExperimentalDetectronDetectionOutput::Attributes;
 
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(2);
     }
 

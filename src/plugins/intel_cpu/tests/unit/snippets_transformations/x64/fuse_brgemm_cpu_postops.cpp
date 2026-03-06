@@ -96,6 +96,7 @@ static const ov::PartialShape brgemm_b_shape{-1, -1, 1024, 128};
 class FuseBrgemmCPUPostopsTests : public TransformationTestsF {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         TransformationTestsF::SetUp();
         manager.register_pass<pass::FuseBrgemmCPUPostops>(external_params_idces);
         comparator.enable(FunctionsComparator::CmpValues::ATTRIBUTES);
@@ -151,6 +152,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         FuseBrgemmCPUPostopsTests::SetUp();
         auto [input_precisions, convert_dst_type] = this->GetParam();
         model = get_model(input_precisions, convert_dst_type);
@@ -222,6 +224,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         FuseBrgemmCPUPostopsTests::SetUp();
         auto [input_precisions, scalar_op_type] = this->GetParam();
         model = get_model(input_precisions, scalar_op_type);
@@ -306,6 +309,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         expected_external_params_idces = {2};
         FuseBrgemmCPUPostopsTests::SetUp();
         auto [input_precisions, binary_op_type, postop_input_shape] = this->GetParam();

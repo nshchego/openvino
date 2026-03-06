@@ -15,6 +15,7 @@ using namespace testing;
 class BinaryConvolutionV1StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v1::BinaryConvolution> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 

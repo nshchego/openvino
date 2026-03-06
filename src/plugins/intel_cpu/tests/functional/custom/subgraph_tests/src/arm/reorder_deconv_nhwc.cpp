@@ -37,6 +37,7 @@ namespace test {
 class ReorderDeconvNHWCTest : virtual public SubgraphBaseStaticTest {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         const ov::Shape inShape = {2, 12, 7, 7};
         const ov::Shape weiShape = {12, 6, 3, 3};
         ov::ParameterVector inputParams{std::make_shared<ov::op::v0::Parameter>(ov::element::f32, inShape),

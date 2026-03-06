@@ -134,6 +134,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         abs_threshold = 0.1f;
         const auto& [inputShapesTuple, inputPrecisions, eltwiseOpTypes, withQuantization, needReshape, enforceSnippets,
                      _targetDevice, cpuParams] = this->GetParam();

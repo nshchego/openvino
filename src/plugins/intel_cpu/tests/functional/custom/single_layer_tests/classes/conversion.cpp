@@ -86,6 +86,7 @@ bool ConvertCPULayerTest::isInOutPrecisionSupported(ov::element::Type inPrc, ov:
 }
 
 void ConvertCPULayerTest::SetUp() {
+    m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [shapes, _inPrc, _outPrc, _special_value, cpuParams] = GetParam();
     inPrc = _inPrc;

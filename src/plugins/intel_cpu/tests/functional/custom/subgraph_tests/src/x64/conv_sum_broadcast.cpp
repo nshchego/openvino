@@ -88,6 +88,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         CPUSpecificParams cpuParams;
         const auto& [convShape, secondShape, bias, fusingParams, additionalConfig] = this->GetParam();
         std::tie(postOpMgrPtr, fusedOps) = fusingParams;
@@ -254,6 +255,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         abs_threshold = 1.001f;
         ConvSumInPlaceTest::SetUp();
         functionRefs = function->clone();

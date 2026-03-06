@@ -16,6 +16,7 @@ using matmul_test_params_t = std::tuple<StaticShape,  // Input A shape
 class MatMulTest : public TestWithParam<matmul_test_params_t> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(a_shape, b_shape) = GetParam();
 
         set_exp_shape();

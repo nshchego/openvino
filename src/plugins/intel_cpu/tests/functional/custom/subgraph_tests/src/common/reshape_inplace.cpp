@@ -42,6 +42,7 @@ namespace test {
 class InPlaceReshapeFromConstantCheck : public SubgraphBaseTest {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto rtPrc = ov::element::f32;
         const ov::Shape inpShape = {21660, 4};
         const ov::Shape secShape = {4};
@@ -110,6 +111,7 @@ TEST_F(InPlaceReshapeFromConstantCheck, smoke_CPU_InPlaceReshapeFromConstantChec
 class InPlaceReshapeShareInputCheck : public SubgraphBaseTest {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto rtPrc = ov::element::f32;
         const ov::Shape inpShape = {1, 16, 16};
         targetStaticShapes = {{inpShape, inpShape}};

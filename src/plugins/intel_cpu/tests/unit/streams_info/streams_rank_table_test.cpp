@@ -23,6 +23,7 @@ class StreamsRankTests : public ov::test::TestsCommon,
                          public testing::WithParamInterface<std::tuple<StreamsRankTestCase>> {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& test_data = std::get<0>(GetParam());
 
         int test_num_sub_streams;

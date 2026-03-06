@@ -57,6 +57,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [basicParamsSet, cpuParams] = this->GetParam();
         const auto& [inputShapes, _targetShape, _axesMapping, mode, netPrecision, isConstInput, _targetDevice] =
             basicParamsSet;

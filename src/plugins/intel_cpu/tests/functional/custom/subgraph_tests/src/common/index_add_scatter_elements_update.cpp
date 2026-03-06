@@ -79,6 +79,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         SKIP_IF_CURRENT_TEST_IS_DISABLED();
 

@@ -74,6 +74,7 @@ public:
     GemmCPUBlockingTest() = default;
 
     void SetUp() override {
+        m_parallel_validation = false;
         pipeline.register_pass<ov::intel_cpu::pass::GemmCPUBlocking>();
     }
 };

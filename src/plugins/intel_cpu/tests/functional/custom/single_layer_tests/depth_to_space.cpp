@@ -49,6 +49,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [shapes, _inType, mode, blockSize, cpuParams] = this->GetParam();
         inType = _inType;
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

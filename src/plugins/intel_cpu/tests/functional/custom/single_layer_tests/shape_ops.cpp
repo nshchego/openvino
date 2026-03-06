@@ -129,6 +129,7 @@ protected:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         idx = 0;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inpDesc, secondType, nodeType, prc, _secondInPrc, specialZero] = this->GetParam();

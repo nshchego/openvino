@@ -34,6 +34,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [netPrecision, rank] = this->GetParam();
         auto bcastTo3D = [](ov::Shape& shape) {

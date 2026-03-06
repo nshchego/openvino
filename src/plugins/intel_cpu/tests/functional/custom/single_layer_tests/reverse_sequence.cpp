@@ -52,6 +52,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [batchAxisIndex, seqAxisIndex, dataInputShape, seqLengthsShape, secondaryInputType, netPrecision,
                      _targetDevice] = GetParam();
         targetDevice = _targetDevice;

@@ -70,6 +70,7 @@ public:
     }
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [basicParamsSet, cpuParams] = this->GetParam();
         const auto& [eltwiseInFmts, eltwiseOutFmts, _priority, _selectedType] = cpuParams;

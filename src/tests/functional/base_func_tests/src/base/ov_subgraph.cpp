@@ -14,7 +14,6 @@
 #endif
 
 #include "openvino/pass/manager.hpp"
-#include "openvino/core/parallel.hpp"
 #include "openvino/core/preprocess/pre_post_process.hpp"
 #include "openvino/pass/serialize.hpp"
 #include "transformations/convert_precision.hpp"
@@ -464,24 +463,57 @@ std::vector<ov::Tensor> SubgraphBaseTest::get_plugin_outputs() {
 }
 
 void SubgraphBaseTest::validate() {
-    std::vector<ov::Tensor> expected_outputs, actual_outputs;
-    std::exception_ptr inference_exception;
+    std::vector<ov::Tensor> expectedOutputs, actualOutputs;
+    std::exception_ptr expected_outputs_error, actual_output_error;
 
-    actual_outputs = get_plugin_outputs();
-    expected_outputs = calculate_refs();
+#ifndef NDEBUG
+    actualOutputs = get_plugin_outputs();
+    expectedOutputs = calculate_refs();
+#else
+    if (m_parallel_validation) {
+        std::thread t_device([this, &actualOutputs, &actual_output_error] {
+            // The try ... catch block is required to handle exceptions during output calculations and report as test fail.
+            // If exception is not caught then application would be terminated with crash. (CVS-133676)
+            try {
+                actualOutputs = get_plugin_outputs();
+            } catch (...) {
+                actual_output_error = std::current_exception();
+            }
+        });
+        std::thread t_ref([this, &expectedOutputs, &expected_outputs_error] {
+            try {
+                expectedOutputs = calculate_refs();
+            } catch (...) {
+                expected_outputs_error = std::current_exception();
+            }
+        });
+        t_device.join();
+        t_ref.join();
 
-    if (expected_outputs.empty()) {
+        if (actual_output_error) {
+            std::rethrow_exception(actual_output_error);
+        }
+        if (expected_outputs_error) {
+            std::rethrow_exception(expected_outputs_error);
+        }
+    } else {
+        actualOutputs = get_plugin_outputs();
+        expectedOutputs = calculate_refs();
+    }
+#endif
+
+    if (expectedOutputs.empty()) {
         return;
     }
 
-    ASSERT_EQ(actual_outputs.size(), expected_outputs.size())
-        << "TEMPLATE plugin has " << expected_outputs.size() << " outputs, while " << targetDevice << " " << actual_outputs.size();
+    ASSERT_EQ(actualOutputs.size(), expectedOutputs.size())
+        << "TEMPLATE plugin has " << expectedOutputs.size() << " outputs, while " << targetDevice << " " << actualOutputs.size();
     if (is_report_stages) {
         std::cout << "[ COMPARATION ] `ov_tensor_utils.hpp::compare()` is started"<< std::endl;
     }
     auto start_time = std::chrono::system_clock::now();
 
-    compare(expected_outputs, actual_outputs);
+    compare(expectedOutputs, actualOutputs);
     if (is_report_stages) {
         auto end_time = std::chrono::system_clock::now();
         std::chrono::duration<double> duration = end_time - start_time;

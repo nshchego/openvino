@@ -107,6 +107,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         abs_threshold = 0.01f;
         const auto &[inputShapesTuple, fqParams, inputRangesValues, cpuParams, additionalConfig] = this->GetParam();
         const auto& [shapesVec, rangesVec, reshapeShape] = inputShapesTuple;

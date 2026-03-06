@@ -49,6 +49,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         abs_threshold = 1e-4;
         const auto& [shape1, shape2, interval1, interval2] = this->GetParam();

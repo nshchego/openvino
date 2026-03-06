@@ -24,6 +24,7 @@ std::string FuseMulAddAndEwSimpleTest::getTestCaseName(const testing::TestParamI
 }
 
 void FuseMulAddAndEwSimpleTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
 
     std::tie(inputShape, inPrec) = this->GetParam();

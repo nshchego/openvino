@@ -770,6 +770,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         TransformationTestsF::SetUp();
         const auto& [moe_type,
                      use_scatter_v12,

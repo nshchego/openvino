@@ -139,6 +139,7 @@ template <class TypeParam>
 class CacheRotationKernelInputTypeParameterizedTest : public ::testing::Test {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         Rank3Matrix<TypeParam> values_before_rotation = {
             {
                 {1.0f, 1.0f, 1.0f, 1.0f},

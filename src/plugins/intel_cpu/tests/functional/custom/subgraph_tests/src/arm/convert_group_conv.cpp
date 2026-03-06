@@ -27,6 +27,7 @@ public:
 protected:
     static const size_t numOfGroups = 2;
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes] = this->GetParam();
         init_input_shapes({inputShapes});

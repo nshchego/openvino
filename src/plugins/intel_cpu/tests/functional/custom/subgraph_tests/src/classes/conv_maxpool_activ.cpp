@@ -18,6 +18,7 @@ std::string ConvPoolActivTest::getTestCaseName(const testing::TestParamInfo<fusi
 }
 
 void ConvPoolActivTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     fusingSpecificParams fusingParams = this->GetParam();
     std::tie(postOpMgrPtr, fusedOps) = fusingParams;

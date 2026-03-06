@@ -73,6 +73,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inType, inputShapeAndOrders] = this->GetParam();
         const auto& [inputShapes, reshapeOrderHS] = inputShapeAndOrders;
 

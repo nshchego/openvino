@@ -32,6 +32,7 @@ namespace ov::test {
 class BF16EmbedTokensRMS : public SubgraphBaseTest {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         const std::vector<InputShape> input_shapes = {
             {{-1, -1}, {{1, 32}, {2, 32}}},  // param 0
             {{-1, -1, EMBEDDINGS_SIZE}, {{1, 32, EMBEDDINGS_SIZE}, {2, 32, EMBEDDINGS_SIZE}}}};

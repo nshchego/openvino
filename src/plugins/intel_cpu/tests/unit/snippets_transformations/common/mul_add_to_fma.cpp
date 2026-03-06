@@ -122,6 +122,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         using PassPosition = ov::snippets::pass::PassPosition;
         LoweringTests::SetUp();
         std::vector<PartialShape> inputShapes(3);

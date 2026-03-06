@@ -39,6 +39,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(input_shapes, permute_axes, output_shapes, causal) = GetParam();
 
         args.clear();

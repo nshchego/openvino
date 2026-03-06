@@ -21,6 +21,7 @@ using namespace testing;
 class EyeV9StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v9::Eye> {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

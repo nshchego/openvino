@@ -92,6 +92,7 @@ protected:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [scatterParams, inputPrecision, idxPrecision] = this->GetParam();
         const auto inputShapes = scatterParams.inputShapes;

@@ -32,6 +32,7 @@ namespace test {
 class ConcatReorderInPlaceTest : virtual public SubgraphBaseStaticTest {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         const ov::Shape inputShape = {1, 100, 1, 1};
         ov::ParameterVector inputParams{std::make_shared<ov::op::v0::Parameter>(ov::element::f32, inputShape),
                                         std::make_shared<ov::op::v0::Parameter>(ov::element::f32, inputShape)};

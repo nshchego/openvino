@@ -49,6 +49,7 @@ protected:
     ElementType inType;
     ElementType outType;
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inShapes, _isFC, _inType, _outType, cpuParams] = this->GetParam();
         isFC = _isFC;

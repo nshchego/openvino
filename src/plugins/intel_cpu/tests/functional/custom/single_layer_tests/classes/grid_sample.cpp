@@ -58,6 +58,7 @@ std::string GridSampleLayerTestCPU::getTestCaseName(testing::TestParamInfo<GridS
 }
 
 void GridSampleLayerTestCPU::SetUp() {
+    m_parallel_validation = false;
     abs_threshold = 0.0005;
     const auto& [inputShapes,
                  interpolateMode,

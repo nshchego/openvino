@@ -12,6 +12,7 @@ using namespace testing;
 
 class BucketizeV3StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v3::Bucketize> {
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

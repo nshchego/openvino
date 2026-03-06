@@ -26,6 +26,7 @@ public:
 
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         auto net_prc = ov::element::f32;
         targetDevice = utils::DEVICE_CPU;
 

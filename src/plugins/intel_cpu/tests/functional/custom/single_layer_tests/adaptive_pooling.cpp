@@ -56,6 +56,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [basicParamsSet, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
         const auto& [adaPoolParams, _mode, isStatic, netPrecision, _targetDevice] = basicParamsSet;

@@ -159,6 +159,7 @@ std::shared_ptr<ov::Model> DeconvolutionLayerCPUTest::createGraph(const std::vec
 }
 
 void DeconvolutionLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     rel_threshold = 1e-4f;
 
     targetDevice = ov::test::utils::DEVICE_CPU;

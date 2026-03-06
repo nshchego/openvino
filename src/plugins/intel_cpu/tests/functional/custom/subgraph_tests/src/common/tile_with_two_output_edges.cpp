@@ -14,6 +14,7 @@ namespace test {
 class TileWithTwoOutputEdges : public SubgraphBaseStaticTest {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
 
         auto ngPrc = element::f32;

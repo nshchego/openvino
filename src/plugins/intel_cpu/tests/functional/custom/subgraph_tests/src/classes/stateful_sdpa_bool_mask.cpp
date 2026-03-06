@@ -40,6 +40,7 @@ std::string StatefulSdpaBoolMaskTest::getTestCaseName(const testing::TestParamIn
 }
 
 void StatefulSdpaBoolMaskTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
 
     const auto inferencePrecision = GetParam();

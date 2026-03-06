@@ -37,6 +37,7 @@ public:
 protected:
     int numberOfExpectedReduce;
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         bool keepDims = true;
         const auto& [axes, _reductionType, inputShapes] = this->GetParam();

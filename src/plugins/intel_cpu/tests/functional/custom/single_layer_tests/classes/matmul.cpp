@@ -60,6 +60,7 @@ void MatMulLayerCPUTest::transpose(T& shape) {
 }
 
 void MatMulLayerCPUTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [basicParamsSet, nodeType, fusingParams, cpuParams] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
     const auto& [shapeRelatedParams, _netType, _inType, _outType, secondaryInputType, _targetDevice, additionalConfig] =

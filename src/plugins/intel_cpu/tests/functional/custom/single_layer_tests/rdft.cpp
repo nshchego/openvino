@@ -65,6 +65,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         inputIdx = 0;
         const auto& [precision, params] = GetParam();
         const auto& [shapes, _axes, _signalSizes, inverse, _constAxes, _constSignalSizes, cpuParams] = params;

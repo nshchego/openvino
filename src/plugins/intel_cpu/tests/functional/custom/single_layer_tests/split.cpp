@@ -43,6 +43,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [numSplits, axis, netPrecision, inputShapes, optOutIndices, cpuParams] = this->GetParam();
         auto splitDefault = [](const size_t numSplits) {

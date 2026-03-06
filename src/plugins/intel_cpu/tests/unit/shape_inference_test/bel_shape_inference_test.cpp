@@ -19,6 +19,7 @@ template <class TOp>
 class BELStaticShapeInferenceTest : public OpStaticShapeInferenceTest<TOp> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         this->output_shapes = StaticShapeVector(1);
     }
 

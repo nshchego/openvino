@@ -46,6 +46,7 @@ std::string RandomUniformLayerTestCPU::getTestCaseName(const testing::TestParamI
 }
 
 void RandomUniformLayerTestCPU::SetUp() {
+        m_parallel_validation = false;
     targetDevice = utils::DEVICE_CPU;
 
     const auto& params     = this->GetParam();

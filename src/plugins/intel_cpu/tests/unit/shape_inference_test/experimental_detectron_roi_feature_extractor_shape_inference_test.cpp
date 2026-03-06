@@ -16,6 +16,7 @@ class ExperimentalDetectronROIFeatureExtractorV6StaticShapeInferenceTest
     : public OpStaticShapeInferenceTest<op::v6::ExperimentalDetectronROIFeatureExtractor> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(2);
     }
 

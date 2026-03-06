@@ -92,6 +92,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inType, inputShapeAndOrders, _hasShapeOf, _quantKeyByChannel, _keyGroupSize] = this->GetParam();
         hasShapeOf = _hasShapeOf;
         quantKeyByChannel = _quantKeyByChannel;

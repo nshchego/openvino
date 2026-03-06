@@ -37,6 +37,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inShapes, fusingParams] = this->GetParam();
         if (inShapes.first.size() != inShapes.second.size())

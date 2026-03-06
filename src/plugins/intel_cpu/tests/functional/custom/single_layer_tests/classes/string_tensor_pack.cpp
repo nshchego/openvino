@@ -70,6 +70,7 @@ void StringTensorPackLayerCPUTest::generate_inputs(const std::vector<ov::Shape>&
 }
 
 void StringTensorPackLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     const auto& [basicParamsSet, cpuParams] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
     const auto& [StringTensorPackParams, indicesPrecision, _targetDevice] = basicParamsSet;

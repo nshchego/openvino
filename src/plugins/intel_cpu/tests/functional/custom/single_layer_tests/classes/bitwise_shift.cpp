@@ -56,6 +56,7 @@ void BitwiseShiftLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& tar
 }
 
 void BitwiseShiftLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     const auto& [basicParamsSet, cpuParams, fusingParams, enforceSnippets, val_map] = this->GetParam();
     const auto& [_shapes, _eltwiseType, secondaryInputType, opType, netType, _inType, _outType, _targetDevice,
                  additionalConfig] = basicParamsSet;

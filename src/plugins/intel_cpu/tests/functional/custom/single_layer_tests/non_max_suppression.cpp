@@ -98,6 +98,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [inShapeParams, inPrecisions, _maxOutBoxesPerClass, thrValues, maxOutBoxesType, boxEncoding,
                      sortResDescend, outType, _targetDevice] = this->GetParam();
         maxOutBoxesPerClass = _maxOutBoxesPerClass;

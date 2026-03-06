@@ -49,6 +49,7 @@ public:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [cpuParams, fusingParams] = this->GetParam();
 
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

@@ -42,6 +42,7 @@ namespace test {
 class ConvertBoolMathTest : public SubgraphBaseStaticTest {
 public:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         ov::ParameterVector inputParams{std::make_shared<ov::opset10::Parameter>(ov::element::f32, ov::Shape{24, 7}),

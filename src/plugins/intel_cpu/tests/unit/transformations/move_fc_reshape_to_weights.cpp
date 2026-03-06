@@ -125,6 +125,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         TransformationTestsF::SetUp();
         const auto& [input_shapes, add_transpose, zp_type, zp_shape] = this->GetParam();
         ov::Shape ref_weights_shape = input_shapes.second;

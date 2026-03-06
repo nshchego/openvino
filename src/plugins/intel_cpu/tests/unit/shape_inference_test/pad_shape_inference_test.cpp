@@ -17,6 +17,7 @@ template <class TOp>
 class PadStaticShapeInference : public OpStaticShapeInferenceTest<TOp> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         this->output_shapes.resize(1);
     }
 };

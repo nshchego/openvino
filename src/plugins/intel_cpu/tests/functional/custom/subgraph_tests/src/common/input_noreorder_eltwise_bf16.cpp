@@ -20,6 +20,7 @@ protected:
         configuration.insert(additional_config.begin(), additional_config.end());
     }
     void SetUp() override {
+        m_parallel_validation = false;
         auto netPrecision = inType = ov::element::f32;
         set_output_type_and_config();
         targetDevice = ov::test::utils::DEVICE_CPU;

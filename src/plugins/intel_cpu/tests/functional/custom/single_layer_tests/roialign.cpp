@@ -115,6 +115,7 @@ protected:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [basicParamsSet, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
         const auto& [roiAlignParams, inputPrecision, _targetDevice] = basicParamsSet;

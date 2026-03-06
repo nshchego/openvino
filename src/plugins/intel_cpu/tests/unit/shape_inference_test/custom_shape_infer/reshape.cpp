@@ -40,6 +40,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         std::tie(input_shapes, axes, exp_shape, specalZero) = GetParam();
         output_shapes = unit_test::ShapeVector(0);
         arg = std::make_shared<op::v0::Parameter>(element::f32, input_shapes.front().get_shape());

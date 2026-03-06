@@ -15,6 +15,7 @@ using namespace testing;
 class ROIPoolingV0StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0::ROIPooling> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

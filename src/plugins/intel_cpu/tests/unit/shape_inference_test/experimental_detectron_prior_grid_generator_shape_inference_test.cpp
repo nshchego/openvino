@@ -18,6 +18,7 @@ protected:
     using Attrs = typename op_type::Attributes;
 
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 

@@ -39,6 +39,7 @@ std::string ConvConcatSubgraphTest::getTestCaseName(const testing::TestParamInfo
 }
 
 void ConvConcatSubgraphTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [type, convParams, cpuParams, inputShapes, axis] = this->GetParam();
     pluginTypeNode = nodeType2PluginType(type);

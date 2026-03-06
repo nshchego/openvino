@@ -40,6 +40,7 @@ std::string ScaledAttnLayerCPUTest::getTestCaseName(const testing::TestParamInfo
 }
 
 void ScaledAttnLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     const auto& [inType, inputShapes, _is_causal, _has_attn, _has_scale, _targetDevice, cpuParams] = this->GetParam();
     is_causal = _is_causal;
     has_attn = _has_attn;

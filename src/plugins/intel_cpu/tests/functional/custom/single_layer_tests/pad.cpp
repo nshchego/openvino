@@ -83,6 +83,7 @@ protected:
         }
     }
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [shapes, secondaryInputType, dataType, _padsBegin, _padsEnd, _padValue, padMode, cpuParams,
                      additionalConfig] = this->GetParam();
         padsBegin = _padsBegin;

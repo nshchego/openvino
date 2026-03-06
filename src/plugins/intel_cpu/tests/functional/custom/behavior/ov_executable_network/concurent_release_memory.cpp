@@ -93,6 +93,7 @@ private:
 class ReleaseMemoryMultiThreadTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         param = std::make_shared<ov::op::v0::Parameter>(ov::element::f32, ov::Shape{1});
 
         constexpr size_t sleep_time = 5;  // us

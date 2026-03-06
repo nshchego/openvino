@@ -140,6 +140,7 @@ protected:
     }
 
     void SetUp() override {
+        m_parallel_validation = false;
         rel_threshold = 1e-4f;
         const auto& [basicParamsSet, cpuParams, fusingParams, additionalConfig] = this->GetParam();
         configuration.insert(additionalConfig.begin(), additionalConfig.end());

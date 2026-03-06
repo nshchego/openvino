@@ -200,6 +200,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, data_et, idces_et, k] = this->GetParam();
         init_input_shapes(inputShapes);

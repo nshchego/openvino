@@ -115,6 +115,7 @@ void ActivationLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& targe
 }
 
 void ActivationLayerCPUTest::SetUp() {
+        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [inputShapes, activationShapes, activationTypeAndConstValue, _netPrecision, inPrecision, outPrecision,
                  cpuParams, enforceSnippets] = this->GetParam();

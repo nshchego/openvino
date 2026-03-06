@@ -21,6 +21,7 @@ template <class TGather>
 class StaticShapeInferenceGatherTest : public OpStaticShapeInferenceTest<TGather> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         OpStaticShapeInferenceTest<TGather>::output_shapes = StaticShapeVector(1);
     }
 

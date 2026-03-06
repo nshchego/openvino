@@ -56,6 +56,7 @@ public:
 
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         const auto& [shapes, inType, indexType, mergeRepeated] = GetParam();
         selectedType = "ref_any_f32";
         targetDevice = ov::test::utils::DEVICE_CPU;

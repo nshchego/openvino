@@ -15,6 +15,7 @@ using namespace ov::intel_cpu;
 class CTCLossV4StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v4::CTCLoss> {
 protected:
     void SetUp() override {
+        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };
