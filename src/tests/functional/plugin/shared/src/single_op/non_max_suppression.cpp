@@ -39,6 +39,7 @@ std::string NmsLayerTest::getTestCaseName(const testing::TestParamInfo<NmsParams
 }
 
 void NmsLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [input_shape_params,
                  input_types,
                  max_out_boxes_per_class,

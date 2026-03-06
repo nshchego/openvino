@@ -44,6 +44,7 @@ std::string ConvolutionLayerTest::getTestCaseName(const testing::TestParamInfo<c
 }
 
 void ConvolutionLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [conv_params, model_type, shapes, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

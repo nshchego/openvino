@@ -71,6 +71,7 @@ void EltwiseLayerTest::transformInputShapesAccordingEltwise(const ov::PartialSha
 }
 
 void EltwiseLayerTest::SetUp() {
+    m_parallel_validation = false;
     Config additional_config;
     const auto& [shapes,
                  eltwise_type,

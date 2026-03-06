@@ -48,6 +48,7 @@ std::string ConvolutionBackpropDataLayerTest::getTestCaseName(const testing::Tes
 }
 
 void ConvolutionBackpropDataLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [convBackpropDataParams, model_type, shapes, output_shape, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

@@ -105,6 +105,7 @@ std::string Gather8LayerTest::getTestCaseName(const testing::TestParamInfo<gathe
 }
 
 void Gather8LayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [shapes, indices_shape, axis_batch_idx, model_type, _targetDevice] = GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

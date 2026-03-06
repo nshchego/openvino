@@ -33,6 +33,7 @@ std::string GatherNDLayerTest::getTestCaseName(const testing::TestParamInfo<Gath
 }
 
 void GatherNDLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [shapes, indices_shape, batch_dims, model_type, indices_type, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

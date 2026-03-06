@@ -44,6 +44,7 @@ std::string MatMulLayerTest::getTestCaseName(const testing::TestParamInfo<MatMul
 }
 
 void MatMulLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [shapes, transpose, model_type, secondary_input_type, _targetDevice, additional_config] =
         this->GetParam();
     targetDevice = _targetDevice;

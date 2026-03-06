@@ -50,6 +50,7 @@ std::string DepthToSpaceLayerTest::getTestCaseName(const testing::TestParamInfo<
 }
 
 void DepthToSpaceLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [shapes, model_type, mode, block_size, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

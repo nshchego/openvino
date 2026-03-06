@@ -52,6 +52,7 @@ std::string LSTMCellTest::getTestCaseName(const testing::TestParamInfo<LSTMCellP
 }
 
 void LSTMCellTest::SetUp() {
+    m_parallel_validation = false;
     std::vector<float> activations_alpha;
     std::vector<float> activations_beta;
 

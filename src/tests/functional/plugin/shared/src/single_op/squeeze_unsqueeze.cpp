@@ -34,6 +34,7 @@ std::string SqueezeUnsqueezeLayerTest::getTestCaseName(const testing::TestParamI
 }
 
 void SqueezeUnsqueezeLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [shape_item, op_type, model_type, _targetDevice] = GetParam();
     targetDevice = _targetDevice;
     const auto& [input_shapes, axes] = shape_item;

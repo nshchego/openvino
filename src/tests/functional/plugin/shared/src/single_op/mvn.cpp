@@ -95,6 +95,7 @@ std::string Mvn6LayerTest::getTestCaseName(const testing::TestParamInfo<mvn6Para
 }
 
 void Mvn6LayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [shapes, model_type, axis_type, axes, normalize_variance, eps, eps_mode, _targetDevice] =
         this->GetParam();
     targetDevice = _targetDevice;

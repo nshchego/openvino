@@ -22,6 +22,7 @@ std::string ReduceOpsLayerTest::getTestCaseName(const testing::TestParamInfo<red
 }
 
 void ReduceOpsLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [axes, op_type, keep_dims, reduction_type, model_type, input_shape, _targetDevice] = GetParam();
     targetDevice = _targetDevice;
 

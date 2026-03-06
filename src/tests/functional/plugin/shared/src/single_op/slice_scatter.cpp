@@ -33,6 +33,7 @@ std::string SliceScatterLayerTest::getTestCaseName(const testing::TestParamInfo<
 }
 
 void SliceScatterLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [test_params, model_type, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
 

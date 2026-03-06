@@ -60,6 +60,7 @@ std::string NmsRotatedOpTest::getTestCaseName(const testing::TestParamInfo<NmsRo
 }
 
 void NmsRotatedOpTest::SetUp() {
+    m_parallel_validation = false;
     const auto& params          = this->GetParam();
     const auto& in_shapes       = std::get<0>(params);
     const auto& boxes_prc       = std::get<1>(params);

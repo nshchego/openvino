@@ -31,6 +31,7 @@ std::string Convert::getTestCaseName(const testing::TestParamInfo<ov::test::snip
 }
 
 void Convert::SetUp() {
+    m_parallel_validation = false;
     const auto& [inputShape, types, _ref_num_nodes, _ref_num_subgraphs, _targetDevice] = this->GetParam();
     ref_num_nodes = _ref_num_nodes;
     ref_num_subgraphs = _ref_num_subgraphs;

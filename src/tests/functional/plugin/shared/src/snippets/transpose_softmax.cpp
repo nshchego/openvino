@@ -44,6 +44,7 @@ void TransposeSoftmax::SetUp() {
 }
 
 void TransposeSoftmaxEltwise::SetUp() {
+    m_parallel_validation = false;
     const auto& [inputShapes, order, axis, _ref_num_nodes, _ref_num_subgraphs, _targetDevice] = this->GetParam();
     ref_num_nodes = _ref_num_nodes;
     ref_num_subgraphs = _ref_num_subgraphs;

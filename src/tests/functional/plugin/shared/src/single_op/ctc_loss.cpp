@@ -48,6 +48,7 @@ std::string CTCLossLayerTest::getTestCaseName(const testing::TestParamInfo<CTCLo
 }
 
 void CTCLossLayerTest::SetUp() {
+    m_parallel_validation = false;
     const auto& [ctcLossArgsSubset, shapes, fp_type, int_type, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     const auto& [logits_length,

@@ -65,6 +65,7 @@ std::shared_ptr<ov::Model> SharedMatmulAndGatherWeightsDecompression::initSubgra
 }
 
 void SharedMatmulAndGatherWeightsDecompression::SetUp() {
+    m_parallel_validation = false;
     const auto& [_targetDevice,
                  shape_params,
                  weights_precision,
