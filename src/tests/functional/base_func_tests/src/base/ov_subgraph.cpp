@@ -465,13 +465,13 @@ std::vector<ov::Tensor> SubgraphBaseTest::get_plugin_outputs() {
 
 void SubgraphBaseTest::validate() {
     std::vector<ov::Tensor> expectedOutputs, actualOutputs;
-    std::exception_ptr expected_outputs_error, actual_output_error;
 
 #ifndef NDEBUG
     actualOutputs = get_plugin_outputs();
     expectedOutputs = calculate_refs();
 #else
     if (m_parallel_validation) {
+        std::exception_ptr expected_outputs_error, actual_output_error;
         std::thread t_device([this, &actualOutputs, &actual_output_error] {
             // The try ... catch block is required to handle exceptions during output calculations and report as test fail.
             // If exception is not caught then application would be terminated with crash. (CVS-133676)
