@@ -31,7 +31,6 @@ protected:
     std::string cpuNodeType;
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [convType, numOut] = this->GetParam();
         cpuNodeType = nodeType2PluginType(convType);

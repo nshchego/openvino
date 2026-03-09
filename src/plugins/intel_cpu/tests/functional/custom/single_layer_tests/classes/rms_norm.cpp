@@ -85,7 +85,6 @@ void RMSNormLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& targetIn
 }
 
 void RMSNormLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     const auto& [inType, inputShapes, _targetDevice, cpuParams] = this->GetParam();
     targetDevice = _targetDevice;
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

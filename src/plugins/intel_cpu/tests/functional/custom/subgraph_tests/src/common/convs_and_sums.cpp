@@ -34,7 +34,6 @@ namespace test {
 class ConvsAndSums : virtual public SubgraphBaseStaticTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         ov::element::Type netPrecision = ov::element::f32;
 
         targetDevice = ov::test::utils::DEVICE_CPU;

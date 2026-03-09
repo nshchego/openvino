@@ -15,7 +15,6 @@ using namespace testing;
 class StridedSliceStaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v1::StridedSlice> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

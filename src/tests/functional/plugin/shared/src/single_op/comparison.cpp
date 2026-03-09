@@ -36,7 +36,6 @@ std::string ComparisonLayerTest::getTestCaseName(const testing::TestParamInfo<Co
 }
 
 void ComparisonLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [shapes, comparison_op_type, second_input_type, model_type, _targetDevice, additional_config] =
         this->GetParam();
     targetDevice = _targetDevice;

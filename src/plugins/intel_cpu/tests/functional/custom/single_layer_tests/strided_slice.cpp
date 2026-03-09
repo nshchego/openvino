@@ -86,7 +86,6 @@ protected:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [shapes, _ssParams, secondaryInputType, dataType, cpuParams] = this->GetParam();
         ssParams = _ssParams;
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

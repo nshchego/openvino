@@ -43,7 +43,6 @@ void FuseTransposeAndReorderTest::check_transpose_count(size_t expectedTranspose
 }
 
 void FuseTransposeAndReorderTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     SKIP_IF_CURRENT_TEST_IS_DISABLED();
     std::tie(input_shape, in_prec) = this->GetParam();

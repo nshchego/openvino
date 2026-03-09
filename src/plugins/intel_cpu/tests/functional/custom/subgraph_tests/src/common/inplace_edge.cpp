@@ -37,7 +37,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
         configuration.insert({ov::hint::inference_precision.name(), ov::element::f16});
         const ov::Shape inputShape = {1, 11, 3, 3};

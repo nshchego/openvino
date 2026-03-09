@@ -83,7 +83,6 @@ protected:
         }
     }
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [shapes, _sliceParams, secondaryInputType, netPrecision, cpuParams] = this->GetParam();
         sliceParams = _sliceParams;
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

@@ -55,7 +55,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inputShapes, activations, clip, netPrecision, cpuParams, additionalConfig] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
         targetDevice = ov::test::utils::DEVICE_CPU;

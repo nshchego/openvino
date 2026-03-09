@@ -16,7 +16,6 @@ using namespace testing;
 class AdaptiveAvgPoolV8StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v8::AdaptiveAvgPool> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

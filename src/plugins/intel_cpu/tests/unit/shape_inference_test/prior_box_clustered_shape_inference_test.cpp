@@ -16,7 +16,6 @@ using namespace testing;
 class PriorBoxClusteredV0StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0::PriorBoxClustered> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
 
         attrs.widths = {2.0f, 3.0f};

@@ -39,7 +39,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inputShape, inputPrecision, shift, axes, _targetDevice] = GetParam();
         targetDevice = _targetDevice;
         init_input_shapes({inputShape});

@@ -112,7 +112,6 @@ void MulticlassNmsLayerTest::generate_inputs(const std::vector<ov::Shape>& targe
 }
 
 void MulticlassNmsLayerTest::SetUp() {
-    m_parallel_validation = false;
     ov::op::util::MulticlassNmsBase::Attributes attrs;
 
     const auto& [shapes,

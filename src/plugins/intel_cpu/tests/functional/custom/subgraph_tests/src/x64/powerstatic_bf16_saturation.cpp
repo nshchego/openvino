@@ -39,7 +39,6 @@ namespace test {
 class PowerStaticBF16Saturation : virtual public SubgraphBaseTest, public CpuTestWithFusing {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         abs_threshold = 0;
         targetDevice = ov::test::utils::DEVICE_CPU;
         InputShape input0 = {{-1, -1}, {{1, 1}}};
@@ -115,7 +114,6 @@ TEST_F(PowerStaticBF16Saturation, CompareWithRefs) {
 class PowerStaticBetaBF16Saturation : virtual public SubgraphBaseTest, public CpuTestWithFusing {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         abs_threshold = 0;
         targetDevice = ov::test::utils::DEVICE_CPU;
         InputShape input0 = {{-1, -1}, {{1, 1}}};

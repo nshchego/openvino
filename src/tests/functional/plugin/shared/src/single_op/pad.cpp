@@ -39,7 +39,6 @@ std::string PadLayerTest::getTestCaseName(const testing::TestParamInfo<padLayerT
 }
 
 void PadLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [pads_begin, pads_end, arg_pad_value, pad_mode, model_type, shapes, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

@@ -90,7 +90,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
         const auto& [inType, inputShape] = this->GetParam();
         init_input_shapes({inputShape});

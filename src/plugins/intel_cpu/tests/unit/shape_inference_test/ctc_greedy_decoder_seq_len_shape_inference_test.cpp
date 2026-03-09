@@ -14,7 +14,6 @@ using namespace testing;
 
 class CTCGreedyDecoderSeqLenV6StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v6::CTCGreedyDecoderSeqLen> {
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

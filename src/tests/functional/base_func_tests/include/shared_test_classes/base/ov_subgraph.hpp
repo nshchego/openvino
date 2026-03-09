@@ -88,7 +88,6 @@ protected:
     bool is_report_stages = false;
     bool is_reported = false;
     double rel_influence_coef = 1.f;
-    bool m_parallel_validation = true;
 
     virtual std::vector<ov::Tensor> calculate_refs();
     virtual std::vector<ov::Tensor> get_plugin_outputs();

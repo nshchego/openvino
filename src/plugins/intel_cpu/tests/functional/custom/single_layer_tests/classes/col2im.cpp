@@ -57,7 +57,6 @@ void Col2ImLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& targetInp
 }
 
 void Col2ImLayerCPUTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [basicParamsSet, cpuParams] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
     const auto& [Col2ImParams, inputPrecision, indexPrecision, _targetDevice] = basicParamsSet;

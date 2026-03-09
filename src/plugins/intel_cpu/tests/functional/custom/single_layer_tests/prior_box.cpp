@@ -82,7 +82,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [specParams, netPrecision, inPrc, outPrc, inputShapes, imageShapes, _targetDevice] = GetParam();
         targetDevice = _targetDevice;
         selectedType = makeSelectedTypeStr("ref_any", ov::test::ElementType::i32);

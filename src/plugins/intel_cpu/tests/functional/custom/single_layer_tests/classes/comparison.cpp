@@ -42,7 +42,6 @@ std::string ComparisonLayerCPUTest::getTestCaseName(const testing::TestParamInfo
 }
 
 void ComparisonLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     const auto& [shapes, comparisonType, secondInType, modelPrc, inferPrc, enforceSnippets] = this->GetParam();
     targetDevice = ov::test::utils::DEVICE_CPU;
 

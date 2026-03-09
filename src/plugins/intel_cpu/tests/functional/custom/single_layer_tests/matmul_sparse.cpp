@@ -128,7 +128,6 @@ protected:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         abs_threshold = 0.5f;
         const auto& [shapeRelatedParams, inType, weiType, outType, fusingParams, cpuParams, additionalConfig,
                      weiSparseRate] = this->GetParam();

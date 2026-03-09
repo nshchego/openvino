@@ -69,7 +69,6 @@ void MatMulBase::generate_inputs(const std::vector<ov::Shape>& targetInputStatic
 }
 
 void MatMul::SetUp() {
-    m_parallel_validation = false;
     const auto& [input_shapes,
                  elem_types,
                  _matmul_type,

@@ -60,7 +60,6 @@ protected:
     size_t inferNum = 0;
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [axis, inputShape, netPrecision, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

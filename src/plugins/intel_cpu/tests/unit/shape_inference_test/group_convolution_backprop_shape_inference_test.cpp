@@ -17,7 +17,6 @@ class GroupConvolutionBackpropDataStaticShapeInferenceTest
     : public OpStaticShapeInferenceTest<op::v1::GroupConvolutionBackpropData> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

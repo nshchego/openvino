@@ -188,7 +188,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         ReorderCustomImplTestParamSet p = ::testing::TestWithParam<ReorderCustomImplTestParamSet>::GetParam();
         srcDims = p.srcDims;
 
@@ -354,7 +353,6 @@ protected:
     };
 
     void SetUp() override {
-        m_parallel_validation = false;
         ReorderCPUTestParamSet reorderTestParam = this->GetParam();
         BuildReorderParams reorderParams;
         reorderParams.srcLayout = reorderTestParam.srcLayout;

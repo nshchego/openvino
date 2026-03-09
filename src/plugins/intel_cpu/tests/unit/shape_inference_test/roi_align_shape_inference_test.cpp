@@ -16,7 +16,6 @@ template <typename T>
 class StaticShapeROIAlignTest : public OpStaticShapeInferenceTest<T> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         this->output_shapes.resize(1);
     }
 };

@@ -16,7 +16,6 @@ using namespace testing;
 class ReverseSequenceV0StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0::ReverseSequence> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
 
         data = std::make_shared<Parameter>(element::f32, PartialShape::dynamic());

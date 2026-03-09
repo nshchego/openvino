@@ -76,7 +76,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const size_t batch_size_pos = 0;
         const size_t seq_length_pos = 1;
         const auto& [seqType, hidden_size, input_size, inShapeParams, activations, clip, linearBeforeReset, direction,

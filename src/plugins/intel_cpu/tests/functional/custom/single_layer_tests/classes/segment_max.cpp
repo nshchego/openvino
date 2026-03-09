@@ -71,7 +71,6 @@ void SegmentMaxLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& targe
 }
 
 void SegmentMaxLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     const auto& [basicParamsSet, cpuParams] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
     const auto& [SegmentMaxParams, inputPrecision, useNumSegments, secondaryInputType, _targetDevice] = basicParamsSet;

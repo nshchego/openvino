@@ -26,7 +26,6 @@ struct UseHTTestCase {
 class UseHTTests : public ov::test::TestsCommon, public testing::WithParamInterface<std::tuple<UseHTTestCase>> {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         auto test_data = std::get<0>(GetParam());
 
         std::vector<std::vector<int>> test_result_table =

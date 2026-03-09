@@ -38,7 +38,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, inputPrecision, kernelSize, strides, rates, padType] = this->GetParam();
         selectedType = makeSelectedTypeStr("ref_any", inputPrecision);

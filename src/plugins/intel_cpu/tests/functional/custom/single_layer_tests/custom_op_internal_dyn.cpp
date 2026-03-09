@@ -77,7 +77,6 @@ public:
 class CustomOpCPUTest : public SubgraphBaseTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         InputShape inputShapes{{-1, -1, -1}, {{10, 5, 3}, {16, 24, 16}, {4, 8, 12}}};

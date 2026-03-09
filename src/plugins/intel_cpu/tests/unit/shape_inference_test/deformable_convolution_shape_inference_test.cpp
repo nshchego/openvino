@@ -16,7 +16,6 @@ class DeformableConvolutionV8StaticShapeInferenceTest
     : public OpStaticShapeInferenceTest<op::v8::DeformableConvolution> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

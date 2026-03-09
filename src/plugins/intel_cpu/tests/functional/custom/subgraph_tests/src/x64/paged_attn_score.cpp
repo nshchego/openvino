@@ -177,7 +177,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inType, inputShapes, score_aggregation_window] = this->GetParam();
         targetDevice = ov::test::utils::DEVICE_CPU;
         rel_threshold = 0.01f;

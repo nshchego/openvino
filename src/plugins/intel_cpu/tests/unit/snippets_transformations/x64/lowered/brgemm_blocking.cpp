@@ -110,7 +110,6 @@ public:
     BrgemmCPUBlockingTest() = default;
 
     void SetUp() override {
-        m_parallel_validation = false;
         pipeline.register_pass<ov::intel_cpu::pass::BrgemmCPUBlocking>();
     }
 };
@@ -514,7 +513,6 @@ public:
     BrgemmTPPBlockingTest() : BrgemmBlockingTest() {}
 
     void SetUp() override {
-        m_parallel_validation = false;
         pipeline.register_pass<ov::intel_cpu::tpp::pass::BrgemmTPPBlocking>();
     }
 };

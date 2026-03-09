@@ -58,7 +58,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [shapes, _blank, preprocessCollapseRepeated, ctcMergeRepeated, unique, fPrecision, iPrecision] =
             GetParam();
         blank = _blank;

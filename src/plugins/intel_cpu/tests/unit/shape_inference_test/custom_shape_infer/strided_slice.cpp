@@ -52,7 +52,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         std::tie(input_shapes, data, begin_mask, end_mask, new_axis_mask, shrink_axis_mask, exp_shape) = GetParam();
         output_shapes = unit_test::ShapeVector(0);
         output_shapes.push_back(exp_shape);

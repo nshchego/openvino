@@ -29,7 +29,6 @@ using transpose_params = std::tuple<std::vector<size_t>,  // transpose order
 class StaticShapeInferenceTest : public TestWithParam<transpose_params> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         std::tie(transpose_order, input_shape, exp_shape) = GetParam();
 
         transpose = make_transpose(input_shape, transpose_order);

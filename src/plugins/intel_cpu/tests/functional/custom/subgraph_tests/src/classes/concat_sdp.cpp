@@ -55,7 +55,6 @@ std::string ConcatSDPTest::getTestCaseName(const testing::TestParamInfo<ConcatSD
 }
 
 void ConcatSDPTest::SetUp() {
-        m_parallel_validation = false;
     const auto& [inType, inputShapes, _m_forceKVU8, _m_hasShapeOf, _m_isDiffKVHeadSize] = this->GetParam();
     m_forceKVU8 = _m_forceKVU8;
     m_hasShapeOf = _m_hasShapeOf;

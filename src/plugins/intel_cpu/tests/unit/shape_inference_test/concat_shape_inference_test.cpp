@@ -23,7 +23,6 @@ class ConcatStaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0:
                                        public WithParamInterface<TestParams> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         std::tie(concat_axis, input_shapes, exp_shape) = GetParam();
 
         for (const auto& in : input_shapes) {

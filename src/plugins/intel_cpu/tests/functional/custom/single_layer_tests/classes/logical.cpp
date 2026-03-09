@@ -44,7 +44,6 @@ std::string LogicalLayerCPUTest::getTestCaseName(const testing::TestParamInfo<Lo
 }
 
 void LogicalLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     const auto& [shapes, logicalType, secondInType, enforceSnippets] = this->GetParam();
     targetDevice = ov::test::utils::DEVICE_CPU;
 

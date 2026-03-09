@@ -12,7 +12,6 @@ using namespace ov::intel_cpu;
 class ScatterNDUpdateV3StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v3::ScatterNDUpdate> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

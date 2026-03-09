@@ -93,7 +93,6 @@ std::string DFTLayerTest::getTestCaseName(const testing::TestParamInfo<DFTParams
 }
 
 void DFTLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [shapes, model_type, axes, signal_size, op_type, dev, axes_in_type, size_in_type] = this->GetParam();
     targetDevice = dev;
 

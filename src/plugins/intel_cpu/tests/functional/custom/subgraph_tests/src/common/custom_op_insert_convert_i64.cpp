@@ -117,7 +117,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         SKIP_IF_CURRENT_TEST_IS_DISABLED();
         targetDevice = test::utils::DEVICE_CPU;
 

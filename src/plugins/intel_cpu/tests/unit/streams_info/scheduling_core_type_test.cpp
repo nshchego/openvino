@@ -25,7 +25,6 @@ class SchedulingCoreTypeTests : public ov::test::TestsCommon,
                                 public testing::WithParamInterface<std::tuple<SchedulingCoreTypeTestCase>> {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& test_data = std::get<0>(GetParam());
         auto test_input_type = test_data.input_type;
 

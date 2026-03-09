@@ -40,7 +40,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [shapes, inType, shuffleChannelsParams, cpuParams] = this->GetParam();
         const auto& [axis, group] = shuffleChannelsParams;
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

@@ -24,7 +24,6 @@ template <typename TGather>
 class CpuShapeInferenceGatherTest : public unit_test::OpCpuShapeInferenceTest<TGather> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         this->output_shapes.resize(0);
     }
 

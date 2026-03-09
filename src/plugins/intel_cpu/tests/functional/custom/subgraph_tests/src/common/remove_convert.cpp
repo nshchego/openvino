@@ -36,7 +36,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inType, inputShape, additionalConfig] = this->GetParam();
         configuration.insert(additionalConfig.begin(), additionalConfig.end());
         targetDevice = ov::test::utils::DEVICE_CPU;
@@ -81,7 +80,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inType, inputShape, additionalConfig] = this->GetParam();
         targetDevice = ov::test::utils::DEVICE_CPU;
 

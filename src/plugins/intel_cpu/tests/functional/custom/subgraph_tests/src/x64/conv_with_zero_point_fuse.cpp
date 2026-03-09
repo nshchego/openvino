@@ -31,7 +31,6 @@ std::string ConvWithZeroPointFuseSubgraphTest::getTestCaseName(const testing::Te
 }
 
 void ConvWithZeroPointFuseSubgraphTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [type, inputShapes] = this->GetParam();
     pluginTypeNode = nodeType2PluginType(type);

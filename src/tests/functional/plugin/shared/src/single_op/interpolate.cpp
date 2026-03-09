@@ -58,7 +58,6 @@ std::string InterpolateLayerTest::getTestCaseName(const testing::TestParamInfo<I
 }
 
 void InterpolateLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [interpolate_params, model_type, shapes, target_shape, _targetDevice, additional_config] =
         this->GetParam();
     targetDevice = _targetDevice;

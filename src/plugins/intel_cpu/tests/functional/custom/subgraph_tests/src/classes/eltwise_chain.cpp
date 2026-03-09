@@ -79,7 +79,6 @@ void EltwiseChainTest::generate_inputs(const std::vector<ov::Shape>& targetInput
 }
 
 void EltwiseChainTest::SetUp() {
-        m_parallel_validation = false;
     abs_threshold = 0.1f;
     const auto& [inputShapes, secondaryInputType, inputPrecisions, eltwiseOpTypes, postNode, conversion,
                  _targetDevice] = this->GetParam();

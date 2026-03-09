@@ -87,7 +87,6 @@ std::string PoolingLayerCPUTest::getTestCaseName(const testing::TestParamInfo<po
 }
 
 void PoolingLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [basicParamsSet, inputShapes, inPrc, isInt8, cpuParams, fusingParams, additionalConfig] =
         this->GetParam();
@@ -173,7 +172,6 @@ std::string AvgPoolingV14LayerCPUTest::getTestCaseName(const testing::TestParamI
 }
 
 void AvgPoolingV14LayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [basicParamsSet, inputShapes, inPrc, isInt8, cpuParams, fusingParams, additionalConfig] =
         this->GetParam();
@@ -250,7 +248,6 @@ std::string MaxPoolingV8LayerCPUTest::getTestCaseName(
 }
 
 void MaxPoolingV8LayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [basicParamsSet, inputShapes, inPrc, cpuParams, additionalConfig] = this->GetParam();
     configuration.insert(additionalConfig.begin(), additionalConfig.end());
@@ -316,7 +313,6 @@ const testing::TestParamInfo<maxPoolV8LayerCpuTestParamsSet>& obj) {
 }
 
 void MaxPoolingV14LayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [basicParamsSet, inputShapes, inPrc, cpuParams, additionalConfig] = this->GetParam();
     configuration.insert(additionalConfig.begin(), additionalConfig.end());

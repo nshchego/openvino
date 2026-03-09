@@ -169,7 +169,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inType, inputShapes] = this->GetParam();
         targetDevice = ov::test::utils::DEVICE_CPU;
         configuration[ov::hint::inference_precision.name()] = ov::element::f32;

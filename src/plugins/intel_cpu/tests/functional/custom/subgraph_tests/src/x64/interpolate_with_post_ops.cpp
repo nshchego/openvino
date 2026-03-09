@@ -29,7 +29,6 @@ public:
 protected:
     bool NCHWAsNHWC_NoFuse = false;
     void SetUp() override {
-        m_parallel_validation = false;
         NCHWAsNHWC_NoFuse = GetParam();
         ov::element::Type netPrecision = ov::element::f32;
         targetDevice = ov::test::utils::DEVICE_CPU;

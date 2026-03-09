@@ -159,7 +159,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [commonAttrs, specificAttrs, batch, _objectness_score, replaceDynamicShapesToIntervals,
                      _targetDevice] = this->GetParam();
         attrs.objectness_score = _objectness_score;

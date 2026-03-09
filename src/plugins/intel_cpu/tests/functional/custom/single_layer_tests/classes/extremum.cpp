@@ -45,7 +45,6 @@ std::string ExtremumLayerCPUTest::getTestCaseName(const testing::TestParamInfo<E
 }
 
 void ExtremumLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [inputShapes, extremumType, netPrecision, inPrecision, outPrecision, cpuParams, enforceSnippets] =
         this->GetParam();

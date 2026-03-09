@@ -128,7 +128,6 @@ void EltwiseLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& targetIn
 }
 
 void EltwiseLayerCPUTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [basicParamsSet, cpuParams, fusingParams, enforceSnippets] = this->GetParam();
     const auto& [_shapes, _eltwiseType, secondaryInputType, opType, _netType, _inType, _outType, _targetDevice,
                  additionalConfig] = basicParamsSet;

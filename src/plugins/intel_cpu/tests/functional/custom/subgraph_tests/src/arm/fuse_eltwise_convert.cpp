@@ -55,7 +55,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [eltwiseType, convertOutType] = this->GetParam();
         const ov::Shape inputShape = {1, 64, 12, 12};

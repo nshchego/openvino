@@ -14,7 +14,6 @@ template <class T>
 class RegPoolTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         if (typename T::RegT(0).isREG()) { // for general purpose registers Reg8, Reg16, Reg32, Reg64
             regNumber = 15; // the RSP register excluded by default
         } else if (typename T::RegT(0).isOPMASK()) {

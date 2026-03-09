@@ -213,7 +213,6 @@ protected:
     size_t patternType;
     ExpectedNodes expectedNodes;
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inputShapes, inputPrecisions, matMulIn0Precisions, _patternType, _expectedNodes, _targetDevice] =
             this->GetParam();
         patternType = _patternType;
@@ -604,7 +603,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         abs_threshold = 0.1f;
         const auto& [inputShapes, inputPrecisions, matMulIn0Precisions, patternType, expectedNodes, _targetDevice] =
             this->GetParam();

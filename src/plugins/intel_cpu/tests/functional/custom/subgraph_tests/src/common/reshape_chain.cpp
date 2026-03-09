@@ -13,7 +13,6 @@ namespace test {
 
 class ReshapeChain : public SubgraphBaseTest {
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         InputShape inputShapes{{-1, -1, -1, -1}, {{10, 20, 30, 40}, {16, 24, 16, 24}, {4, 8, 12, 16}}};

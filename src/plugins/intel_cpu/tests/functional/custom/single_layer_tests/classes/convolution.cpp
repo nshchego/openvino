@@ -149,7 +149,6 @@ void ConvolutionLayerCPUTest::generate_inputs(const std::vector<ov::Shape>& targ
 }
 
 void ConvolutionLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     rel_threshold = 1e-4f;
     const auto& [basicParamsSet, cpuParams, extraOpsParams, additionalConfig] = this->GetParam();
     const auto& [fusingParams, qinfo] = extraOpsParams;

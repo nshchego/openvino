@@ -62,7 +62,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const ElementType intInputsPrecision = ElementType::i64;
         const auto &[inputShapes, axisAndBatchDims, netPrecision, isAxisConstant, cpuParams, additionalConfig] =
             this->GetParam();
@@ -176,7 +175,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         constexpr ElementType intInputsPrecision = ElementType::i64;
         constexpr int batchDims = 0;
         const auto &[inputShapes, indices, axis, netPrecision, cpuParams] = this->GetParam();

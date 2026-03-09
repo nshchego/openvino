@@ -27,7 +27,6 @@ class CpuPinningTests : public ov::test::TestsCommon,
                         public testing::WithParamInterface<std::tuple<CpuPinningTestCase>> {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         auto test_data = std::get<0>(GetParam());
         CPU& cpu = cpu_info();
         cpu._cpu_mapping_table = test_data.input_cpu_map_table;

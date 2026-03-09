@@ -15,7 +15,6 @@ using namespace testing;
 class SliceStaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v8::Slice> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(num_of_outputs);
     }
 

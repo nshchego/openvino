@@ -21,7 +21,6 @@ namespace v0 {
 class SqueezeV0StaticShapeInferenceAssertTest : public OpStaticShapeInferenceTest<op::v0::Squeeze> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes = StaticShapeVector(1);
     }
 };
@@ -59,7 +58,6 @@ class SqueezeV0StaticShapeInferenceTest : public SqueezeV0StaticShapeInferenceAs
                                         public WithParamInterface<TestParams> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         SqueezeV0StaticShapeInferenceAssertTest::SetUp();
         std::tie(input_shapes, axes, exp_shape) = GetParam();
 
@@ -135,7 +133,6 @@ namespace v15 {
 class SqueezeV15StaticShapeInferenceAssertTest : public OpStaticShapeInferenceTest<op::v15::Squeeze> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes = StaticShapeVector(1);
     }
 };
@@ -173,7 +170,6 @@ class SqueezeV15StaticShapeInferenceTest : public SqueezeV15StaticShapeInference
                                         public WithParamInterface<TestParams> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         SqueezeV15StaticShapeInferenceAssertTest::SetUp();
         std::tie(input_shapes, axes, exp_shape) = GetParam();
 

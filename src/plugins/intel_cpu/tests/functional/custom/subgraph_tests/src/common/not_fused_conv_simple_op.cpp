@@ -14,7 +14,6 @@ namespace test {
 class NotFusedConvSimpleOp : virtual public ov::test::SubgraphBaseStaticTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         ov::ParameterVector inputParams{

@@ -37,7 +37,6 @@ namespace test {
 class SplitConcatAddInPlace : virtual public ov::test::SubgraphBaseTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto precision = ov::element::f32;
         ov::test::InputShape input_shape{{}, {{1, 3, 3, 3}}};

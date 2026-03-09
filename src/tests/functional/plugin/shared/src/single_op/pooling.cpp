@@ -53,7 +53,6 @@ std::string PoolingLayerTest::getTestCaseName(const testing::TestParamInfo<poolL
 }
 
 void PoolingLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [pool_params, model_type, shapes, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
 
@@ -181,7 +180,6 @@ std::string AvgPoolingV16LayerTest::getTestCaseName(const testing::TestParamInfo
 }
 
 void AvgPoolingV16LayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [basicParamsSet, inPrc, inputShapes, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
 

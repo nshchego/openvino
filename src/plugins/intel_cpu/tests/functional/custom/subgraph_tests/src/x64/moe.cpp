@@ -111,7 +111,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [moe_params, moe_type, additional_config] = GetParam();
 
@@ -178,7 +177,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         rel_threshold = 5e-4f;

@@ -67,7 +67,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         const ov::Shape tensor_shape = {3, 32, 7, 7};

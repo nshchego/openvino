@@ -15,8 +15,7 @@ using namespace testing;
 
 class RandomUniformV8StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v8::RandomUniform> {
 protected:
-    void SetUp() override {
-        m_parallel_validation = false;}
+    void SetUp() override {}
 
     uint64_t global_seed = 120, op_seed = 100;
 };

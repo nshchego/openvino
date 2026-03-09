@@ -71,7 +71,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& shape = std::get<0>(GetParam());
         const auto& params = std::get<1>(GetParam());
         OPENVINO_ASSERT(shape.size() == 4 || shape.size() == 3,

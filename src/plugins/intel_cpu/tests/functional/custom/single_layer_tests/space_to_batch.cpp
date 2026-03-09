@@ -93,7 +93,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, _blockShape, _padsBegin, _padsEnd, netPrecision, cpuParams] = this->GetParam();
         blockShape = _blockShape;

@@ -51,7 +51,6 @@ std::string ISTFTLayerTest::getTestCaseName(const testing::TestParamInfo<ISTFTPa
 }
 
 void ISTFTLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [data_shapes,
                  frame_size,
                  frame_step,

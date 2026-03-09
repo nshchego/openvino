@@ -35,7 +35,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         std::tie(input_shapes, axes, exp_shape) = GetParam();
 
         output_shapes = unit_test::ShapeVector(0);

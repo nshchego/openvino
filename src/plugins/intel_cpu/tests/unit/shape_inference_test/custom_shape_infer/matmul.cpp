@@ -35,7 +35,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         std::tie(a_shape, b_shape) = GetParam();
         (*exp_shape).clear();
         set_exp_shape();

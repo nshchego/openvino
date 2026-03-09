@@ -54,7 +54,6 @@ std::string ReduceCPULayerTest::getTestCaseName(const testing::TestParamInfo<Red
 }
 
 void ReduceCPULayerTest::SetUp() {
-        m_parallel_validation = false;
     targetDevice = ov::test::utils::DEVICE_CPU;
     const auto& [basicParams, cpuParams, fusingParams, additionalConfig] = this->GetParam();
     std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

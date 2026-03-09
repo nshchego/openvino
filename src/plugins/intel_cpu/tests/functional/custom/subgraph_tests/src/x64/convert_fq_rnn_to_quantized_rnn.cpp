@@ -89,7 +89,6 @@ protected:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         selectedType = "ref_any_I8";
         const auto& [rnnType, origInputShapes, quantizedHiddenState] = this->GetParam();

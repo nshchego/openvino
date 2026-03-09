@@ -153,7 +153,6 @@ protected:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, transpose, origWeiConstElemType, additionalConfig, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
@@ -405,7 +404,6 @@ INSTANTIATE_TEST_SUITE_P(smoke_FC_3D_BF16,
 class MatMulDecompressConvertTest2 : public MatMulDecompressConvertTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, transpose, origWeiConstElemType, additionalConfig, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;
@@ -539,7 +537,6 @@ INSTANTIATE_TEST_SUITE_P(smoke_FC_2D_FP16_2,
 class MatMulDecompressConvertTest3 : public MatMulDecompressConvertTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShapes, transpose, weiConstElemType, additionalConfig, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

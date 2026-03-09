@@ -61,7 +61,6 @@ class StreamGenerationTests : public ov::test::TestsCommon,
                               public testing::WithParamInterface<std::tuple<StreamGenerateionTestCase>> {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         auto test_data = std::get<0>(GetParam());
         ov::intel_cpu::Config config;
         make_config(test_data, config);

@@ -15,7 +15,6 @@ namespace test {
 class StaticZeroDims : public SubgraphBaseTest {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
 
         InputShape inputShapes{{}, {{7, 4}}};

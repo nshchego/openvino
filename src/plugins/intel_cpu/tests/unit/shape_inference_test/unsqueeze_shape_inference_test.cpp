@@ -17,7 +17,6 @@ using namespace testing;
 class UnsqueezeStaticShapeInferenceAssertTest : public OpStaticShapeInferenceTest<op::v0::Unsqueeze> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes = StaticShapeVector(1);
     }
 };
@@ -62,7 +61,6 @@ class UnsqueezeStaticShapeInferenceTest : public UnsqueezeStaticShapeInferenceAs
                                           public WithParamInterface<TestParams> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         UnsqueezeStaticShapeInferenceAssertTest::SetUp();
         std::tie(input_shapes, axes, exp_shape) = GetParam();
 

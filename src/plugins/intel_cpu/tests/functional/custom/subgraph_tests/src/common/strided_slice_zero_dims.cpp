@@ -31,7 +31,6 @@ namespace test {
 class StridedSliceZeroDimsTest : public SubgraphBaseTest {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         InputShape inpShape0 = {{}, {{56}}};
         InputShape inpShape1 = {{-1, -1, 768}, {{1, 544, 768}}};

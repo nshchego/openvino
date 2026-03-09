@@ -16,7 +16,6 @@ using namespace testing;
 class DepthToSpaceV0StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0::DepthToSpace> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         input_shapes = {StaticShape{1, 16, 3, 1080, 1616}};
         output_shapes.resize(1);
     }

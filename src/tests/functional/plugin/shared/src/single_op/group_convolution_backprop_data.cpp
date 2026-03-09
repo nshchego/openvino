@@ -47,7 +47,6 @@ std::string GroupConvBackpropLayerTest::getTestCaseName(const testing::TestParam
 }
 
 void GroupConvBackpropLayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [group_conv_backprop_data_params, model_type, shapes, output_shape, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
 

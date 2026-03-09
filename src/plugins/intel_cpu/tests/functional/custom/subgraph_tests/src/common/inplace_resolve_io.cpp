@@ -69,7 +69,6 @@ Edge Concat -> Result0 can share memory of inference output; Reshape1 -> Result1
 */
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         constexpr size_t softmax_axis = 1ul;
         constexpr size_t hidden_size = 3;
         targetDevice = ov::test::utils::DEVICE_CPU;
@@ -180,7 +179,6 @@ expect edge Reshape0->Result1 to be referenced by its upstreams, instead of refe
 */
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         constexpr size_t softmax_axis = 1ul;
         targetDevice = ov::test::utils::DEVICE_CPU;
         auto& input_shape = this->GetParam();
@@ -231,7 +229,6 @@ could get a chance to be referenced by infer request.
 */
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         constexpr size_t softmax_axis = 1ul;
         targetDevice = ov::test::utils::DEVICE_CPU;
         auto& input_shape = this->GetParam();
@@ -279,7 +276,6 @@ Edge Reshape0 -> Result0 cannot be referenced by its upstreams as its upstream i
 */
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         auto& input_shape = this->GetParam();
         init_input_shapes({input_shape});

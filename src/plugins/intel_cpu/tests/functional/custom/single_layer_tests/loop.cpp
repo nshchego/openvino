@@ -86,7 +86,6 @@ protected:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [trip_count_type, trip_count, exec_cond, shapes, types, netType] = this->GetParam();
         targetDevice = ov::test::utils::DEVICE_CPU;
         init_input_shapes(shapes);
@@ -163,7 +162,6 @@ protected:
     //  i += 2
 
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [trip_count_type, trip_count, exec_cond, shapes, types, _inType] = this->GetParam();
         inType = _inType;
         targetDevice = ov::test::utils::DEVICE_CPU;
@@ -232,7 +230,6 @@ class LoopForDiffShapesLayerCPUTest : public LoopLayerCPUTest {
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [trip_count_type, trip_count, exec_cond, shapes, types, _inType] = this->GetParam();
         inType = _inType;
         targetDevice = ov::test::utils::DEVICE_CPU;
@@ -306,7 +303,6 @@ class LoopForConcatLayerCPUTest : public LoopLayerCPUTest {
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [trip_count_type, trip_count, exec_cond, shapes, types, _inType] = this->GetParam();
         inType = _inType;
         targetDevice = ov::test::utils::DEVICE_CPU;
@@ -362,7 +358,6 @@ protected:
 
 class StaticLoopDynamicSubgraphCPUTest : public SubgraphBaseTest {
     void SetUp() override {
-        m_parallel_validation = false;
         InputShape input_shape = {{25, 1, 1}, {{25, 1, 1}, {25, 1, 1}}};  // infer more than once
         InputShape input_exec_flag_shape = {{1}, {{1}, {1}}};
         targetDevice = ov::test::utils::DEVICE_CPU;

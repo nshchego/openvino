@@ -32,7 +32,6 @@ namespace test {
 class InputOutputTensorReuse : public SubgraphBaseTest {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         constexpr size_t softmax_axis = 1ul;
         constexpr int concat_axis = 2;
         targetDevice = ov::test::utils::DEVICE_CPU;

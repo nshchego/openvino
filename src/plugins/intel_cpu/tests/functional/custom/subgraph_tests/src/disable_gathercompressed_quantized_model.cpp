@@ -43,7 +43,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
         const auto& [weight_prec, inputShape1, inputShape2] = GetParam();
         init_input_shapes({inputShape1, inputShape2});

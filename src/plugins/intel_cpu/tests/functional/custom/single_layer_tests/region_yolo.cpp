@@ -49,7 +49,6 @@ public:
     }
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [inputShape, attributes, mask, inPrc, outPrc, additionalConfig, _targetDevice] = this->GetParam();
         targetDevice = _targetDevice;
         if (inPrc == ov::test::ElementType::bf16) {

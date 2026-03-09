@@ -40,7 +40,6 @@ protected:
     size_t constNodeNum;
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [nonConstShape, constShape, prc, nodeType, port, _constNodeNum] = this->GetParam();
         constNodeNum = _constNodeNum;

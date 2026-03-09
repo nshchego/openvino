@@ -62,7 +62,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto &[inputShapes, decompose, activations, clip, linearBeforeReset, netPrecision, cpuParams,
                      additionalConfig] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

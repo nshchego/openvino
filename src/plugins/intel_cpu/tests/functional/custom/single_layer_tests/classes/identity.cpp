@@ -33,7 +33,6 @@ std::string IdentityLayerTestCPU::getTestCaseName(const testing::TestParamInfo<I
 }
 
 void IdentityLayerTestCPU::SetUp() {
-        m_parallel_validation = false;
     targetDevice = utils::DEVICE_CPU;
 
     const auto& [output_shape, output_precision, const_input, cpu_params, additionalConfig] = this->GetParam();

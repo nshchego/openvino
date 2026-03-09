@@ -23,7 +23,6 @@ class LinuxSortProcTableTests : public ov::test::TestsCommon,
                                 public testing::WithParamInterface<std::tuple<LinuxSortProcTableTestCase>> {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& test_data = std::get<0>(GetParam());
 
         std::vector<std::vector<int>> test_proc_type_table = test_data._proc_type_table_input;

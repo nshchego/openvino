@@ -33,7 +33,6 @@ Verify deconvolution node correctly handles
 class DeconvMultipleOutputEdges : virtual public SubgraphBaseStaticTest {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         auto ngPrc = ov::element::f32;
         const ov::Shape inShape = {2, 12, 7, 7};
         const ov::Shape weiShape = {12, 6, 3, 3};

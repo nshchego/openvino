@@ -38,7 +38,6 @@ std::string ExtractImagePatchesTest::getTestCaseName(const testing::TestParamInf
 }
 
 void ExtractImagePatchesTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [shapes, kernel, strides, rates, pad_type, model_type, _targetDevice] = this->GetParam();
     targetDevice = _targetDevice;
     init_input_shapes(shapes);

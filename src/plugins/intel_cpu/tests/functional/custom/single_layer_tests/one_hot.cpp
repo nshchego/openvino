@@ -81,7 +81,6 @@ public:
     }
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [inputShape, _Axis, _Mode, inputType, _Depth, _OnValue, _OffValue, _outType, cpuParams] =
             this->GetParam();

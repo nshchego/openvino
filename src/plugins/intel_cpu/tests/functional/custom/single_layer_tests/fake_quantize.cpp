@@ -67,7 +67,6 @@ protected:
     std::string layerName;
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [fqParams, testShapes, inPrec, inputRangesValues, shouldBeDecomposed, cpuParams] = this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

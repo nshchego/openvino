@@ -46,7 +46,6 @@ std::string MatrixNmsLayerTest::getTestCaseName(const testing::TestParamInfo<Nms
 }
 
 void MatrixNmsLayerTest::SetUp() {
-    m_parallel_validation = false;
     ov::op::v8::MatrixNms::Attributes attrs;
 
     const auto& [shapes,

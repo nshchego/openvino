@@ -20,7 +20,6 @@ class ScatterElementsUpdateV3StaticShapeInferenceTest
     : public OpStaticShapeInferenceTest<op::v3::ScatterElementsUpdate> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

@@ -151,7 +151,6 @@ protected:
 class InitGraphStatefulModel : public InitGraphStatefulModelBase {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
         const auto& [_inputShapes, directPair] = this->GetParam();
         inputShapes = _inputShapes;
@@ -214,7 +213,6 @@ TEST_P(InitGraphStatefulModel, CompareWithRefs) {
 class InitGraphStatefulDiffPrimitiveModel : public InitGraphStatefulModelBase {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
 
         configuration.insert({"SNIPPETS_MODE", "DISABLE"});
@@ -301,7 +299,6 @@ TEST_P(InitGraphStatefulDiffPrimitiveModel, CompareWithRefs) {
 class InitGraphStatefulModelFakeConvert : public InitGraphStatefulModelBase {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = utils::DEVICE_CPU;
 
         std::tie(inputShapes, directPair) = this->GetParam();

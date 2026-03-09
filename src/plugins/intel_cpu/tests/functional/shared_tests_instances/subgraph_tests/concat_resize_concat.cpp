@@ -33,7 +33,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         const auto& [channels_count, batch_count] = this->GetParam();
         std::vector<int> dims1({batch_count, channels_count, 2, 2});

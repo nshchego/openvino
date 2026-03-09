@@ -24,7 +24,6 @@ template <class TOp>
 class TopKTest : public OpStaticShapeInferenceTest<TOp>, public WithParamInterface<TopKTestParams> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         std::tie(this->input_shapes, this->axis, this->k, this->exp_shape) = GetParam();
         this->output_shapes.resize(2);
     }

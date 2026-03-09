@@ -42,7 +42,6 @@ namespace test {
 class ReLuConcatConvSumInPlaceTest : virtual public SubgraphBaseStaticTest {
 public:
     void SetUp() override {
-        m_parallel_validation = false;
         const ov::Shape inputShape = {1, 64, 12, 12};
         const std::vector<size_t> kernel = {1, 1};
         const std::vector<size_t> stride = {1, 1};

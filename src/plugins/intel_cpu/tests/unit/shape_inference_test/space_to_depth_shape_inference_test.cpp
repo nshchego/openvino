@@ -16,7 +16,6 @@ using namespace testing;
 class SpaceToDepthV0StaticShapeInferenceTest : public OpStaticShapeInferenceTest<op::v0::SpaceToDepth> {
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         output_shapes.resize(1);
     }
 };

@@ -45,7 +45,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto& [input_shape, layer_type, extra_multiply] = GetParam();
         targetDevice = ov::test::utils::DEVICE_CPU;
         std::tie(inFmts, outFmts, priority, selectedType) = CPUSpecificParams{{}, {}, {}, CPUTestsBase::any_type};

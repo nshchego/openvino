@@ -37,7 +37,6 @@ std::string SoftMaxLayerCPUTest::getTestCaseName(const testing::TestParamInfo<so
 }
 
 void SoftMaxLayerCPUTest::SetUp() {
-        m_parallel_validation = false;
     const auto& [inType, config, _targetDevice, cpuParams, additionalConfig] = this->GetParam();
     targetDevice = _targetDevice;
     configuration.insert(additionalConfig.begin(), additionalConfig.end());

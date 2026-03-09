@@ -215,7 +215,6 @@ public:
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         TransformationTestsF::SetUp();
         const auto& p = GetParam();
         const auto rank = p.input_shape.size();

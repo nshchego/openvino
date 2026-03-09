@@ -70,7 +70,6 @@ class LSTMSequenceCPUTest : public testing::WithParamInterface<LSTMSequenceCpuSp
 
 protected:
     void SetUp() override {
-        m_parallel_validation = false;
         const auto &[inputShapes, seqMode, activations, clip, direction, netPrecision, cpuParams, additionalConfig, dynamicBatch] =
             this->GetParam();
         std::tie(inFmts, outFmts, priority, selectedType) = cpuParams;

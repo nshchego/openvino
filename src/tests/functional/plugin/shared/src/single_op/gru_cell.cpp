@@ -59,7 +59,6 @@ std::string GRUCellTest::getTestCaseName(const testing::TestParamInfo<GRUCellPar
 }
 
 void GRUCellTest::SetUp() {
-    m_parallel_validation = false;
     std::vector<float> activations_alpha;
     std::vector<float> activations_beta;
 

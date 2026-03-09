@@ -90,7 +90,6 @@ std::string OneHot16LayerTest::getTestCaseName(const testing::TestParamInfo<oneH
 }
 
 void OneHot16LayerTest::SetUp() {
-    m_parallel_validation = false;
     const auto& [depth_type, depth_val, set_type, on_val, off_val, axis, model_type, shapes, mode, _targetDevice] =
         this->GetParam();
     targetDevice = _targetDevice;

@@ -47,7 +47,6 @@ public:
     }
 
     void SetUp() override {
-        m_parallel_validation = false;
         targetDevice = ov::test::utils::DEVICE_CPU;
         configuration = {{ov::hint::inference_precision.name(), ov::element::f16}};
 
