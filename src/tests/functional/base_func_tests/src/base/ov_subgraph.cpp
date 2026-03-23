@@ -76,11 +76,12 @@ void SubgraphBaseTest::run() {
         std::string errorMessage;
         try {
             compile_model();
-            uint32_t counter = 0U;
             for (const auto& targetStaticShapeVec : targetStaticShapes) {
                 generate_inputs(targetStaticShapeVec);
-                validate(m_check_models_caching && counter == 0U);
-                counter++;
+                validate();
+                // if (m_check_models_caching) {
+                //     models_cache();
+                // }
             }
             status = ov::test::utils::PassRate::Statuses::PASSED;
         } catch (const std::exception& ex) {
@@ -466,7 +467,7 @@ std::vector<ov::Tensor> SubgraphBaseTest::get_plugin_outputs() {
     return outputs;
 }
 
-void SubgraphBaseTest::validate(bool check_models_caching) {
+void SubgraphBaseTest::validate() {
     std::vector<ov::Tensor> expectedOutputs, actualOutputs;
     std::exception_ptr expected_outputs_error, actual_output_error;
 
@@ -500,7 +501,7 @@ void SubgraphBaseTest::validate(bool check_models_caching) {
     //     std::rethrow_exception(expected_outputs_error);
     // }
 
-    if (check_models_caching) {
+    if (m_check_models_caching) {
         const std::string gen_ir_name = ov::test::utils::generateTestFilePrefix();
         m_xml_path = gen_ir_name + ".xml";
         m_bin_path = gen_ir_name + ".bin";
