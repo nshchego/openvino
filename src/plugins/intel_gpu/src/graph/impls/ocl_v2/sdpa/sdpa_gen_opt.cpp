@@ -112,7 +112,21 @@ JitConstants SDPAOptGeneratorBase::get_jit_constants_base(const kernel_impl_para
         jit.make("K_HEAD_SIZE_LEFTOVER", k_head_size % subgroup_size);
         jit.make("V_HEAD_SIZE_LEFTOVER", v_head_size % subgroup_size);
     }
-    jit.make("SEQ_LEN_PARTITION_SIZE", get_seq_len_partition_size(info, v_head_size, stage));
+
+    auto seq_len_partition_size = get_seq_len_partition_size(info, v_head_size, stage);
+    if (stage == SDPAStage::MULTI_TOKENS && params.is_type<scaled_dot_product_attention>()) {
+        auto desc = params.typed_desc<scaled_dot_product_attention>();
+        auto extended_input_k_transpose_order = extend_order_in_num_heads_dim(desc->input_k_transpose_order);
+        const auto source_seq_len = get_seq_length(params.get_input_layout(1), extended_input_k_transpose_order);
+
+        // For very long prefill runs with 64-wide heads, the extra partition overhead dominates.
+        // Use a larger partition size when the device has enough local memory to keep the qk SLM buffer resident.
+        if (source_seq_len >= 32768 && v_head_size == 64 && info.max_local_mem_size >= (64 * 1024)) {
+            seq_len_partition_size = 512;
+        }
+    }
+
+    jit.make("SEQ_LEN_PARTITION_SIZE", seq_len_partition_size);
     jit.make("SG_SCALE_FACTOR", get_sg_number_scale_factor(info, v_head_size, stage));
 
     bool could_use_flashattn_v2 = params.get_program().get_config().get_could_use_flashattn_v2();
