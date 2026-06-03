@@ -16,9 +16,10 @@ std::vector<CPUSpecificParams> filterCPUInfo(const std::vector<CPUSpecificParams
 
 std::vector<CPUSpecificParams> filterCPUInfoForArch(const std::vector<CPUSpecificParams>& CPUParams) {
     std::vector<CPUSpecificParams> resCPUParams;
+    resCPUParams.reserve(CPUParams.size());
     const int selectedTypeIndex = 3;
 
-    for (auto param : CPUParams) {
+    for (const auto& param : CPUParams) {
         auto selectedTypeStr = std::get<selectedTypeIndex>(param);
 
         if (selectedTypeStr.find("shl") == std::string::npos &&
@@ -33,9 +34,10 @@ std::vector<CPUSpecificParams> filterCPUInfoForArch(const std::vector<CPUSpecifi
 
 std::vector<CPUSpecificParams> filterCPUInfoForDevice(const std::vector<CPUSpecificParams>& CPUParams) {
     std::vector<CPUSpecificParams> resCPUParams;
+    resCPUParams.reserve(CPUParams.size());
     const int selectedTypeIndex = 3;
 
-    for (auto param : CPUParams) {
+    for (const auto& param : CPUParams) {
         auto selectedTypeStr = std::get<selectedTypeIndex>(param);
 
         if (selectedTypeStr.find("jit") != std::string::npos)

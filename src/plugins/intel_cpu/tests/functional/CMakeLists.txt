@@ -115,7 +115,8 @@ ov_build_target_faster(${TARGET_NAME} PCH)
 include(cmake/specific_tests.cmake)
 include(cmake/target_per_test.cmake)
 
-# exclude 'ov_cpu_func_tests' from target 'all' if specific tests path was specified
-if(DEFINED ENABLE_CPU_SPECIFIC_TESTS_PATH)
+# exclude 'ov_cpu_func_tests' from target 'all' if subset tests path was specified
+# Keep backward compatibility with older variable name.
+if(DEFINED ENABLE_CPU_SUBSET_TESTS_PATH OR DEFINED ENABLE_CPU_SPECIFIC_TESTS_PATH)
     set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL ON)
 endif()
