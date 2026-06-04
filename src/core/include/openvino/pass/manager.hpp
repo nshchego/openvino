@@ -7,6 +7,7 @@
 #include <list>
 #include <memory>
 #include <typeinfo>
+#include <type_traits>
 #include <vector>
 
 #include "openvino/pass/pass.hpp"
@@ -49,11 +50,13 @@ public:
     std::shared_ptr<T> register_pass(Args&&... args) {
         auto rc = push_pass<T>(std::forward<Args>(args)...);
         rc->set_pass_config(m_pass_config);
-        if (m_per_pass_validation && T::get_type_info_static() != Validate::get_type_info_static()) {
+        if (m_per_pass_validation && !std::is_same<T, Validate>::value) {
             push_validate_pass();
         }
-        if (!Enable && !m_pass_config->is_enabled<T>()) {
-            m_pass_config->disable<T>();
+        if constexpr (!Enable) {
+            if (!m_pass_config->is_enabled<T>()) {
+                m_pass_config->disable<T>();
+            }
         }
         return rc;
     }

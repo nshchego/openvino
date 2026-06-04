@@ -316,15 +316,25 @@ private:
 
 }  // namespace
 
-ov::pass::Manager::Manager() : m_pass_config(std::make_shared<PassConfig>()) {}
+namespace {
+constexpr size_t kDefaultRegisteredPassesCapacity = 64;
+}
+
+ov::pass::Manager::Manager() : m_pass_config(std::make_shared<PassConfig>()) {
+    m_pass_list.reserve(kDefaultRegisteredPassesCapacity);
+}
 
 ov::pass::Manager::~Manager() = default;
 
-ov::pass::Manager::Manager(std::string name) : m_pass_config(std::make_shared<PassConfig>()), m_name(std::move(name)) {}
+ov::pass::Manager::Manager(std::string name) : m_pass_config(std::make_shared<PassConfig>()), m_name(std::move(name)) {
+    m_pass_list.reserve(kDefaultRegisteredPassesCapacity);
+}
 
 ov::pass::Manager::Manager(std::shared_ptr<ov::pass::PassConfig> pass_config, std::string name)
     : m_pass_config(std::move(pass_config)),
-      m_name(std::move(name)) {}
+      m_name(std::move(name)) {
+    m_pass_list.reserve(kDefaultRegisteredPassesCapacity);
+}
 
 ov::pass::Manager::Manager(const PassConfig& pass_config, std::string name)
     : Manager(std::make_shared<PassConfig>(pass_config), std::move(name)) {}
