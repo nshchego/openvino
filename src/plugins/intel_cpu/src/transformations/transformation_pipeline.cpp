@@ -726,21 +726,21 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
         },
         ov::pass::ConvertAvgPool14ToAvgPool1);
 
+    auto is_rnn_supported = [](const_node_ptr& node) -> bool {
+        std::string msg;
+        return node::RNN::isSupportedOperation(node, msg);
+    };
     CPU_SET_CALLBACK_COMMON(
         manager,
-        [](const_node_ptr& node) -> bool {
-            std::string msg;
-            return node::RNN::isSupportedOperation(node, msg);
-        },
+        is_rnn_supported,
         ov::pass::ConvertRNNSequenceToTensorIterator,
         ov::pass::ConvertGRUSequenceToTensorIterator,
         ov::pass::ConvertLSTMSequenceToTensorIterator);
 
     CPU_SET_CALLBACK_COMMON(
         manager,
-        [](const_node_ptr& node) -> bool {
-            std::string msg;
-            return !node::RNN::isSupportedOperation(node, msg);
+        [&is_rnn_supported](const_node_ptr& node) -> bool {
+            return !is_rnn_supported(node);
         },
         ov::pass::ConvertLoopToLSTMSequence,
         ov::pass::FuseReverseLSTMSequence,
@@ -748,19 +748,15 @@ void Transformations::PreLpt(const std::vector<ov::element::Type>& defaultPrecis
 
     CPU_SET_CALLBACK_COMMON(
         manager,
-        [](const_node_ptr& node) -> bool {
-            std::string msg;
-            return node::RNN::isSupportedOperation(node, msg);
-        },
+        is_rnn_supported,
         ov::pass::RNNCellDecomposition,
         ov::pass::GRUCellDecomposition,
         ov::pass::LSTMCellDecomposition);
 
     CPU_SET_CALLBACK_COMMON(
         manager,
-        [](const_node_ptr& node) -> bool {
-            std::string msg;
-            return !node::RNN::isSupportedOperation(node, msg);
+        [&is_rnn_supported](const_node_ptr& node) -> bool {
+            return !is_rnn_supported(node);
         },
         ov::pass::LSTMCellFusion);
 
@@ -1154,27 +1150,15 @@ void Transformations::PostLpt() {
         }
 
         CPU_REGISTER_PASS_X64(postLPTPassManager, QKVProjFusion);
-        CPU_SET_CALLBACK_X64(
-            postLPTPassManager,
-            [=](const_node_ptr& node) -> bool {
-                std::string errorMsg;
-                return node::QKVProjection::isSupportedOperation(node,
-                                                                 errorMsg,
-                                                                 concurrency,
-                                                                 fcDynamicQuantizationGroupSize);
-            },
-            QKVProjFusionPass1);
-
-        CPU_SET_CALLBACK_X64(
-            postLPTPassManager,
-            [=](const_node_ptr& node) -> bool {
-                std::string errorMsg;
-                return node::QKVProjection::isSupportedOperation(node,
-                                                                 errorMsg,
-                                                                 concurrency,
-                                                                 fcDynamicQuantizationGroupSize);
-            },
-            QKVProjFusionPass2);
+        auto qkv_proj_supported = [=](const_node_ptr& node) -> bool {
+            std::string errorMsg;
+            return node::QKVProjection::isSupportedOperation(node,
+                                                             errorMsg,
+                                                             concurrency,
+                                                             fcDynamicQuantizationGroupSize);
+        };
+        CPU_SET_CALLBACK_X64(postLPTPassManager, qkv_proj_supported, QKVProjFusionPass1);
+        CPU_SET_CALLBACK_X64(postLPTPassManager, qkv_proj_supported, QKVProjFusionPass2);
     }
 #endif  // OPENVINO_ARCH_X86_64
 
