@@ -218,18 +218,21 @@ ov::descriptor::Input& ov::Node::get_input_descriptor(size_t position) {
 }
 
 ov::descriptor::Output& ov::Node::get_output_descriptor(size_t position) {
-    while (m_outputs.size() <= position) {
-        const auto i = m_outputs.size();
-        m_outputs.emplace_back(this, i, make_shared<descriptor::Tensor>(element::dynamic, PartialShape::dynamic()));
+    if (position >= m_outputs.size()) {
+        const auto old_size = m_outputs.size();
+        for (size_t i = old_size; i <= position; ++i) {
+            m_outputs.emplace_back(this, i, make_shared<descriptor::Tensor>(element::dynamic, PartialShape::dynamic()));
+        }
     }
     return m_outputs[position];
 }
 
 void ov::Node::set_argument(size_t position, const Output<Node>& argument) {
+    const auto argument_index = argument.get_index();
     auto output_node = argument.get_node();
-    auto& output_descriptor = output_node->m_outputs.size() > argument.get_index()
-                                  ? output_node->m_outputs.at(argument.get_index())
-                                  : output_node->get_output_descriptor(argument.get_index());
+    auto& output_descriptor = output_node->m_outputs.size() > argument_index
+                                  ? output_node->m_outputs[argument_index]
+                                  : output_node->get_output_descriptor(argument_index);
     if (position < m_inputs.size()) {
         get_input_descriptor(position).replace_output(output_descriptor);
     } else {
@@ -246,9 +249,13 @@ void ov::Node::constructor_validate_and_infer_types() {
 
 void ov::Node::set_output_size(size_t n) {
     OPENVINO_ASSERT(n >= m_outputs.size(), "shrinking ", m_outputs.size(), " to ", n);
-    for (size_t i = m_outputs.size(); i < n; ++i) {
-        // create the descriptors
-        get_output_descriptor(i);
+    if (n == m_outputs.size()) {
+        return;
+    }
+
+    const auto old_size = m_outputs.size();
+    for (size_t i = old_size; i < n; ++i) {
+        m_outputs.emplace_back(this, i, make_shared<descriptor::Tensor>(element::dynamic, PartialShape::dynamic()));
     }
 }
 
@@ -270,7 +277,11 @@ void ov::Node::set_input_is_relevant_to_value(size_t i, bool relevant) {
 }
 
 void ov::Node::set_output_type(size_t i, const element::Type& element_type, const PartialShape& pshape) {
-    ov::descriptor::set_tensor_type(get_output_descriptor(i).get_tensor(), element_type, pshape);
+    if (i < m_outputs.size()) {
+        ov::descriptor::set_tensor_type(m_outputs[i].get_tensor(), element_type, pshape);
+    } else {
+        ov::descriptor::set_tensor_type(get_output_descriptor(i).get_tensor(), element_type, pshape);
+    }
 }
 
 std::string ov::Node::description() const {
