@@ -18,6 +18,8 @@ namespace utils {
 
 extern bool disable_tests_skipping;
 
+void set_disabled_tests_filter_from_patterns(const char* argv0);
+
 bool current_test_is_disabled();
 
 }  // namespace utils
