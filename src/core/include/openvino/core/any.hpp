@@ -592,10 +592,11 @@ class OPENVINO_API Any {
         T runtime_attribute;
     };
 
+    #define OPENVINO_RTTI_WRAP(T) OPENVINO_RTTI(#T)
     template <class T>
     struct Impl<T, typename std::enable_if<!std::is_convertible<T, std::shared_ptr<RuntimeAttribute>>::value>::type>
         : public Base {
-        OPENVINO_RTTI(typeid(T).name());
+        OPENVINO_RTTI_WRAP(T);
 
         template <typename... Args>
         Impl(Args&&... args) : value(std::forward<Args>(args)...) {}
@@ -695,6 +696,7 @@ class OPENVINO_API Any {
 
         T value;
     };
+    #undef OPENVINO_RTTI_WRAP
 
     // Generic if there is no specialization for T.
     template <class T>
