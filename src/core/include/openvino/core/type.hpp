@@ -17,6 +17,31 @@
 
 namespace ov {
 
+namespace detail {
+constexpr size_t fnv1a_basis = static_cast<size_t>(14695981039346656037ull);
+constexpr size_t fnv1a_prime = static_cast<size_t>(1099511628211ull);
+
+constexpr size_t fnv1a_hash_impl(const char* str, size_t idx, size_t hash_val) {
+    return str[idx] == '\0'
+               ? hash_val
+               : fnv1a_hash_impl(str,
+                                 idx + 1,
+                                 (hash_val ^ static_cast<unsigned char>(str[idx])) * fnv1a_prime);
+}
+
+constexpr size_t fnv1a_hash(const char* str) {
+    return str ? fnv1a_hash_impl(str, 0, fnv1a_basis) : 0;
+}
+
+constexpr size_t hash_combine_constexpr(size_t val, size_t seed) {
+    return seed ^ (val + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+constexpr size_t compute_type_hash(const char* name, const char* version_id) {
+    return hash_combine_constexpr(fnv1a_hash(name), hash_combine_constexpr(fnv1a_hash(version_id), 0));
+}
+}  // namespace detail
+
 /**
  * @brief Type information for a type system without inheritance; instances have exactly one type not
  * related to any other type.
@@ -34,7 +59,11 @@ struct OPENVINO_API DiscreteTypeInfo {
     // exact type identification
     const DiscreteTypeInfo* parent;
 
-    DiscreteTypeInfo() = default;
+        constexpr DiscreteTypeInfo()
+                : name(nullptr),
+                    version_id(nullptr),
+                    parent(nullptr),
+                    hash_value(0) {}
     DiscreteTypeInfo(const DiscreteTypeInfo&) = default;
     DiscreteTypeInfo(DiscreteTypeInfo&&) = default;
     DiscreteTypeInfo& operator=(const DiscreteTypeInfo&) = default;
@@ -45,13 +74,13 @@ struct OPENVINO_API DiscreteTypeInfo {
         : name(_name),
           version_id(_version_id),
           parent(_parent),
-          hash_value(0) {}
+                    hash_value(detail::compute_type_hash(_name, _version_id)) {}
 
     constexpr DiscreteTypeInfo(const char* _name, const DiscreteTypeInfo* _parent = nullptr)
         : name(_name),
           version_id(nullptr),
           parent(_parent),
-          hash_value(0) {}
+                    hash_value(detail::compute_type_hash(_name, nullptr)) {}
 
     bool is_castable(const DiscreteTypeInfo& target_type) const;
 
@@ -67,12 +96,15 @@ struct OPENVINO_API DiscreteTypeInfo {
 
     operator std::string() const;
 
-    size_t hash() const;
-    size_t hash();
+    constexpr size_t hash() const;
 
 private:
     size_t hash_value;
 };
+
+constexpr inline size_t DiscreteTypeInfo::hash() const {
+    return hash_value;
+}
 
 OPENVINO_API
 std::ostream& operator<<(std::ostream& s, const DiscreteTypeInfo& info);
