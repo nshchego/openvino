@@ -59,7 +59,7 @@ Graph::Graph(std::shared_ptr<ov::Model> model, const RemoteContextImpl::Ptr& con
 
 Graph::Graph(cldnn::BinaryInputBuffer &ib, const RemoteContextImpl::Ptr& context, const ExecutionConfig& config, uint16_t stream_id)
     : m_context(context)
-    , m_config(config)
+    , m_config(config.clone())
     , m_stream_id(stream_id) {
     bool need_onednn_engine = false;
     ib >> need_onednn_engine;

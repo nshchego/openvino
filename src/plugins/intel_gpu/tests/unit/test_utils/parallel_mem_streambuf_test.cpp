@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -447,6 +448,60 @@ TEST(ParallelMemStreamBufTest, FileBackedMmapNonZeroOffset) {
         // Verify we got the payload, not the prefix
         std::vector<char> expected_payload(file_content.begin() + k_prefix, file_content.end());
         EXPECT_EQ(got, expected_payload);
+    }
+
+    ::munmap(mapped, k_total);
+    std::filesystem::remove(tmp_path);
+}
+
+TEST(ParallelMemStreamBufTest, FileBackedMmapNonZeroOffsetKeepsPayloadBounds) {
+    const size_t page_size = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+    const size_t k_prefix = page_size;
+    const size_t k_payload = 8 * 1024;
+    const size_t k_suffix = page_size;
+    const size_t k_total = k_prefix + k_payload + k_suffix;
+
+    std::vector<char> file_content(k_total);
+    std::memset(file_content.data(), 0x7F, k_prefix);
+    std::memset(file_content.data() + k_prefix + k_payload, 0x55, k_suffix);
+    for (size_t i = 0; i < k_payload; ++i) {
+        file_content[k_prefix + i] = static_cast<char>(i % 251u);
+    }
+
+    auto tmp_path = std::filesystem::temp_directory_path() / "par_mem_mmap_bounds_test.bin";
+    {
+        std::ofstream ofs(tmp_path, std::ios::binary | std::ios::trunc);
+        ASSERT_TRUE(ofs.is_open());
+        ofs.write(file_content.data(), static_cast<std::streamsize>(k_total));
+    }
+
+    int fd = ::open(tmp_path.c_str(), O_RDONLY);
+    ASSERT_NE(fd, -1);
+    void* mapped = ::mmap(nullptr, k_total, PROT_READ, MAP_PRIVATE, fd, 0);
+    ::close(fd);
+    ASSERT_NE(mapped, MAP_FAILED);
+
+    const void* payload_ptr = static_cast<const char*>(mapped) + k_prefix;
+
+    {
+        ov::intel_gpu::ParallelMemStreamBuf buf(payload_ptr, k_payload, /*threshold=*/1);
+        std::istream stream(&buf);
+
+        stream.seekg(0, std::ios::end);
+        ASSERT_TRUE(stream.good());
+        EXPECT_EQ(stream.tellg(), static_cast<std::streampos>(k_payload));
+        EXPECT_EQ(stream.rdbuf()->in_avail(), static_cast<std::streamsize>(-1));
+
+        stream.seekg(0, std::ios::beg);
+        ASSERT_TRUE(stream.good());
+        EXPECT_EQ(stream.rdbuf()->in_avail(), static_cast<std::streamsize>(k_payload));
+
+        std::vector<char> got(k_payload + k_suffix);
+        stream.read(got.data(), static_cast<std::streamsize>(got.size()));
+        EXPECT_EQ(stream.gcount(), static_cast<std::streamsize>(k_payload));
+
+        std::vector<char> expected_payload(file_content.begin() + k_prefix, file_content.begin() + k_prefix + k_payload);
+        EXPECT_TRUE(std::equal(expected_payload.begin(), expected_payload.end(), got.begin()));
     }
 
     ::munmap(mapped, k_total);

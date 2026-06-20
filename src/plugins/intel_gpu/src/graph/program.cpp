@@ -1999,11 +1999,17 @@ void program::load(cldnn::BinaryInputBuffer& ib,
                                         _engine.get_device_info().dev_type == device_type::integrated_gpu && !_config.get_enable_weightless();
     memory_ptr model_tensor_base_ptr = nullptr;
     if (can_use_mmap_zero_copy) {
-        model_tensor_base_ptr =
-            ib.get_engine().create_mmap_hostbuffer(ib.get_mmap_tensor(),
-                                                   ib.get_stream_size(),
-                                                   allocation_type::usm_host,
-                                                   layout({{static_cast<tensor::value_type>(ib.get_stream_size()), 1, 1, 1}, data_types::u8, format::bfyx}));
+        const auto stream_size = ib.get_stream_size();
+        try {
+            model_tensor_base_ptr =
+                ib.get_engine().create_mmap_hostbuffer(ib.get_mmap_tensor(),
+                                                       stream_size,
+                                                       allocation_type::usm_host,
+                                                       layout({{static_cast<tensor::value_type>(stream_size), 1, 1, 1}, data_types::u8, format::bfyx}));
+        } catch (const std::exception& ex) {
+            GPU_DEBUG_INFO << "[GPU] Mmap zero-copy import is unavailable, falling back to buffered cache import: "
+                           << ex.what() << std::endl;
+        }
     }
 
     size_t num_nodes;

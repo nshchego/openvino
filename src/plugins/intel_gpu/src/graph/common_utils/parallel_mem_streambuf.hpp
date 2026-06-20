@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <streambuf>
@@ -32,7 +33,11 @@ public:
     /// wraps a file-backed mmap. Returns false for the in-memory memcpy path,
     /// where the data is already resident and no preloading is meaningful.
     bool prefetch(std::streamsize size) {
-        return m_file_buf ? m_file_buf->prefetch(size) : false;
+        if (!m_file_buf) {
+            return false;
+        }
+        const auto remaining = static_cast<std::streamsize>(m_end - m_current);
+        return m_file_buf->prefetch(std::min(size, remaining));
     }
 
 protected:

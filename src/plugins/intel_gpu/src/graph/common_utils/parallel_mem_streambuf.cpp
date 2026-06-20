@@ -175,7 +175,14 @@ ParallelMemStreamBuf::ParallelMemStreamBuf(const void* data, size_t size, size_t
 
 std::streamsize ParallelMemStreamBuf::xsgetn(char_type* dst, std::streamsize n) {
     if (m_file_buf) {
-        return m_file_buf->sgetn(dst, n);
+        if (n <= 0 || m_current >= m_end) {
+            return 0;
+        }
+        const std::streamsize avail = static_cast<std::streamsize>(m_end - m_current);
+        const std::streamsize to_read = std::min(n, avail);
+        const auto read_size = m_file_buf->sgetn(dst, to_read);
+        m_current += read_size;
+        return read_size;
     }
     if (n <= 0 || m_current >= m_end) {
         return 0;
@@ -195,6 +202,9 @@ std::streamsize ParallelMemStreamBuf::xsgetn(char_type* dst, std::streamsize n) 
 
 ParallelMemStreamBuf::int_type ParallelMemStreamBuf::underflow() {
     if (m_file_buf) {
+        if (m_current >= m_end) {
+            return traits_type::eof();
+        }
         return m_file_buf->sgetc();
     }
     if (m_current >= m_end) {
@@ -205,7 +215,14 @@ ParallelMemStreamBuf::int_type ParallelMemStreamBuf::underflow() {
 
 ParallelMemStreamBuf::int_type ParallelMemStreamBuf::uflow() {
     if (m_file_buf) {
-        return m_file_buf->sbumpc();
+        if (m_current >= m_end) {
+            return traits_type::eof();
+        }
+        auto res = m_file_buf->sbumpc();
+        if (!traits_type::eq_int_type(res, traits_type::eof())) {
+            ++m_current;
+        }
+        return res;
     }
     if (m_current >= m_end) {
         return traits_type::eof();
@@ -215,7 +232,25 @@ ParallelMemStreamBuf::int_type ParallelMemStreamBuf::uflow() {
 
 ParallelMemStreamBuf::pos_type ParallelMemStreamBuf::seekoff(off_type off, std::ios_base::seekdir way, std::ios_base::openmode which) {
     if (m_file_buf) {
-        return m_file_buf->pubseekoff(off, way, which);
+        const char* new_pos = nullptr;
+        if (way == std::ios_base::beg) {
+            new_pos = m_begin + off;
+        } else if (way == std::ios_base::cur) {
+            new_pos = m_current + off;
+        } else {
+            new_pos = m_end + off;
+        }
+
+        if (new_pos < m_begin || new_pos > m_end) {
+            return pos_type(off_type(-1));
+        }
+
+        const auto logical_pos = static_cast<off_type>(new_pos - m_begin);
+        if (m_file_buf->pubseekpos(pos_type(logical_pos), which) == pos_type(off_type(-1))) {
+            return pos_type(off_type(-1));
+        }
+        m_current = new_pos;
+        return pos_type(logical_pos);
     }
     const char* new_pos = nullptr;
     if (way == std::ios_base::beg) {
@@ -236,14 +271,15 @@ ParallelMemStreamBuf::pos_type ParallelMemStreamBuf::seekoff(off_type off, std::
 
 ParallelMemStreamBuf::pos_type ParallelMemStreamBuf::seekpos(pos_type pos, std::ios_base::openmode which) {
     if (m_file_buf) {
-        return m_file_buf->pubseekpos(pos, which);
+        return seekoff(off_type(pos), std::ios_base::beg, which);
     }
     return seekoff(off_type(pos), std::ios_base::beg, std::ios_base::in);
 }
 
 std::streamsize ParallelMemStreamBuf::showmanyc() {
     if (m_file_buf) {
-        return m_file_buf->in_avail();
+        const std::streamsize avail = static_cast<std::streamsize>(m_end - m_current);
+        return avail > 0 ? avail : -1;
     }
     const std::streamsize avail = static_cast<std::streamsize>(m_end - m_current);
     return avail > 0 ? avail : -1;
