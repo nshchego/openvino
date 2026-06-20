@@ -424,6 +424,28 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model,
     ExecutionConfig config = m_configs_map.at(device_id);
     config.set_user_property(_orig_config, OptionVisibility::RELEASE);
     const auto model_ptr = config.get_model();
+
+    if (ov::util::is_weightless_enabled(config.get_user_properties()).value_or(false)) {
+        const auto& weights_path = ov::util::make_path(config.get_weights_path());
+
+        if (weights_path.extension() != ".bin") {
+            // This is non IR case, e.g. onnxruntime.
+            // This may not be required. Constant nodes should have the information already.
+            // This is a temporary solution. A more robust solution will be implemented in future.
+
+            // If some app modifies ov::Model before compile_model(), and
+            // the constants are changed, and such modification is not done before import_model(),
+            // weightless caching will not produce correct result.
+            if (model_ptr != nullptr) {
+                if (!is_weightless_cache_attributes_set(model_ptr)) {
+                    create_weightless_cache_attributes(model_ptr, config);
+                }
+            } else {
+                return nullptr;
+            }
+        }
+    }
+
     config.finalize(context_impl.get(), model_ptr.get());
 
     ov::CacheMode cache_mode = config.get_cache_mode();
@@ -440,27 +462,6 @@ std::shared_ptr<ov::ICompiledModel> Plugin::import_model(std::istream& model,
 
     if (loaded_cache_mode != cache_mode) {
         return nullptr;
-    }
-
-    if (ov::util::is_weightless_enabled(config.get_user_properties()).value_or(false)) {
-        const auto& weights_path = ov::util::make_path(config.get_weights_path());
-
-        if (weights_path.extension() != ".bin") {
-            // This is non IR case, e.g. onnxruntime.
-            // This may not be required. Constant nodes should have the information already.
-            // This is a temporary solution. A more robust solution will be implemented in future.
-
-            // If some app modifies ov::Model before compile_model(), and
-            // the constants are changed, and such modification is not done before import_model(),
-            // weightless caching will not produce correct result.
-            if (auto& orig_model = config.get_model(); orig_model != nullptr) {
-                if (!is_weightless_cache_attributes_set(orig_model)) {
-                    create_weightless_cache_attributes(orig_model, config);
-                }
-            } else {
-                return nullptr;
-            }
-        }
     }
 
     return std::make_shared<CompiledModel>(ib, shared_from_this(), context_impl, config, loaded_from_cache);
