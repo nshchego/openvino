@@ -1314,7 +1314,7 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
             }
 
 
-            if ((inputChannels % 4 != 0) || (outputChannels % 16 != 0)) {
+            if (inputChannels % 4 != 0) {
                 return true;
             }
 

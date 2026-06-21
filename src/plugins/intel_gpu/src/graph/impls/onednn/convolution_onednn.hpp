@@ -80,6 +80,9 @@ struct ConvolutionImplementationManager : public ImplementationManager {
             return false;
 
         auto prim = conv_node.get_primitive();
+        if (prim->transposed && in_dt == data_types::f16 && out_dt == data_types::f16)
+            return false;
+
         if (prim->groups > 1 && !prim->grouped_weights_shape)
             return false;
 

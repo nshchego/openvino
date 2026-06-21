@@ -28,6 +28,10 @@ void ConvolutionBackpropDataTransformation::SetUp() {
     auto [netPrecision, inputShapeAndHandling, outputShape, device, param] = this->GetParam();
     targetDevice = device;
 
+    if (netPrecision == ov::element::f16) {
+        abs_threshold = 0.1f;
+    }
+
     std::shared_ptr<ov::Node> weights;
 
     const auto& inputShape = inputShapeAndHandling.first;

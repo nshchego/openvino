@@ -51,6 +51,11 @@ void prepare_quantization::prepare_scale_shift_opt(program &p, quantize_node& qu
     auto &output_low = output_low_node.as<data>();
     auto &output_high = output_high_node.as<data>();
 
+    if (quantize_node.get_input_layout().data_type == data_types::f16 &&
+        quantize_node.get_output_layout().data_type == data_types::f16) {
+        return;
+    }
+
     auto mem_input_low = input_low.get_attached_memory_ptr();
     auto mem_input_high = input_high.get_attached_memory_ptr();
     auto mem_output_low = output_low.get_attached_memory_ptr();
