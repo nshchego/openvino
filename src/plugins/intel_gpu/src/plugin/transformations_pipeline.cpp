@@ -1335,6 +1335,11 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
             auto axesNode = ov::as_type_ptr<const ov::op::v0::Constant>(norm->get_input_node_shared_ptr(1));
             const auto axes = axesNode->cast_vector<size_t>();
             const auto isSupportedAxes = [](const std::vector<size_t> &axes, const size_t inputRank) {
+                // Native GPU normalize primitive only supports up to 4D (bfyx-family) layouts,
+                // so always decompose NormalizeL2 for higher ranks.
+                if (inputRank > 4) {
+                    return false;
+                }
                 if (axes.size() == 1 && axes[0] == 1) {
                     return true;
                 }
