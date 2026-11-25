@@ -3384,42 +3384,120 @@ TEST(pooling_onednn, blocked_rank_3_layout_no_throw_in_calc_dims) {
 #endif   // ENABLE_ONEDNN_FOR_GPU
 
 #ifdef RUN_ALL_MODEL_CACHING_TESTS
-TEST_P(pooling_random_test, max_i8_cached) {
+// The "_cached" tests verify that a compiled pooling network survives export/import. Batch, feature count,
+// spatial size and window size do not influence serialization, so the cached suites keep every data type,
+// pooling mode and format (2D, 3D and batched blocked formats) but use a single representative shape each.
+struct pooling_random_test_cached : public pooling_random_test {};
+struct pooling_random_test_fp16_fp32_cached : public pooling_random_test {};
+
+INSTANTIATE_TEST_SUITE_P(
+    smoke_low_precision_2d_spatial,
+    pooling_random_test_cached,
+    testing::Combine(testing::Values(2),
+                     testing::Values(8),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(12, 12, 1)),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(4, 4, 1)),
+                     testing::Values(std::tuple<int, int, int>(2, 2, 1)),
+                     testing::Values(std::tuple<int, int, int>(0, 0, 0)),
+                     testing::Values(format::yxfb,
+                                     format::bfyx,
+                                     format::b_fs_yx_fsv4,
+                                     format::b_fs_yx_fsv16,
+                                     format::b_fs_yx_fsv32)),
+                    testing::internal::DefaultParamName<pooling_random_test_params>);
+
+INSTANTIATE_TEST_SUITE_P(
+    smoke_low_precision_3d_spatial,
+    pooling_random_test_cached,
+    testing::Combine(testing::Values(2),
+                     testing::Values(8),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(12, 12, 12)),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(4, 4, 4)),
+                     testing::Values(std::tuple<int, int, int>(2, 2, 2)),
+                     testing::Values(std::tuple<int, int, int>(0, 0, 0)),
+                     testing::Values(format::bfzyx,
+                                     format::b_fs_zyx_fsv16)),
+                    testing::internal::DefaultParamName<pooling_random_test_params>);
+
+INSTANTIATE_TEST_SUITE_P(
+    batched_low_precision,
+    pooling_random_test_cached,
+    testing::Combine(testing::Values(16),
+                     testing::Values(16),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(8, 8, 1)),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(3, 3, 1)),
+                     testing::Values(std::tuple<int, int, int>(1, 1, 1)),
+                     testing::Values(std::tuple<int, int, int>(0, 0, 0)),
+                     testing::Values(format::bs_fs_yx_bsv16_fsv16)),
+                    testing::internal::DefaultParamName<pooling_random_test_params>);
+
+INSTANTIATE_TEST_SUITE_P(
+    smoke_low_precision,
+    pooling_random_test_cached,
+    testing::Combine(testing::Values(2),
+                     testing::Values(8),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(12, 12, 1)),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(4, 4, 1)),
+                     testing::Values(std::tuple<int, int, int>(2, 2, 1)),
+                     testing::Values(std::tuple<int, int, int>(0, 0, 0)),
+                     testing::Values(format::fs_b_yx_fsv32)),
+                    testing::internal::DefaultParamName<pooling_random_test_params>);
+
+INSTANTIATE_TEST_SUITE_P(
+    smoke_low_precision,
+    pooling_random_test_fp16_fp32_cached,
+    testing::Combine(testing::Values(2),
+                     testing::Values(8),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(12, 12, 1)),
+                     testing::Values(std::tuple<size_t, size_t, size_t>(4, 4, 1)),
+                     testing::Values(std::tuple<int, int, int>(2, 2, 1)),
+                     testing::Values(std::tuple<int, int, int>(0, 0, 0)),
+                     testing::Values(format::yxfb,
+                                     format::bfyx,
+                                     format::byxf,
+                                     format::b_fs_yx_fsv16,
+                                     format::fs_b_yx_fsv32,
+                                     format::b_fs_yx_fsv32,
+                                     format::b_fs_yx_fsv4)),
+                    testing::internal::DefaultParamName<pooling_random_test_params>);
+
+TEST_P(pooling_random_test_cached, max_i8) {
     auto test_case = max_pooling_i8_random_test();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
 
-TEST_P(pooling_random_test, max_u8_cached) {
+TEST_P(pooling_random_test_cached, max_u8) {
     auto test_case = max_pooling_u8_random_test();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
 
-TEST_P(pooling_random_test, avg_i8_cached) {
+TEST_P(pooling_random_test_cached, avg_i8) {
     auto test_case = avg_pooling_i8_random_test();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
 
-TEST_P(pooling_random_test, avg_u8_cached) {
+TEST_P(pooling_random_test_cached, avg_u8) {
     auto test_case = avg_pooling_u8_random_test();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
 
-TEST_P(pooling_random_test_fp16_fp32, avg_fp16_cached) {
+TEST_P(pooling_random_test_fp16_fp32_cached, avg_fp16) {
     auto test_case = pooling_random_test_base<ov::float16, pooling_mode::average>();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
 
-TEST_P(pooling_random_test_fp16_fp32, max_fp16_cached) {
+TEST_P(pooling_random_test_fp16_fp32_cached, max_fp16) {
     auto test_case = pooling_random_test_base<ov::float16, pooling_mode::max>();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
 
-TEST_P(pooling_random_test_fp16_fp32, avg_fp32_cached) {
+TEST_P(pooling_random_test_fp16_fp32_cached, avg_fp32) {
     auto test_case = pooling_random_test_base<float, pooling_mode::average>();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
-#endif  // RUN_ALL_MODEL_CACHING_TESTS
-TEST_P(pooling_random_test_fp16_fp32, max_fp32_cached) {
+
+TEST_P(pooling_random_test_fp16_fp32_cached, max_fp32) {
     auto test_case = pooling_random_test_base<float, pooling_mode::max>();
     ASSERT_NO_FATAL_FAILURE(test_case.run_random(GetParam(), true));
 }
+#endif  // RUN_ALL_MODEL_CACHING_TESTS

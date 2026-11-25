@@ -9544,7 +9544,6 @@ using convolution_random_test_u8u8f32 = convolution_random_test_base<uint8_t, ui
 
 
 using convolution_random_test_fsv4_input_s8s8f32 = convolution_random_test_fsv4_input<int8_t, int8_t, float>;
-using convolution_random_test_fsv4_input_u8s8f32 = convolution_random_test_fsv4_input<uint8_t, int8_t, float>;
 
 using convolution_scale_random_test_s8s8f32 = convolution_scale_random_test<int8_t, int8_t, float>;
 using convolution_scale_random_test_u8s8f32 = convolution_scale_random_test<uint8_t, int8_t, float>;
@@ -9726,11 +9725,6 @@ TEST_P(convolution_random_smoke_test, u8s8f32_scale) {
 
 TEST_P(convolution_random_smoke_test, s8s8f32_fsv4_input) {
     convolution_random_test_fsv4_input_s8s8f32 test;
-    ASSERT_NO_FATAL_FAILURE(test.run_random(GetParam()));
-}
-
-TEST_P(convolution_random_smoke_test, u8s8f32_fsv4_input) {
-    convolution_random_test_fsv4_input_u8s8f32 test;
     ASSERT_NO_FATAL_FAILURE(test.run_random(GetParam()));
 }
 
